@@ -9,6 +9,8 @@ use crate::fs::local::{self, DirSummary};
 use crate::fs::registry::{Connection, ConnectionInfo, ConnectionKind, Registry};
 use crate::fs::sftp::{SftpClient, SftpConfig};
 use crate::fs::types::{Entry, FsResult, ListOptions};
+use crate::sync::backend::Backend;
+use crate::sync::cross_engine::{execute_cross, plan_cross};
 use crate::sync::dedup::{dedup as run_dedup, DedupSummary};
 use crate::sync::engine::{execute as execute_sync, CancelToken};
 use crate::sync::plan::plan as plan_sync;
@@ -563,6 +565,163 @@ pub fn sync_cpstamp(src: String, dest_dir: String) -> FsResult<String> {
 #[tauri::command]
 pub fn sync_dedup(path: String) -> FsResult<DedupSummary> {
     run_dedup(Path::new(&path))
+}
+
+/// Resolve a frontend path string into a (Backend, remote-path) pair.
+/// `sftp://<id>/<path>` routes through the connection registry; any
+/// other shape is treated as a local path.
+fn resolve_backend(
+    path: &str,
+    fs_registry: &Registry,
+) -> Result<(Backend, String), String> {
+    if let Some(rest) = path.strip_prefix("sftp://") {
+        let slash = rest.find('/');
+        let id = match slash {
+            Some(i) => &rest[..i],
+            None => rest,
+        };
+        let remote_path = match slash {
+            Some(i) => &rest[i..],
+            None => "/",
+        };
+        let client = fs_registry.get_sftp(id)?;
+        Ok((Backend::Sftp(client), remote_path.to_string()))
+    } else {
+        Ok((Backend::Local, path.to_string()))
+    }
+}
+
+/// Cross-protocol Skiffsync. Either side may be a local path or
+/// `sftp://<connection_id>/<path>`. The frontend's `client.startSync`
+/// dispatches here when at least one side is remote; pure local-to-
+/// local jobs still go through `sync_start_local` for the kernel-
+/// accelerated copy path.
+#[tauri::command]
+pub fn sync_start_cross(
+    src: String,
+    dest: String,
+    options: Option<JobOptions>,
+    jobs: State<'_, Arc<JobRegistry>>,
+    fs_registry: State<'_, Arc<Registry>>,
+    app: tauri::AppHandle,
+) -> FsResult<String> {
+    let opts = options.unwrap_or(JobOptions {
+        max_size_gb: 1,
+        lookback_days: 7,
+        conflict_policy: Default::default(),
+        dry_run: false,
+    });
+    let id = Uuid::new_v4().to_string();
+    let info = JobInfo {
+        id: id.clone(),
+        src: src.clone(),
+        dest: dest.clone(),
+        state: JobState::Planning,
+    };
+    let cancel = jobs.insert(info);
+
+    let jobs_arc = (*jobs).clone();
+    let fs_registry_arc = (*fs_registry).clone();
+    let id_for_plan = id.clone();
+    let app_for_plan = app.clone();
+
+    std::thread::spawn(move || {
+        // Resolve both sides up front. Errors surface as sync:error so
+        // the UI can show the connection-id-not-found / etc. message.
+        let (src_backend, src_path) = match resolve_backend(&src, &fs_registry_arc) {
+            Ok(p) => p,
+            Err(e) => {
+                jobs_arc.set_state(&id_for_plan, JobState::Failed);
+                let _ = app_for_plan.emit(
+                    "sync:error",
+                    serde_json::json!({ "jobId": id_for_plan, "error": e }),
+                );
+                return;
+            }
+        };
+        let (dest_backend, dest_path) = match resolve_backend(&dest, &fs_registry_arc) {
+            Ok(p) => p,
+            Err(e) => {
+                jobs_arc.set_state(&id_for_plan, JobState::Failed);
+                let _ = app_for_plan.emit(
+                    "sync:error",
+                    serde_json::json!({ "jobId": id_for_plan, "error": e }),
+                );
+                return;
+            }
+        };
+
+        // Spin a tokio runtime on this worker thread for the async
+        // engine. Building one per job is cheap (no thread-pool reuse
+        // gain across jobs since each job lives on its own thread).
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(r) => r,
+            Err(e) => {
+                jobs_arc.set_state(&id_for_plan, JobState::Failed);
+                let _ = app_for_plan.emit(
+                    "sync:error",
+                    serde_json::json!({ "jobId": id_for_plan, "error": e.to_string() }),
+                );
+                return;
+            }
+        };
+
+        rt.block_on(async {
+            let (plan, total_bytes) = match plan_cross(&src_backend, &src_path, &dest_path).await {
+                Ok(p) => p,
+                Err(e) => {
+                    jobs_arc.set_state(&id_for_plan, JobState::Failed);
+                    let _ = app_for_plan.emit(
+                        "sync:error",
+                        serde_json::json!({ "jobId": id_for_plan, "error": e }),
+                    );
+                    return;
+                }
+            };
+            let cap = opts.max_size_gb.saturating_mul(1024 * 1024 * 1024);
+            if total_bytes > cap {
+                jobs_arc.set_state(&id_for_plan, JobState::Failed);
+                let _ = app_for_plan.emit(
+                    "sync:error",
+                    serde_json::json!({
+                        "jobId": id_for_plan,
+                        "error": format!(
+                            "total size {} bytes exceeds maxSizeGb={} ({} bytes)",
+                            total_bytes, opts.max_size_gb, cap
+                        ),
+                    }),
+                );
+                return;
+            }
+            jobs_arc.set_state(&id_for_plan, JobState::Running);
+            let app_progress = app_for_plan.clone();
+            let summary = execute_cross(
+                &id_for_plan,
+                plan,
+                total_bytes,
+                &opts,
+                cancel,
+                src_backend,
+                dest_backend,
+                move |p| {
+                    let _ = app_progress.emit("sync:progress", &p);
+                },
+            )
+            .await;
+            let final_state = if summary.cancelled {
+                JobState::Cancelled
+            } else {
+                JobState::Done
+            };
+            jobs_arc.set_state(&id_for_plan, final_state);
+            let _ = app_for_plan.emit("sync:done", &summary);
+        });
+    });
+
+    Ok(id)
 }
 
 /// `cprepo` mode — same shape as `sync_start_local` but the planner

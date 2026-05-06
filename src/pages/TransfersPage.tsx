@@ -38,7 +38,6 @@ import {
   syncList,
   syncPause,
   syncResume,
-  syncStartLocal,
   syncStartRepo,
   type ConflictPolicy,
   type DedupSummary,
@@ -46,6 +45,7 @@ import {
   type Progress,
   type Summary,
 } from "../api/sync";
+import { startSync } from "../api/client";
 import { formatBytes } from "../util/format";
 
 /** UI-side per-job aggregate, blending JobInfo with the latest progress
@@ -203,7 +203,10 @@ export default function TransfersPage() {
   const handleStart = async () => {
     setError(null);
     setBusy(true);
-    const start = planner === "repo" ? syncStartRepo : syncStartLocal;
+    // The "Local copy" mode now actually means "let the client pick"
+    // — pure local-to-local goes via sync_start_local; anything else
+    // routes through sync_start_cross. cprepo stays as-is.
+    const start = planner === "repo" ? syncStartRepo : startSync;
     try {
       const id = await start(src, dest, {
         maxSizeGb,
@@ -319,7 +322,7 @@ export default function TransfersPage() {
     setConflictPolicy(j.conflictPolicy);
     setError(null);
     setBusy(true);
-    const start = j.planner === "repo" ? syncStartRepo : syncStartLocal;
+    const start = j.planner === "repo" ? syncStartRepo : startSync;
     try {
       const id = await start(j.src, j.dest, {
         maxSizeGb: j.maxSizeGb,

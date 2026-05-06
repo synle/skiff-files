@@ -24,7 +24,12 @@ import {
   connRemove,
   connStat,
 } from "./conn";
-import { formatSftp, parseLocation } from "../util/location";
+import { formatSftp, isRemote, parseLocation } from "../util/location";
+import {
+  syncStartCross,
+  syncStartLocal,
+  type JobOptions,
+} from "./sync";
 
 /** Re-shape a remote Entry so its `path` field is the full sftp:// form
  *  rather than the bare server-side path. Required because the rest of
@@ -91,6 +96,21 @@ export async function mkdir(path: string): Promise<void> {
     return connMkdir(loc.backend.connectionId, loc.remotePath);
   }
   return fsMkdir(path);
+}
+
+/** Backend-agnostic sync starter. Pure local-to-local goes through
+ *  `sync_start_local` (kernel-accelerated copy path); anything that
+ *  involves a remote endpoint routes through `sync_start_cross`. The
+ *  caller doesn't need to care which is used. */
+export async function startSync(
+  src: string,
+  dest: string,
+  options?: JobOptions,
+): Promise<string> {
+  if (isRemote(src) || isRemote(dest)) {
+    return syncStartCross(src, dest, options);
+  }
+  return syncStartLocal(src, dest, options);
 }
 
 /** Multi-path delete that picks the right backend per path. Local

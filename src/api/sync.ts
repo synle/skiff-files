@@ -108,6 +108,16 @@ export const syncStartRepo = (
 ): Promise<string> =>
   invoke<string>("sync_start_repo", { src, dest, options });
 
+/** Cross-protocol sync. Either side may be local or `sftp://<id>/...`.
+ *  The Rust side dispatches the engine; the frontend just hands over
+ *  the strings. */
+export const syncStartCross = (
+  src: string,
+  dest: string,
+  options?: JobOptions,
+): Promise<string> =>
+  invoke<string>("sync_start_cross", { src, dest, options });
+
 /** `cpstamp` mode — copy `src` into `destDir` with a YYYY_MM_DD_HH_MM
  *  suffix. Returns the path the stamped copy landed at. */
 export const syncCpstamp = (src: string, destDir: string): Promise<string> =>

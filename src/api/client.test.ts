@@ -169,4 +169,34 @@ describe("client.mkdir / removeOrTrashMany dispatch", () => {
     expect(calls).not.toContain("fs_trash_many");
     expect(calls).toContain("conn_remove");
   });
+
+  it("startSync routes pure local through sync_start_local", async () => {
+    mocked.mockResolvedValueOnce("job-1");
+    const { startSync } = await import("./client");
+    await startSync("/src", "/dest");
+    expect(mocked).toHaveBeenLastCalledWith(
+      "sync_start_local",
+      expect.objectContaining({ src: "/src", dest: "/dest" }),
+    );
+  });
+
+  it("startSync routes remote-src through sync_start_cross", async () => {
+    mocked.mockResolvedValueOnce("job-2");
+    const { startSync } = await import("./client");
+    await startSync("sftp://abc/x", "/dest");
+    expect(mocked).toHaveBeenLastCalledWith(
+      "sync_start_cross",
+      expect.objectContaining({ src: "sftp://abc/x", dest: "/dest" }),
+    );
+  });
+
+  it("startSync routes remote-dest through sync_start_cross", async () => {
+    mocked.mockResolvedValueOnce("job-3");
+    const { startSync } = await import("./client");
+    await startSync("/src", "sftp://abc/x");
+    expect(mocked).toHaveBeenLastCalledWith(
+      "sync_start_cross",
+      expect.objectContaining({ src: "/src", dest: "sftp://abc/x" }),
+    );
+  });
 });

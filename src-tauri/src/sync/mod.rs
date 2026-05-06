@@ -4,6 +4,8 @@
 //! resume, and the TeraCopy-style smart-batch conflict dialog land in
 //! Phase 4b.
 
+pub mod backend;
+pub mod cross_engine;
 pub mod dedup;
 pub mod engine;
 pub mod plan;

@@ -14,10 +14,9 @@ import {
   listDir as clientListDir,
   mkdir as clientMkdir,
   removeOrTrashMany,
+  startSync,
 } from "../api/client";
-import { syncStartLocal } from "../api/sync";
 import { parentPath } from "../util/format";
-import { isRemote } from "../util/location";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
 import { NAVIGATE_EVENT } from "../App";
@@ -171,12 +170,7 @@ export default function Browser({
           async (event) => {
             if (cancelled) return;
             setDragOver(false);
-            // Phase 4b will route remote dest via syncStartRepo etc; for
-            // now drop is local-only.
-            if (!path || isRemote(path)) {
-              setError("Drag-and-drop into a remote folder isn't supported yet.");
-              return;
-            }
+            if (!path) return;
             const paths = event.payload?.paths ?? [];
             for (const p of paths) {
               try {
@@ -184,7 +178,9 @@ export default function Browser({
                 // For directories, nest under <currentPath>/<basename>.
                 // For files, the planner joins the basename for us.
                 const dest = meta.isDir ? `${path}/${meta.name}` : path;
-                await syncStartLocal(p, dest, {
+                // Cross-protocol-aware: drops onto an sftp:// folder
+                // route through the cross-engine automatically.
+                await startSync(p, dest, {
                   maxSizeGb: 100,
                   conflictPolicy: "skip",
                 });

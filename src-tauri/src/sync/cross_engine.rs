@@ -1,0 +1,481 @@
+//! Cross-protocol Skiffsync engine. Async, walks any [`Backend`]
+//! (local + sftp in 0.2.0; ftp + smb arrive in 0.2.1+).
+//!
+//! Phase 0.2.0 ships a thin slice: `skip`, `overwrite`, `keepBoth`
+//! conflict policies + skip-if-unchanged-by-size. The full TeraCopy
+//! smart-batch matrix exists in the local engine and lands here in
+//! 0.2.x once we're confident in the async flow. `Prompt` is
+//! intentionally not supported here yet — the resolver hub doesn't
+//! know about cross jobs and that plumbing is a separate slice.
+//!
+//! Per-file copies are buffered in memory up to a 256 MB cap; larger
+//! files surface as per-file errors rather than choking the cross
+//! engine. Streaming (read-chunk → write-chunk) lands in 0.2.1.
+
+use super::backend::{walk_files, Backend};
+use super::engine::CancelToken;
+use super::types::{ConflictPolicy, FileOutcome, JobOptions, Progress, Summary};
+use std::path::Path;
+use std::sync::Arc;
+
+/// Hard cap for in-memory per-file copies. We could in principle stream
+/// — Phase 0.2.1 will — but for now larger files become a per-file
+/// error so the rest of the job continues.
+const PER_FILE_CAP_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Same shape as [`crate::sync::plan::PlannedFile`] but with String
+/// paths because remote paths can't round-trip through `PathBuf` on
+/// Windows (POSIX vs `\\`-separated).
+#[derive(Debug, Clone)]
+pub struct CrossPlannedFile {
+    pub src: String,
+    pub dest: String,
+    pub size: u64,
+    pub mtime: Option<i64>,
+}
+
+/// Walk `src` with the source backend and produce a flat list of
+/// files-to-copy. Destinations are computed by mirroring the relative
+/// path from `src_root` onto `dest_root`. Both `src_root` and
+/// `dest_root` are absolute strings native to their respective
+/// backends.
+pub async fn plan_cross(
+    src_backend: &Backend,
+    src_root: &str,
+    dest_root: &str,
+) -> Result<(Vec<CrossPlannedFile>, u64), String> {
+    let files = walk_files(src_backend, src_root).await?;
+    let mut out = Vec::with_capacity(files.len());
+    let mut total = 0u64;
+    for (abs, size, mtime) in files {
+        // Drop the src_root prefix to get the relative path; if the
+        // walker handed us the root itself (single-file case), the
+        // dest is `dest_root + basename`.
+        let rel = abs.strip_prefix(src_root).map(|s| s.trim_start_matches(['/', '\\'])).unwrap_or("");
+        let dest = if rel.is_empty() {
+            // Single-file case (src_root IS the file). Compute basename.
+            let basename = match src_backend {
+                Backend::Local => Path::new(&abs)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string(),
+                Backend::Sftp(_) => abs
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or("")
+                    .to_string(),
+            };
+            join_dest(dest_root, &basename)
+        } else {
+            join_dest(dest_root, rel)
+        };
+        out.push(CrossPlannedFile {
+            src: abs,
+            dest,
+            size,
+            mtime,
+        });
+        total += size;
+    }
+    Ok((out, total))
+}
+
+/// Join a backend-agnostic dest root with a relative segment. We
+/// always emit forward slashes — every backend we ship treats them as
+/// the path separator (Windows local + std::fs accepts forward
+/// slashes too).
+fn join_dest(root: &str, rel: &str) -> String {
+    let trimmed = root.trim_end_matches(['/', '\\']);
+    if rel.is_empty() {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}/{rel}")
+    }
+}
+
+/// Whether to skip the file as "unchanged". Mirrors the local
+/// engine's heuristic but takes already-fetched metadata so the cross
+/// engine doesn't double-stat. Returns `Some(reason)` to skip.
+fn unchanged_reason(
+    src_size: u64,
+    dest_size: u64,
+    src_mtime: Option<i64>,
+    dest_mtime: Option<i64>,
+    lookback_days: u64,
+) -> Option<String> {
+    if src_size != dest_size {
+        return None;
+    }
+    if lookback_days == 0 {
+        return Some("same size".into());
+    }
+    match (src_mtime, dest_mtime) {
+        (Some(s), Some(d)) => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            let window = (lookback_days * 86_400) as i64;
+            if now - s > window && now - d > window {
+                Some("same size, both older than lookback".into())
+            } else if s == d {
+                Some("same size + same mtime".into())
+            } else {
+                None
+            }
+        }
+        _ => Some("same size".into()),
+    }
+}
+
+/// Pick the keep-both sibling path on the dest side. Walks `(2)`,
+/// `(3)`, ... until `dest.exists()` returns false.
+async fn keep_both_path(dest_backend: &Backend, dest: &str) -> String {
+    let dot = dest.rfind('.');
+    let (stem, ext) = match dot {
+        Some(i) if i > 0 && i > dest.rfind('/').unwrap_or(0) => {
+            (&dest[..i], Some(&dest[i + 1..]))
+        }
+        _ => (dest, None),
+    };
+    for n in 2..1_000_000 {
+        let candidate = match ext {
+            Some(e) => format!("{stem} ({n}).{e}"),
+            None => format!("{stem} ({n})"),
+        };
+        let exists = dest_backend
+            .metadata(&candidate)
+            .await
+            .map(|m| m.is_some())
+            .unwrap_or(false);
+        if !exists {
+            return candidate;
+        }
+    }
+    dest.to_string()
+}
+
+/// Execute a cross-protocol plan. Mirrors the local engine's loop
+/// shape (cancel check, process file, emit progress) but every
+/// metadata + IO call is async.
+pub async fn execute_cross(
+    job_id: &str,
+    plan: Vec<CrossPlannedFile>,
+    total_bytes: u64,
+    opts: &JobOptions,
+    cancel: Arc<CancelToken>,
+    src_backend: Backend,
+    dest_backend: Backend,
+    mut on_progress: impl FnMut(Progress),
+) -> Summary {
+    let mut summary = Summary {
+        job_id: job_id.to_string(),
+        copied: 0,
+        skipped: 0,
+        conflicts: 0,
+        errors: 0,
+        bytes_copied: 0,
+        cancelled: false,
+    };
+    let total_files = plan.len() as u64;
+    let mut bytes_seen: u64 = 0;
+
+    for (i, file) in plan.iter().enumerate() {
+        if cancel.is_cancelled() {
+            summary.cancelled = true;
+            return summary;
+        }
+        if cancel.wait_if_paused() {
+            summary.cancelled = true;
+            return summary;
+        }
+        let outcome = process_one(file, opts, &src_backend, &dest_backend, &mut summary).await;
+        bytes_seen += file.size;
+        on_progress(Progress {
+            job_id: job_id.to_string(),
+            files_total: total_files,
+            files_done: (i as u64) + 1,
+            bytes_total: total_bytes,
+            bytes_done: bytes_seen,
+            last: Some(outcome),
+        });
+    }
+    summary
+}
+
+/// Per-file step. Returns a [`FileOutcome`] and updates counters.
+/// Conflict policies handled in 0.2.0: Skip / Overwrite / KeepBoth.
+/// Smart-batch policies (overwriteOlder etc.) are honored too, since
+/// the per-file decision is a pure metadata comparison. Prompt is NOT
+/// supported here yet — falls through to Skip with a marker reason.
+async fn process_one(
+    file: &CrossPlannedFile,
+    opts: &JobOptions,
+    src_backend: &Backend,
+    dest_backend: &Backend,
+    summary: &mut Summary,
+) -> FileOutcome {
+    // Stat dest once. None = doesn't exist; we just copy.
+    let dest_meta = match dest_backend.metadata(&file.dest).await {
+        Ok(m) => m,
+        Err(e) => {
+            summary.errors += 1;
+            return FileOutcome::Error {
+                src: file.src.clone(),
+                dest: file.dest.clone(),
+                error: e,
+            };
+        }
+    };
+    if let Some(dm) = dest_meta {
+        if let Some(reason) = unchanged_reason(
+            file.size,
+            dm.size,
+            file.mtime,
+            dm.mtime,
+            opts.lookback_days,
+        ) {
+            summary.skipped += 1;
+            return FileOutcome::Skipped {
+                src: file.src.clone(),
+                dest: file.dest.clone(),
+                reason,
+            };
+        }
+        // Decide via the policy. Smart-batch policies map to per-file
+        // copy/skip decisions on metadata alone; they work unchanged
+        // here. Rename* and Prompt fall through to skip.
+        let proceed = match opts.conflict_policy {
+            ConflictPolicy::Skip => false,
+            ConflictPolicy::Overwrite => true,
+            ConflictPolicy::KeepBoth => {
+                let renamed = keep_both_path(dest_backend, &file.dest).await;
+                return do_copy_one(file, &renamed, src_backend, dest_backend, opts, summary).await;
+            }
+            ConflictPolicy::OverwriteOlder => {
+                file.mtime
+                    .zip(dm.mtime)
+                    .map(|(s, d)| d < s)
+                    .unwrap_or(false)
+            }
+            ConflictPolicy::ReplaceSmaller => dm.size < file.size,
+            ConflictPolicy::ReplaceIfSizeDifferent => dm.size != file.size,
+            ConflictPolicy::RenameTarget
+            | ConflictPolicy::RenameOlderTarget
+            | ConflictPolicy::Prompt => {
+                // Cross-mode doesn't yet implement aside-rename or the
+                // prompt protocol — surface as a conflict so the user
+                // sees why nothing happened, rather than silently
+                // overwriting.
+                false
+            }
+        };
+        if !proceed {
+            summary.conflicts += 1;
+            return FileOutcome::Conflict {
+                src: file.src.clone(),
+                dest: file.dest.clone(),
+                reason: format!("policy={:?} (cross mode)", opts.conflict_policy),
+            };
+        }
+    }
+    do_copy_one(file, &file.dest, src_backend, dest_backend, opts, summary).await
+}
+
+/// Read src, write dest. Honors `dry_run`. Errors per file rather
+/// than aborting the job.
+async fn do_copy_one(
+    file: &CrossPlannedFile,
+    target: &str,
+    src_backend: &Backend,
+    dest_backend: &Backend,
+    opts: &JobOptions,
+    summary: &mut Summary,
+) -> FileOutcome {
+    if opts.dry_run {
+        summary.copied += 1;
+        summary.bytes_copied += file.size;
+        return FileOutcome::Copied {
+            src: file.src.clone(),
+            dest: target.to_string(),
+            bytes: file.size,
+        };
+    }
+    if file.size > PER_FILE_CAP_BYTES {
+        summary.errors += 1;
+        return FileOutcome::Error {
+            src: file.src.clone(),
+            dest: target.to_string(),
+            error: format!(
+                "file too large for in-memory cross-copy: {} bytes (limit {})",
+                file.size, PER_FILE_CAP_BYTES
+            ),
+        };
+    }
+    let bytes = match src_backend.read_full(&file.src, PER_FILE_CAP_BYTES).await {
+        Ok(b) => b,
+        Err(e) => {
+            summary.errors += 1;
+            return FileOutcome::Error {
+                src: file.src.clone(),
+                dest: target.to_string(),
+                error: e,
+            };
+        }
+    };
+    if let Err(e) = dest_backend.write_full(target, &bytes).await {
+        summary.errors += 1;
+        return FileOutcome::Error {
+            src: file.src.clone(),
+            dest: target.to_string(),
+            error: e,
+        };
+    }
+    summary.copied += 1;
+    summary.bytes_copied += bytes.len() as u64;
+    FileOutcome::Copied {
+        src: file.src.clone(),
+        dest: target.to_string(),
+        bytes: bytes.len() as u64,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn uniq() -> String {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::time::{SystemTime, UNIX_EPOCH};
+        static N: AtomicU64 = AtomicU64::new(0);
+        let n = N.fetch_add(1, Ordering::Relaxed);
+        let t = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        format!("{t}-{n}")
+    }
+
+    #[tokio::test]
+    async fn local_to_local_round_trip() {
+        let src = std::env::temp_dir().join(format!("skiff-cross-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("a.txt"), b"hello").unwrap();
+        fs::create_dir(src.join("sub")).unwrap();
+        fs::write(src.join("sub/b.txt"), b"world!").unwrap();
+
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(plan.len(), 2);
+        assert_eq!(total, 5 + 6);
+
+        let s = execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::Overwrite,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+        )
+        .await;
+        assert_eq!(s.copied, 2);
+        assert!(dest.join("a.txt").exists());
+        assert!(dest.join("sub/b.txt").exists());
+
+        // Second run with same opts should skip both via unchanged.
+        let (plan2, total2) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        let s2 = execute_cross(
+            "test2",
+            plan2,
+            total2,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::Overwrite,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+        )
+        .await;
+        assert_eq!(s2.skipped, 2);
+        assert_eq!(s2.copied, 0);
+
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[tokio::test]
+    async fn cross_mode_keep_both_picks_a_renamed_sibling() {
+        let src = std::env::temp_dir().join(format!("skiff-cross-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(src.join("a.txt"), b"new-content").unwrap();
+        fs::write(dest.join("a.txt"), b"existing").unwrap();
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::KeepBoth,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+        )
+        .await;
+        // Original untouched; sibling created.
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"existing");
+        assert!(dest.join("a (2).txt").exists());
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[test]
+    fn join_dest_emits_forward_slashes() {
+        assert_eq!(join_dest("/x", "a/b"), "/x/a/b");
+        assert_eq!(join_dest("/x/", "a/b"), "/x/a/b");
+        assert_eq!(join_dest("/x", ""), "/x");
+    }
+
+    #[test]
+    fn unchanged_reason_size_only() {
+        assert!(unchanged_reason(100, 100, None, None, 0).is_some());
+        assert!(unchanged_reason(100, 200, None, None, 0).is_none());
+    }
+}

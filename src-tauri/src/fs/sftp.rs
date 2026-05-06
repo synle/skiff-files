@@ -16,6 +16,7 @@ use base64::Engine as _;
 use russh::client::{Handle, Handler};
 use russh_sftp::client::SftpSession;
 use russh_sftp::protocol::{FileAttributes, OpenFlags};
+use tokio::io::AsyncWriteExt;
 use serde::Deserialize;
 use std::path::Path;
 use std::sync::Arc;
@@ -311,6 +312,27 @@ impl SftpClient {
         sftp.rename(from, to)
             .await
             .map_err(|e| format!("rename({from} -> {to}): {e}"))
+    }
+
+    /// Write a buffer as a remote file. Used by the cross-protocol
+    /// engine when the destination is SFTP. Truncates if the file
+    /// exists; the conflict-resolution layer is upstream.
+    pub async fn write_full(&self, path: &str, data: &[u8]) -> FsResult<()> {
+        let sftp = self.sftp.lock().await;
+        let mut file = sftp
+            .open_with_flags(
+                path,
+                OpenFlags::WRITE | OpenFlags::CREATE | OpenFlags::TRUNCATE,
+            )
+            .await
+            .map_err(|e| format!("open_for_write({path}): {e}"))?;
+        file.write_all(data)
+            .await
+            .map_err(|e| format!("write({path}): {e}"))?;
+        file.flush()
+            .await
+            .map_err(|e| format!("flush({path}): {e}"))?;
+        Ok(())
     }
 
     /// Recursive remove. SFTP's primitives are file vs dir-only, so we
