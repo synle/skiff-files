@@ -1,24 +1,37 @@
 // Prevents an additional console window on Windows in release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-/// Returns the app version baked in at compile time by `build.rs`.
-#[tauri::command]
-fn get_app_version() -> &'static str {
-    env!("APP_VERSION")
-}
+//! Skiff Files — Tauri v2 backend entry point. The actual fs implementations
+//! live in [`fs`]; the Tauri command surface lives in [`commands`]. Keep this
+//! file focused on registration so it's easy to see at a glance which commands
+//! are exposed.
 
-/// Sample command for the frontend "Call greet()" button.
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {name}! You've been greeted from Rust.")
-}
+pub mod commands;
+pub mod fs;
 
-/// Tauri application entry point.
+use commands::{
+    fs_canonicalize, fs_copy_file, fs_home_dir, fs_list_dir, fs_mkdir, fs_remove, fs_rename,
+    fs_stat, get_app_version,
+};
+
+/// Tauri application entry point. The handler list is the public API of the
+/// Rust side — every `invoke()` call from the frontend has to match a name
+/// here.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![get_app_version, greet])
+        .invoke_handler(tauri::generate_handler![
+            get_app_version,
+            fs_home_dir,
+            fs_list_dir,
+            fs_stat,
+            fs_mkdir,
+            fs_rename,
+            fs_remove,
+            fs_copy_file,
+            fs_canonicalize,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -28,12 +41,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn greet_returns_message() {
-        assert_eq!(greet("world"), "Hello, world! You've been greeted from Rust.");
+    fn app_version_is_non_empty() {
+        assert!(!get_app_version().is_empty());
     }
 
     #[test]
-    fn app_version_is_non_empty() {
-        assert!(!get_app_version().is_empty());
+    fn home_dir_resolves() {
+        // Should always succeed in CI runners (which have $HOME / %USERPROFILE%).
+        let home = fs_home_dir().expect("home dir");
+        assert!(!home.is_empty());
     }
 }

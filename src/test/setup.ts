@@ -6,9 +6,26 @@ import { vi } from "vitest";
  * without a Tauri runtime. Tests can override per-call with `vi.mocked(...)`.
  */
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(async (cmd: string) => {
+  invoke: vi.fn(async (cmd: string, _args?: Record<string, unknown>) => {
+    // Default mock: enough to keep components from throwing during smoke tests.
+    // Individual tests override per-call via vi.mocked(invoke).mockImplementation.
     if (cmd === "get_app_version") return "0.1.0-test";
-    if (cmd === "greet") return "Hello, world!";
+    if (cmd === "fs_home_dir") return "/home/test";
+    if (cmd === "fs_list_dir") return [];
+    if (cmd === "fs_canonicalize") return _args?.path ?? "/";
+    if (cmd === "fs_stat") {
+      return {
+        name: "test",
+        path: _args?.path ?? "/",
+        kind: "folder",
+        size: 0,
+        mtime: null,
+        isDir: true,
+        isSymlink: false,
+        isHidden: false,
+        mode: null,
+      };
+    }
     return null;
   }),
 }));

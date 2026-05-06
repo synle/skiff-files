@@ -28,8 +28,17 @@ cd src-tauri && cargo test  # Rust tests
 
 Two layers, talking via `invoke()`:
 
-- **`src/` (React + TS)** — UI built with MUI v9. Routes via React Router (`HashRouter` so deep links work under `tauri://`). The `pages/` directory holds route-level components (`Browser`, `Connections`, `Transfers`, `Settings`); `components/` holds shared UI (`FileList`, `Sidebar`, `Toolbar`, `PathBar`, `StatusBar`, `PreviewPane`). Tauri APIs are mocked in `src/test/setup.ts` so component tests don't need a Tauri runtime.
-- **`src-tauri/` (Rust)** — Tauri v2 shell. The filesystem layer lives in `src/fs/` with a `RemoteFs` async trait implemented by `local`, `sftp`, `ftp`, `smb` modules. The `Skiffsync` engine lives in `src/sync/`. Commands are declared with `#[tauri::command]` and registered in `tauri::Builder::default().invoke_handler(...)` in `src/lib.rs`.
+- **`src/` (React + TS)** — UI built with MUI v9. Routes via React Router (`HashRouter` so deep links work under `tauri://`). The `pages/` directory holds route-level components (`Browser`, `SettingsPage`); `components/` holds shared UI (`FileList`, `Sidebar`, `Toolbar`, `PathBar`, `StatusBar`, `IconForKind`). Settings live in a Context store at `state/settings.tsx`, persisted to `localStorage`. The MUI theme switches between light/dark/system via `theme/index.ts`. Pure utilities live in `util/`. Typed `invoke` wrappers live in `api/fs.ts`. Tauri APIs are mocked in `src/test/setup.ts` so component tests don't need a Tauri runtime.
+- **`src-tauri/` (Rust)** — Tauri v2 shell. The filesystem layer lives in `src/fs/` with `types.rs` (Entry, FileKind, ListOptions), `local.rs` (sync filesystem ops), and `icons.rs` (extension → kind). Tauri command adapters live in `src/commands.rs` and are registered in `src/lib.rs`. Future remote backends (sftp/ftp/smb) and the `Skiffsync` engine will sit alongside `local` under `fs/` and `sync/` respectively.
+
+## Phase status
+
+- **Phase 0** — ✅ scaffold + branding + CI workflows + public repo
+- **Phase 1** — ✅ local file explorer (browse, navigate, mkdir, rename, remove, copy; virtualized list; light/dark/system theme; settings page)
+- **Phase 2** — pending — connection abstraction + SFTP
+- **Phase 3** — pending — FTP/FTPS + SMB
+- **Phase 4** — pending — Skiffsync engine
+- **Phase 5+** — see TODO.md
 
 ## Versioning
 
