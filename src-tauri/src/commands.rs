@@ -10,12 +10,16 @@ use crate::fs::registry::{Connection, ConnectionInfo, ConnectionKind, Registry};
 use crate::fs::sftp::{SftpClient, SftpConfig};
 use crate::fs::types::{Entry, FsResult, ListOptions};
 use crate::sync::dedup::{dedup as run_dedup, DedupSummary};
-use crate::sync::engine::execute as execute_sync;
+use crate::sync::engine::{execute as execute_sync, CancelToken};
 use crate::sync::plan::plan as plan_sync;
+use crate::sync::plan::PlannedFile;
 use crate::sync::registry::JobRegistry;
 use crate::sync::repo::plan_repo;
+use crate::sync::resolver::ResolverHub;
 use crate::sync::stamp::cpstamp;
-use crate::sync::types::{JobInfo, JobOptions, JobState, Summary};
+use crate::sync::types::{
+    ConflictPrompt, ConflictPromptDecision, JobInfo, JobOptions, JobState, Summary,
+};
 use std::path::Path;
 use std::sync::Arc;
 use tauri::{Emitter, State};
@@ -285,6 +289,90 @@ pub async fn conn_dir_summary(
 
 // ---------- Sync commands (Phase 4a) ----------
 
+/// Run a fully-planned job synchronously. Shared between
+/// `sync_start_local` and `sync_start_repo` so the cap check, state
+/// transitions, prompt-event wiring, and final summary emit live in
+/// one place. Caller is responsible for spawning the worker thread
+/// that hosts plan + this run.
+fn run_job(
+    id: String,
+    files: Vec<PlannedFile>,
+    total_bytes: u64,
+    opts: JobOptions,
+    cancel: Arc<CancelToken>,
+    jobs: Arc<JobRegistry>,
+    hub: Arc<ResolverHub>,
+    app: tauri::AppHandle,
+) {
+    {
+        let cap = opts.max_size_gb.saturating_mul(1024 * 1024 * 1024);
+        if total_bytes > cap {
+            jobs.set_state(&id, JobState::Failed);
+            let _ = app.emit(
+                "sync:error",
+                serde_json::json!({
+                    "jobId": id,
+                    "error": format!(
+                        "total size {} bytes exceeds maxSizeGb={} ({} bytes)",
+                        total_bytes, opts.max_size_gb, cap
+                    ),
+                }),
+            );
+            return;
+        }
+        jobs.set_state(&id, JobState::Running);
+
+        let app_progress = app.clone();
+        let id_for_progress = id.clone();
+        let app_prompt = app.clone();
+        let id_for_prompt = id.clone();
+        let hub_for_prompt = hub.clone();
+        let cancel_for_prompt = cancel.clone();
+
+        let summary: Summary = execute_sync(
+            &id,
+            &files,
+            total_bytes,
+            &opts,
+            cancel,
+            move |p| {
+                let _ = app_progress.emit("sync:progress", &p);
+            },
+            // The prompt closure: emit a conflict event with both sides'
+            // metadata, then park on the resolver hub. Returns None on
+            // cancel — engine treats that as a per-file skip and the
+            // outer cancel-check exits the loop next iteration.
+            move |file, dest_md| {
+                let conflict_id = uuid::Uuid::new_v4().to_string();
+                let payload = ConflictPrompt {
+                    job_id: id_for_prompt.clone(),
+                    conflict_id: conflict_id.clone(),
+                    src: file.src.to_string_lossy().into_owned(),
+                    dest: file.dest.to_string_lossy().into_owned(),
+                    src_size: file.size,
+                    dest_size: dest_md.len(),
+                    src_mtime: file.mtime,
+                    dest_mtime: dest_md
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_secs() as i64),
+                };
+                let _ = app_prompt.emit("sync:conflict", &payload);
+                hub_for_prompt.wait_for(&conflict_id, &cancel_for_prompt)
+            },
+        );
+
+        let final_state = if summary.cancelled {
+            JobState::Cancelled
+        } else {
+            JobState::Done
+        };
+        jobs.set_state(&id_for_progress, final_state);
+        let _ = app.emit("sync:done", &summary);
+    }
+}
+
 /// Start a local-to-local copy job. Cross-protocol jobs land in Phase 4b
 /// — for now both `src` and `dest` must be local paths. Returns the new
 /// job id; progress streams via the `sync:progress` Tauri event and the
@@ -295,6 +383,7 @@ pub fn sync_start_local(
     dest: String,
     options: Option<JobOptions>,
     jobs: State<'_, Arc<JobRegistry>>,
+    hub: State<'_, Arc<ResolverHub>>,
     app: tauri::AppHandle,
 ) -> FsResult<String> {
     let opts = options.unwrap_or(JobOptions {
@@ -311,67 +400,36 @@ pub fn sync_start_local(
         state: JobState::Planning,
     };
     let cancel = jobs.insert(info);
-    let jobs_for_task = (*jobs).clone();
-    let id_for_task = id.clone();
-    let app_for_task = app.clone();
-    let src_for_task = src;
-    let dest_for_task = dest;
+    let jobs_arc = (*jobs).clone();
+    let hub_arc = (*hub).clone();
+    let id_for_plan = id.clone();
+    let app_for_plan = app.clone();
 
     // Run the planner + executor on a blocking thread — std::fs is sync
     // and copying gigabytes shouldn't block the tokio reactor used by
     // the rest of the app (notably russh / SFTP).
     std::thread::spawn(move || {
-        let (files, total_bytes) = match plan_sync(
-            Path::new(&src_for_task),
-            Path::new(&dest_for_task),
-        ) {
+        let (files, total_bytes) = match plan_sync(Path::new(&src), Path::new(&dest)) {
             Ok(p) => p,
             Err(e) => {
-                jobs_for_task.set_state(&id_for_task, JobState::Failed);
-                let _ = app_for_task.emit(
+                jobs_arc.set_state(&id_for_plan, JobState::Failed);
+                let _ = app_for_plan.emit(
                     "sync:error",
-                    serde_json::json!({ "jobId": id_for_task, "error": e }),
+                    serde_json::json!({ "jobId": id_for_plan, "error": e }),
                 );
                 return;
             }
         };
-        // Enforce the max-size guard BEFORE any IO, just like cpsync.
-        let cap = opts.max_size_gb.saturating_mul(1024 * 1024 * 1024);
-        if total_bytes > cap {
-            jobs_for_task.set_state(&id_for_task, JobState::Failed);
-            let _ = app_for_task.emit(
-                "sync:error",
-                serde_json::json!({
-                    "jobId": id_for_task,
-                    "error": format!(
-                        "total size {} bytes exceeds maxSizeGb={} ({} bytes)",
-                        total_bytes, opts.max_size_gb, cap
-                    ),
-                }),
-            );
-            return;
-        }
-        jobs_for_task.set_state(&id_for_task, JobState::Running);
-
-        let app_progress = app_for_task.clone();
-        let summary: Summary = execute_sync(
-            &id_for_task,
-            &files,
+        run_job(
+            id_for_plan,
+            files,
             total_bytes,
-            &opts,
+            opts,
             cancel,
-            move |p| {
-                let _ = app_progress.emit("sync:progress", &p);
-            },
+            jobs_arc,
+            hub_arc,
+            app_for_plan,
         );
-
-        let final_state = if summary.cancelled {
-            JobState::Cancelled
-        } else {
-            JobState::Done
-        };
-        jobs_for_task.set_state(&id_for_task, final_state);
-        let _ = app_for_task.emit("sync:done", &summary);
     });
 
     Ok(id)
@@ -399,6 +457,28 @@ pub fn sync_pause(id: String, jobs: State<'_, Arc<JobRegistry>>) -> FsResult<()>
 #[tauri::command]
 pub fn sync_resume(id: String, jobs: State<'_, Arc<JobRegistry>>) -> FsResult<()> {
     jobs.resume(&id);
+    Ok(())
+}
+
+/// Frontend → engine reply when the user clicks an action in the
+/// TeraCopy-style modal. The `decision` is forwarded to whatever
+/// `wait_for(conflict_id)` is currently parked. CancelJob also flips
+/// the job's cancel token so the executor exits at the next file.
+#[tauri::command]
+pub fn sync_resolve_conflict(
+    job_id: String,
+    conflict_id: String,
+    decision: ConflictPromptDecision,
+    jobs: State<'_, Arc<JobRegistry>>,
+    hub: State<'_, Arc<ResolverHub>>,
+) -> FsResult<()> {
+    if matches!(decision, ConflictPromptDecision::CancelJob) {
+        // Belt-and-suspenders: signal cancel BEFORE depositing the
+        // decision so the executor's wakeup sees `is_cancelled = true`
+        // and bails for the rest of the queue.
+        jobs.cancel(&job_id);
+    }
+    hub.resolve(conflict_id, decision);
     Ok(())
 }
 
@@ -435,6 +515,7 @@ pub fn sync_start_repo(
     dest: String,
     options: Option<JobOptions>,
     jobs: State<'_, Arc<JobRegistry>>,
+    hub: State<'_, Arc<ResolverHub>>,
     app: tauri::AppHandle,
 ) -> FsResult<String> {
     let opts = options.unwrap_or(JobOptions {
@@ -451,64 +532,33 @@ pub fn sync_start_repo(
         state: JobState::Planning,
     };
     let cancel = jobs.insert(info);
-    let jobs_for_task = (*jobs).clone();
-    let id_for_task = id.clone();
-    let app_for_task = app.clone();
-    let src_for_task = src;
-    let dest_for_task = dest;
+    let jobs_arc = (*jobs).clone();
+    let hub_arc = (*hub).clone();
+    let id_for_plan = id.clone();
+    let app_for_plan = app.clone();
 
     std::thread::spawn(move || {
-        // Same shape as sync_start_local, just a different planner.
-        let (files, total_bytes) = match plan_repo(
-            Path::new(&src_for_task),
-            Path::new(&dest_for_task),
-        ) {
+        let (files, total_bytes) = match plan_repo(Path::new(&src), Path::new(&dest)) {
             Ok(p) => p,
             Err(e) => {
-                jobs_for_task.set_state(&id_for_task, JobState::Failed);
-                let _ = app_for_task.emit(
+                jobs_arc.set_state(&id_for_plan, JobState::Failed);
+                let _ = app_for_plan.emit(
                     "sync:error",
-                    serde_json::json!({ "jobId": id_for_task, "error": e }),
+                    serde_json::json!({ "jobId": id_for_plan, "error": e }),
                 );
                 return;
             }
         };
-        let cap = opts.max_size_gb.saturating_mul(1024 * 1024 * 1024);
-        if total_bytes > cap {
-            jobs_for_task.set_state(&id_for_task, JobState::Failed);
-            let _ = app_for_task.emit(
-                "sync:error",
-                serde_json::json!({
-                    "jobId": id_for_task,
-                    "error": format!(
-                        "total size {} bytes exceeds maxSizeGb={} ({} bytes)",
-                        total_bytes, opts.max_size_gb, cap
-                    ),
-                }),
-            );
-            return;
-        }
-        jobs_for_task.set_state(&id_for_task, JobState::Running);
-
-        let app_progress = app_for_task.clone();
-        let summary: Summary = execute_sync(
-            &id_for_task,
-            &files,
+        run_job(
+            id_for_plan,
+            files,
             total_bytes,
-            &opts,
+            opts,
             cancel,
-            move |p| {
-                let _ = app_progress.emit("sync:progress", &p);
-            },
+            jobs_arc,
+            hub_arc,
+            app_for_plan,
         );
-
-        let final_state = if summary.cancelled {
-            JobState::Cancelled
-        } else {
-            JobState::Done
-        };
-        jobs_for_task.set_state(&id_for_task, final_state);
-        let _ = app_for_task.emit("sync:done", &summary);
     });
 
     Ok(id)

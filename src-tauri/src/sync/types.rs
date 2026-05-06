@@ -37,6 +37,42 @@ pub enum ConflictPolicy {
     /// than the source. Older targets get aside-renamed; newer targets
     /// stay put (treated as `Skip`).
     RenameOlderTarget,
+    /// Block on a user prompt. The engine emits a `sync:conflict`
+    /// event, parks on the resolver hub, and applies whatever decision
+    /// the frontend dispatches via `sync_resolve_conflict`. Cancelling
+    /// the job unblocks the wait and treats it as a cancellation.
+    Prompt,
+}
+
+/// What the user picks in the TeraCopy-style modal. Maps onto a
+/// per-file [`crate::sync::engine::ConflictDecision`] in the engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ConflictPromptDecision {
+    Overwrite,
+    Skip,
+    KeepBoth,
+    /// Frontend sends this when the user clicks "Cancel" inside the
+    /// modal. Engine treats it the same as a `sync_cancel` for the rest
+    /// of the job — the wait unblocks, current file is skipped, and
+    /// the job exits with `cancelled = true`.
+    CancelJob,
+}
+
+/// Frontend-bound payload for `sync:conflict` events. The hub
+/// generates a fresh `conflict_id` per pause; the modal echoes it back
+/// in `sync_resolve_conflict` so we can match decisions to waiters.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictPrompt {
+    pub job_id: String,
+    pub conflict_id: String,
+    pub src: String,
+    pub dest: String,
+    pub src_size: u64,
+    pub dest_size: u64,
+    pub src_mtime: Option<i64>,
+    pub dest_mtime: Option<i64>,
 }
 
 impl Default for ConflictPolicy {

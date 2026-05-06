@@ -6,7 +6,8 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 /** Mirror of `crate::sync::types::ConflictPolicy`. The smart-batch
  *  variants match the TeraCopy "Destination File Already Exists"
- *  dialog action set verbatim. */
+ *  dialog action set verbatim. `prompt` blocks each conflict on a
+ *  modal — see [[ConflictPromptDecision]] for the set of replies. */
 export type ConflictPolicy =
   | "skip"
   | "overwrite"
@@ -15,7 +16,27 @@ export type ConflictPolicy =
   | "replaceSmaller"
   | "replaceIfSizeDifferent"
   | "renameTarget"
-  | "renameOlderTarget";
+  | "renameOlderTarget"
+  | "prompt";
+
+/** Mirror of `crate::sync::types::ConflictPromptDecision`. */
+export type ConflictPromptDecision =
+  | "overwrite"
+  | "skip"
+  | "keepBoth"
+  | "cancelJob";
+
+/** Mirror of `crate::sync::types::ConflictPrompt`. */
+export interface ConflictPromptPayload {
+  jobId: string;
+  conflictId: string;
+  src: string;
+  dest: string;
+  srcSize: number;
+  destSize: number;
+  srcMtime: number | null;
+  destMtime: number | null;
+}
 
 /** Mirror of `crate::sync::types::JobOptions`. */
 export interface JobOptions {
@@ -115,6 +136,22 @@ export const syncPause = (id: string): Promise<void> =>
 /** Resume a paused job. No-op when the job isn't paused. */
 export const syncResume = (id: string): Promise<void> =>
   invoke<void>("sync_resume", { id });
+
+/** Reply to a sync:conflict prompt. The conflict id comes from the
+ *  event payload; the decision is whatever button the user clicked. */
+export const syncResolveConflict = (
+  jobId: string,
+  conflictId: string,
+  decision: ConflictPromptDecision,
+): Promise<void> =>
+  invoke<void>("sync_resolve_conflict", { jobId, conflictId, decision });
+
+/** Subscribe to sync:conflict events. The modal in TransfersPage uses
+ *  this to surface the TeraCopy-style prompt. */
+export const onConflict = (
+  cb: (p: ConflictPromptPayload) => void,
+): Promise<UnlistenFn> =>
+  listen<ConflictPromptPayload>("sync:conflict", (e) => cb(e.payload));
 
 export const syncList = (): Promise<JobInfo[]> =>
   invoke<JobInfo[]>("sync_list");

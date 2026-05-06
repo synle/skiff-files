@@ -441,6 +441,7 @@ export default function TransfersPage() {
                   <MenuItem value="renameOlderTarget">
                     Rename older target → (old)
                   </MenuItem>
+                  <MenuItem value="prompt">Ask each time…</MenuItem>
                 </Select>
               </FormControl>
             </Stack>

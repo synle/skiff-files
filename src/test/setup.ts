@@ -52,6 +52,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "sync_cancel") return null;
     if (cmd === "sync_pause") return null;
     if (cmd === "sync_resume") return null;
+    if (cmd === "sync_resolve_conflict") return null;
     if (cmd === "fs_trash") return null;
     if (cmd === "fs_trash_many") return null;
     if (cmd === "settings_load") return null;

@@ -45,12 +45,14 @@ Two layers, talking via `invoke()`:
 - **0.1.4 polish** — OS trash via `trash` crate (`fs_trash` / `fs_trash_many`), Delete key in Browser sends selection to trash with confirm. Settings now persist to `app_data_dir/settings.json` via `settings_load` / `settings_save` Tauri commands; localStorage stays as a hot cache + test fallback.
 - **0.1.5 polish** — In-pane live search (Cmd/Ctrl+F focuses; Esc clears). OS drag-and-drop into the Browser pane: Tauri drag-drop events route each dropped path through `sync_start_local` (directories nest under their basename so they land AT the cursor target rather than flatten), with a translucent overlay during drag-over. Remote folders refuse drops cleanly until 4b lands.
 - **0.1.6 polish** — Sync **pause / resume**. `CancelToken` grew a `pause` flag + `wait_if_paused()` (50 ms poll loop, breaks on cancel). `sync_pause` / `sync_resume` Tauri commands; new `JobState::Paused`. Transfers UI shows Pause/Resume button per in-flight job alongside Cancel; state flips locally on click for instant feedback (no wait for the next progress tick).
+- **0.1.7 polish** — **Interactive TeraCopy modal** for `ConflictPolicy::Prompt`. New `ResolverHub` (`Mutex<HashMap>` + `Condvar`) parks the executor on a fresh `conflict_id` per file; `sync:conflict` event surfaces src/dest metadata to the frontend; `sync_resolve_conflict` deposits the user's choice. Modal shows side-by-side metadata with "Same size" / "Same date" badges, queues multiple conflicts, and offers Overwrite / Skip / Keep both / Cancel job. The smart-batch row from the screenshot ("Overwrite all older", etc.) lands later — those policies already exist in the engine, the UI just needs the apply-to-all toggle in 0.1.8.
 - **Phase 5+** — see TODO.md
 
 ## Backlog policy
 
-The "Backlog" section at the bottom of TODO.md contains items the user has explicitly deferred. **Do not implement them or add tests for them unless the user explicitly says "go work on X" by name.** As of 2026-05-06 this list contains:
+The "Backlog" section at the bottom of TODO.md contains items the user has explicitly deferred. **Do not implement them or add tests for them unless the user explicitly says "go work on X" by name.** As of 2026-05-06 this list contains, in priority order:
 
+- **Unified progress dialogs** for all in-progress operations (delete / copy / cut+paste / sync) — determinate bar + files counter + rolling-window ETA + current item + pause/cancel; same widget across every long-running flow. *Top of backlog.*
 - Built-in archive viewer (zip/tar/7z)
 - User-customizable theme (custom MUI palettes + presets, with color pickers)
 

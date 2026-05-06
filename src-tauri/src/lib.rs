@@ -15,12 +15,13 @@ use commands::{
     conn_read_base64, conn_read_text, conn_stat, fs_canonicalize, fs_copy_file, fs_dir_summary,
     fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64, fs_read_text, fs_remove, fs_rename,
     fs_stat, fs_trash, fs_trash_many, get_app_version, settings_load, settings_save, sync_cancel,
-    sync_cpstamp, sync_dedup, sync_list, sync_pause, sync_resume, sync_start_local,
-    sync_start_repo,
+    sync_cpstamp, sync_dedup, sync_list, sync_pause, sync_resolve_conflict, sync_resume,
+    sync_start_local, sync_start_repo,
 };
 use fs::registry::Registry;
 use std::sync::Arc;
 use sync::registry::JobRegistry;
+use sync::resolver::ResolverHub;
 
 /// Tauri application entry point. The handler list is the public API of the
 /// Rust side — every `invoke()` call from the frontend has to match a name
@@ -32,6 +33,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(Arc::new(Registry::new()))
         .manage(Arc::new(JobRegistry::new()))
+        .manage(Arc::new(ResolverHub::new()))
         .invoke_handler(tauri::generate_handler![
             // local
             get_app_version,
@@ -67,6 +69,7 @@ pub fn run() {
             sync_cancel,
             sync_pause,
             sync_resume,
+            sync_resolve_conflict,
             sync_list,
         ])
         .run(tauri::generate_context!())

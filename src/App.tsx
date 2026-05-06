@@ -6,6 +6,7 @@ import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import ShortcutsModal from "./components/ShortcutsModal";
+import ConflictModal from "./components/ConflictModal";
 import Browser from "./pages/Browser";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
@@ -81,6 +82,10 @@ export default function App() {
       {/* Mounted once at the app root so any route can pop the cheatsheet
           via `?` without re-listening per page. */}
       <ShortcutsModal />
+      {/* Sync-conflict prompt. Lives at the root because conflict events
+          can fire while the user is on Settings / Connections; the modal
+          must surface regardless of route. */}
+      <ConflictModal />
     </Box>
   );
 }

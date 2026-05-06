@@ -8,7 +8,9 @@
 //! mid-stream lands in Phase 4b.
 
 use super::plan::PlannedFile;
-use super::types::{ConflictPolicy, FileOutcome, JobOptions, Progress, Summary};
+use super::types::{
+    ConflictPolicy, ConflictPromptDecision, FileOutcome, JobOptions, Progress, Summary,
+};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -227,6 +229,9 @@ fn resolve_conflict(
                 ConflictDecision::Skip("dest not older".into())
             }
         }
+        // The actual prompt is dispatched by `process_file` (it has the
+        // closure); resolve_conflict just signals "ask the user".
+        ConflictPolicy::Prompt => ConflictDecision::PromptUser,
     }
 }
 
@@ -236,6 +241,23 @@ enum ConflictDecision {
     Skip(String),
     KeepBoth,
     RenameTarget,
+    /// `ConflictPolicy::Prompt` only — the executor must invoke the
+    /// frontend prompt closure and translate its answer into one of the
+    /// concrete variants above.
+    PromptUser,
+}
+
+/// Translate a frontend prompt decision into our internal one. Used by
+/// `process_file` after a `PromptUser` outcome resolves.
+fn from_prompt_decision(d: ConflictPromptDecision) -> ConflictDecision {
+    match d {
+        ConflictPromptDecision::Overwrite => ConflictDecision::Copy,
+        ConflictPromptDecision::Skip => ConflictDecision::Skip("user skipped".into()),
+        ConflictPromptDecision::KeepBoth => ConflictDecision::KeepBoth,
+        ConflictPromptDecision::CancelJob => {
+            ConflictDecision::Skip("job cancelled".into())
+        }
+    }
 }
 
 /// True when the destination's mtime is older than the source's. If
@@ -260,11 +282,19 @@ fn dest_is_older(src: &PlannedFile, dest_meta: &fs::Metadata) -> bool {
 /// Per-file step. Decides what to do via `resolve_conflict` and then
 /// performs the IO (or fakes it for dry-run). Returns the outcome to
 /// emit and updates counters in `summary`.
-fn process_file(
+///
+/// `on_prompt` is invoked when the policy is `Prompt`; it should emit
+/// the `sync:conflict` event and block on the resolver hub, returning
+/// the user's choice. Returning `None` is treated as a job cancel.
+fn process_file<F>(
     file: &PlannedFile,
     opts: &JobOptions,
     summary: &mut Summary,
-) -> FileOutcome {
+    on_prompt: &mut F,
+) -> FileOutcome
+where
+    F: FnMut(&PlannedFile, &fs::Metadata) -> Option<ConflictPromptDecision>,
+{
     let dest = &file.dest;
     let src_str = || file.src.to_string_lossy().into_owned();
 
@@ -278,7 +308,17 @@ fn process_file(
                 reason,
             };
         }
-        match resolve_conflict(opts.conflict_policy, file, &dest_md) {
+        let mut decision = resolve_conflict(opts.conflict_policy, file, &dest_md);
+        if matches!(decision, ConflictDecision::PromptUser) {
+            decision = match on_prompt(file, &dest_md) {
+                Some(d) => from_prompt_decision(d),
+                // Cancel — the outer loop will catch the cancel flag and
+                // bail. For this file, treat as skip so the summary
+                // reflects "user backed out".
+                None => ConflictDecision::Skip("user cancelled".into()),
+            };
+        }
+        match decision {
             ConflictDecision::Skip(reason) => {
                 summary.conflicts += 1;
                 return FileOutcome::Conflict {
@@ -314,6 +354,10 @@ fn process_file(
                     }
                 }
             }
+            // Unreachable: `PromptUser` is always translated into a
+            // concrete variant by the if-block above before reaching
+            // this match.
+            ConflictDecision::PromptUser => unreachable!("prompt resolved upstream"),
         }
     }
 
@@ -384,8 +428,10 @@ fn copy_with_fallback(src: &std::path::Path, dest: &std::path::Path) -> Result<u
 
 /// Execute a planned job. `on_progress` is called after each file with
 /// the running totals so the Tauri command layer can emit `sync:progress`
-/// events. Returns the final summary (including a `cancelled` flag if the
-/// token tripped).
+/// events. `on_prompt` runs only when the policy is `Prompt`; the
+/// command layer wires it to the `ResolverHub` so the modal in the
+/// frontend gets a chance to answer. Returns the final summary
+/// (including a `cancelled` flag if the token tripped).
 pub fn execute(
     job_id: &str,
     files: &[PlannedFile],
@@ -393,6 +439,7 @@ pub fn execute(
     opts: &JobOptions,
     cancel: Arc<CancelToken>,
     mut on_progress: impl FnMut(Progress),
+    mut on_prompt: impl FnMut(&PlannedFile, &fs::Metadata) -> Option<ConflictPromptDecision>,
 ) -> Summary {
     let mut summary = Summary {
         job_id: job_id.to_string(),
@@ -417,7 +464,7 @@ pub fn execute(
             summary.cancelled = true;
             return summary;
         }
-        let outcome = process_file(file, opts, &mut summary);
+        let outcome = process_file(file, opts, &mut summary, &mut on_prompt);
         bytes_seen += file.size;
         on_progress(Progress {
             job_id: job_id.to_string(),
@@ -478,6 +525,8 @@ mod tests {
             &opts,
             CancelToken::new(),
             |_p| {},
+            // Tests use non-Prompt policies; this closure is never invoked.
+            |_f, _md| None,
         )
     }
 
@@ -773,6 +822,7 @@ mod tests {
                 },
                 token_for_runner,
                 |_| {},
+                |_f, _md| None,
             )
         });
 
@@ -808,6 +858,7 @@ mod tests {
                 },
                 token_for_runner,
                 |_| {},
+                |_f, _md| None,
             )
         });
 
@@ -837,6 +888,7 @@ mod tests {
             },
             token,
             |_| {},
+            |_f, _md| None,
         );
         assert!(s.cancelled);
         assert_eq!(s.copied, 0);

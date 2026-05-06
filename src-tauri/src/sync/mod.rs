@@ -9,5 +9,6 @@ pub mod engine;
 pub mod plan;
 pub mod registry;
 pub mod repo;
+pub mod resolver;
 pub mod stamp;
 pub mod types;
