@@ -35,10 +35,15 @@ Two layers, talking via `invoke()`:
 
 - **Phase 0** — ✅ scaffold + branding + CI workflows + public repo
 - **Phase 1** — ✅ local file explorer (browse, navigate, mkdir, rename, remove, copy; virtualized list; light/dark/system theme; settings page)
+- **Phase 1.5** — pending — right-side preview pane (image / text / markdown / pdf / folder summary)
 - **Phase 2** — pending — connection abstraction + SFTP
 - **Phase 3** — pending — FTP/FTPS + SMB
-- **Phase 4** — pending — Skiffsync engine
+- **Phase 4** — pending — Skiffsync engine (TeraCopy-style conflict resolution)
 - **Phase 5+** — see TODO.md
+
+## Backlog policy
+
+The "Backlog" section at the bottom of TODO.md contains items the user has explicitly deferred. **Do not implement them or add tests for them unless the user explicitly says "go work on X" by name.** As of 2026-05-06 this list contains the built-in archive (zip/tar/7z) viewer.
 
 ## Versioning
 

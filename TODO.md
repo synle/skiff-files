@@ -77,20 +77,28 @@ To hit those: virtualized list (`@tanstack/react-virtual`), debounced/cancellabl
 
 A single `pages/Settings.tsx` route with grouped sections — saved to `app_data_dir()/settings.json` with a Rust-side validator.
 
+> **Familiarity bar**: model the Settings page after macOS Finder → Settings (Tabs are: General, Tags, Sidebar, Advanced) and Windows Explorer → Folder Options. Group toggles into named sections, never bury them more than one click deep, and stick to the toggle vocabulary users already know from those apps. Don't invent new names for "Show hidden files" or "Show extensions" — match the OS convention so users muscle-memory their way through.
+
+The Phase 1 page already follows this approach (Appearance / Default View / Advanced). Below is the full target surface; sections come online as later phases land.
+
 ### Appearance
 - Theme: Light / Dark / System
 - Accent color (preset palette + custom hex)
 - Font size: S / M / L
 - Density: Comfortable / Compact (affects row height in list view)
-- Show hidden files (dotfiles): on/off
-- Show file extensions: always / never / when-ambiguous
+- Show hidden files (dotfiles): on/off — *Finder convention*
+- Show file extensions: always / never / when-ambiguous — *Finder/Explorer convention*
+- Show full path in title bar: on/off
+- Show status bar: on/off
 - Reduce motion: on/off (auto-detects)
 
 ### Default View
 - Default view mode for new folders: List / Tile / Gallery / Column
 - Per-folder overrides: keep / forget all
 - Default sort: name / size / mtime / kind, asc/desc
+- Group folders before files: on/off (Finder default = on)
 - Show preview pane on the right: off / images-only / always
+- Default zoom for tile/gallery views
 
 ### Sidebar
 - Sections visible: Favorites, Hosts, Devices (toggle each)
@@ -98,11 +106,12 @@ A single `pages/Settings.tsx` route with grouped sections — saved to `app_data
 - Auto-collapse inactive sections: on/off
 
 ### Transfers (Skiffsync)
-- Default conflict policy: skip / overwrite / rename / prompt
+- Default conflict policy (TeraCopy-style — see Phase 4 for the full action list)
 - Default lookback days for "skip if unchanged" heuristic (matches `cpsync`)
 - Max parallel transfers
 - Bandwidth cap (KB/s, 0 = unlimited)
 - Verify after copy (re-stat dest size; optional MD5 for paranoid mode)
+- Show conflict dialog: always / only when policy=prompt / never
 
 ### Connections
 - Reachable from sidebar context menu **and** Settings
@@ -173,6 +182,28 @@ Goal: a usable single-pane local file manager.
 
 ---
 
+## Phase 1.5 — Right-side Preview Pane
+
+Goal: a Finder-style "Get Info" / "Preview" pane that opens to the right of the file list and shows the content of the currently selected file.
+
+- [ ] Toggleable via Toolbar button (eye icon) and `⌘I` keyboard shortcut
+- [ ] Persisted preference: Settings → Default View → "Show preview pane" = off / images-only / always
+- [ ] **Image preview** — render directly inline; supports png, jpg/jpeg, gif, webp, bmp, svg, avif, heic/heif (heic via Rust-side decode if browser webview can't render natively)
+  - Fit-to-pane by default, click to zoom 100%, drag to pan when zoomed
+  - Show dimensions + EXIF date/camera if present (read via `kamadak-exif` crate)
+- [ ] **Text preview** — first 200 KB rendered with monospace font; longer files show a "show all" link that opens an external editor
+- [ ] **Markdown preview** — rendered (toggle to raw)
+- [ ] **PDF preview** — embed via webview's native PDF viewer
+- [ ] **Audio / video preview** — `<audio>` / `<video>` element, lazy-mounted on first frame
+- [ ] **Folder summary** — item count + total size (recursive, cancellable scan)
+- [ ] **Properties block** at the top of every preview: size, kind, mtime, mode, full path, "Open with…"
+- [ ] Resizable pane (drag the divider); width persisted
+- [ ] Cancel any in-flight preview render when selection changes
+
+**Exit criteria:** select a 4 K image, see it in the pane within 200 ms; select a folder, see recursive size within 1 s for 10k entries.
+
+---
+
 ## Phase 2 — Connection Abstraction & SFTP
 
 Goal: introduce the remote-FS abstraction; ship SSH/SFTP as the first remote.
@@ -224,8 +255,18 @@ Goal: port `cpsync`'s spirit to a cross-protocol, cross-platform engine. **The h
 ### New for Skiff Files
 - [ ] **Cross-protocol**: source/dest each may be `local`, `sftp`, `ftp`, `smb`
 - [ ] **Pause / resume / cancel**
-- [ ] **Conflict policy**: skip / overwrite / rename-with-suffix / prompt-each
-- [ ] **Dry-run** view: would-copy / would-skip / too-big, diff-style panel
+- [ ] **TeraCopy-style conflict resolution dialog** — when a destination file already exists, present a "Destination File Already Exists" sheet with:
+  - **Per-file actions** (large primary buttons): Overwrite · Overwrite all · Skip · Skip all · Keep both (rename copied file with `(2)` suffix)
+  - **Smart-batch actions** (apply to all remaining conflicts in this job):
+    - Overwrite all older files (mtime older than source)
+    - Replace all smaller files (size < source)
+    - Replace all files if size different
+    - Rename all copied files (always keep both)
+    - Rename all target files (move existing dest to `name (old).ext`, write new file under original name)
+    - Rename all older target files (same as above, but only if the dest is older)
+  - Show source vs. dest metadata side-by-side (date, size, "Same date" / "Same size" badges where applicable)
+  - Reachable defaults from Settings → Transfers (default conflict policy)
+- [ ] **Dry-run** view: would-copy / would-skip / would-conflict / too-big, diff-style panel
 - [ ] **Saved sync jobs**: name + source + dest + options, runnable from Transfers page; queue + history
 - [ ] **`cpstamp` mode**: copy with timestamp suffix `file.ext.YYYY_MM_DD_HH_MM`
 - [ ] **`cprepo` mode**: when source is git, only sync `git ls-files` output (zip-and-ship optional)
@@ -301,8 +342,15 @@ Goal: port `cpsync`'s spirit to a cross-protocol, cross-platform engine. **The h
 - [ ] Encryption-at-rest for saved credentials beyond OS keychain
 - [ ] Mobile companion (Tauri 2 mobile target)
 - [ ] Plugin API for custom protocols
-- [ ] Built-in archive viewer (zip/tar/7z) browse-without-extract
 - [ ] Image rotate / batch-rename / EXIF strip (simple bulk ops)
+
+---
+
+## Backlog (do NOT implement until explicitly requested)
+
+These are tracked here so they don't get lost, but the user has asked that they remain inert until they explicitly say "go work on X".
+
+- [ ] **Built-in archive viewer (zip / tar / 7z)** — browse archive contents inline without extracting first; open files inside the archive into the preview pane; extract individual files via right-click; settings toggle "Open archives in Skiff Files vs. fall back to OS default" (off by default → defers to OS). Implementation note: `zip` + `tar` + `sevenz-rust` crates; expose archive contents through the same `RemoteFs` trait so the file list / preview / sidebar stay protocol-agnostic.
 
 ---
 
