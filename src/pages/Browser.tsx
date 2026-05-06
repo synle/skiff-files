@@ -9,7 +9,7 @@ import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
-import { fsHomeDir, fsMkdir, type Entry } from "../api/fs";
+import { fsHomeDir, fsMkdir, fsTrashMany, type Entry } from "../api/fs";
 import { listDir as clientListDir } from "../api/client";
 import { parentPath } from "../util/format";
 import { isRemote } from "../util/location";
@@ -118,6 +118,37 @@ export default function Browser({ initialPath }: Props) {
     window.addEventListener(NAVIGATE_EVENT, onExternalNavigate);
     return () => window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
   }, []);
+
+  // Delete-key → send selection to OS trash. Backspace alone is reserved
+  // for "go up", so we use the dedicated Delete key (Mac users can hit
+  // Fn+Backspace which the OS rewrites to Delete). Skips input focus so
+  // typing in the path bar / connection form isn't hijacked.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      if (selectedPaths.length === 0) return;
+      // Remote trash is a Phase 2b+ item — refuse here so we don't
+      // pretend to send remote files to a local recycle bin.
+      if (selectedPaths.some((p) => p.startsWith("sftp://"))) {
+        setError("Remote trash is not supported yet.");
+        return;
+      }
+      const ok = window.confirm(
+        `Move ${selectedPaths.length} item${selectedPaths.length === 1 ? "" : "s"} to Trash?`,
+      );
+      if (!ok) return;
+      void fsTrashMany(selectedPaths)
+        .then(() => {
+          if (path) void refresh(path);
+        })
+        .catch((err) => setError(String(err)));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedPaths, path, refresh]);
 
   /** Push a path onto history (the canonical way to navigate). */
   const navigate = useCallback((target: string) => {

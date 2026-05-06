@@ -23,6 +23,9 @@ import {
   Typography,
 } from "@mui/material";
 import StopIcon from "@mui/icons-material/Stop";
+import DeleteIcon from "@mui/icons-material/Delete";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import SaveIcon from "@mui/icons-material/Save";
 import { useEffect, useRef, useState } from "react";
 import {
   onDone,
@@ -52,6 +55,40 @@ interface JobUiState {
   error?: string;
 }
 
+/** A saved job template — what was on the form when the user clicked
+ *  Save. Stored as a list in localStorage. The label defaults to
+ *  `<src> → <dest>` but is editable. We never persist mid-flight job
+ *  state here — only the inputs needed to re-create the run. */
+interface SavedJob {
+  id: string;
+  label: string;
+  planner: "local" | "repo";
+  src: string;
+  dest: string;
+  maxSizeGb: number;
+  lookbackDays: number;
+  conflictPolicy: ConflictPolicy;
+}
+
+const SAVED_JOBS_KEY = "skiff-files.savedJobs.v1";
+
+function loadSavedJobs(): SavedJob[] {
+  try {
+    const raw = localStorage.getItem(SAVED_JOBS_KEY);
+    return raw ? (JSON.parse(raw) as SavedJob[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSavedJobs(jobs: SavedJob[]): void {
+  try {
+    localStorage.setItem(SAVED_JOBS_KEY, JSON.stringify(jobs));
+  } catch {
+    /* private mode — silently drop */
+  }
+}
+
 export default function TransfersPage() {
   const [jobs, setJobs] = useState<Record<string, JobUiState>>({});
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +111,14 @@ export default function TransfersPage() {
   const [dedupRoot, setDedupRoot] = useState("");
   const [stampResult, setStampResult] = useState<string | null>(null);
   const [dedupResult, setDedupResult] = useState<DedupSummary | null>(null);
+
+  // Saved jobs (templates) — persisted as a list of named configs in
+  // localStorage. Saving does not start the job; clicking Run on a
+  // saved entry fills the form with its values and starts immediately.
+  const [savedJobs, setSavedJobs] = useState<SavedJob[]>(() => loadSavedJobs());
+  useEffect(() => {
+    saveSavedJobs(savedJobs);
+  }, [savedJobs]);
 
   const mounted = useRef(true);
 
@@ -206,6 +251,58 @@ export default function TransfersPage() {
     }
   };
 
+  const handleSaveJob = () => {
+    if (!src || !dest) return;
+    const job: SavedJob = {
+      id: crypto.randomUUID(),
+      label: `${src} → ${dest}`,
+      planner,
+      src,
+      dest,
+      maxSizeGb,
+      lookbackDays,
+      conflictPolicy,
+    };
+    setSavedJobs((prev) => [...prev, job]);
+  };
+
+  const handleDeleteSavedJob = (id: string) => {
+    setSavedJobs((prev) => prev.filter((j) => j.id !== id));
+  };
+
+  /** Fills the form with a saved job's values + starts it immediately.
+   *  Skips the form-fill if the user just wants to inspect — that path
+   *  is the click on the row itself. */
+  const handleRunSavedJob = async (j: SavedJob) => {
+    setSrc(j.src);
+    setDest(j.dest);
+    setPlanner(j.planner);
+    setMaxSizeGb(j.maxSizeGb);
+    setLookbackDays(j.lookbackDays);
+    setConflictPolicy(j.conflictPolicy);
+    setError(null);
+    setBusy(true);
+    const start = j.planner === "repo" ? syncStartRepo : syncStartLocal;
+    try {
+      const id = await start(j.src, j.dest, {
+        maxSizeGb: j.maxSizeGb,
+        lookbackDays: j.lookbackDays,
+        conflictPolicy: j.conflictPolicy,
+        dryRun: false,
+      });
+      setJobs((prev) => ({
+        ...prev,
+        [id]: {
+          info: { id, src: j.src, dest: j.dest, state: "planning" },
+        },
+      }));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const jobList = Object.values(jobs).sort((a, b) =>
     a.info.id.localeCompare(b.info.id),
   );
@@ -319,7 +416,7 @@ export default function TransfersPage() {
               }
               label="Dry run (report what would happen, write nothing)"
             />
-            <Box>
+            <Stack direction="row" spacing={1}>
               <Button
                 variant="contained"
                 disabled={busy || !src || !dest}
@@ -327,7 +424,15 @@ export default function TransfersPage() {
               >
                 Start
               </Button>
-            </Box>
+              <Button
+                variant="outlined"
+                startIcon={<SaveIcon />}
+                disabled={!src || !dest}
+                onClick={handleSaveJob}
+              >
+                Save as template
+              </Button>
+            </Stack>
           </Stack>
         </Paper>
 
@@ -417,6 +522,48 @@ export default function TransfersPage() {
             )}
           </Stack>
         </Paper>
+
+        {savedJobs.length > 0 && (
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Saved templates
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Click ▶ to run a saved job with its stored options.
+            </Typography>
+            <List dense>
+              {savedJobs.map((j) => (
+                <ListItem
+                  key={j.id}
+                  secondaryAction={
+                    <Stack direction="row">
+                      <IconButton
+                        edge="end"
+                        onClick={() => void handleRunSavedJob(j)}
+                        disabled={busy}
+                        aria-label={`Run ${j.label}`}
+                      >
+                        <PlayArrowIcon />
+                      </IconButton>
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleDeleteSavedJob(j.id)}
+                        aria-label={`Delete saved job ${j.label}`}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Stack>
+                  }
+                >
+                  <ListItemText
+                    primary={j.label}
+                    secondary={`${j.planner} · max ${j.maxSizeGb} GB · ${j.conflictPolicy}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
+        )}
 
         <Box>
           <Typography variant="h6" gutterBottom>

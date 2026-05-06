@@ -10,6 +10,7 @@ const mocked = vi.mocked(invoke);
 
 beforeEach(() => {
   mocked.mockClear();
+  localStorage.clear();
 });
 
 function r() {
@@ -107,6 +108,53 @@ describe("TransfersPage", () => {
     expect(
       await screen.findByText(/Scanned 5 files/, { exact: false }),
     ).toBeInTheDocument();
+  });
+
+  it("Save as template persists a saved job", async () => {
+    r();
+    fireEvent.change(screen.getByLabelText(/^Source$/), {
+      target: { value: "/a" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Destination$/), {
+      target: { value: "/b" },
+    });
+    fireEvent.click(screen.getByText("Save as template"));
+    await waitFor(() => {
+      expect(screen.getByText("Saved templates")).toBeInTheDocument();
+      expect(screen.getByText("/a → /b")).toBeInTheDocument();
+    });
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.savedJobs.v1") ?? "[]",
+    );
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ src: "/a", dest: "/b" });
+  });
+
+  it("clicking Run on a saved job invokes sync_start_local", async () => {
+    // Pre-populate localStorage with a saved job so the section renders.
+    localStorage.setItem(
+      "skiff-files.savedJobs.v1",
+      JSON.stringify([
+        {
+          id: "x",
+          label: "/foo → /bar",
+          planner: "local",
+          src: "/foo",
+          dest: "/bar",
+          maxSizeGb: 1,
+          lookbackDays: 7,
+          conflictPolicy: "skip",
+        },
+      ]),
+    );
+    r();
+    fireEvent.click(screen.getByLabelText("Run /foo → /bar"));
+    await waitFor(() => {
+      expect(mocked).toHaveBeenCalledWith(
+        "sync_start_local",
+        expect.objectContaining({ src: "/foo", dest: "/bar" }),
+      );
+    });
   });
 
   it("routes to sync_start_repo when planner is set to Repo copy", async () => {

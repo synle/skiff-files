@@ -14,8 +14,8 @@ use commands::{
     conn_create_sftp, conn_dir_summary, conn_disconnect, conn_list, conn_list_dir,
     conn_read_base64, conn_read_text, conn_stat, fs_canonicalize, fs_copy_file, fs_dir_summary,
     fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64, fs_read_text, fs_remove, fs_rename,
-    fs_stat, get_app_version, sync_cancel, sync_cpstamp, sync_dedup, sync_list, sync_start_local,
-    sync_start_repo,
+    fs_stat, fs_trash, fs_trash_many, get_app_version, settings_load, settings_save, sync_cancel,
+    sync_cpstamp, sync_dedup, sync_list, sync_start_local, sync_start_repo,
 };
 use fs::registry::Registry;
 use std::sync::Arc;
@@ -45,6 +45,10 @@ pub fn run() {
             fs_read_text,
             fs_read_base64,
             fs_dir_summary,
+            fs_trash,
+            fs_trash_many,
+            settings_load,
+            settings_save,
             // connections
             conn_create_sftp,
             conn_disconnect,

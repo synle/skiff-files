@@ -15,6 +15,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { ThemeMode } from "../theme";
 
 /** What rendering style the file list uses. Per-folder overrides land later. */
@@ -82,6 +83,34 @@ export function saveSettings(s: Settings): void {
   }
 }
 
+/**
+ * Load settings from disk via Tauri. Returns the parsed settings or
+ * `null` if no file exists yet. Errors (e.g. running outside Tauri,
+ * or `app_data_dir` denied) resolve to `null` so callers can fall
+ * back to localStorage cleanly. Never throws.
+ */
+export async function loadSettingsFromDisk(): Promise<Settings | null> {
+  try {
+    const raw = await invoke<string | null>("settings_load");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<Settings>;
+    return { ...DEFAULTS, ...parsed };
+  } catch {
+    return null;
+  }
+}
+
+/** Save settings to disk via Tauri. Fire-and-forget; localStorage stays
+ *  in sync as a hot cache so the next page load doesn't have to await
+ *  the Rust call. */
+export async function saveSettingsToDisk(s: Settings): Promise<void> {
+  try {
+    await invoke<void>("settings_save", { json: JSON.stringify(s) });
+  } catch {
+    /* ignore — localStorage covers us */
+  }
+}
+
 interface Ctx {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;
@@ -95,12 +124,28 @@ const SettingsContext = createContext<Ctx | undefined>(undefined);
 
 /** Provider wraps the app so any descendant can `useSettings()`. */
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  // Initial state seeds from localStorage so the first paint is instant.
+  // We then race a Tauri disk-load and overwrite if the on-disk version
+  // exists. Tests + browser-mode dev see localStorage only, which is fine.
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
 
-  // Persist on every change. The cost is one `JSON.stringify` per setting
-  // tweak; settings are tiny so this is fine.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const fromDisk = await loadSettingsFromDisk();
+      if (!cancelled && fromDisk) setSettings(fromDisk);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist on every change to BOTH localStorage (hot cache for next
+  // mount) and disk via Tauri (durable across reinstalls / dotfile
+  // sync). The cost is one JSON.stringify per setting tweak; tiny.
   useEffect(() => {
     saveSettings(settings);
+    void saveSettingsToDisk(settings);
   }, [settings]);
 
   const update = useCallback<Ctx["update"]>((key, value) => {

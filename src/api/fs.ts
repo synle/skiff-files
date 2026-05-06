@@ -65,6 +65,14 @@ export const fsRename = (from: string, to: string): Promise<void> =>
 export const fsRemove = (path: string): Promise<void> =>
   invoke<void>("fs_remove", { path });
 
+/** Send a single path to the OS trash. Cross-platform. */
+export const fsTrash = (path: string): Promise<void> =>
+  invoke<void>("fs_trash", { path });
+
+/** Multi-path trash — one IPC round-trip for a multi-selection delete. */
+export const fsTrashMany = (paths: string[]): Promise<void> =>
+  invoke<void>("fs_trash_many", { paths });
+
 export const fsCopyFile = (from: string, to: string): Promise<number> =>
   invoke<number>("fs_copy_file", { from, to });
 

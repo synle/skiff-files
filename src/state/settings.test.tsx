@@ -4,9 +4,15 @@ import {
   DEFAULTS,
   SettingsProvider,
   loadSettings,
+  loadSettingsFromDisk,
   saveSettings,
+  saveSettingsToDisk,
   useSettings,
 } from "./settings";
+import { invoke } from "@tauri-apps/api/core";
+import { vi } from "vitest";
+
+const mocked = vi.mocked(invoke);
 
 beforeEach(() => {
   localStorage.clear();
@@ -86,5 +92,33 @@ describe("SettingsProvider", () => {
       screen.getByText("reset").click();
     });
     expect(screen.getByTestId("theme").textContent).toBe(DEFAULTS.themeMode);
+  });
+});
+
+describe("loadSettingsFromDisk / saveSettingsToDisk", () => {
+  it("returns null when settings_load returns null", async () => {
+    mocked.mockResolvedValueOnce(null);
+    const out = await loadSettingsFromDisk();
+    expect(out).toBeNull();
+  });
+
+  it("merges disk payload against DEFAULTS", async () => {
+    mocked.mockResolvedValueOnce(JSON.stringify({ themeMode: "dark" }));
+    const out = await loadSettingsFromDisk();
+    expect(out).toMatchObject({ ...DEFAULTS, themeMode: "dark" });
+  });
+
+  it("returns null when settings_load throws", async () => {
+    mocked.mockRejectedValueOnce(new Error("no app_data_dir"));
+    const out = await loadSettingsFromDisk();
+    expect(out).toBeNull();
+  });
+
+  it("saveSettingsToDisk invokes settings_save with stringified JSON", async () => {
+    mocked.mockResolvedValueOnce(undefined);
+    await saveSettingsToDisk({ ...DEFAULTS, themeMode: "dark" });
+    expect(mocked).toHaveBeenLastCalledWith("settings_save", {
+      json: expect.stringContaining('"themeMode":"dark"'),
+    });
   });
 });

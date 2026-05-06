@@ -78,13 +78,74 @@ pub fn fs_rename(from: String, to: String) -> FsResult<()> {
     local::rename(Path::new(&from), Path::new(&to))
 }
 
-/// Delete a file or directory (recursive for dirs). The Phase 6 polish step
-/// will replace this with a "send to OS trash" path via the `trash` crate;
-/// this command will then become the "permanent delete" path behind a
-/// confirmation dialog.
+/// Permanently delete a file or directory (recursive for dirs). Should
+/// only be called from a confirmation flow — the soft-delete path is
+/// `fs_trash` below, which is what the Browser's Delete keybind binds
+/// to by default.
 #[tauri::command]
 pub fn fs_remove(path: String) -> FsResult<()> {
     local::remove(Path::new(&path))
+}
+
+/// Send a single path (file or directory) to the OS trash via the
+/// `trash` crate. Cross-platform: macOS Trash, Windows Recycle Bin,
+/// Linux freedesktop.org Trash. Errors are surfaced as strings.
+#[tauri::command]
+pub fn fs_trash(path: String) -> FsResult<()> {
+    trash::delete(&path).map_err(|e| format!("trash({path}): {e}"))
+}
+
+/// Multi-path trash. Cheaper than N round-trips through `invoke` when
+/// the user deletes a multi-selection. The crate's `delete_all` is
+/// atomic per path: any failures collect, the rest still succeed.
+#[tauri::command]
+pub fn fs_trash_many(paths: Vec<String>) -> FsResult<()> {
+    trash::delete_all(&paths).map_err(|e| format!("trash_many: {e}"))
+}
+
+// ---------- Settings persistence (Phase 0.1.4) ----------
+//
+// We keep Settings as opaque JSON on the Rust side — the schema is owned
+// by the frontend (see `src/state/settings.tsx`). Storing it as
+// `app_data_dir()/settings.json` lets users sync via dotfiles, scrub
+// values from a CLI, and survives reinstalls (Tauri's app_data_dir is
+// stable across versions).
+
+/// Path the settings JSON lives at. Created on first save.
+fn settings_path(app: &tauri::AppHandle) -> FsResult<std::path::PathBuf> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app_data_dir: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir({}): {e}", dir.display()))?;
+    Ok(dir.join("settings.json"))
+}
+
+/// Load settings JSON. Returns `null` (as a JSON string) if no file
+/// exists yet so the frontend can detect first-launch and migrate from
+/// localStorage before writing.
+#[tauri::command]
+pub fn settings_load(app: tauri::AppHandle) -> FsResult<Option<String>> {
+    let p = settings_path(&app)?;
+    if !p.exists() {
+        return Ok(None);
+    }
+    let body = std::fs::read_to_string(&p)
+        .map_err(|e| format!("read({}): {e}", p.display()))?;
+    Ok(Some(body))
+}
+
+/// Persist the settings blob. We write atomically via a temp file +
+/// rename so a partial write doesn't corrupt user state on a crash.
+#[tauri::command]
+pub fn settings_save(json: String, app: tauri::AppHandle) -> FsResult<()> {
+    let final_path = settings_path(&app)?;
+    let tmp = final_path.with_extension("json.tmp");
+    std::fs::write(&tmp, &json).map_err(|e| format!("write({}): {e}", tmp.display()))?;
+    std::fs::rename(&tmp, &final_path)
+        .map_err(|e| format!("rename({} -> {}): {e}", tmp.display(), final_path.display()))?;
+    Ok(())
 }
 
 /// Copy a single file. Returns bytes written.

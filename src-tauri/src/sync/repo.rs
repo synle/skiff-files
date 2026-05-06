@@ -12,7 +12,7 @@
 
 use crate::sync::plan::PlannedFile;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::time::UNIX_EPOCH;
 
@@ -85,6 +85,7 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
+    use std::path::PathBuf;
 
     fn uniq() -> String {
         use std::sync::atomic::{AtomicU64, Ordering};
