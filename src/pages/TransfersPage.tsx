@@ -238,7 +238,20 @@ export default function TransfersPage() {
                 >
                   <MenuItem value="skip">Skip</MenuItem>
                   <MenuItem value="overwrite">Overwrite</MenuItem>
-                  <MenuItem value="keepBoth">Keep both</MenuItem>
+                  <MenuItem value="keepBoth">Keep both (rename copied)</MenuItem>
+                  <MenuItem value="overwriteOlder">
+                    Overwrite older files
+                  </MenuItem>
+                  <MenuItem value="replaceSmaller">Replace smaller files</MenuItem>
+                  <MenuItem value="replaceIfSizeDifferent">
+                    Replace if size differs
+                  </MenuItem>
+                  <MenuItem value="renameTarget">
+                    Rename existing target → (old)
+                  </MenuItem>
+                  <MenuItem value="renameOlderTarget">
+                    Rename older target → (old)
+                  </MenuItem>
                 </Select>
               </FormControl>
             </Stack>

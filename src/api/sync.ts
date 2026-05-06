@@ -4,8 +4,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-/** Mirror of `crate::sync::types::ConflictPolicy`. */
-export type ConflictPolicy = "skip" | "overwrite" | "keepBoth";
+/** Mirror of `crate::sync::types::ConflictPolicy`. The smart-batch
+ *  variants match the TeraCopy "Destination File Already Exists"
+ *  dialog action set verbatim. */
+export type ConflictPolicy =
+  | "skip"
+  | "overwrite"
+  | "keepBoth"
+  | "overwriteOlder"
+  | "replaceSmaller"
+  | "replaceIfSizeDifferent"
+  | "renameTarget"
+  | "renameOlderTarget";
 
 /** Mirror of `crate::sync::types::JobOptions`. */
 export interface JobOptions {

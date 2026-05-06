@@ -112,102 +112,224 @@ fn keep_both_path(dest: &PlannedFile) -> PathBuf {
     dest.dest.clone()
 }
 
-/// Per-file step that updates counters + builds the right
-/// [`FileOutcome`]. Returns the bytes that were actually written so the
-/// running total can advance.
+/// Aside-rename the existing dest to `name (old).ext`. If `(old)` is
+/// already taken (rare — happens when a previous renameTarget pass left
+/// one behind), suffix with `(old N)`. Returns the path the existing
+/// file was moved to.
+fn aside_rename_existing(dest: &std::path::Path) -> Result<PathBuf, String> {
+    let stem = dest
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let ext = dest
+        .extension()
+        .map(|s| s.to_string_lossy().into_owned());
+    let parent = dest
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    let make = |suffix: String| {
+        let name = match &ext {
+            Some(e) => format!("{stem} ({suffix}).{e}"),
+            None => format!("{stem} ({suffix})"),
+        };
+        parent.join(name)
+    };
+    let mut target = make("old".into());
+    let mut n = 2;
+    while target.exists() {
+        target = make(format!("old {n}"));
+        n += 1;
+        if n > 1_000_000 {
+            return Err(format!(
+                "couldn't find a free aside-rename slot for {}",
+                dest.display()
+            ));
+        }
+    }
+    fs::rename(dest, &target)
+        .map_err(|e| format!("rename({} -> {}): {e}", dest.display(), target.display()))?;
+    Ok(target)
+}
+
+/// Decide what `process_file` should do for the given conflict-policy /
+/// metadata combination. Pulled out as a pure function so each branch
+/// has a focused unit test instead of a giant integration setup.
+///
+/// Variants:
+/// - `Copy`           — proceed with overwrite at `file.dest`
+/// - `Skip(reason)`   — leave dest untouched, count as conflict
+/// - `KeepBoth`       — write to a `(2)` sibling
+/// - `RenameTarget`   — aside-rename existing then copy under original name
+fn resolve_conflict(
+    policy: ConflictPolicy,
+    src: &PlannedFile,
+    dest_meta: &fs::Metadata,
+) -> ConflictDecision {
+    match policy {
+        ConflictPolicy::Skip => ConflictDecision::Skip("exists; policy=skip".into()),
+        ConflictPolicy::Overwrite => ConflictDecision::Copy,
+        ConflictPolicy::KeepBoth => ConflictDecision::KeepBoth,
+        ConflictPolicy::OverwriteOlder => {
+            if dest_is_older(src, dest_meta) {
+                ConflictDecision::Copy
+            } else {
+                ConflictDecision::Skip("dest not older".into())
+            }
+        }
+        ConflictPolicy::ReplaceSmaller => {
+            if dest_meta.len() < src.size {
+                ConflictDecision::Copy
+            } else {
+                ConflictDecision::Skip("dest not smaller".into())
+            }
+        }
+        ConflictPolicy::ReplaceIfSizeDifferent => {
+            if dest_meta.len() != src.size {
+                ConflictDecision::Copy
+            } else {
+                ConflictDecision::Skip("same size".into())
+            }
+        }
+        ConflictPolicy::RenameTarget => ConflictDecision::RenameTarget,
+        ConflictPolicy::RenameOlderTarget => {
+            if dest_is_older(src, dest_meta) {
+                ConflictDecision::RenameTarget
+            } else {
+                ConflictDecision::Skip("dest not older".into())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ConflictDecision {
+    Copy,
+    Skip(String),
+    KeepBoth,
+    RenameTarget,
+}
+
+/// True when the destination's mtime is older than the source's. If
+/// either platform refuses to surface a usable mtime, we err on the
+/// side of "not older" — better to skip than to clobber.
+fn dest_is_older(src: &PlannedFile, dest_meta: &fs::Metadata) -> bool {
+    let src_mtime = match src.mtime {
+        Some(m) => m,
+        None => return false,
+    };
+    let dest_mtime = dest_meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64);
+    match dest_mtime {
+        Some(d) => d < src_mtime,
+        None => false,
+    }
+}
+
+/// Per-file step. Decides what to do via `resolve_conflict` and then
+/// performs the IO (or fakes it for dry-run). Returns the outcome to
+/// emit and updates counters in `summary`.
 fn process_file(
     file: &PlannedFile,
     opts: &JobOptions,
     summary: &mut Summary,
 ) -> FileOutcome {
     let dest = &file.dest;
+    let src_str = || file.src.to_string_lossy().into_owned();
 
     // Conflict + unchanged checks only matter when dest exists.
     if let Ok(dest_md) = fs::metadata(dest) {
         if let Some(reason) = should_skip_unchanged(file, &dest_md, opts.lookback_days) {
             summary.skipped += 1;
             return FileOutcome::Skipped {
-                src: file.src.to_string_lossy().into_owned(),
+                src: src_str(),
                 dest: dest.to_string_lossy().into_owned(),
                 reason,
             };
         }
-        match opts.conflict_policy {
-            ConflictPolicy::Skip => {
+        match resolve_conflict(opts.conflict_policy, file, &dest_md) {
+            ConflictDecision::Skip(reason) => {
                 summary.conflicts += 1;
                 return FileOutcome::Conflict {
-                    src: file.src.to_string_lossy().into_owned(),
+                    src: src_str(),
                     dest: dest.to_string_lossy().into_owned(),
-                    reason: "exists; policy=skip".into(),
+                    reason,
                 };
             }
-            ConflictPolicy::Overwrite => { /* fall through to copy */ }
-            ConflictPolicy::KeepBoth => {
-                // Pick a fresh sibling and rebind for the copy below.
+            ConflictDecision::Copy => { /* fall through to overwrite */ }
+            ConflictDecision::KeepBoth => {
                 let renamed = keep_both_path(file);
+                return do_copy(file, &renamed, opts, summary);
+            }
+            ConflictDecision::RenameTarget => {
                 if opts.dry_run {
                     summary.copied += 1;
                     summary.bytes_copied += file.size;
                     return FileOutcome::Copied {
-                        src: file.src.to_string_lossy().into_owned(),
-                        dest: renamed.to_string_lossy().into_owned(),
+                        src: src_str(),
+                        dest: dest.to_string_lossy().into_owned(),
                         bytes: file.size,
                     };
                 }
-                if let Some(parent) = renamed.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                return match copy_with_fallback(&file.src, &renamed) {
-                    Ok(n) => {
-                        summary.copied += 1;
-                        summary.bytes_copied += n;
-                        FileOutcome::Copied {
-                            src: file.src.to_string_lossy().into_owned(),
-                            dest: renamed.to_string_lossy().into_owned(),
-                            bytes: n,
-                        }
-                    }
+                match aside_rename_existing(dest) {
+                    Ok(_) => { /* dest is now free; fall through to copy */ }
                     Err(e) => {
                         summary.errors += 1;
-                        FileOutcome::Error {
-                            src: file.src.to_string_lossy().into_owned(),
-                            dest: renamed.to_string_lossy().into_owned(),
+                        return FileOutcome::Error {
+                            src: src_str(),
+                            dest: dest.to_string_lossy().into_owned(),
                             error: e,
-                        }
+                        };
                     }
-                };
+                }
             }
         }
     }
 
-    // Default path: copy `src -> dest` (overwriting if present).
+    do_copy(file, dest, opts, summary)
+}
+
+/// Perform the actual write at `target`. Shared between the default and
+/// keep-both paths so the dry-run + parent-mkdir + error-mapping logic
+/// lives in one place.
+fn do_copy(
+    file: &PlannedFile,
+    target: &std::path::Path,
+    opts: &JobOptions,
+    summary: &mut Summary,
+) -> FileOutcome {
+    let src_str = file.src.to_string_lossy().into_owned();
+    let dest_str = target.to_string_lossy().into_owned();
     if opts.dry_run {
         summary.copied += 1;
         summary.bytes_copied += file.size;
         return FileOutcome::Copied {
-            src: file.src.to_string_lossy().into_owned(),
-            dest: dest.to_string_lossy().into_owned(),
+            src: src_str,
+            dest: dest_str,
             bytes: file.size,
         };
     }
-    if let Some(parent) = dest.parent() {
+    if let Some(parent) = target.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    match copy_with_fallback(&file.src, dest) {
+    match copy_with_fallback(&file.src, target) {
         Ok(n) => {
             summary.copied += 1;
             summary.bytes_copied += n;
             FileOutcome::Copied {
-                src: file.src.to_string_lossy().into_owned(),
-                dest: dest.to_string_lossy().into_owned(),
+                src: src_str,
+                dest: dest_str,
                 bytes: n,
             }
         }
         Err(e) => {
             summary.errors += 1;
             FileOutcome::Error {
-                src: file.src.to_string_lossy().into_owned(),
-                dest: dest.to_string_lossy().into_owned(),
+                src: src_str,
+                dest: dest_str,
                 error: e,
             }
         }
@@ -422,6 +544,177 @@ mod tests {
         assert_eq!(s.copied, 2);
         assert!(!dest.join("a.txt").exists());
         let _ = fs::remove_dir_all(&src);
+    }
+
+    /// Convenience: stomp `dest/a.txt` to a different size + force its
+    /// mtime so we can assert older/newer policies deterministically.
+    fn poke(path: &PathBuf, contents: &[u8], mtime_offset_secs: i64) {
+        fs::write(path, contents).unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let target = std::time::UNIX_EPOCH
+            + std::time::Duration::from_secs((now + mtime_offset_secs).max(0) as u64);
+        let _ = filetime::set_file_mtime(path, filetime::FileTime::from_system_time(target));
+    }
+
+    #[test]
+    fn overwrite_older_overwrites_only_when_dest_is_older() {
+        let (src, dest) = fixture();
+        fs::create_dir_all(&dest).unwrap();
+        // Pre-populate dest with old, smaller-but-different content.
+        poke(&dest.join("a.txt"), b"OLD", -3600); // 1h old
+        // src/a.txt is newer (just created in fixture()).
+        let s = run_default(
+            &src,
+            &dest,
+            JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::OverwriteOlder,
+                dry_run: false,
+            },
+        );
+        assert!(s.copied >= 1, "expected at least one overwrite, got {s:?}");
+        // a.txt should now match src ("hello").
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"hello");
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn overwrite_older_skips_when_dest_is_newer() {
+        let (src, dest) = fixture();
+        fs::create_dir_all(&dest).unwrap();
+        // Make dest newer than src — and different size so the
+        // skip-if-unchanged heuristic doesn't short-circuit before the
+        // conflict policy gets a chance to evaluate.
+        poke(&dest.join("a.txt"), b"NEWER-AND-DIFFERENT-SIZE", 3600);
+        let s = run_default(
+            &src,
+            &dest,
+            JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::OverwriteOlder,
+                dry_run: false,
+            },
+        );
+        assert!(s.conflicts >= 1);
+        // dest content untouched.
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"NEWER-AND-DIFFERENT-SIZE");
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn replace_smaller_overwrites_only_when_dest_smaller_than_src() {
+        let (src, dest) = fixture();
+        fs::create_dir_all(&dest).unwrap();
+        // src/a.txt is "hello" = 5 bytes. Pre-populate dest with 2 bytes.
+        fs::write(dest.join("a.txt"), b"OK").unwrap();
+        let s = run_default(
+            &src,
+            &dest,
+            JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::ReplaceSmaller,
+                dry_run: false,
+            },
+        );
+        assert!(s.copied >= 1);
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"hello");
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn replace_smaller_skips_when_dest_larger() {
+        let (src, dest) = fixture();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(dest.join("a.txt"), b"a much larger payload").unwrap();
+        let s = run_default(
+            &src,
+            &dest,
+            JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::ReplaceSmaller,
+                dry_run: false,
+            },
+        );
+        assert!(s.conflicts >= 1);
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn replace_if_size_different_overwrites_when_size_differs() {
+        let (src, dest) = fixture();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(dest.join("a.txt"), b"X").unwrap();
+        let s = run_default(
+            &src,
+            &dest,
+            JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::ReplaceIfSizeDifferent,
+                dry_run: false,
+            },
+        );
+        assert!(s.copied >= 1);
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn rename_target_aside_renames_existing_then_copies_new_under_original() {
+        let (src, dest) = fixture();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(dest.join("a.txt"), b"PREVIOUS").unwrap();
+        let s = run_default(
+            &src,
+            &dest,
+            JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::RenameTarget,
+                dry_run: false,
+            },
+        );
+        assert!(s.copied >= 1);
+        // Original name now holds the new content.
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"hello");
+        // The previous version is parked next to it.
+        assert!(dest.join("a (old).txt").exists());
+        assert_eq!(fs::read(dest.join("a (old).txt")).unwrap(), b"PREVIOUS");
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn rename_older_target_only_renames_when_dest_is_older() {
+        let (src, dest) = fixture();
+        fs::create_dir_all(&dest).unwrap();
+        // Newer dest — should NOT be aside-renamed.
+        poke(&dest.join("a.txt"), b"FUTURE", 3600);
+        let s = run_default(
+            &src,
+            &dest,
+            JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::RenameOlderTarget,
+                dry_run: false,
+            },
+        );
+        assert!(s.conflicts >= 1);
+        assert!(!dest.join("a (old).txt").exists());
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
     }
 
     #[test]

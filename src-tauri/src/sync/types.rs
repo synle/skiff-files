@@ -3,10 +3,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// What to do when the destination already exists. The TeraCopy-style
-/// smart-batch options ("overwrite all older", "replace if different
-/// size") will surface as additional variants in Phase 4b once the UI
-/// has the modal to pick them.
+/// What to do when the destination already exists. The variants mirror
+/// the action set in the TeraCopy "Destination File Already Exists"
+/// dialog (see TODO.md → Phase 4) so the future modal can map directly
+/// onto these. Three of the names match macOS Finder, the rest match
+/// Windows Explorer / TeraCopy power-user vocabulary verbatim — no new
+/// terminology invented.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ConflictPolicy {
@@ -17,6 +19,24 @@ pub enum ConflictPolicy {
     /// Write a sibling: `name (2).ext`, `name (3).ext`, ... so neither
     /// file is lost. Mirrors macOS Finder's "Keep both" affordance.
     KeepBoth,
+    // ----- Smart-batch variants (TeraCopy parity) -----
+    /// Overwrite only when the destination's mtime is older than the
+    /// source's. Useful for "newer wins" backup semantics.
+    OverwriteOlder,
+    /// Overwrite only when the destination is smaller than the source.
+    /// Used for media re-encodes / partial-download recovery.
+    ReplaceSmaller,
+    /// Overwrite when sizes differ at all (regardless of which is
+    /// larger). Pairs well with the skip-if-same-size heuristic.
+    ReplaceIfSizeDifferent,
+    /// Move the destination to `name (old).ext` and write the source
+    /// under the original name. The user always sees the new copy at
+    /// the path they expect; the previous version is preserved.
+    RenameTarget,
+    /// Like `RenameTarget`, but only when the existing dest is older
+    /// than the source. Older targets get aside-renamed; newer targets
+    /// stay put (treated as `Skip`).
+    RenameOlderTarget,
 }
 
 impl Default for ConflictPolicy {

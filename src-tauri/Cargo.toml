@@ -27,6 +27,9 @@ russh-sftp = "2"
 russh-keys = "0.45"
 uuid = { version = "1", features = ["v4"] }
 
+[dev-dependencies]
+filetime = "0.2"
+
 [profile.release]
 panic = "abort"
 codegen-units = 1
