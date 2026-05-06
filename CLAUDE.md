@@ -43,6 +43,7 @@ Two layers, talking via `invoke()`:
 - **Phase 4b (in progress)** — smart-batch conflict policies (overwriteOlder / replaceSmaller / replaceIfSizeDifferent / renameTarget / renameOlderTarget — TeraCopy parity for per-file decisions). `cpstamp`, `dedup`, `cprepo` modes shipped. **Saved job templates** persisted to localStorage (Run + Delete actions on each). Still pending: cross-protocol src/dest, interactive TeraCopy modal (Overwrite/Skip/Keep both — applies-to-all-remaining), pause/resume.
 
 - **0.1.4 polish** — OS trash via `trash` crate (`fs_trash` / `fs_trash_many`), Delete key in Browser sends selection to trash with confirm. Settings now persist to `app_data_dir/settings.json` via `settings_load` / `settings_save` Tauri commands; localStorage stays as a hot cache + test fallback.
+- **0.1.5 polish** — In-pane live search (Cmd/Ctrl+F focuses; Esc clears). OS drag-and-drop into the Browser pane: Tauri drag-drop events route each dropped path through `sync_start_local` (directories nest under their basename so they land AT the cursor target rather than flatten), with a translucent overlay during drag-over. Remote folders refuse drops cleanly until 4b lands.
 - **Phase 5+** — see TODO.md
 
 ## Backlog policy

@@ -2,20 +2,22 @@
 // the active sort. Delegates rendering to PathBar / Toolbar / FileList /
 // StatusBar, and the sidebar lives one level up in App so it persists across
 // route changes.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box } from "@mui/material";
 import PathBar from "../components/PathBar";
 import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
-import { fsHomeDir, fsMkdir, fsTrashMany, type Entry } from "../api/fs";
+import { fsHomeDir, fsMkdir, fsStat, fsTrashMany, type Entry } from "../api/fs";
 import { listDir as clientListDir } from "../api/client";
+import { syncStartLocal } from "../api/sync";
 import { parentPath } from "../util/format";
 import { isRemote } from "../util/location";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
 import { NAVIGATE_EVENT } from "../App";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
@@ -51,6 +53,13 @@ export default function Browser({ initialPath }: Props) {
   const [previewOpen, setPreviewOpen] = useState<boolean>(
     () => settings.previewMode !== "off",
   );
+  /** In-folder search query. Pure client-side filter — Phase 6 will add
+   *  recursive find on top of this primitive. */
+  const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  /** True while a Tauri drag-drop is hovering the window. Drives the
+   *  semi-transparent overlay rendered at the bottom of this component. */
+  const [dragOver, setDragOver] = useState(false);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -117,6 +126,83 @@ export default function Browser({ initialPath }: Props) {
     };
     window.addEventListener(NAVIGATE_EVENT, onExternalNavigate);
     return () => window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
+  }, []);
+
+  // OS-level drag-and-drop. Tauri emits a unified event for enter / over
+  // / drop / leave. On drop, we route each dropped path through
+  // sync_start_local so the user gets a progress bar in the Transfers
+  // page; for directories we nest under the basename so the dropped
+  // folder lands AT the cursor target rather than flattening into it.
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let cancelled = false;
+    void (async () => {
+      try {
+        unlisten = await listen<{ type: string; paths?: string[] }>(
+          "tauri://drag-drop",
+          async (event) => {
+            if (cancelled) return;
+            setDragOver(false);
+            // Phase 4b will route remote dest via syncStartRepo etc; for
+            // now drop is local-only.
+            if (!path || isRemote(path)) {
+              setError("Drag-and-drop into a remote folder isn't supported yet.");
+              return;
+            }
+            const paths = event.payload?.paths ?? [];
+            for (const p of paths) {
+              try {
+                const meta = await fsStat(p);
+                // For directories, nest under <currentPath>/<basename>.
+                // For files, the planner joins the basename for us.
+                const dest = meta.isDir ? `${path}/${meta.name}` : path;
+                await syncStartLocal(p, dest, {
+                  maxSizeGb: 100,
+                  conflictPolicy: "skip",
+                });
+              } catch (e) {
+                setError(String(e));
+              }
+            }
+            void refresh(path);
+          },
+        );
+        const enter = await listen("tauri://drag-enter", () => {
+          if (!cancelled) setDragOver(true);
+        });
+        const leave = await listen("tauri://drag-leave", () => {
+          if (!cancelled) setDragOver(false);
+        });
+        const prevUnlisten = unlisten;
+        unlisten = () => {
+          prevUnlisten?.();
+          enter();
+          leave();
+        };
+      } catch {
+        // Running outside Tauri (browser dev / tests) — drag-drop just
+        // doesn't fire. Silent fallback.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [path, refresh]);
+
+  // Cmd/Ctrl + F → focus the toolbar search input. Doesn't fire if the
+  // user is already in an input (so it doesn't hijack the path bar).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "f") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // Delete-key → send selection to OS trash. Backspace alone is reserved
@@ -224,6 +310,18 @@ export default function Browser({ initialPath }: Props) {
     return { totalSize };
   }, [entries]);
 
+  /** Filtered entry list — case-insensitive substring match on `name`.
+   *  Only applied when there's a query; an empty box is a no-op. */
+  const visibleEntries = useMemo(() => {
+    if (!search) return entries;
+    const q = search.toLowerCase();
+    return entries.filter((e) => e.name.toLowerCase().includes(q));
+  }, [entries, search]);
+
+  // Reset the query on every navigation — the new folder almost certainly
+  // doesn't have files matching the previous folder's search.
+  useEffect(() => setSearch(""), [path]);
+
   /** Aggregate stats over the multi-selection. Memoized so a 100k-entry
    *  folder doesn't re-walk on every keystroke. */
   const selectionStats = useMemo(() => {
@@ -268,6 +366,9 @@ export default function Browser({ initialPath }: Props) {
         flexDirection: "column",
         minWidth: 0,
         height: "100%",
+        // `position: relative` so the drag-drop overlay can absolute-pin
+        // to this Browser pane (and not the whole window).
+        position: "relative",
       }}
     >
       <PathBar
@@ -288,10 +389,13 @@ export default function Browser({ initialPath }: Props) {
         onViewChange={(v) => update("defaultView", v)}
         previewOpen={previewOpen}
         onTogglePreview={() => setPreviewOpen((o) => !o)}
+        search={search}
+        onSearchChange={setSearch}
+        searchInputRef={searchInputRef}
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
         <FileList
-          entries={entries}
+          entries={visibleEntries}
           sortKey={sortKey}
           sortDir={sortDir}
           onSortChange={handleSort}
@@ -316,6 +420,38 @@ export default function Browser({ initialPath }: Props) {
         }
         errorMessage={error}
       />
+      {dragOver && (
+        // Pointer-events: none so the OS drag operation isn't intercepted
+        // by the overlay; we're purely visual here.
+        <Box
+          aria-hidden
+          sx={{
+            position: "absolute",
+            inset: 0,
+            bgcolor: "primary.main",
+            opacity: 0.15,
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Box
+            sx={{
+              bgcolor: "background.paper",
+              border: 2,
+              borderStyle: "dashed",
+              borderColor: "primary.main",
+              borderRadius: 2,
+              px: 4,
+              py: 2,
+              opacity: 1,
+            }}
+          >
+            Drop to copy here
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }

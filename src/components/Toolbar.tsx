@@ -8,7 +8,12 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Divider,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
+import { type Ref } from "react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -36,6 +41,12 @@ interface Props {
   /** Whether the right-side preview pane is currently visible. */
   previewOpen: boolean;
   onTogglePreview: () => void;
+  /** Live search query — filters the current folder client-side. */
+  search: string;
+  onSearchChange: (v: string) => void;
+  /** Ref for Cmd/Ctrl+F focus. The Browser owns the keybind so the
+   *  toolbar doesn't need to know about route-level shortcuts. */
+  searchInputRef?: Ref<HTMLInputElement>;
 }
 
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
@@ -53,6 +64,9 @@ export default function Toolbar(props: Props) {
     onViewChange,
     previewOpen,
     onTogglePreview,
+    search,
+    onSearchChange,
+    searchInputRef,
   } = props;
 
   return (
@@ -122,6 +136,46 @@ export default function Toolbar(props: Props) {
       </Tooltip>
 
       <Box sx={{ flexGrow: 1 }} />
+
+      <TextField
+        size="small"
+        placeholder="Search…"
+        value={search}
+        onChange={(e) => onSearchChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            // Esc clears + blurs so the user can resume keyboard nav.
+            onSearchChange("");
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        inputRef={searchInputRef}
+        sx={{ width: 200 }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+            endAdornment: search ? (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={() => onSearchChange("")}
+                  aria-label="Clear search"
+                  sx={{ p: 0.25 }}
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          },
+          htmlInput: { "aria-label": "Search current folder" },
+        }}
+      />
+
+      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       <Tooltip title={previewOpen ? "Hide preview" : "Show preview"}>
         <IconButton

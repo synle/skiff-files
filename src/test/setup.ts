@@ -59,6 +59,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
+  // listen returns an unlisten fn; default to a no-op so mount/unmount
+  // doesn't blow up when components subscribe to drag-drop or sync events.
   listen: vi.fn(async () => () => {}),
   emit: vi.fn(async () => {}),
 }));
