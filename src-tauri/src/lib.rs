@@ -11,13 +11,12 @@ pub mod fs;
 pub mod sync;
 
 use commands::{
-    conn_create_sftp, conn_dir_summary, conn_disconnect, conn_list, conn_list_dir,
-    conn_read_base64, conn_read_text, conn_stat, fs_canonicalize, fs_copy_file, fs_dir_summary,
-    fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64, fs_read_text, fs_remove, fs_rename,
-    fs_find, fs_stat, fs_trash, fs_trash_many, get_app_version, settings_load, settings_save,
-    sync_cancel,
-    sync_cpstamp, sync_dedup, sync_list, sync_pause, sync_resolve_conflict, sync_resume,
-    sync_start_local, sync_start_repo,
+    conn_create_sftp, conn_dir_summary, conn_disconnect, conn_list, conn_list_dir, conn_mkdir,
+    conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, fs_canonicalize,
+    fs_copy_file, fs_dir_summary, fs_find, fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64,
+    fs_read_text, fs_remove, fs_rename, fs_stat, fs_trash, fs_trash_many, get_app_version,
+    settings_load, settings_save, sync_cancel, sync_cpstamp, sync_dedup, sync_list, sync_pause,
+    sync_resolve_conflict, sync_resume, sync_start_local, sync_start_repo,
 };
 use fs::registry::Registry;
 use std::sync::Arc;
@@ -63,6 +62,9 @@ pub fn run() {
             conn_read_text,
             conn_read_base64,
             conn_dir_summary,
+            conn_mkdir,
+            conn_rename,
+            conn_remove,
             // sync
             sync_start_local,
             sync_start_repo,

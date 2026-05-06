@@ -38,6 +38,9 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "conn_list") return [];
     if (cmd === "conn_create_sftp") return "test-conn-id";
     if (cmd === "conn_disconnect") return null;
+    if (cmd === "conn_mkdir") return null;
+    if (cmd === "conn_rename") return null;
+    if (cmd === "conn_remove") return null;
     if (cmd === "sync_list") return [];
     if (cmd === "sync_start_local") return "test-job-id";
     if (cmd === "sync_start_repo") return "test-repo-job-id";

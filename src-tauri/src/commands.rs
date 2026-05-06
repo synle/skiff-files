@@ -310,6 +310,42 @@ pub async fn conn_dir_summary(
     client.dir_summary(&path, DIR_SCAN_MAX_ENTRIES).await
 }
 
+/// Remote `mkdir -p`. Idempotent.
+#[tauri::command]
+pub async fn conn_mkdir(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<()> {
+    let client = registry.get_sftp(&id)?;
+    client.mkdir(&path).await
+}
+
+/// Remote rename / same-FS move.
+#[tauri::command]
+pub async fn conn_rename(
+    id: String,
+    from: String,
+    to: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<()> {
+    let client = registry.get_sftp(&id)?;
+    client.rename(&from, &to).await
+}
+
+/// Remote remove. Recursive for directories. There's no "send to trash"
+/// equivalent on the server side; this is a permanent delete and the
+/// frontend should confirm before invoking.
+#[tauri::command]
+pub async fn conn_remove(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<()> {
+    let client = registry.get_sftp(&id)?;
+    client.remove(&path).await
+}
+
 // ---------- Sync commands (Phase 4a) ----------
 
 /// Run a fully-planned job synchronously. Shared between

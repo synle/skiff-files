@@ -5,20 +5,24 @@
 // same backend without the caller having to remember.
 import {
   fsListDir,
+  fsMkdir,
   fsStat,
   fsReadText,
   fsReadBase64,
   fsDirSummary,
+  fsTrashMany,
   type DirSummary,
   type Entry,
   type ListOptions,
 } from "./fs";
 import {
-  connListDir,
-  connStat,
-  connReadText,
-  connReadBase64,
   connDirSummary,
+  connListDir,
+  connMkdir,
+  connReadBase64,
+  connReadText,
+  connRemove,
+  connStat,
 } from "./conn";
 import { formatSftp, parseLocation } from "../util/location";
 
@@ -78,4 +82,37 @@ export async function dirSummary(path: string): Promise<DirSummary> {
     return connDirSummary(loc.backend.connectionId, loc.remotePath);
   }
   return fsDirSummary(path);
+}
+
+/** Backend-agnostic mkdir (recursive). */
+export async function mkdir(path: string): Promise<void> {
+  const loc = parseLocation(path);
+  if (loc.backend.kind === "sftp") {
+    return connMkdir(loc.backend.connectionId, loc.remotePath);
+  }
+  return fsMkdir(path);
+}
+
+/** Multi-path delete that picks the right backend per path. Local
+ *  paths go to the OS trash; remote paths permanently delete (no
+ *  server-side trash exists). The caller should confirm before this is
+ *  invoked when remote paths are present, since they're permanent. */
+export async function removeOrTrashMany(paths: string[]): Promise<void> {
+  // Group locals together for one batched fs_trash_many; dispatch
+  // remotes per-path through their connection.
+  const local: string[] = [];
+  const remote: { id: string; remotePath: string }[] = [];
+  for (const p of paths) {
+    const loc = parseLocation(p);
+    if (loc.backend.kind === "sftp") {
+      remote.push({
+        id: loc.backend.connectionId,
+        remotePath: loc.remotePath,
+      });
+    } else {
+      local.push(p);
+    }
+  }
+  if (local.length) await fsTrashMany(local);
+  for (const r of remote) await connRemove(r.id, r.remotePath);
 }

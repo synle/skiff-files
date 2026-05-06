@@ -261,6 +261,119 @@ impl SftpClient {
         Ok(buf)
     }
 
+    /// Create a directory on the remote. The russh-sftp client surfaces
+    /// `create_dir` as a single-level `MKDIR` — there's no recursive
+    /// variant, so we walk parents ourselves and ignore "already exists"
+    /// failures (matching the local fs flavor's idempotency).
+    pub async fn mkdir(&self, path: &str) -> FsResult<()> {
+        let sftp = self.sftp.lock().await;
+        // Build the ancestor list (POSIX-only: SFTP paths are always /-separated).
+        let mut parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        // Drop the leaf so we mkdir parents first, then the target itself.
+        let leaf = parts.pop();
+        let mut acc = String::new();
+        for p in parts {
+            acc.push('/');
+            acc.push_str(p);
+            // Server returns an error for "already exists" — swallow it.
+            // We could call try_exists first but that's an extra round
+            // trip; cheaper to attempt + ignore.
+            let _ = sftp.create_dir(acc.clone()).await;
+        }
+        if let Some(leaf) = leaf {
+            acc.push('/');
+            acc.push_str(leaf);
+            // Final segment: surface the real error if creation actually
+            // fails (permissions, parent-not-a-dir, etc.).
+            match sftp.create_dir(acc.clone()).await {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    // If the path now exists as a directory, treat as
+                    // success — we likely lost a race with another
+                    // client, or the dir was already there.
+                    match sftp.metadata(acc.clone()).await {
+                        Ok(md) if md.is_dir() => Ok(()),
+                        _ => Err(format!("mkdir({path}): {e}")),
+                    }
+                }
+            }
+        } else {
+            // Empty/root path — nothing to do.
+            Ok(())
+        }
+    }
+
+    /// Move (or rename within the same dir). Same-FS only — for cross-
+    /// device the engine should fall back to copy + remove, just like
+    /// local.
+    pub async fn rename(&self, from: &str, to: &str) -> FsResult<()> {
+        let sftp = self.sftp.lock().await;
+        sftp.rename(from, to)
+            .await
+            .map_err(|e| format!("rename({from} -> {to}): {e}"))
+    }
+
+    /// Recursive remove. SFTP's primitives are file vs dir-only, so we
+    /// stat first and dispatch; for dirs we walk depth-first, removing
+    /// children before the parent.
+    pub async fn remove(&self, path: &str) -> FsResult<()> {
+        let sftp = self.sftp.lock().await;
+        let md = sftp
+            .metadata(path)
+            .await
+            .map_err(|e| format!("stat({path}): {e}"))?;
+        if !md.is_dir() {
+            return sftp
+                .remove_file(path)
+                .await
+                .map_err(|e| format!("remove_file({path}): {e}"))
+        }
+        // Iterative DFS post-order: collect every entry first, then
+        // delete deepest-first. Symlinks inside the tree get removed as
+        // links (we never follow them).
+        let mut to_remove_files: Vec<String> = Vec::new();
+        let mut to_remove_dirs: Vec<String> = vec![path.to_string()];
+        let mut stack: Vec<String> = vec![path.to_string()];
+        while let Some(dir) = stack.pop() {
+            let listing = match sftp.read_dir(&dir).await {
+                Ok(l) => l,
+                // Unreadable subdir — try to rmdir it later anyway; if
+                // it's actually populated, the rmdir errors will
+                // surface.
+                Err(_) => continue,
+            };
+            for entry in listing {
+                let name = entry.file_name();
+                let attrs = entry.metadata();
+                let full = if dir.ends_with('/') {
+                    format!("{dir}{name}")
+                } else {
+                    format!("{dir}/{name}")
+                };
+                if attrs.is_dir() && !attrs.is_symlink() {
+                    to_remove_dirs.push(full.clone());
+                    stack.push(full);
+                } else {
+                    to_remove_files.push(full);
+                }
+            }
+        }
+        for f in to_remove_files {
+            sftp.remove_file(&f)
+                .await
+                .map_err(|e| format!("remove_file({f}): {e}"))?;
+        }
+        // Reverse so deepest dirs go first. The original `path` is at
+        // index 0; we want it last.
+        to_remove_dirs.reverse();
+        for d in to_remove_dirs {
+            sftp.remove_dir(&d)
+                .await
+                .map_err(|e| format!("remove_dir({d}): {e}"))?;
+        }
+        Ok(())
+    }
+
     /// Recursive entries + size, capped at `max_entries`. Iterative so a
     /// deep tree doesn't blow the stack. Mirrors the local impl's shape.
     pub async fn dir_summary(&self, path: &str, max_entries: usize) -> FsResult<DirSummary> {

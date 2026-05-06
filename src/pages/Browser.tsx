@@ -9,15 +9,12 @@ import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
+import { fsFind, fsHomeDir, fsStat, type Entry } from "../api/fs";
 import {
-  fsFind,
-  fsHomeDir,
-  fsMkdir,
-  fsStat,
-  fsTrashMany,
-  type Entry,
-} from "../api/fs";
-import { listDir as clientListDir } from "../api/client";
+  listDir as clientListDir,
+  mkdir as clientMkdir,
+  removeOrTrashMany,
+} from "../api/client";
 import { syncStartLocal } from "../api/sync";
 import { parentPath } from "../util/format";
 import { isRemote } from "../util/location";
@@ -252,17 +249,15 @@ export default function Browser({
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
       if (selectedPaths.length === 0) return;
-      // Remote trash is a Phase 2b+ item — refuse here so we don't
-      // pretend to send remote files to a local recycle bin.
-      if (selectedPaths.some((p) => p.startsWith("sftp://"))) {
-        setError("Remote trash is not supported yet.");
-        return;
-      }
+      const hasRemote = selectedPaths.some((p) => p.startsWith("sftp://"));
+      const verb = hasRemote
+        ? "Permanently delete" // remote: no server-side trash
+        : "Move to Trash";
       const ok = window.confirm(
-        `Move ${selectedPaths.length} item${selectedPaths.length === 1 ? "" : "s"} to Trash?`,
+        `${verb} ${selectedPaths.length} item${selectedPaths.length === 1 ? "" : "s"}?`,
       );
       if (!ok) return;
-      void fsTrashMany(selectedPaths)
+      void removeOrTrashMany(selectedPaths)
         .then(() => {
           if (path) void refresh(path);
         })
@@ -316,13 +311,6 @@ export default function Browser({
 
   const handleNewFolder = async () => {
     if (!path) return;
-    // mkdir on remote backends lands in a follow-up — Phase 2a only ships
-    // the read-side of SFTP. Skip silently rather than throwing a confusing
-    // "command not found" error at the user.
-    if (isRemote(path)) {
-      setError("Remote mkdir is not supported yet.");
-      return;
-    }
     // Auto-name "New Folder", "New Folder 2", ... so we don't need a modal
     // on the first cut. A rename-on-create flow lands with the context menu.
     const existing = new Set(entries.map((e) => e.name));
@@ -333,7 +321,7 @@ export default function Browser({
     }
     const target = `${path}/${name}`;
     try {
-      await fsMkdir(target);
+      await clientMkdir(target);
       await refresh(path);
     } catch (e) {
       setError(String(e));

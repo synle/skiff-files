@@ -53,3 +53,19 @@ export const connDirSummary = (
   id: string,
   path: string,
 ): Promise<DirSummary> => invoke<DirSummary>("conn_dir_summary", { id, path });
+
+/** Create a directory on a remote (recursive, idempotent). */
+export const connMkdir = (id: string, path: string): Promise<void> =>
+  invoke<void>("conn_mkdir", { id, path });
+
+/** Rename / same-FS move on a remote. */
+export const connRename = (
+  id: string,
+  from: string,
+  to: string,
+): Promise<void> => invoke<void>("conn_rename", { id, from, to });
+
+/** Recursive remove on a remote. Permanent — there's no server-side
+ *  trash; the frontend should confirm before invoking. */
+export const connRemove = (id: string, path: string): Promise<void> =>
+  invoke<void>("conn_remove", { id, path });

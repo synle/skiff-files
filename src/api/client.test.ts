@@ -117,3 +117,56 @@ describe("client.stat / readText / readBase64 / dirSummary route by scheme", () 
     });
   });
 });
+
+describe("client.mkdir / removeOrTrashMany dispatch", () => {
+  it("mkdir routes local through fs_mkdir", async () => {
+    mocked.mockResolvedValueOnce(undefined);
+    const { mkdir } = await import("./client");
+    await mkdir("/x/new");
+    expect(mocked).toHaveBeenLastCalledWith("fs_mkdir", { path: "/x/new" });
+  });
+
+  it("mkdir routes sftp through conn_mkdir", async () => {
+    mocked.mockResolvedValueOnce(undefined);
+    const { mkdir } = await import("./client");
+    await mkdir("sftp://abc/new");
+    expect(mocked).toHaveBeenLastCalledWith("conn_mkdir", {
+      id: "abc",
+      path: "/new",
+    });
+  });
+
+  it("removeOrTrashMany batches locals + dispatches remotes per-path", async () => {
+    mocked.mockResolvedValueOnce(undefined); // fs_trash_many for the locals
+    mocked.mockResolvedValueOnce(undefined); // conn_remove for /a
+    mocked.mockResolvedValueOnce(undefined); // conn_remove for /b
+    const { removeOrTrashMany } = await import("./client");
+    await removeOrTrashMany([
+      "/local/x",
+      "/local/y",
+      "sftp://abc/a",
+      "sftp://abc/b",
+    ]);
+    expect(mocked).toHaveBeenCalledWith("fs_trash_many", {
+      paths: ["/local/x", "/local/y"],
+    });
+    expect(mocked).toHaveBeenCalledWith("conn_remove", {
+      id: "abc",
+      path: "/a",
+    });
+    expect(mocked).toHaveBeenCalledWith("conn_remove", {
+      id: "abc",
+      path: "/b",
+    });
+  });
+
+  it("removeOrTrashMany skips fs_trash_many when no locals", async () => {
+    mocked.mockResolvedValueOnce(undefined);
+    const { removeOrTrashMany } = await import("./client");
+    await removeOrTrashMany(["sftp://abc/only-remote"]);
+    // The call ordering is: only conn_remove, no fs_trash_many.
+    const calls = mocked.mock.calls.map((c) => c[0]);
+    expect(calls).not.toContain("fs_trash_many");
+    expect(calls).toContain("conn_remove");
+  });
+});
