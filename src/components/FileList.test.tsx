@@ -72,6 +72,7 @@ const ENTRIES: Entry[] = [
 function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
   const onSortChange = props?.onSortChange ?? vi.fn();
   const onOpenDir = props?.onOpenDir ?? vi.fn();
+  const onPrimarySelect = props?.onPrimarySelect ?? vi.fn();
   render(
     <ThemeProvider theme={theme}>
       <div style={{ height: 600 }}>
@@ -81,13 +82,14 @@ function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
           sortDir={props?.sortDir ?? "asc"}
           onSortChange={onSortChange}
           onOpenDir={onOpenDir}
+          onPrimarySelect={onPrimarySelect}
           density={props?.density ?? "comfortable"}
           showExtensions={props?.showExtensions ?? true}
         />
       </div>
     </ThemeProvider>,
   );
-  return { onSortChange, onOpenDir };
+  return { onSortChange, onOpenDir, onPrimarySelect };
 }
 
 describe("FileList", () => {
@@ -116,6 +118,17 @@ describe("FileList", () => {
     expect(folderRow).toBeTruthy();
     fireEvent.doubleClick(folderRow!);
     expect(onOpenDir).toHaveBeenCalled();
+  });
+
+  it("single-clicking a row fires onPrimarySelect with that entry", () => {
+    const { onPrimarySelect } = renderList();
+    const row = screen
+      .getAllByTestId("file-row")
+      .find((r) => r.textContent?.includes("alpha.txt"))!;
+    fireEvent.click(row);
+    expect(onPrimarySelect).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "alpha.txt" }),
+    );
   });
 
   it("hides extensions when showExtensions=false", () => {

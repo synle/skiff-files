@@ -70,3 +70,27 @@ export const fsCopyFile = (from: string, to: string): Promise<number> =>
 
 export const fsCanonicalize = (path: string): Promise<string> =>
   invoke<string>("fs_canonicalize", { path });
+
+// ---------- Preview commands (Phase 1.5) ----------
+
+/** Mirror of `crate::fs::local::DirSummary`. */
+export interface DirSummary {
+  entries: number;
+  totalSize: number;
+  /** True when the recursive scan hit the entry cap before finishing. */
+  truncated: boolean;
+}
+
+/** Read the head of a text file. Capped server-side; never returns more
+ *  than ~256 KB. */
+export const fsReadText = (path: string): Promise<string> =>
+  invoke<string>("fs_read_text", { path });
+
+/** Read the entire file as base64. Errors for files over 16 MB. The caller
+ *  wraps this in a data URL for inline image rendering. */
+export const fsReadBase64 = (path: string): Promise<string> =>
+  invoke<string>("fs_read_base64", { path });
+
+/** Recursive entry count + total size for a folder. Capped scan. */
+export const fsDirSummary = (path: string): Promise<DirSummary> =>
+  invoke<DirSummary>("fs_dir_summary", { path });

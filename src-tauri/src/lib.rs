@@ -10,8 +10,8 @@ pub mod commands;
 pub mod fs;
 
 use commands::{
-    fs_canonicalize, fs_copy_file, fs_home_dir, fs_list_dir, fs_mkdir, fs_remove, fs_rename,
-    fs_stat, get_app_version,
+    fs_canonicalize, fs_copy_file, fs_dir_summary, fs_home_dir, fs_list_dir, fs_mkdir,
+    fs_read_base64, fs_read_text, fs_remove, fs_rename, fs_stat, get_app_version,
 };
 
 /// Tauri application entry point. The handler list is the public API of the
@@ -31,6 +31,9 @@ pub fn run() {
             fs_remove,
             fs_copy_file,
             fs_canonicalize,
+            fs_read_text,
+            fs_read_base64,
+            fs_dir_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

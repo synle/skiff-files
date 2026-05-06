@@ -23,6 +23,12 @@ export type ViewMode = "list" | "tile" | "gallery" | "column";
 /** Visual density of list rows. */
 export type Density = "comfortable" | "compact";
 
+/** Preview pane visibility policy:
+ *  - `off` — never show the pane
+ *  - `imagesOnly` — auto-open when an image is selected, otherwise hidden
+ *  - `always` — always show, render placeholder when no selection */
+export type PreviewMode = "off" | "imagesOnly" | "always";
+
 /** Persisted settings shape. Add new keys with sensible defaults — see DEFAULTS. */
 export interface Settings {
   themeMode: ThemeMode;
@@ -30,6 +36,10 @@ export interface Settings {
   density: Density;
   showHidden: boolean;
   showExtensions: boolean;
+  /** Right-side preview pane policy. */
+  previewMode: PreviewMode;
+  /** Width of the preview pane in pixels. Persisted across sessions. */
+  previewWidth: number;
   /** Where the Browser opens on launch. Empty = home dir (resolved at runtime). */
   startPath: string;
 }
@@ -40,6 +50,8 @@ export const DEFAULTS: Settings = {
   density: "comfortable",
   showHidden: false,
   showExtensions: true,
+  previewMode: "imagesOnly",
+  previewWidth: 320,
   startPath: "",
 };
 

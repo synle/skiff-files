@@ -26,6 +26,14 @@ vi.mock("@tauri-apps/api/core", () => ({
         mode: null,
       };
     }
+    if (cmd === "fs_read_text") return "preview text";
+    if (cmd === "fs_read_base64") {
+      // Tiny 1x1 transparent PNG so jsdom's image element doesn't choke.
+      return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=";
+    }
+    if (cmd === "fs_dir_summary") {
+      return { entries: 42, totalSize: 1024, truncated: false };
+    }
     return null;
   }),
 }));

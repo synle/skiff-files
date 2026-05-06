@@ -128,6 +128,25 @@ export default function SettingsPage() {
             }
             label="Show file extensions"
           />
+
+          <FormControl size="small" sx={{ maxWidth: 240 }}>
+            <InputLabel id="preview-mode-label">Preview pane</InputLabel>
+            <Select
+              labelId="preview-mode-label"
+              label="Preview pane"
+              value={settings.previewMode}
+              onChange={(e) =>
+                update(
+                  "previewMode",
+                  e.target.value as typeof settings.previewMode,
+                )
+              }
+            >
+              <MenuItem value="off">Off</MenuItem>
+              <MenuItem value="imagesOnly">Images only</MenuItem>
+              <MenuItem value="always">Always show</MenuItem>
+            </Select>
+          </FormControl>
         </Section>
 
         <Divider />

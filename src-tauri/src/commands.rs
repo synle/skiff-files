@@ -5,9 +5,23 @@
 //! Commands live here (rather than `lib.rs`) so the registration list in
 //! `lib.rs` stays a one-liner per command — easier to scan and reorder.
 
-use crate::fs::local;
+use crate::fs::local::{self, DirSummary};
 use crate::fs::types::{Entry, FsResult, ListOptions};
 use std::path::Path;
+
+/// Hard cap for inline image previews. Anything bigger should open in an
+/// external viewer rather than blow up our IPC channel. 16 MB is enough for
+/// 24 MP JPEGs and shrunken RAW conversions.
+const IMAGE_PREVIEW_MAX_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Hard cap for text previews — Phase 1.5 only renders the head. The
+/// "show all" link in the preview pane will open in an external editor.
+const TEXT_PREVIEW_MAX_BYTES: u64 = 256 * 1024;
+
+/// Hard cap for the recursive directory scan that powers the folder
+/// summary. 250k matches the ~10 second sweet spot on a SATA SSD; tweak
+/// as we get real numbers.
+const DIR_SCAN_MAX_ENTRIES: usize = 250_000;
 
 /// Versioning is sourced from `tauri.conf.json` via `build.rs`. Returning a
 /// `&'static str` avoids a heap allocation per call.
@@ -75,4 +89,29 @@ pub fn fs_canonicalize(path: String) -> FsResult<String> {
     Ok(local::canonicalize(Path::new(&path))?
         .to_string_lossy()
         .into_owned())
+}
+
+// ---------- Preview commands (Phase 1.5) ----------
+
+/// Read up to TEXT_PREVIEW_MAX_BYTES of `path` as UTF-8. Used by the right-
+/// side preview pane for text/markdown/code files.
+#[tauri::command]
+pub fn fs_read_text(path: String) -> FsResult<String> {
+    local::read_file_text(Path::new(&path), TEXT_PREVIEW_MAX_BYTES)
+}
+
+/// Read `path` as base64. The frontend wraps this in a `data:image/...;base64,`
+/// URL for inline rendering. We refuse oversized files instead of truncating
+/// (a half-image is worse than no preview).
+#[tauri::command]
+pub fn fs_read_base64(path: String) -> FsResult<String> {
+    local::read_file_base64(Path::new(&path), IMAGE_PREVIEW_MAX_BYTES)
+}
+
+/// Recursive entries + size for a folder. Capped scan; the response
+/// includes `truncated: true` when we hit the cap so the UI can show a
+/// "≥" prefix.
+#[tauri::command]
+pub fn fs_dir_summary(path: String) -> FsResult<DirSummary> {
+    local::dir_summary(Path::new(&path), DIR_SCAN_MAX_ENTRIES)
 }

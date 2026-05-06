@@ -8,9 +8,11 @@ import PathBar from "../components/PathBar";
 import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
+import PreviewPane from "../components/PreviewPane";
 import { fsHomeDir, fsListDir, fsMkdir, type Entry } from "../api/fs";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
+import { isImage } from "../util/mime";
 import { NAVIGATE_EVENT } from "../App";
 
 interface Props {
@@ -36,6 +38,14 @@ export default function Browser({ initialPath }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  /** Last-clicked entry — drives the preview pane. */
+  const [primarySelected, setPrimarySelected] = useState<Entry | null>(null);
+  /** Per-session toggle of the preview pane, seeded from the persisted
+   *  policy. The toolbar eye icon flips this; closing-then-reopening
+   *  doesn't change Settings. */
+  const [previewOpen, setPreviewOpen] = useState<boolean>(
+    () => settings.previewMode !== "off",
+  );
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -167,6 +177,26 @@ export default function Browser({ initialPath }: Props) {
     return { totalSize };
   }, [entries]);
 
+  // Reset the primary selection on every navigation — sticking to a row in
+  // the previous folder would surface a stale path in the preview pane.
+  useEffect(() => {
+    setPrimarySelected(null);
+  }, [path]);
+
+  // Honor the preview policy. `imagesOnly` only opens the pane when the
+  // primary selection is image-shaped; `always` opens unconditionally. The
+  // user can still hide via the toolbar — the policy seeds defaults, it
+  // doesn't lock state.
+  const effectivePreviewOpen =
+    settings.previewMode === "off"
+      ? false
+      : settings.previewMode === "always"
+        ? previewOpen
+        : previewOpen &&
+          !!primarySelected &&
+          !primarySelected.isDir &&
+          isImage(primarySelected.path);
+
   return (
     <Box
       sx={{
@@ -193,16 +223,27 @@ export default function Browser({ initialPath }: Props) {
         onNewFolder={() => void handleNewFolder()}
         view={settings.defaultView}
         onViewChange={(v) => update("defaultView", v)}
+        previewOpen={previewOpen}
+        onTogglePreview={() => setPreviewOpen((o) => !o)}
       />
-      <FileList
-        entries={entries}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSortChange={handleSort}
-        onOpenDir={(e) => navigate(e.path)}
-        density={settings.density}
-        showExtensions={settings.showExtensions}
-      />
+      <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
+        <FileList
+          entries={entries}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSortChange={handleSort}
+          onOpenDir={(e) => navigate(e.path)}
+          onPrimarySelect={setPrimarySelected}
+          density={settings.density}
+          showExtensions={settings.showExtensions}
+        />
+        {effectivePreviewOpen && (
+          <PreviewPane
+            selected={primarySelected}
+            width={settings.previewWidth}
+          />
+        )}
+      </Box>
       <StatusBar
         totalEntries={entries.length}
         selectedEntries={0}

@@ -18,6 +18,8 @@ import ViewListIcon from "@mui/icons-material/ViewList";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import type { ViewMode } from "../state/settings";
 
 interface Props {
@@ -31,6 +33,9 @@ interface Props {
   onNewFolder: () => void;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
+  /** Whether the right-side preview pane is currently visible. */
+  previewOpen: boolean;
+  onTogglePreview: () => void;
 }
 
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
@@ -46,6 +51,8 @@ export default function Toolbar(props: Props) {
     onNewFolder,
     view,
     onViewChange,
+    previewOpen,
+    onTogglePreview,
   } = props;
 
   return (
@@ -115,6 +122,23 @@ export default function Toolbar(props: Props) {
       </Tooltip>
 
       <Box sx={{ flexGrow: 1 }} />
+
+      <Tooltip title={previewOpen ? "Hide preview" : "Show preview"}>
+        <IconButton
+          size="small"
+          onClick={onTogglePreview}
+          aria-label={previewOpen ? "Hide preview" : "Show preview"}
+          aria-pressed={previewOpen}
+        >
+          {previewOpen ? (
+            <VisibilityIcon fontSize="small" />
+          ) : (
+            <VisibilityOffIcon fontSize="small" />
+          )}
+        </IconButton>
+      </Tooltip>
+
+      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       <ToggleButtonGroup
         size="small"

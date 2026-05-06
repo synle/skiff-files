@@ -23,6 +23,9 @@ interface Props {
   onSortChange: (key: SortKey) => void;
   /** Called when a folder is double-clicked or Enter pressed on it. */
   onOpenDir: (entry: Entry) => void;
+  /** Fires whenever a row is clicked. The "primary" selection drives the
+   *  preview pane; the FileList still tracks its own multi-select internally. */
+  onPrimarySelect?: (entry: Entry | null) => void;
   density: Density;
   showExtensions: boolean;
 }
@@ -102,6 +105,7 @@ export default function FileList(props: Props) {
     sortDir,
     onSortChange,
     onOpenDir,
+    onPrimarySelect,
     density,
     showExtensions,
   } = props;
@@ -137,6 +141,7 @@ export default function FileList(props: Props) {
 
   const onRowClick = (e: Entry, evt: React.MouseEvent) => {
     toggleSel(e.path, evt.metaKey || evt.ctrlKey);
+    onPrimarySelect?.(e);
   };
   const onRowDouble = (e: Entry) => {
     if (e.isDir) onOpenDir(e);

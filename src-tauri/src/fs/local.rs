@@ -178,6 +178,104 @@ pub fn home_dir() -> FsResult<PathBuf> {
     dirs::home_dir().ok_or_else(|| "home dir not available on this platform".to_string())
 }
 
+// ---------- Preview helpers (Phase 1.5) ----------
+//
+// These power the right-side preview pane. They cap how much data we'll
+// read so a stray click on a 10 GB log file doesn't pin the UI thread.
+
+/// Read a file as UTF-8 text, capped at `max_bytes`. We intentionally lossy-
+/// decode so a non-UTF8 file (e.g. a Latin-1 readme) doesn't error — the
+/// preview pane shows replacement chars rather than nothing.
+pub fn read_file_text(path: &Path, max_bytes: u64) -> FsResult<String> {
+    let md = fs::metadata(path).map_err(|e| format!("stat({}): {e}", path.display()))?;
+    if md.is_dir() {
+        return Err(format!("not a file: {}", path.display()));
+    }
+    let len = std::cmp::min(md.len(), max_bytes);
+    let mut f = fs::File::open(path).map_err(|e| format!("open({}): {e}", path.display()))?;
+    use std::io::Read;
+    let mut buf = vec![0u8; len as usize];
+    f.read_exact(&mut buf)
+        .map_err(|e| format!("read({}): {e}", path.display()))?;
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
+
+/// Read a file as base64 — used for inline image previews. We refuse anything
+/// over `max_bytes` instead of silently truncating (a half-image is worse
+/// than no image).
+pub fn read_file_base64(path: &Path, max_bytes: u64) -> FsResult<String> {
+    use base64::engine::general_purpose::STANDARD as B64;
+    use base64::Engine as _;
+    let md = fs::metadata(path).map_err(|e| format!("stat({}): {e}", path.display()))?;
+    if md.is_dir() {
+        return Err(format!("not a file: {}", path.display()));
+    }
+    if md.len() > max_bytes {
+        return Err(format!(
+            "file too large for preview: {} bytes (limit {})",
+            md.len(),
+            max_bytes
+        ));
+    }
+    let bytes = fs::read(path).map_err(|e| format!("read({}): {e}", path.display()))?;
+    Ok(B64.encode(bytes))
+}
+
+/// Recursive directory summary — total entries + total bytes. Capped at
+/// `max_entries` so a click on `/` doesn't lock up; if we hit the cap we
+/// flip `truncated = true` and the UI shows a "≥" prefix.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirSummary {
+    pub entries: u64,
+    pub total_size: u64,
+    pub truncated: bool,
+}
+
+pub fn dir_summary(path: &Path, max_entries: usize) -> FsResult<DirSummary> {
+    let mut entries: u64 = 0;
+    let mut total_size: u64 = 0;
+    // Iterative DFS so a deeply-nested tree doesn't blow the stack.
+    let mut stack: Vec<PathBuf> = vec![path.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let read = match fs::read_dir(&dir) {
+            Ok(r) => r,
+            // Skip unreadable subdirs (permissions etc.) rather than failing
+            // the whole scan — same behavior as the listing fn.
+            Err(_) => continue,
+        };
+        for d in read {
+            if entries as usize >= max_entries {
+                return Ok(DirSummary {
+                    entries,
+                    total_size,
+                    truncated: true,
+                });
+            }
+            let d = match d {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            entries += 1;
+            let p = d.path();
+            let md = match fs::symlink_metadata(&p) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if md.is_dir() && !md.file_type().is_symlink() {
+                stack.push(p);
+            } else {
+                total_size += md.len();
+            }
+        }
+    }
+    Ok(DirSummary {
+        entries,
+        total_size,
+        truncated: false,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309,5 +407,72 @@ mod tests {
             ListOptions::default(),
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_file_text_returns_contents() {
+        let root = fixture();
+        let txt = read_file_text(&root.join("hello.md"), 1024).unwrap();
+        assert!(txt.contains("# hi"), "got {txt:?}");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn read_file_text_caps_at_max_bytes() {
+        let root = fixture();
+        let p = root.join("big.txt");
+        fs::write(&p, "abcdefghijklmnop").unwrap(); // 16 bytes
+        let txt = read_file_text(&p, 5).unwrap();
+        assert_eq!(txt.len(), 5);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn read_file_base64_round_trips() {
+        use base64::engine::general_purpose::STANDARD as B64;
+        use base64::Engine as _;
+        let root = fixture();
+        let b64 = read_file_base64(&root.join("hello.md"), 1024).unwrap();
+        let decoded = B64.decode(b64).unwrap();
+        assert_eq!(decoded, b"# hi\n");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn read_file_base64_refuses_oversize() {
+        let root = fixture();
+        let p = root.join("big.bin");
+        fs::write(&p, vec![0u8; 4096]).unwrap();
+        let result = read_file_base64(&p, 100);
+        assert!(result.is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn read_file_base64_rejects_directory() {
+        let root = fixture();
+        assert!(read_file_base64(&root, 1024).is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn dir_summary_counts_entries_and_size() {
+        let root = fixture();
+        // hello.md (5 bytes) + .hidden (0 bytes) + sub/ (counted as entry, 0 size)
+        let s = dir_summary(&root, 1000).unwrap();
+        assert_eq!(s.entries, 3);
+        assert!(s.total_size >= 5);
+        assert!(!s.truncated);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn dir_summary_truncates_at_cap() {
+        let root = fixture();
+        // Cap at 1; with 3 entries we should see truncated=true.
+        let s = dir_summary(&root, 1).unwrap();
+        assert!(s.truncated);
+        assert!(s.entries <= 3);
+        let _ = fs::remove_dir_all(root);
     }
 }
