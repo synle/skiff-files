@@ -5,6 +5,7 @@ import { Routes, Route, Navigate, useNavigate } from "react-router";
 import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
+import ShortcutsModal from "./components/ShortcutsModal";
 import Browser from "./pages/Browser";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
@@ -77,6 +78,9 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Box>
+      {/* Mounted once at the app root so any route can pop the cheatsheet
+          via `?` without re-listening per page. */}
+      <ShortcutsModal />
     </Box>
   );
 }

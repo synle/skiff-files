@@ -45,7 +45,10 @@ Two layers, talking via `invoke()`:
 
 ## Backlog policy
 
-The "Backlog" section at the bottom of TODO.md contains items the user has explicitly deferred. **Do not implement them or add tests for them unless the user explicitly says "go work on X" by name.** As of 2026-05-06 this list contains the built-in archive (zip/tar/7z) viewer.
+The "Backlog" section at the bottom of TODO.md contains items the user has explicitly deferred. **Do not implement them or add tests for them unless the user explicitly says "go work on X" by name.** As of 2026-05-06 this list contains:
+
+- Built-in archive viewer (zip/tar/7z)
+- User-customizable theme (custom MUI palettes + presets, with color pickers)
 
 ## Versioning
 

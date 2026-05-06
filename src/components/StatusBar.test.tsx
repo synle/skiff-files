@@ -39,4 +39,15 @@ describe("StatusBar", () => {
     });
     expect(screen.getByText("permission denied")).toBeInTheDocument();
   });
+
+  it("error message takes precedence over selection summary", () => {
+    r({
+      totalEntries: 14,
+      selectedEntries: 3,
+      selectedSize: 1024,
+      errorMessage: "boom",
+    });
+    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(screen.queryByText(/3 of 14 selected/)).not.toBeInTheDocument();
+  });
 });

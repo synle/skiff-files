@@ -42,6 +42,9 @@ export default function Browser({ initialPath }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   /** Last-clicked entry — drives the preview pane. */
   const [primarySelected, setPrimarySelected] = useState<Entry | null>(null);
+  /** Multi-select set, reported by FileList. We compute aggregate stats
+   *  here so the StatusBar can render N of M selected · total size. */
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   /** Per-session toggle of the preview pane, seeded from the persisted
    *  policy. The toolbar eye icon flips this; closing-then-reopening
    *  doesn't change Settings. */
@@ -190,6 +193,22 @@ export default function Browser({ initialPath }: Props) {
     return { totalSize };
   }, [entries]);
 
+  /** Aggregate stats over the multi-selection. Memoized so a 100k-entry
+   *  folder doesn't re-walk on every keystroke. */
+  const selectionStats = useMemo(() => {
+    if (selectedPaths.length === 0) return { count: 0, size: 0 };
+    const set = new Set(selectedPaths);
+    let size = 0;
+    let count = 0;
+    for (const e of entries) {
+      if (set.has(e.path)) {
+        count++;
+        if (!e.isDir) size += e.size;
+      }
+    }
+    return { count, size };
+  }, [entries, selectedPaths]);
+
   // Reset the primary selection on every navigation — sticking to a row in
   // the previous folder would surface a stale path in the preview pane.
   useEffect(() => {
@@ -247,6 +266,7 @@ export default function Browser({ initialPath }: Props) {
           onSortChange={handleSort}
           onOpenDir={(e) => navigate(e.path)}
           onPrimarySelect={setPrimarySelected}
+          onSelectionChange={setSelectedPaths}
           density={settings.density}
           showExtensions={settings.showExtensions}
         />
@@ -259,8 +279,10 @@ export default function Browser({ initialPath }: Props) {
       </Box>
       <StatusBar
         totalEntries={entries.length}
-        selectedEntries={0}
-        selectedSize={totals.totalSize}
+        selectedEntries={selectionStats.count}
+        selectedSize={
+          selectionStats.count > 0 ? selectionStats.size : totals.totalSize
+        }
         errorMessage={error}
       />
     </Box>

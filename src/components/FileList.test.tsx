@@ -73,6 +73,7 @@ function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
   const onSortChange = props?.onSortChange ?? vi.fn();
   const onOpenDir = props?.onOpenDir ?? vi.fn();
   const onPrimarySelect = props?.onPrimarySelect ?? vi.fn();
+  const onSelectionChange = props?.onSelectionChange ?? vi.fn();
   render(
     <ThemeProvider theme={theme}>
       <div style={{ height: 600 }}>
@@ -83,13 +84,14 @@ function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
           onSortChange={onSortChange}
           onOpenDir={onOpenDir}
           onPrimarySelect={onPrimarySelect}
+          onSelectionChange={onSelectionChange}
           density={props?.density ?? "comfortable"}
           showExtensions={props?.showExtensions ?? true}
         />
       </div>
     </ThemeProvider>,
   );
-  return { onSortChange, onOpenDir, onPrimarySelect };
+  return { onSortChange, onOpenDir, onPrimarySelect, onSelectionChange };
 }
 
 describe("FileList", () => {
@@ -129,6 +131,19 @@ describe("FileList", () => {
     expect(onPrimarySelect).toHaveBeenCalledWith(
       expect.objectContaining({ name: "alpha.txt" }),
     );
+  });
+
+  it("reports the multi-selection set via onSelectionChange", () => {
+    const onSelectionChange = vi.fn();
+    renderList({ onSelectionChange });
+    const row = screen
+      .getAllByTestId("file-row")
+      .find((r) => r.textContent?.includes("alpha.txt"))!;
+    fireEvent.click(row);
+    // Last call has the new selection. Previous calls may include the
+    // initial empty array from the mount-time effect.
+    const last = onSelectionChange.mock.calls.at(-1)?.[0];
+    expect(last).toContain("/x/alpha.txt");
   });
 
   it("hides extensions when showExtensions=false", () => {

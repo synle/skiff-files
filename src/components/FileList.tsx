@@ -4,7 +4,7 @@
 //
 // Sort and selection are owned here because they're list-local concerns; the
 // parent Browser owns navigation, refresh, and the underlying entries array.
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Box, Typography, Checkbox } from "@mui/material";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Entry } from "../api/fs";
@@ -24,8 +24,12 @@ interface Props {
   /** Called when a folder is double-clicked or Enter pressed on it. */
   onOpenDir: (entry: Entry) => void;
   /** Fires whenever a row is clicked. The "primary" selection drives the
-   *  preview pane; the FileList still tracks its own multi-select internally. */
+   *  preview pane; multi-select is tracked here and reported via
+   *  `onSelectionChange`. */
   onPrimarySelect?: (entry: Entry | null) => void;
+  /** Fires whenever the multi-selection set changes. The parent uses
+   *  this to drive the StatusBar count + total-size display. */
+  onSelectionChange?: (selectedPaths: string[]) => void;
   density: Density;
   showExtensions: boolean;
 }
@@ -106,6 +110,7 @@ export default function FileList(props: Props) {
     onSortChange,
     onOpenDir,
     onPrimarySelect,
+    onSelectionChange,
     density,
     showExtensions,
   } = props;
@@ -118,6 +123,20 @@ export default function FileList(props: Props) {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const parentRef = useRef<HTMLDivElement>(null);
+
+  // Reset selection when the entries array identity changes — typically
+  // after a navigation. Sticking to a stale path in the previous folder
+  // would surface a wrong size in the StatusBar.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [entries]);
+
+  // Notify the parent on every selection change. Memoized via an effect
+  // rather than calling inside the click handler so we don't fire twice
+  // on the synthetic-event + state-update boundary.
+  useEffect(() => {
+    onSelectionChange?.(Array.from(selected));
+  }, [selected, onSelectionChange]);
 
   // Row height is the dominant perf knob — keep both densities in sync with
   // the inner row Box height below.

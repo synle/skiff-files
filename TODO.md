@@ -352,6 +352,8 @@ These are tracked here so they don't get lost, but the user has asked that they 
 
 - [ ] **Built-in archive viewer (zip / tar / 7z)** — browse archive contents inline without extracting first; open files inside the archive into the preview pane; extract individual files via right-click; settings toggle "Open archives in Skiff Files vs. fall back to OS default" (off by default → defers to OS). Implementation note: `zip` + `tar` + `sevenz-rust` crates; expose archive contents through the same `RemoteFs` trait so the file list / preview / sidebar stay protocol-agnostic.
 
+- [ ] **User-customizable theme** — let the user design their own light + dark palettes on top of MUI's theming. Settings page gets a "Custom theme" tab with color pickers for the primary palette fragments (`primary.main`, `secondary.main`, `background.default`, `background.paper`, `text.primary`, `text.secondary`, plus accent / sidebar / toolbar tints). Two side-by-side previews (light + dark) so the user can see their colors live. Persist as `customLightTheme` + `customDarkTheme` JSON in settings; MUI `createTheme` consumes them when `themeMode` is set to a new "Custom" value. Should also include preset palettes (Solarized, Dracula, Nord, etc.) the user can clone-and-tweak. Implementation note: `react-colorful` for the picker (~3 KB, no deps). Don't reinvent the MUI theme schema — let users edit the fields MUI already documents.
+
 ---
 
 ## Tech Decisions (committed)

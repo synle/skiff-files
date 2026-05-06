@@ -263,9 +263,35 @@ export default function ConnectionsPage() {
         </Paper>
 
         <Box>
-          <Typography variant="h6" gutterBottom>
-            Active connections
-          </Typography>
+          <Stack
+            direction="row"
+            sx={{
+              mb: 0.5,
+              justifyContent: "space-between",
+              alignItems: "baseline",
+            }}
+          >
+            <Typography variant="h6">Active connections</Typography>
+            {live.length > 1 && (
+              <Button
+                size="small"
+                color="warning"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Disconnect all ${live.length} connections?`,
+                    )
+                  ) {
+                    void Promise.all(live.map((c) => connDisconnect(c.id)))
+                      .then(refreshLive)
+                      .catch((e) => setError(String(e)));
+                  }
+                }}
+              >
+                Disconnect all
+              </Button>
+            )}
+          </Stack>
           {live.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               No live connections.
