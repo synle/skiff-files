@@ -157,6 +157,39 @@ describe("TransfersPage", () => {
     });
   });
 
+  it("renders Pause + Cancel buttons for an in-flight job and Pause invokes sync_pause", async () => {
+    r();
+    // Drive a fake job into the running state via the form.
+    fireEvent.change(screen.getByLabelText(/^Source$/), {
+      target: { value: "/src" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Destination$/), {
+      target: { value: "/dest" },
+    });
+    fireEvent.click(screen.getByText("Start"));
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Pause job test-job-id"),
+      ).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByLabelText("Pause job test-job-id"));
+    await waitFor(() => {
+      expect(mocked).toHaveBeenCalledWith("sync_pause", { id: "test-job-id" });
+    });
+    // After pause the row should now expose a Resume button.
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Resume job test-job-id"),
+      ).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByLabelText("Resume job test-job-id"));
+    await waitFor(() => {
+      expect(mocked).toHaveBeenCalledWith("sync_resume", {
+        id: "test-job-id",
+      });
+    });
+  });
+
   it("routes to sync_start_repo when planner is set to Repo copy", async () => {
     r();
     // Open the mode select.

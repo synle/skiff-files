@@ -385,6 +385,23 @@ pub fn sync_cancel(id: String, jobs: State<'_, Arc<JobRegistry>>) -> FsResult<()
     Ok(())
 }
 
+/// Pause a running job. The executor blocks between files until
+/// `sync_resume` (or `sync_cancel`) flips the flag. Idempotent —
+/// pausing an already-paused job is a no-op.
+#[tauri::command]
+pub fn sync_pause(id: String, jobs: State<'_, Arc<JobRegistry>>) -> FsResult<()> {
+    jobs.pause(&id);
+    Ok(())
+}
+
+/// Resume a paused job. No-op for jobs that aren't currently paused
+/// (e.g. running, cancelled, done).
+#[tauri::command]
+pub fn sync_resume(id: String, jobs: State<'_, Arc<JobRegistry>>) -> FsResult<()> {
+    jobs.resume(&id);
+    Ok(())
+}
+
 /// List jobs (running, planning, completed, failed). The frontend filters
 /// for the queue widget.
 #[tauri::command]

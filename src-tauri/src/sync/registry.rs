@@ -68,6 +68,36 @@ impl JobRegistry {
         }
     }
 
+    /// Pause a running job (executor blocks at the next inter-file
+    /// checkpoint). Returns `true` if found.
+    pub fn pause(&self, id: &str) -> bool {
+        let mut g = self.inner.lock().expect("job registry poisoned");
+        match g.get_mut(id) {
+            Some(slot) => {
+                slot.cancel.pause();
+                slot.info.state = JobState::Paused;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Resume a previously-paused job. Cancelled jobs are NOT
+    /// resumable; this is intentional — once aborted, callers should
+    /// start a fresh job. Returns `true` if the resume actually flips
+    /// state (i.e. job exists and was paused).
+    pub fn resume(&self, id: &str) -> bool {
+        let mut g = self.inner.lock().expect("job registry poisoned");
+        match g.get_mut(id) {
+            Some(slot) if slot.info.state == JobState::Paused => {
+                slot.cancel.resume();
+                slot.info.state = JobState::Running;
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// List every known job. The frontend filters to the in-flight ones
     /// for the queue widget.
     pub fn list(&self) -> Vec<JobInfo> {
@@ -121,5 +151,35 @@ mod tests {
     fn cancel_returns_false_for_unknown_ids() {
         let r = JobRegistry::new();
         assert!(!r.cancel("nope"));
+    }
+
+    #[test]
+    fn pause_flips_token_and_state() {
+        let r = JobRegistry::new();
+        let token = r.insert(info("a"));
+        assert!(r.pause("a"));
+        assert!(token.is_paused());
+        assert_eq!(r.list()[0].state, JobState::Paused);
+    }
+
+    #[test]
+    fn resume_only_unpauses_if_currently_paused() {
+        let r = JobRegistry::new();
+        let token = r.insert(info("a"));
+        // Not paused yet — resume should be a no-op + return false.
+        assert!(!r.resume("a"));
+        // Pause then resume.
+        r.pause("a");
+        assert!(token.is_paused());
+        assert!(r.resume("a"));
+        assert!(!token.is_paused());
+        assert_eq!(r.list()[0].state, JobState::Running);
+    }
+
+    #[test]
+    fn pause_resume_unknown_id_returns_false() {
+        let r = JobRegistry::new();
+        assert!(!r.pause("missing"));
+        assert!(!r.resume("missing"));
     }
 }

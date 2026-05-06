@@ -29,6 +29,7 @@ export interface JobOptions {
 export type JobState =
   | "planning"
   | "running"
+  | "paused"
   | "cancelled"
   | "done"
   | "failed";
@@ -105,6 +106,15 @@ export const syncDedup = (path: string): Promise<DedupSummary> =>
 
 export const syncCancel = (id: string): Promise<void> =>
   invoke<void>("sync_cancel", { id });
+
+/** Pause a running job. Block at the next inter-file checkpoint until
+ *  syncResume or syncCancel. */
+export const syncPause = (id: string): Promise<void> =>
+  invoke<void>("sync_pause", { id });
+
+/** Resume a paused job. No-op when the job isn't paused. */
+export const syncResume = (id: string): Promise<void> =>
+  invoke<void>("sync_resume", { id });
 
 export const syncList = (): Promise<JobInfo[]> =>
   invoke<JobInfo[]>("sync_list");

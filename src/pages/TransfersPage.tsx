@@ -25,6 +25,7 @@ import {
 import StopIcon from "@mui/icons-material/Stop";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
 import SaveIcon from "@mui/icons-material/Save";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -35,6 +36,8 @@ import {
   syncCpstamp,
   syncDedup,
   syncList,
+  syncPause,
+  syncResume,
   syncStartLocal,
   syncStartRepo,
   type ConflictPolicy,
@@ -246,6 +249,40 @@ export default function TransfersPage() {
   const handleCancel = async (id: string) => {
     try {
       await syncCancel(id);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handlePause = async (id: string) => {
+    try {
+      await syncPause(id);
+      // Reflect locally so the UI button flips immediately, without
+      // waiting for the next progress tick.
+      setJobs((prev) => {
+        const slot = prev[id];
+        if (!slot) return prev;
+        return {
+          ...prev,
+          [id]: { ...slot, info: { ...slot.info, state: "paused" } },
+        };
+      });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleResume = async (id: string) => {
+    try {
+      await syncResume(id);
+      setJobs((prev) => {
+        const slot = prev[id];
+        if (!slot) return prev;
+        return {
+          ...prev,
+          [id]: { ...slot, info: { ...slot.info, state: "running" } },
+        };
+      });
     } catch (e) {
       setError(String(e));
     }
@@ -582,18 +619,39 @@ export default function TransfersPage() {
                   : null;
                 const running =
                   j.info.state === "running" || j.info.state === "planning";
+                const paused = j.info.state === "paused";
+                const inFlight = running || paused;
                 return (
                   <ListItem
                     key={j.info.id}
                     secondaryAction={
-                      running ? (
-                        <IconButton
-                          edge="end"
-                          onClick={() => void handleCancel(j.info.id)}
-                          aria-label={`Cancel job ${j.info.id}`}
-                        >
-                          <StopIcon />
-                        </IconButton>
+                      inFlight ? (
+                        <Stack direction="row">
+                          {paused ? (
+                            <IconButton
+                              edge="end"
+                              onClick={() => void handleResume(j.info.id)}
+                              aria-label={`Resume job ${j.info.id}`}
+                            >
+                              <PlayArrowIcon />
+                            </IconButton>
+                          ) : (
+                            <IconButton
+                              edge="end"
+                              onClick={() => void handlePause(j.info.id)}
+                              aria-label={`Pause job ${j.info.id}`}
+                            >
+                              <PauseIcon />
+                            </IconButton>
+                          )}
+                          <IconButton
+                            edge="end"
+                            onClick={() => void handleCancel(j.info.id)}
+                            aria-label={`Cancel job ${j.info.id}`}
+                          >
+                            <StopIcon />
+                          </IconButton>
+                        </Stack>
                       ) : null
                     }
                     alignItems="flex-start"

@@ -130,6 +130,10 @@ pub enum JobState {
     Planning,
     /// Active copy in flight.
     Running,
+    /// User paused — executor is blocked at the next inter-file
+    /// checkpoint until `sync_resume` flips the flag (or
+    /// `sync_cancel` aborts).
+    Paused,
     /// User cancelled (between files).
     Cancelled,
     /// Completed without cancellation.

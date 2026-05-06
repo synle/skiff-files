@@ -14,11 +14,18 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-/// Token the registry hands the executor; flipping it true makes the
-/// next inter-file checkpoint return early.
+/// Shared control token for the executor. Two independent flags:
+///
+/// - `cancel` — flip true to abort at the next inter-file checkpoint.
+///   Once set, never clears (a cancelled job cannot be resumed; the
+///   user must start a new one).
+/// - `pause`  — when true, the executor blocks between files. Toggle
+///   freely with `pause()` / `resume()`. A paused job can also be
+///   cancelled — the wait loop exits immediately.
 #[derive(Default)]
 pub struct CancelToken {
-    flag: AtomicBool,
+    cancel: AtomicBool,
+    pause: AtomicBool,
 }
 
 impl CancelToken {
@@ -26,10 +33,31 @@ impl CancelToken {
         Arc::new(Self::default())
     }
     pub fn cancel(&self) {
-        self.flag.store(true, Ordering::Relaxed);
+        self.cancel.store(true, Ordering::Relaxed);
     }
     pub fn is_cancelled(&self) -> bool {
-        self.flag.load(Ordering::Relaxed)
+        self.cancel.load(Ordering::Relaxed)
+    }
+    pub fn pause(&self) {
+        self.pause.store(true, Ordering::Relaxed);
+    }
+    pub fn resume(&self) {
+        self.pause.store(false, Ordering::Relaxed);
+    }
+    pub fn is_paused(&self) -> bool {
+        self.pause.load(Ordering::Relaxed)
+    }
+
+    /// Block while paused. Returns `true` if the wait was broken by a
+    /// cancel — in that case the executor should bail. Polls every
+    /// 50 ms; that's tight enough for the UI to feel responsive
+    /// (resume → next file kicks off in under one frame) without
+    /// burning CPU on idle jobs.
+    pub fn wait_if_paused(&self) -> bool {
+        while self.is_paused() && !self.is_cancelled() {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        self.is_cancelled()
     }
 }
 
@@ -383,6 +411,12 @@ pub fn execute(
             summary.cancelled = true;
             return summary;
         }
+        // Block here while paused so the executor doesn't burn CPU. Returns
+        // true if the wait was interrupted by a cancel.
+        if cancel.wait_if_paused() {
+            summary.cancelled = true;
+            return summary;
+        }
         let outcome = process_file(file, opts, &mut summary);
         bytes_seen += file.size;
         on_progress(Progress {
@@ -713,6 +747,74 @@ mod tests {
         );
         assert!(s.conflicts >= 1);
         assert!(!dest.join("a (old).txt").exists());
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn pause_blocks_until_resume() {
+        let (src, dest) = fixture();
+        let (files, total) = plan::plan(&src, &dest).unwrap();
+        let token = CancelToken::new();
+        token.pause();
+
+        // Spawn the executor on a worker; flip resume after ~100 ms.
+        let token_for_runner = token.clone();
+        let handle = std::thread::spawn(move || {
+            execute(
+                "test",
+                &files,
+                total,
+                &JobOptions {
+                    max_size_gb: 1,
+                    lookback_days: 0,
+                    conflict_policy: ConflictPolicy::Overwrite,
+                    dry_run: false,
+                },
+                token_for_runner,
+                |_| {},
+            )
+        });
+
+        // Hold for at least one wait_if_paused poll cycle (50 ms) to
+        // prove the executor is truly blocked, then resume.
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        token.resume();
+        let s = handle.join().unwrap();
+        assert!(!s.cancelled);
+        assert_eq!(s.copied, 2);
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn pause_then_cancel_unblocks_wait_and_marks_cancelled() {
+        let (src, dest) = fixture();
+        let (files, total) = plan::plan(&src, &dest).unwrap();
+        let token = CancelToken::new();
+        token.pause();
+
+        let token_for_runner = token.clone();
+        let handle = std::thread::spawn(move || {
+            execute(
+                "test",
+                &files,
+                total,
+                &JobOptions {
+                    max_size_gb: 1,
+                    lookback_days: 0,
+                    conflict_policy: ConflictPolicy::Overwrite,
+                    dry_run: false,
+                },
+                token_for_runner,
+                |_| {},
+            )
+        });
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        token.cancel();
+        let s = handle.join().unwrap();
+        assert!(s.cancelled);
         let _ = fs::remove_dir_all(&src);
         let _ = fs::remove_dir_all(&dest);
     }

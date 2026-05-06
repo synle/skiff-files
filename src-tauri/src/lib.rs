@@ -15,7 +15,8 @@ use commands::{
     conn_read_base64, conn_read_text, conn_stat, fs_canonicalize, fs_copy_file, fs_dir_summary,
     fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64, fs_read_text, fs_remove, fs_rename,
     fs_stat, fs_trash, fs_trash_many, get_app_version, settings_load, settings_save, sync_cancel,
-    sync_cpstamp, sync_dedup, sync_list, sync_start_local, sync_start_repo,
+    sync_cpstamp, sync_dedup, sync_list, sync_pause, sync_resume, sync_start_local,
+    sync_start_repo,
 };
 use fs::registry::Registry;
 use std::sync::Arc;
@@ -64,6 +65,8 @@ pub fn run() {
             sync_cpstamp,
             sync_dedup,
             sync_cancel,
+            sync_pause,
+            sync_resume,
             sync_list,
         ])
         .run(tauri::generate_context!())

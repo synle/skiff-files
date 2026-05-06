@@ -44,6 +44,7 @@ Two layers, talking via `invoke()`:
 
 - **0.1.4 polish** — OS trash via `trash` crate (`fs_trash` / `fs_trash_many`), Delete key in Browser sends selection to trash with confirm. Settings now persist to `app_data_dir/settings.json` via `settings_load` / `settings_save` Tauri commands; localStorage stays as a hot cache + test fallback.
 - **0.1.5 polish** — In-pane live search (Cmd/Ctrl+F focuses; Esc clears). OS drag-and-drop into the Browser pane: Tauri drag-drop events route each dropped path through `sync_start_local` (directories nest under their basename so they land AT the cursor target rather than flatten), with a translucent overlay during drag-over. Remote folders refuse drops cleanly until 4b lands.
+- **0.1.6 polish** — Sync **pause / resume**. `CancelToken` grew a `pause` flag + `wait_if_paused()` (50 ms poll loop, breaks on cancel). `sync_pause` / `sync_resume` Tauri commands; new `JobState::Paused`. Transfers UI shows Pause/Resume button per in-flight job alongside Cancel; state flips locally on click for instant feedback (no wait for the next progress tick).
 - **Phase 5+** — see TODO.md
 
 ## Backlog policy
