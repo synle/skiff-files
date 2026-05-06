@@ -16,6 +16,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import DownloadIcon from "@mui/icons-material/Download";
 import SettingsIcon from "@mui/icons-material/Settings";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import HubIcon from "@mui/icons-material/Hub";
 import CircleIcon from "@mui/icons-material/Circle";
 import { Link as RouterLink } from "react-router";
@@ -181,6 +182,14 @@ export default function Sidebar({ home, onNavigate }: Props) {
       </Box>
 
       <List dense disablePadding sx={{ borderTop: 1, borderColor: "divider" }}>
+        <ListItem disablePadding>
+          <ListItemButton component={RouterLink} to="/transfers">
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <SwapHorizIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="Transfers" />
+          </ListItemButton>
+        </ListItem>
         <ListItem disablePadding>
           <ListItemButton component={RouterLink} to="/settings">
             <ListItemIcon sx={{ minWidth: 32 }}>

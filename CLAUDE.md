@@ -29,7 +29,7 @@ cd src-tauri && cargo test  # Rust tests
 Two layers, talking via `invoke()`:
 
 - **`src/` (React + TS)** — UI built with MUI v9. Routes via React Router (`HashRouter` so deep links work under `tauri://`). The `pages/` directory holds route-level components (`Browser`, `SettingsPage`); `components/` holds shared UI (`FileList`, `Sidebar`, `Toolbar`, `PathBar`, `StatusBar`, `IconForKind`). Settings live in a Context store at `state/settings.tsx`, persisted to `localStorage`. The MUI theme switches between light/dark/system via `theme/index.ts`. Pure utilities live in `util/`. Typed `invoke` wrappers live in `api/fs.ts`. Tauri APIs are mocked in `src/test/setup.ts` so component tests don't need a Tauri runtime.
-- **`src-tauri/` (Rust)** — Tauri v2 shell. The filesystem layer lives in `src/fs/` with `types.rs` (Entry, FileKind, ListOptions), `local.rs` (sync filesystem ops + DirSummary type), `icons.rs` (extension → kind), `sftp.rs` (async SFTP backend via russh), and `registry.rs` (live-connection map held in Tauri State). Tauri command adapters live in `src/commands.rs` and are registered in `src/lib.rs`. Future remote backends (ftp/smb) and the `Skiffsync` engine will sit alongside under `fs/` and `sync/` respectively.
+- **`src-tauri/` (Rust)** — Tauri v2 shell. The filesystem layer lives in `src/fs/` with `types.rs` (Entry, FileKind, ListOptions), `local.rs` (sync filesystem ops + DirSummary type), `icons.rs` (extension → kind), `sftp.rs` (async SFTP backend via russh), and `registry.rs` (live-connection map held in Tauri State). The Skiffsync engine lives in `src/sync/` with `types.rs` (ConflictPolicy, JobOptions, Progress, Summary), `plan.rs` (pre-scan), `engine.rs` (executor + skip-if-unchanged + cancel token), and `registry.rs` (job tracking). Tauri command adapters live in `src/commands.rs` and are registered in `src/lib.rs`. Future remote backends (ftp/smb) join under `fs/`.
 
 ## Phase status
 
@@ -39,7 +39,8 @@ Two layers, talking via `invoke()`:
 - **Phase 2a** — ✅ SFTP backend (russh + russh-sftp, pure-Rust), connection registry as Tauri State, conn_* commands, Connections page (add/list/disconnect/save drafts), Sidebar live-host list. Real SFTP integration tests deferred to Phase 3 (need docker harness).
 - **Phase 2b** — ✅ Browser remote integration: `sftp://<connection_id>/<path>` scheme parsed by `util/location.ts`; `api/client.ts` unifies fs_*/conn_* dispatch; pathSegments / parentPath are scheme-aware; clicking a host in the Sidebar opens that connection in the Browser. mkdir/rename/remove/upload on remote, ssh-config import, and known-hosts TOFU still pending — schedule those when Phase 3 lands docker-based integration tests.
 - **Phase 3** — pending — FTP/FTPS + SMB
-- **Phase 4** — pending — Skiffsync engine (TeraCopy-style conflict resolution)
+- **Phase 4a** — ✅ Skiffsync local-to-local: `src-tauri/src/sync/` with plan + engine + registry. Skip-if-unchanged (size + lookback-days), conflict policies (skip / overwrite / keepBoth), dry-run, cancel between files, max-size guard, per-file progress events (`sync:progress` / `sync:done` / `sync:error`). Transfers page (`/transfers`) drives jobs and shows progress bars.
+- **Phase 4b** — pending — cross-protocol jobs (sftp/ftp/smb endpoints), TeraCopy-style smart-batch conflict dialog, pause/resume, `cpstamp`/`cprepo`/`dedup` modes, saved jobs.
 - **Phase 5+** — see TODO.md
 
 ## Backlog policy

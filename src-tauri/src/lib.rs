@@ -8,15 +8,17 @@
 
 pub mod commands;
 pub mod fs;
+pub mod sync;
 
 use commands::{
     conn_create_sftp, conn_dir_summary, conn_disconnect, conn_list, conn_list_dir,
     conn_read_base64, conn_read_text, conn_stat, fs_canonicalize, fs_copy_file, fs_dir_summary,
     fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64, fs_read_text, fs_remove, fs_rename,
-    fs_stat, get_app_version,
+    fs_stat, get_app_version, sync_cancel, sync_list, sync_start_local,
 };
 use fs::registry::Registry;
 use std::sync::Arc;
+use sync::registry::JobRegistry;
 
 /// Tauri application entry point. The handler list is the public API of the
 /// Rust side — every `invoke()` call from the frontend has to match a name
@@ -27,6 +29,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(Arc::new(Registry::new()))
+        .manage(Arc::new(JobRegistry::new()))
         .invoke_handler(tauri::generate_handler![
             // local
             get_app_version,
@@ -50,6 +53,10 @@ pub fn run() {
             conn_read_text,
             conn_read_base64,
             conn_dir_summary,
+            // sync
+            sync_start_local,
+            sync_cancel,
+            sync_list,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

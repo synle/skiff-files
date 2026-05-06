@@ -9,9 +9,14 @@ use crate::fs::local::{self, DirSummary};
 use crate::fs::registry::{Connection, ConnectionInfo, ConnectionKind, Registry};
 use crate::fs::sftp::{SftpClient, SftpConfig};
 use crate::fs::types::{Entry, FsResult, ListOptions};
+use crate::sync::engine::execute as execute_sync;
+use crate::sync::plan::plan as plan_sync;
+use crate::sync::registry::JobRegistry;
+use crate::sync::types::{JobInfo, JobOptions, JobState, Summary};
 use std::path::Path;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Emitter, State};
+use uuid::Uuid;
 
 /// Hard cap for inline image previews. Anything bigger should open in an
 /// external viewer rather than blow up our IPC channel. 16 MB is enough for
@@ -212,4 +217,113 @@ pub async fn conn_dir_summary(
 ) -> FsResult<DirSummary> {
     let client = registry.get_sftp(&id)?;
     client.dir_summary(&path, DIR_SCAN_MAX_ENTRIES).await
+}
+
+// ---------- Sync commands (Phase 4a) ----------
+
+/// Start a local-to-local copy job. Cross-protocol jobs land in Phase 4b
+/// — for now both `src` and `dest` must be local paths. Returns the new
+/// job id; progress streams via the `sync:progress` Tauri event and the
+/// final summary via `sync:done`.
+#[tauri::command]
+pub fn sync_start_local(
+    src: String,
+    dest: String,
+    options: Option<JobOptions>,
+    jobs: State<'_, Arc<JobRegistry>>,
+    app: tauri::AppHandle,
+) -> FsResult<String> {
+    let opts = options.unwrap_or(JobOptions {
+        max_size_gb: 1,
+        lookback_days: 7,
+        conflict_policy: Default::default(),
+        dry_run: false,
+    });
+    let id = Uuid::new_v4().to_string();
+    let info = JobInfo {
+        id: id.clone(),
+        src: src.clone(),
+        dest: dest.clone(),
+        state: JobState::Planning,
+    };
+    let cancel = jobs.insert(info);
+    let jobs_for_task = (*jobs).clone();
+    let id_for_task = id.clone();
+    let app_for_task = app.clone();
+    let src_for_task = src;
+    let dest_for_task = dest;
+
+    // Run the planner + executor on a blocking thread — std::fs is sync
+    // and copying gigabytes shouldn't block the tokio reactor used by
+    // the rest of the app (notably russh / SFTP).
+    std::thread::spawn(move || {
+        let (files, total_bytes) = match plan_sync(
+            Path::new(&src_for_task),
+            Path::new(&dest_for_task),
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                jobs_for_task.set_state(&id_for_task, JobState::Failed);
+                let _ = app_for_task.emit(
+                    "sync:error",
+                    serde_json::json!({ "jobId": id_for_task, "error": e }),
+                );
+                return;
+            }
+        };
+        // Enforce the max-size guard BEFORE any IO, just like cpsync.
+        let cap = opts.max_size_gb.saturating_mul(1024 * 1024 * 1024);
+        if total_bytes > cap {
+            jobs_for_task.set_state(&id_for_task, JobState::Failed);
+            let _ = app_for_task.emit(
+                "sync:error",
+                serde_json::json!({
+                    "jobId": id_for_task,
+                    "error": format!(
+                        "total size {} bytes exceeds maxSizeGb={} ({} bytes)",
+                        total_bytes, opts.max_size_gb, cap
+                    ),
+                }),
+            );
+            return;
+        }
+        jobs_for_task.set_state(&id_for_task, JobState::Running);
+
+        let app_progress = app_for_task.clone();
+        let summary: Summary = execute_sync(
+            &id_for_task,
+            &files,
+            total_bytes,
+            &opts,
+            cancel,
+            move |p| {
+                let _ = app_progress.emit("sync:progress", &p);
+            },
+        );
+
+        let final_state = if summary.cancelled {
+            JobState::Cancelled
+        } else {
+            JobState::Done
+        };
+        jobs_for_task.set_state(&id_for_task, final_state);
+        let _ = app_for_task.emit("sync:done", &summary);
+    });
+
+    Ok(id)
+}
+
+/// Cancel a running job. No-op if unknown — the user might have clicked
+/// twice. Always returns Ok.
+#[tauri::command]
+pub fn sync_cancel(id: String, jobs: State<'_, Arc<JobRegistry>>) -> FsResult<()> {
+    jobs.cancel(&id);
+    Ok(())
+}
+
+/// List jobs (running, planning, completed, failed). The frontend filters
+/// for the queue widget.
+#[tauri::command]
+pub fn sync_list(jobs: State<'_, Arc<JobRegistry>>) -> FsResult<Vec<JobInfo>> {
+    Ok(jobs.list())
 }

@@ -8,6 +8,7 @@ import Sidebar from "./components/Sidebar";
 import Browser from "./pages/Browser";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
+import TransfersPage from "./pages/TransfersPage";
 import { fsHomeDir } from "./api/fs";
 
 /** A custom DOM event the Sidebar emits to ask the Browser to navigate. We
@@ -71,6 +72,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Browser />} />
           <Route path="/connections" element={<ConnectionsPage />} />
+          <Route path="/transfers" element={<TransfersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
