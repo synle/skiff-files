@@ -1,0 +1,66 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in this repository.
+
+## Project Overview
+
+**Skiff Files** — a fast, cross-platform desktop file explorer for Windows / macOS / Linux. Built with **Tauri v2** (Rust backend) + **React 19** (TypeScript) + **MUI v9** + **Vite 6**. No sidecar — all backend logic lives in the Rust crate, which keeps bundles small and avoids a Node runtime.
+
+Supports local FS, SSH/SFTP, FTP/FTPS, SMB/Samba, and (optional) NTFS mounts. Headline feature is **Skiffsync**, a `cpsync`-inspired smart-copy engine that skips unchanged files across protocols.
+
+The phased implementation plan is in [`TODO.md`](./TODO.md). Always consult it before starting a new feature.
+
+## Build commands
+
+```bash
+npm install              # JS dependencies
+npm run dev              # Vite dev server only (browser mode)
+npx tauri dev            # Full desktop app in dev mode
+npm run build            # Production frontend build
+npx tauri build          # Production desktop build
+npm test                 # Vitest (run once)
+npm run test:watch       # Vitest watch mode
+npm run typecheck        # tsc --noEmit
+cd src-tauri && cargo test  # Rust tests
+```
+
+## Architecture
+
+Two layers, talking via `invoke()`:
+
+- **`src/` (React + TS)** — UI built with MUI v9. Routes via React Router (`HashRouter` so deep links work under `tauri://`). The `pages/` directory holds route-level components (`Browser`, `Connections`, `Transfers`, `Settings`); `components/` holds shared UI (`FileList`, `Sidebar`, `Toolbar`, `PathBar`, `StatusBar`, `PreviewPane`). Tauri APIs are mocked in `src/test/setup.ts` so component tests don't need a Tauri runtime.
+- **`src-tauri/` (Rust)** — Tauri v2 shell. The filesystem layer lives in `src/fs/` with a `RemoteFs` async trait implemented by `local`, `sftp`, `ftp`, `smb` modules. The `Skiffsync` engine lives in `src/sync/`. Commands are declared with `#[tauri::command]` and registered in `tauri::Builder::default().invoke_handler(...)` in `src/lib.rs`.
+
+## Versioning
+
+Single source of truth: **`src-tauri/tauri.conf.json` → `version`**. `build.rs` reads it and exposes `APP_VERSION` as a compile-time env var (`env!("APP_VERSION")`). Dev builds append `[DEV]`; CI release builds set `TAURI_RELEASE=true` for a clean string.
+
+`package.json` and `src-tauri/Cargo.toml` versions are not used by the app — leave them at `0.1.0` / `0.0.0`.
+
+## Conventions
+
+- All Rust structs sent to the frontend use `#[serde(rename_all = "camelCase")]`.
+- Tauri commands are `snake_case` in Rust, called with `snake_case` strings from `invoke()`.
+- Frontend parameter objects use `camelCase` (Serde converts).
+- Always add tests for new code: React components get `*.test.tsx` (Vitest + Testing Library), Rust modules get `#[cfg(test)] mod tests` blocks.
+- **Performance is a feature.** Never block the UI thread; never call `read_to_end` on user files; always virtualize lists; always cancel inflight scans on navigation.
+- Theme tokens live in `src/theme/{light,dark}.ts`; never hard-code colors in components.
+
+## CI / Release Workflows
+
+- **`build.yml`** — runs on every push/PR to `main`, runs `npm test` and `cargo test` then builds the Tauri bundle on macOS (ARM + Intel), Windows, Linux. Posts a PR comment with artifact download links.
+- **`release-official.yml`** — triggered by `v*` tag pushes or manual `workflow_dispatch`. Uses `synle/workflows/actions/release/begin-release` → matrix Tauri build → `end-release`. Sets `TAURI_RELEASE=true`.
+- **`release-beta.yml`** — manual `workflow_dispatch` only. Builds a draft prerelease tagged `release-beta-<date>-<sha>`.
+
+Use `/release-official` and `/release-beta` slash commands to trigger interactively.
+
+## GitHub Raw File URLs
+
+Always use the `?raw=1` blob URL format: `https://github.com/{owner}/{repo}/blob/head/{path}?raw=1`.
+
+Do NOT use `api.github.com/repos/.../contents/` or `raw.githubusercontent.com`.
+
+## Git / PR Merge Policy
+
+- Always use **squash and merge** for PRs.
+- **Always rebase before pushing** (`git pull --rebase` before `git push`).

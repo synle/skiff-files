@@ -1,0 +1,32 @@
+# Node
+node_modules/
+dist/
+build/
+.npm/
+.eslintcache
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite/Vitest
+.vite/
+coverage/
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/
+src-tauri/Cargo.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Env
+.env
+.env.local
+.env.*.local

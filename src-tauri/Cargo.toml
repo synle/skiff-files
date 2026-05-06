@@ -1,0 +1,27 @@
+[package]
+name = "skiff-files"
+version = "0.0.0"
+description = "Skiff Files — fast cross-platform file explorer with FTP / SFTP / SMB and a smart-sync engine."
+authors = ["Sy Le"]
+edition = "2021"
+
+[lib]
+name = "app_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+serde_json = "1"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
