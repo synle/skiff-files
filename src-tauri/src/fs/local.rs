@@ -221,6 +221,74 @@ pub fn read_file_base64(path: &Path, max_bytes: u64) -> FsResult<String> {
     Ok(B64.encode(bytes))
 }
 
+/// Recursive substring find. Walks `root` depth-first, matching each
+/// entry's name (case-insensitively) against `query`. Capped two ways:
+/// `max_results` short-circuits the walk once we've found enough,
+/// `max_secs` bails out if the scan runs over budget. The latter is a
+/// safety net for `/` searches on machines with slow disks.
+///
+/// Hidden subdirectories (leading-dot) are still traversed — the user
+/// usually wants config files surfaced too. `_recycleBin/` and
+/// `.git/` are pruned because matching there is almost never useful
+/// and they're often huge.
+pub fn find(
+    root: &Path,
+    query: &str,
+    max_results: usize,
+    max_secs: u64,
+) -> FsResult<Vec<Entry>> {
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let needle = query.to_lowercase();
+    let started = std::time::Instant::now();
+    let budget = std::time::Duration::from_secs(max_secs);
+    let mut out: Vec<Entry> = Vec::new();
+    let mut stack: Vec<PathBuf> = vec![root.to_path_buf()];
+
+    while let Some(dir) = stack.pop() {
+        if started.elapsed() > budget {
+            break;
+        }
+        let read = match fs::read_dir(&dir) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        for d in read.flatten() {
+            if out.len() >= max_results {
+                return Ok(out);
+            }
+            if started.elapsed() > budget {
+                return Ok(out);
+            }
+            let p = d.path();
+            let md = match fs::symlink_metadata(&p) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let name = p
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            // Prune the noise dirs. We still descend into other dotdirs
+            // because `.config` etc. is fair game to search.
+            if md.is_dir()
+                && !md.file_type().is_symlink()
+                && name != ".git"
+                && name != "_recycleBin"
+                && name != "node_modules"
+            {
+                stack.push(p.clone());
+            }
+            if name.to_lowercase().contains(&needle) {
+                out.push(entry_from_metadata(&p, &md));
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Recursive directory summary — total entries + total bytes. Capped at
 /// `max_entries` so a click on `/` doesn't lock up; if we hit the cap we
 /// flip `truncated = true` and the UI shows a "≥" prefix.
@@ -463,6 +531,60 @@ mod tests {
         assert_eq!(s.entries, 3);
         assert!(s.total_size >= 5);
         assert!(!s.truncated);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn find_returns_only_substring_matches() {
+        let root = fixture();
+        // fixture() has hello.md and sub/ — add another nested file.
+        fs::write(root.join("sub/hello.txt"), b"x").unwrap();
+        let out = find(&root, "hello", 100, 5).unwrap();
+        let names: Vec<_> = out.iter().map(|e| e.name.as_str()).collect();
+        assert!(names.contains(&"hello.md"));
+        assert!(names.contains(&"hello.txt"));
+        assert!(!names.contains(&"sub"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn find_is_case_insensitive() {
+        let root = fixture();
+        let out = find(&root, "HELLO", 100, 5).unwrap();
+        assert!(!out.is_empty());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn find_caps_at_max_results() {
+        let root = fixture();
+        for i in 0..10 {
+            fs::write(root.join(format!("hello-{i}.txt")), b"x").unwrap();
+        }
+        let out = find(&root, "hello", 5, 5).unwrap();
+        assert_eq!(out.len(), 5);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn find_returns_empty_for_blank_query() {
+        let root = fixture();
+        let out = find(&root, "", 100, 5).unwrap();
+        assert!(out.is_empty());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn find_skips_pruned_dirs() {
+        let root = fixture();
+        // Drop a hit inside .git — it should NOT be returned.
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::write(root.join(".git/hello.txt"), b"x").unwrap();
+        let out = find(&root, "hello", 100, 5).unwrap();
+        let in_git = out
+            .iter()
+            .any(|e| e.path.contains("/.git/"));
+        assert!(!in_git, "found hit inside .git: {out:?}");
         let _ = fs::remove_dir_all(root);
     }
 

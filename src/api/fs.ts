@@ -102,3 +102,8 @@ export const fsReadBase64 = (path: string): Promise<string> =>
 /** Recursive entry count + total size for a folder. Capped scan. */
 export const fsDirSummary = (path: string): Promise<DirSummary> =>
   invoke<DirSummary>("fs_dir_summary", { path });
+
+/** Recursive substring find. Returns up to 1000 entries; stops walking
+ *  after 10 s. `.git` / `node_modules` / `_recycleBin` are pruned. */
+export const fsFind = (path: string, query: string): Promise<Entry[]> =>
+  invoke<Entry[]>("fs_find", { path, query });

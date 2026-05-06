@@ -44,6 +44,11 @@ interface Props {
   /** Live search query — filters the current folder client-side. */
   search: string;
   onSearchChange: (v: string) => void;
+  /** When true, the search runs recursively via `fs_find` instead of
+   *  filtering the in-pane entries. The Browser owns the actual fetch;
+   *  the toolbar just exposes the toggle. */
+  searchRecursive: boolean;
+  onSearchRecursiveChange: (v: boolean) => void;
   /** Ref for Cmd/Ctrl+F focus. The Browser owns the keybind so the
    *  toolbar doesn't need to know about route-level shortcuts. */
   searchInputRef?: Ref<HTMLInputElement>;
@@ -66,6 +71,8 @@ export default function Toolbar(props: Props) {
     onTogglePreview,
     search,
     onSearchChange,
+    searchRecursive,
+    onSearchRecursiveChange,
     searchInputRef,
   } = props;
 
@@ -137,9 +144,29 @@ export default function Toolbar(props: Props) {
 
       <Box sx={{ flexGrow: 1 }} />
 
+      <Tooltip
+        title={
+          searchRecursive
+            ? "Searching subfolders (click to limit to current folder)"
+            : "Click to search subfolders"
+        }
+      >
+        <ToggleButton
+          size="small"
+          value="recursive"
+          selected={searchRecursive}
+          onChange={() => onSearchRecursiveChange(!searchRecursive)}
+          aria-label="Toggle recursive search"
+          aria-pressed={searchRecursive}
+          sx={{ p: 0.5, mr: 0.5 }}
+        >
+          <SearchIcon fontSize="small" />
+        </ToggleButton>
+      </Tooltip>
+
       <TextField
         size="small"
-        placeholder="Search…"
+        placeholder={searchRecursive ? "Find in subfolders…" : "Search…"}
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         onKeyDown={(e) => {

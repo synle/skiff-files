@@ -34,6 +34,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "fs_dir_summary") {
       return { entries: 42, totalSize: 1024, truncated: false };
     }
+    if (cmd === "fs_find") return [];
     if (cmd === "conn_list") return [];
     if (cmd === "conn_create_sftp") return "test-conn-id";
     if (cmd === "conn_disconnect") return null;

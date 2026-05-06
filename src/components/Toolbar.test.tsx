@@ -21,6 +21,8 @@ function r(overrides?: Partial<Parameters<typeof Toolbar>[0]>) {
     onTogglePreview: vi.fn(),
     search: "",
     onSearchChange: vi.fn(),
+    searchRecursive: false,
+    onSearchRecursiveChange: vi.fn(),
     ...overrides,
   };
   render(
@@ -62,5 +64,18 @@ describe("Toolbar search", () => {
   it("clear button is hidden when search is empty", () => {
     r();
     expect(screen.queryByLabelText("Clear search")).not.toBeInTheDocument();
+  });
+
+  it("recursive toggle fires onSearchRecursiveChange", () => {
+    const props = r();
+    fireEvent.click(screen.getByLabelText("Toggle recursive search"));
+    expect(props.onSearchRecursiveChange).toHaveBeenCalledWith(true);
+  });
+
+  it("placeholder text changes when recursive search is on", () => {
+    r({ searchRecursive: true });
+    expect(
+      screen.getByPlaceholderText(/Find in subfolders/),
+    ).toBeInTheDocument();
   });
 });

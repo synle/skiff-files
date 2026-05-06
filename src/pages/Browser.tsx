@@ -9,7 +9,14 @@ import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
-import { fsHomeDir, fsMkdir, fsStat, fsTrashMany, type Entry } from "../api/fs";
+import {
+  fsFind,
+  fsHomeDir,
+  fsMkdir,
+  fsStat,
+  fsTrashMany,
+  type Entry,
+} from "../api/fs";
 import { listDir as clientListDir } from "../api/client";
 import { syncStartLocal } from "../api/sync";
 import { parentPath } from "../util/format";
@@ -53,9 +60,12 @@ export default function Browser({ initialPath }: Props) {
   const [previewOpen, setPreviewOpen] = useState<boolean>(
     () => settings.previewMode !== "off",
   );
-  /** In-folder search query. Pure client-side filter — Phase 6 will add
-   *  recursive find on top of this primitive. */
+  /** In-folder search query. Pure client-side filter when
+   *  `searchRecursive` is false; otherwise we dispatch `fs_find` and
+   *  show its results until the user navigates / clears. */
   const [search, setSearch] = useState("");
+  const [searchRecursive, setSearchRecursive] = useState(false);
+  const [findResults, setFindResults] = useState<Entry[] | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   /** True while a Tauri drag-drop is hovering the window. Drives the
    *  semi-transparent overlay rendered at the bottom of this component. */
@@ -311,16 +321,46 @@ export default function Browser({ initialPath }: Props) {
   }, [entries]);
 
   /** Filtered entry list — case-insensitive substring match on `name`.
-   *  Only applied when there's a query; an empty box is a no-op. */
+   *  When recursive find is on we substitute the find results instead. */
   const visibleEntries = useMemo(() => {
+    if (searchRecursive && findResults) return findResults;
     if (!search) return entries;
     const q = search.toLowerCase();
     return entries.filter((e) => e.name.toLowerCase().includes(q));
-  }, [entries, search]);
+  }, [entries, search, searchRecursive, findResults]);
 
   // Reset the query on every navigation — the new folder almost certainly
   // doesn't have files matching the previous folder's search.
-  useEffect(() => setSearch(""), [path]);
+  useEffect(() => {
+    setSearch("");
+    setFindResults(null);
+    setSearchRecursive(false);
+  }, [path]);
+
+  // Debounced recursive find. Fires 300 ms after the last keystroke so a
+  // user typing "abc" doesn't trigger three full disk walks. Cancellation
+  // happens via `cancelled` rather than a server-side cancel because
+  // fs_find is bounded by max-results + max-secs anyway.
+  useEffect(() => {
+    if (!searchRecursive) {
+      setFindResults(null);
+      return;
+    }
+    if (!search || !path) {
+      setFindResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void fsFind(path, search)
+        .then((rs) => !cancelled && setFindResults(rs))
+        .catch((e) => !cancelled && setError(String(e)));
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search, searchRecursive, path]);
 
   /** Aggregate stats over the multi-selection. Memoized so a 100k-entry
    *  folder doesn't re-walk on every keystroke. */
@@ -391,6 +431,8 @@ export default function Browser({ initialPath }: Props) {
         onTogglePreview={() => setPreviewOpen((o) => !o)}
         search={search}
         onSearchChange={setSearch}
+        searchRecursive={searchRecursive}
+        onSearchRecursiveChange={setSearchRecursive}
         searchInputRef={searchInputRef}
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>

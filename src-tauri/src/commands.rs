@@ -193,6 +193,29 @@ pub fn fs_dir_summary(path: String) -> FsResult<DirSummary> {
     local::dir_summary(Path::new(&path), DIR_SCAN_MAX_ENTRIES)
 }
 
+/// Hard cap on results returned to the search overlay. Above this the
+/// UI gets cluttered and IPC payloads bloat — the user should refine
+/// the query instead.
+const FIND_MAX_RESULTS: usize = 1_000;
+
+/// Time budget for a single recursive find. Stops the walk early so a
+/// user typing `/` doesn't pin the disk for minutes.
+const FIND_MAX_SECS: u64 = 10;
+
+/// Recursive substring find. Returns at most FIND_MAX_RESULTS entries;
+/// stops walking after FIND_MAX_SECS. Pruned dirs (.git, node_modules,
+/// _recycleBin) are skipped — the typical "find under home" use case
+/// rarely wants matches there.
+#[tauri::command]
+pub fn fs_find(path: String, query: String) -> FsResult<Vec<Entry>> {
+    local::find(
+        Path::new(&path),
+        &query,
+        FIND_MAX_RESULTS,
+        FIND_MAX_SECS,
+    )
+}
+
 // ---------- Connection commands (Phase 2a) ----------
 
 /// Open a new SFTP connection. Returns the registry id so the frontend
