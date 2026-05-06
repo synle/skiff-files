@@ -25,8 +25,8 @@ function r() {
 describe("TransfersPage", () => {
   it("renders the new-job form", () => {
     r();
-    expect(screen.getByLabelText(/Source/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Destination/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Source$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Destination$/)).toBeInTheDocument();
     expect(screen.getByText("Start")).toBeInTheDocument();
   });
 
@@ -34,10 +34,10 @@ describe("TransfersPage", () => {
     r();
     const start = screen.getByText("Start");
     expect(start).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(/Source/), {
+    fireEvent.change(screen.getByLabelText(/^Source$/), {
       target: { value: "/a" },
     });
-    fireEvent.change(screen.getByLabelText(/Destination/), {
+    fireEvent.change(screen.getByLabelText(/^Destination$/), {
       target: { value: "/b" },
     });
     expect(start).not.toBeDisabled();
@@ -45,10 +45,10 @@ describe("TransfersPage", () => {
 
   it("invokes sync_start_local with the form values", async () => {
     r();
-    fireEvent.change(screen.getByLabelText(/Source/), {
+    fireEvent.change(screen.getByLabelText(/^Source$/), {
       target: { value: "/src" },
     });
-    fireEvent.change(screen.getByLabelText(/Destination/), {
+    fireEvent.change(screen.getByLabelText(/^Destination$/), {
       target: { value: "/dest" },
     });
     fireEvent.click(screen.getByText("Start"));
@@ -72,6 +72,60 @@ describe("TransfersPage", () => {
     r();
     await waitFor(() => {
       expect(screen.getByText(/No jobs yet/i)).toBeInTheDocument();
+    });
+  });
+
+  it("invokes sync_cpstamp when Stamp + copy is clicked", async () => {
+    r();
+    fireEvent.change(screen.getByLabelText(/Source file/), {
+      target: { value: "/zshrc" },
+    });
+    fireEvent.change(screen.getByLabelText(/Destination folder/), {
+      target: { value: "/backup" },
+    });
+    fireEvent.click(screen.getByText("Stamp + copy"));
+    await waitFor(() => {
+      expect(mocked).toHaveBeenCalledWith("sync_cpstamp", {
+        src: "/zshrc",
+        destDir: "/backup",
+      });
+    });
+    expect(
+      await screen.findByText(/Wrote/, { exact: false }),
+    ).toBeInTheDocument();
+  });
+
+  it("invokes sync_dedup when Find + move duplicates is clicked", async () => {
+    r();
+    fireEvent.change(screen.getByLabelText(/Folder/), {
+      target: { value: "/downloads" },
+    });
+    fireEvent.click(screen.getByText("Find + move duplicates"));
+    await waitFor(() => {
+      expect(mocked).toHaveBeenCalledWith("sync_dedup", { path: "/downloads" });
+    });
+    expect(
+      await screen.findByText(/Scanned 5 files/, { exact: false }),
+    ).toBeInTheDocument();
+  });
+
+  it("routes to sync_start_repo when planner is set to Repo copy", async () => {
+    r();
+    // Open the mode select.
+    fireEvent.mouseDown(screen.getByLabelText("Mode"));
+    fireEvent.click(screen.getByRole("option", { name: /Repo copy/i }));
+    fireEvent.change(screen.getByLabelText(/^Source$/), {
+      target: { value: "/repo" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Destination$/), {
+      target: { value: "/backup" },
+    });
+    fireEvent.click(screen.getByText("Start"));
+    await waitFor(() => {
+      expect(mocked).toHaveBeenCalledWith(
+        "sync_start_repo",
+        expect.objectContaining({ src: "/repo", dest: "/backup" }),
+      );
     });
   });
 });

@@ -9,9 +9,12 @@ use crate::fs::local::{self, DirSummary};
 use crate::fs::registry::{Connection, ConnectionInfo, ConnectionKind, Registry};
 use crate::fs::sftp::{SftpClient, SftpConfig};
 use crate::fs::types::{Entry, FsResult, ListOptions};
+use crate::sync::dedup::{dedup as run_dedup, DedupSummary};
 use crate::sync::engine::execute as execute_sync;
 use crate::sync::plan::plan as plan_sync;
 use crate::sync::registry::JobRegistry;
+use crate::sync::repo::plan_repo;
+use crate::sync::stamp::cpstamp;
 use crate::sync::types::{JobInfo, JobOptions, JobState, Summary};
 use std::path::Path;
 use std::sync::Arc;
@@ -326,4 +329,109 @@ pub fn sync_cancel(id: String, jobs: State<'_, Arc<JobRegistry>>) -> FsResult<()
 #[tauri::command]
 pub fn sync_list(jobs: State<'_, Arc<JobRegistry>>) -> FsResult<Vec<JobInfo>> {
     Ok(jobs.list())
+}
+
+/// `cpstamp` mode — copy a single file with a `YYYY_MM_DD_HH_MM` suffix
+/// into `dest_dir`. Synchronous (the file's small enough we don't need
+/// the job lifecycle); returns the path the stamped copy landed at.
+#[tauri::command]
+pub fn sync_cpstamp(src: String, dest_dir: String) -> FsResult<String> {
+    let out = cpstamp(Path::new(&src), Path::new(&dest_dir))?;
+    Ok(out.to_string_lossy().into_owned())
+}
+
+/// `dedup` mode — recursively scan `path`, find duplicates by md5+size,
+/// move extras into `<path>/_recycleBin/<relative-path>`. Returns a
+/// summary the UI can show in a toast.
+#[tauri::command]
+pub fn sync_dedup(path: String) -> FsResult<DedupSummary> {
+    run_dedup(Path::new(&path))
+}
+
+/// `cprepo` mode — same shape as `sync_start_local` but the planner
+/// only includes files reported by `git ls-files`. Useful for shipping
+/// a repo to a backup target without dragging `node_modules/` along.
+#[tauri::command]
+pub fn sync_start_repo(
+    src: String,
+    dest: String,
+    options: Option<JobOptions>,
+    jobs: State<'_, Arc<JobRegistry>>,
+    app: tauri::AppHandle,
+) -> FsResult<String> {
+    let opts = options.unwrap_or(JobOptions {
+        max_size_gb: 1,
+        lookback_days: 7,
+        conflict_policy: Default::default(),
+        dry_run: false,
+    });
+    let id = Uuid::new_v4().to_string();
+    let info = JobInfo {
+        id: id.clone(),
+        src: src.clone(),
+        dest: dest.clone(),
+        state: JobState::Planning,
+    };
+    let cancel = jobs.insert(info);
+    let jobs_for_task = (*jobs).clone();
+    let id_for_task = id.clone();
+    let app_for_task = app.clone();
+    let src_for_task = src;
+    let dest_for_task = dest;
+
+    std::thread::spawn(move || {
+        // Same shape as sync_start_local, just a different planner.
+        let (files, total_bytes) = match plan_repo(
+            Path::new(&src_for_task),
+            Path::new(&dest_for_task),
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                jobs_for_task.set_state(&id_for_task, JobState::Failed);
+                let _ = app_for_task.emit(
+                    "sync:error",
+                    serde_json::json!({ "jobId": id_for_task, "error": e }),
+                );
+                return;
+            }
+        };
+        let cap = opts.max_size_gb.saturating_mul(1024 * 1024 * 1024);
+        if total_bytes > cap {
+            jobs_for_task.set_state(&id_for_task, JobState::Failed);
+            let _ = app_for_task.emit(
+                "sync:error",
+                serde_json::json!({
+                    "jobId": id_for_task,
+                    "error": format!(
+                        "total size {} bytes exceeds maxSizeGb={} ({} bytes)",
+                        total_bytes, opts.max_size_gb, cap
+                    ),
+                }),
+            );
+            return;
+        }
+        jobs_for_task.set_state(&id_for_task, JobState::Running);
+
+        let app_progress = app_for_task.clone();
+        let summary: Summary = execute_sync(
+            &id_for_task,
+            &files,
+            total_bytes,
+            &opts,
+            cancel,
+            move |p| {
+                let _ = app_progress.emit("sync:progress", &p);
+            },
+        );
+
+        let final_state = if summary.cancelled {
+            JobState::Cancelled
+        } else {
+            JobState::Done
+        };
+        jobs_for_task.set_state(&id_for_task, final_state);
+        let _ = app_for_task.emit("sync:done", &summary);
+    });
+
+    Ok(id)
 }

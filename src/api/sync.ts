@@ -77,6 +77,32 @@ export const syncStartLocal = (
 ): Promise<string> =>
   invoke<string>("sync_start_local", { src, dest, options });
 
+/** `cprepo` mode — same shape as syncStartLocal but only git-tracked
+ *  files are included in the plan. */
+export const syncStartRepo = (
+  src: string,
+  dest: string,
+  options?: JobOptions,
+): Promise<string> =>
+  invoke<string>("sync_start_repo", { src, dest, options });
+
+/** `cpstamp` mode — copy `src` into `destDir` with a YYYY_MM_DD_HH_MM
+ *  suffix. Returns the path the stamped copy landed at. */
+export const syncCpstamp = (src: string, destDir: string): Promise<string> =>
+  invoke<string>("sync_cpstamp", { src, destDir });
+
+/** Mirror of `crate::sync::dedup::DedupSummary`. */
+export interface DedupSummary {
+  scanned: number;
+  duplicates: number;
+  bytesFreed: number;
+  recycleBin: string;
+}
+
+/** `dedup` mode — recursively scan, move duplicates to _recycleBin/. */
+export const syncDedup = (path: string): Promise<DedupSummary> =>
+  invoke<DedupSummary>("sync_dedup", { path });
+
 export const syncCancel = (id: string): Promise<void> =>
   invoke<void>("sync_cancel", { id });
 

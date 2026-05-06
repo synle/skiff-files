@@ -29,9 +29,13 @@ import {
   onError,
   onProgress,
   syncCancel,
+  syncCpstamp,
+  syncDedup,
   syncList,
   syncStartLocal,
+  syncStartRepo,
   type ConflictPolicy,
+  type DedupSummary,
   type JobInfo,
   type Progress,
   type Summary,
@@ -52,7 +56,9 @@ export default function TransfersPage() {
   const [jobs, setJobs] = useState<Record<string, JobUiState>>({});
   const [error, setError] = useState<string | null>(null);
 
-  // Form state for "New job".
+  // Form state for "New job". The mode picker switches between the
+  // local/cprepo planners; cpstamp + dedup live in their own
+  // collapsible sections below since their inputs differ.
   const [src, setSrc] = useState("");
   const [dest, setDest] = useState("");
   const [maxSizeGb, setMaxSizeGb] = useState(1);
@@ -60,6 +66,14 @@ export default function TransfersPage() {
   const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>("skip");
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [planner, setPlanner] = useState<"local" | "repo">("local");
+
+  // cpstamp + dedup form state.
+  const [stampSrc, setStampSrc] = useState("");
+  const [stampDestDir, setStampDestDir] = useState("");
+  const [dedupRoot, setDedupRoot] = useState("");
+  const [stampResult, setStampResult] = useState<string | null>(null);
+  const [dedupResult, setDedupResult] = useState<DedupSummary | null>(null);
 
   const mounted = useRef(true);
 
@@ -141,8 +155,9 @@ export default function TransfersPage() {
   const handleStart = async () => {
     setError(null);
     setBusy(true);
+    const start = planner === "repo" ? syncStartRepo : syncStartLocal;
     try {
-      const id = await syncStartLocal(src, dest, {
+      const id = await start(src, dest, {
         maxSizeGb,
         lookbackDays,
         conflictPolicy,
@@ -158,6 +173,28 @@ export default function TransfersPage() {
       setError(String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleCpstamp = async () => {
+    setError(null);
+    setStampResult(null);
+    try {
+      const out = await syncCpstamp(stampSrc, stampDestDir);
+      setStampResult(out);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleDedup = async () => {
+    setError(null);
+    setDedupResult(null);
+    try {
+      const summary = await syncDedup(dedupRoot);
+      setDedupResult(summary);
+    } catch (e) {
+      setError(String(e));
     }
   };
 
@@ -195,6 +232,24 @@ export default function TransfersPage() {
             (SFTP / FTP / SMB) jobs come in Phase 4b.
           </Typography>
           <Stack spacing={2}>
+            <FormControl size="small" sx={{ maxWidth: 280 }}>
+              <InputLabel id="planner-label">Mode</InputLabel>
+              <Select
+                labelId="planner-label"
+                label="Mode"
+                value={planner}
+                onChange={(e) =>
+                  setPlanner(e.target.value as "local" | "repo")
+                }
+              >
+                <MenuItem value="local">
+                  Local copy (everything in src)
+                </MenuItem>
+                <MenuItem value="repo">
+                  Repo copy (only git ls-files)
+                </MenuItem>
+              </Select>
+            </FormControl>
             <TextField
               label="Source"
               size="small"
@@ -273,6 +328,93 @@ export default function TransfersPage() {
                 Start
               </Button>
             </Box>
+          </Stack>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Stamped copy (cpstamp)
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Copy a single file with a <code>YYYY_MM_DD_HH_MM</code>{" "}
+            suffix — handy for "snapshot this config before I touch it".
+          </Typography>
+          <Stack spacing={2}>
+            <TextField
+              label="Source file"
+              size="small"
+              value={stampSrc}
+              onChange={(e) => setStampSrc(e.target.value)}
+              placeholder="/Users/you/.zshrc"
+            />
+            <TextField
+              label="Destination folder"
+              size="small"
+              value={stampDestDir}
+              onChange={(e) => setStampDestDir(e.target.value)}
+              placeholder="/Volumes/Backup/configs"
+            />
+            <Box>
+              <Button
+                variant="outlined"
+                disabled={!stampSrc || !stampDestDir}
+                onClick={() => void handleCpstamp()}
+              >
+                Stamp + copy
+              </Button>
+            </Box>
+            {stampResult && (
+              <Alert severity="success" onClose={() => setStampResult(null)}>
+                Wrote <code>{stampResult}</code>
+              </Alert>
+            )}
+          </Stack>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            De-duplicate folder
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Recursively scans a folder, finds byte-identical duplicates
+            (md5 + size), and moves the extras into{" "}
+            <code>&lt;folder&gt;/_recycleBin/</code>. Idempotent — run again
+            to verify nothing else is left to remove.
+          </Typography>
+          <Stack spacing={2}>
+            <TextField
+              label="Folder"
+              size="small"
+              value={dedupRoot}
+              onChange={(e) => setDedupRoot(e.target.value)}
+              placeholder="/Users/you/Downloads"
+            />
+            <Box>
+              <Button
+                variant="outlined"
+                color="warning"
+                disabled={!dedupRoot}
+                onClick={() => void handleDedup()}
+              >
+                Find + move duplicates
+              </Button>
+            </Box>
+            {dedupResult && (
+              <Alert
+                severity={dedupResult.duplicates > 0 ? "warning" : "info"}
+                onClose={() => setDedupResult(null)}
+              >
+                Scanned {dedupResult.scanned} files,{" "}
+                {dedupResult.duplicates} duplicates moved (
+                {formatBytes(dedupResult.bytesFreed)} freed).
+                {dedupResult.duplicates > 0 && (
+                  <>
+                    {" "}
+                    Review at <code>{dedupResult.recycleBin}</code>.
+                  </>
+                )}
+              </Alert>
+            )}
           </Stack>
         </Paper>
 

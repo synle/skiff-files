@@ -39,6 +39,16 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "conn_disconnect") return null;
     if (cmd === "sync_list") return [];
     if (cmd === "sync_start_local") return "test-job-id";
+    if (cmd === "sync_start_repo") return "test-repo-job-id";
+    if (cmd === "sync_cpstamp") return "/dest/file.txt.2026_05_06_13_45";
+    if (cmd === "sync_dedup") {
+      return {
+        scanned: 5,
+        duplicates: 1,
+        bytesFreed: 2048,
+        recycleBin: "/path/_recycleBin",
+      };
+    }
     if (cmd === "sync_cancel") return null;
     return null;
   }),
