@@ -1,18 +1,18 @@
 // Map FileKind -> MUI icon. Keeping the lookup here means components don't
 // import twelve icons each; they import one component and pass the kind.
-import {
-  Folder,
-  InsertDriveFile,
-  Image,
-  Movie,
-  MusicNote,
-  Archive,
-  PictureAsPdf,
-  Code,
-  TableChart,
-  Article,
-  Link as LinkIcon,
-} from "@mui/icons-material";
+// Per-icon imports — pulling from the barrel `"@mui/icons-material"` loads
+// every icon and chokes CI runners with EMFILE. Always go via the deep path.
+import Folder from "@mui/icons-material/Folder";
+import InsertDriveFile from "@mui/icons-material/InsertDriveFile";
+import Image from "@mui/icons-material/Image";
+import Movie from "@mui/icons-material/Movie";
+import MusicNote from "@mui/icons-material/MusicNote";
+import Archive from "@mui/icons-material/Archive";
+import PictureAsPdf from "@mui/icons-material/PictureAsPdf";
+import Code from "@mui/icons-material/Code";
+import TableChart from "@mui/icons-material/TableChart";
+import Article from "@mui/icons-material/Article";
+import LinkIcon from "@mui/icons-material/Link";
 import type { FileKind } from "../api/fs";
 
 interface Props {
