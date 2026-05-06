@@ -1,0 +1,372 @@
+//! SFTP backend, built on `russh` + `russh-sftp` (pure-Rust, no libssh2 C
+//! dependency). Phase 2a ships the read-only operations the preview pane
+//! and listing already need; mkdir/rename/remove land in Phase 2b once we
+//! have a docker-compose harness to integration-test the write path.
+//!
+//! Threading: a single `SftpSession` is wrapped in a `tokio::sync::Mutex`
+//! because each command channel is single-flight. The registry holds an
+//! `Arc<SftpClient>` so concurrent Tauri commands queue on the mutex
+//! rather than racing.
+
+use crate::fs::icons::kind_for_path;
+use crate::fs::local::DirSummary;
+use crate::fs::types::{Entry, FileKind, FsResult, ListOptions};
+use base64::engine::general_purpose::STANDARD as B64;
+use base64::Engine as _;
+use russh::client::{Handle, Handler};
+use russh_sftp::client::SftpSession;
+use russh_sftp::protocol::{FileAttributes, OpenFlags};
+use serde::Deserialize;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::AsyncReadExt;
+use tokio::sync::Mutex;
+
+/// Config the frontend sends to open a new SFTP connection. Auth is exactly
+/// one of `password` or `private_key_path` (the credential validation lives
+/// in [`SftpClient::connect`]). `known_host_pin` is the optional server-key
+/// fingerprint pin; when `None` we currently accept any key (Phase 2b will
+/// surface a TOFU prompt).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SftpConfig {
+    pub host: String,
+    #[serde(default = "default_port")]
+    pub port: u16,
+    pub user: String,
+    pub password: Option<String>,
+    /// Path to an OpenSSH private key file. Optional passphrase via
+    /// `private_key_passphrase`.
+    pub private_key_path: Option<String>,
+    pub private_key_passphrase: Option<String>,
+}
+
+fn default_port() -> u16 {
+    22
+}
+
+/// Russh client handler that accepts any server key. **TODO Phase 2b**:
+/// thread a known-hosts policy through the registry so we can pin keys.
+struct AcceptAllHandler;
+
+#[async_trait::async_trait]
+impl Handler for AcceptAllHandler {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        _server_public_key: &russh::keys::key::PublicKey,
+    ) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+}
+
+/// Live SFTP connection. Constructed via [`SftpClient::connect`] and held by
+/// the connection registry until disposed.
+pub struct SftpClient {
+    /// Holds the SFTP session behind a mutex — russh-sftp commands aren't
+    /// `&mut self` but the protocol is single-flight per channel.
+    sftp: Arc<Mutex<SftpSession>>,
+    /// Keeps the underlying SSH session alive for the lifetime of the
+    /// SftpClient. Dropping this drops the channel; the field is otherwise
+    /// unused at runtime.
+    _session: Handle<AcceptAllHandler>,
+}
+
+impl SftpClient {
+    /// Open a new SFTP connection to `config.host:config.port` and
+    /// authenticate. Errors flatten to strings on the way out — the
+    /// frontend just shows them in a snackbar.
+    pub async fn connect(config: SftpConfig) -> FsResult<Self> {
+        let ssh_config = Arc::new(russh::client::Config {
+            inactivity_timeout: Some(Duration::from_secs(300)),
+            ..russh::client::Config::default()
+        });
+
+        let mut session = russh::client::connect(
+            ssh_config,
+            (config.host.as_str(), config.port),
+            AcceptAllHandler,
+        )
+        .await
+        .map_err(|e| format!("ssh connect: {e}"))?;
+
+        // Auth dispatch — caller validates exactly-one upstream.
+        let authenticated: bool = if let Some(pw) = &config.password {
+            session
+                .authenticate_password(&config.user, pw)
+                .await
+                .map_err(|e| format!("ssh auth (password): {e}"))?
+        } else if let Some(key_path) = &config.private_key_path {
+            let key = russh_keys::load_secret_key(
+                key_path,
+                config.private_key_passphrase.as_deref(),
+            )
+            .map_err(|e| format!("load private key {key_path}: {e}"))?;
+            session
+                .authenticate_publickey(&config.user, Arc::new(key))
+                .await
+                .map_err(|e| format!("ssh auth (publickey): {e}"))?
+        } else {
+            return Err("no auth method provided (password or private key required)".into());
+        };
+
+        if !authenticated {
+            return Err("ssh auth: rejected by server".into());
+        }
+
+        let channel = session
+            .channel_open_session()
+            .await
+            .map_err(|e| format!("open channel: {e}"))?;
+        channel
+            .request_subsystem(true, "sftp")
+            .await
+            .map_err(|e| format!("request sftp subsystem: {e}"))?;
+
+        let sftp = SftpSession::new(channel.into_stream())
+            .await
+            .map_err(|e| format!("sftp init: {e}"))?;
+
+        Ok(Self {
+            sftp: Arc::new(Mutex::new(sftp)),
+            _session: session,
+        })
+    }
+
+    /// Convert a `FileAttributes` row into our shared `Entry` shape. Pulled
+    /// out so list_dir / stat both run through the same mapping logic.
+    fn entry_from_attrs(name: String, path: String, attrs: &FileAttributes) -> Entry {
+        let is_dir = attrs.is_dir();
+        let is_symlink = attrs.is_symlink();
+        let kind = if is_dir {
+            FileKind::Folder
+        } else if is_symlink {
+            FileKind::Symlink
+        } else {
+            kind_for_path(Path::new(&name))
+        };
+        // Hidden = leading-dot. SFTP doesn't have a separate flag.
+        let is_hidden = name.starts_with('.') && name != "." && name != "..";
+
+        Entry {
+            name,
+            path,
+            kind,
+            size: if is_dir { 0 } else { attrs.size.unwrap_or(0) },
+            mtime: attrs.mtime.map(|t| t as i64),
+            is_dir,
+            is_symlink,
+            is_hidden,
+            mode: attrs.permissions,
+        }
+    }
+
+    /// List immediate children of `path`. The russh-sftp iterator already
+    /// drops `.` / `..` for us, so this is just an attribute mapping pass
+    /// plus the hidden-file filter.
+    pub async fn list_dir(&self, path: &str, opts: ListOptions) -> FsResult<Vec<Entry>> {
+        let sftp = self.sftp.lock().await;
+        let dir = sftp
+            .read_dir(path)
+            .await
+            .map_err(|e| format!("read_dir({path}): {e}"))?;
+
+        let mut out = Vec::new();
+        for entry in dir {
+            let name = entry.file_name();
+            let attrs = entry.metadata();
+            let full = if path.ends_with('/') {
+                format!("{path}{name}")
+            } else {
+                format!("{path}/{name}")
+            };
+            let e = Self::entry_from_attrs(name, full, &attrs);
+            if !opts.show_hidden && e.is_hidden {
+                continue;
+            }
+            out.push(e);
+        }
+        Ok(out)
+    }
+
+    /// Stat a single path. Used by the path bar.
+    pub async fn stat(&self, path: &str) -> FsResult<Entry> {
+        let sftp = self.sftp.lock().await;
+        let attrs = sftp
+            .metadata(path)
+            .await
+            .map_err(|e| format!("stat({path}): {e}"))?;
+        let name = path.rsplit('/').next().unwrap_or(path).to_string();
+        Ok(Self::entry_from_attrs(name, path.to_string(), &attrs))
+    }
+
+    /// Read the head of a file as UTF-8 (lossy). Used by the preview pane.
+    pub async fn read_text(&self, path: &str, max_bytes: u64) -> FsResult<String> {
+        let bytes = self.read_bytes_capped(path, max_bytes, false).await?;
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    /// Read the entire file as base64. Refuses oversized inputs.
+    pub async fn read_base64(&self, path: &str, max_bytes: u64) -> FsResult<String> {
+        let bytes = self.read_bytes_capped(path, max_bytes, true).await?;
+        Ok(B64.encode(bytes))
+    }
+
+    /// Internal helper. `strict_size_check = true` errors on oversized files
+    /// (used for images — we'd rather fail than render half a frame);
+    /// `false` truncates (used for text previews where head-only is fine).
+    async fn read_bytes_capped(
+        &self,
+        path: &str,
+        max_bytes: u64,
+        strict_size_check: bool,
+    ) -> FsResult<Vec<u8>> {
+        let sftp = self.sftp.lock().await;
+        let attrs = sftp
+            .metadata(path)
+            .await
+            .map_err(|e| format!("stat({path}): {e}"))?;
+        if attrs.is_dir() {
+            return Err(format!("not a file: {path}"));
+        }
+        let size = attrs.size.unwrap_or(0);
+        if strict_size_check && size > max_bytes {
+            return Err(format!(
+                "file too large for preview: {} bytes (limit {})",
+                size, max_bytes
+            ));
+        }
+        let mut file = sftp
+            .open_with_flags(path, OpenFlags::READ)
+            .await
+            .map_err(|e| format!("open({path}): {e}"))?;
+        let take = std::cmp::min(size, max_bytes) as usize;
+        let mut buf = Vec::with_capacity(take);
+        let mut chunk = [0u8; 64 * 1024];
+        let mut total = 0;
+        while total < take {
+            let want = std::cmp::min(chunk.len(), take - total);
+            let n = file
+                .read(&mut chunk[..want])
+                .await
+                .map_err(|e| format!("read({path}): {e}"))?;
+            if n == 0 {
+                break;
+            }
+            buf.extend_from_slice(&chunk[..n]);
+            total += n;
+        }
+        Ok(buf)
+    }
+
+    /// Recursive entries + size, capped at `max_entries`. Iterative so a
+    /// deep tree doesn't blow the stack. Mirrors the local impl's shape.
+    pub async fn dir_summary(&self, path: &str, max_entries: usize) -> FsResult<DirSummary> {
+        let mut entries: u64 = 0;
+        let mut total_size: u64 = 0;
+        let mut stack: Vec<String> = vec![path.to_string()];
+        let sftp = self.sftp.lock().await;
+        while let Some(dir) = stack.pop() {
+            let listing = match sftp.read_dir(&dir).await {
+                Ok(l) => l,
+                // Unreadable subdir (permissions) — keep going.
+                Err(_) => continue,
+            };
+            for entry in listing {
+                if entries as usize >= max_entries {
+                    return Ok(DirSummary {
+                        entries,
+                        total_size,
+                        truncated: true,
+                    });
+                }
+                entries += 1;
+                let attrs = entry.metadata();
+                let full = if dir.ends_with('/') {
+                    format!("{dir}{}", entry.file_name())
+                } else {
+                    format!("{dir}/{}", entry.file_name())
+                };
+                if attrs.is_dir() && !attrs.is_symlink() {
+                    stack.push(full);
+                } else {
+                    total_size += attrs.size.unwrap_or(0);
+                }
+            }
+        }
+        Ok(DirSummary {
+            entries,
+            total_size,
+            truncated: false,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // We can't run a real SFTP server in unit tests — that comes via the
+    // docker-compose harness in Phase 3. These tests verify the pieces
+    // that don't need network access: config parsing and the entry mapping.
+
+    #[test]
+    fn config_deserializes_with_camelcase() {
+        let json = r#"{
+            "host": "example.com",
+            "port": 2222,
+            "user": "alice",
+            "password": "hunter2",
+            "privateKeyPath": null,
+            "privateKeyPassphrase": null
+        }"#;
+        let cfg: SftpConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(cfg.host, "example.com");
+        assert_eq!(cfg.port, 2222);
+        assert_eq!(cfg.user, "alice");
+        assert_eq!(cfg.password.as_deref(), Some("hunter2"));
+        assert!(cfg.private_key_path.is_none());
+    }
+
+    #[test]
+    fn config_defaults_port_22() {
+        let json = r#"{"host":"a","user":"b","password":"c"}"#;
+        let cfg: SftpConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(cfg.port, 22);
+    }
+
+    /// Build a FileAttributes with `permissions` set to a unix-style
+    /// type+mode. The library's `is_dir`/`is_symlink` consult that field.
+    fn attrs_with(permissions: u32, size: Option<u64>) -> FileAttributes {
+        let mut a = FileAttributes::default();
+        a.permissions = Some(permissions);
+        a.size = size;
+        a
+    }
+
+    #[test]
+    fn entry_from_attrs_maps_dir() {
+        let a = attrs_with(0o040755, None);
+        let e = SftpClient::entry_from_attrs("foo".into(), "/x/foo".into(), &a);
+        assert!(e.is_dir);
+        assert_eq!(e.kind, FileKind::Folder);
+        assert_eq!(e.size, 0);
+    }
+
+    #[test]
+    fn entry_from_attrs_classifies_markdown() {
+        let a = attrs_with(0o100644, Some(1234));
+        let e = SftpClient::entry_from_attrs("notes.md".into(), "/x/notes.md".into(), &a);
+        assert!(!e.is_dir);
+        assert_eq!(e.kind, FileKind::Markdown);
+        assert_eq!(e.size, 1234);
+    }
+
+    #[test]
+    fn entry_from_attrs_marks_dotfile_hidden() {
+        let a = attrs_with(0o100644, Some(0));
+        let e = SftpClient::entry_from_attrs(".env".into(), "/x/.env".into(), &a);
+        assert!(e.is_hidden);
+    }
+}

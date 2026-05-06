@@ -2,11 +2,13 @@
 // Devices sections come online when the connection layer lands in Phase 2.
 import {
   Box,
+  CircularProgress,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
@@ -14,7 +16,11 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import DownloadIcon from "@mui/icons-material/Download";
 import SettingsIcon from "@mui/icons-material/Settings";
+import HubIcon from "@mui/icons-material/Hub";
+import CircleIcon from "@mui/icons-material/Circle";
 import { Link as RouterLink } from "react-router";
+import { useEffect, useState } from "react";
+import { connList, type ConnectionInfo } from "../api/conn";
 
 interface Favorite {
   label: string;
@@ -38,11 +44,31 @@ interface Props {
   onNavigate: (path: string) => void;
 }
 
-/** Simple list of favorite shortcuts + a Settings link at the bottom. */
+/** Simple list of favorite shortcuts + Connections + a Settings link. */
 export default function Sidebar({ home, onNavigate }: Props) {
   // POSIX-style join is fine here — Tauri normalizes the slashes for us when
   // we hand the path to canonicalize / list_dir.
   const join = (rel: string) => (rel ? `${home}/${rel}` : home);
+
+  // Live connections, refreshed on mount + when other code dispatches the
+  // 'skiff:connections-changed' event (Connections page does that on
+  // connect/disconnect). A poll loop would be wasted work given how rare
+  // these state changes are.
+  const [connections, setConnections] = useState<ConnectionInfo[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () =>
+      connList()
+        .then((c) => !cancelled && setConnections(c))
+        .catch(() => !cancelled && setConnections([]));
+    void refresh();
+    const onChange = () => void refresh();
+    window.addEventListener("skiff:connections-changed", onChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("skiff:connections-changed", onChange);
+    };
+  }, []);
 
   return (
     <Box
@@ -85,9 +111,58 @@ export default function Sidebar({ home, onNavigate }: Props) {
         >
           Hosts
         </Typography>
-        <Typography variant="caption" sx={{ px: 2, color: "text.disabled" }}>
-          (FTP / SFTP / SMB — Phase 2)
-        </Typography>
+        {connections == null ? (
+          <Box sx={{ px: 2, py: 0.5 }}>
+            <CircularProgress size={14} />
+          </Box>
+        ) : connections.length === 0 ? (
+          <List dense disablePadding>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/connections">
+                <ListItemIcon sx={{ minWidth: 32 }}>
+                  <HubIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Add connection…"
+                  slotProps={{ primary: { variant: "body2" } }}
+                />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        ) : (
+          <List dense disablePadding>
+            {connections.map((c) => (
+              <ListItem key={c.id} disablePadding>
+                <ListItemButton component={RouterLink} to="/connections">
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <Tooltip title="Connected">
+                      <CircleIcon
+                        sx={{ fontSize: 10, color: "success.main" }}
+                      />
+                    </Tooltip>
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={c.label}
+                    slotProps={{
+                      primary: { variant: "body2", noWrap: true },
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/connections">
+                <ListItemIcon sx={{ minWidth: 32 }}>
+                  <HubIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Manage connections…"
+                  slotProps={{ primary: { variant: "body2" } }}
+                />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        )}
 
         <Typography
           variant="overline"

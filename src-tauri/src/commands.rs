@@ -6,8 +6,12 @@
 //! `lib.rs` stays a one-liner per command — easier to scan and reorder.
 
 use crate::fs::local::{self, DirSummary};
+use crate::fs::registry::{Connection, ConnectionInfo, ConnectionKind, Registry};
+use crate::fs::sftp::{SftpClient, SftpConfig};
 use crate::fs::types::{Entry, FsResult, ListOptions};
 use std::path::Path;
+use std::sync::Arc;
+use tauri::State;
 
 /// Hard cap for inline image previews. Anything bigger should open in an
 /// external viewer rather than blow up our IPC channel. 16 MB is enough for
@@ -114,4 +118,98 @@ pub fn fs_read_base64(path: String) -> FsResult<String> {
 #[tauri::command]
 pub fn fs_dir_summary(path: String) -> FsResult<DirSummary> {
     local::dir_summary(Path::new(&path), DIR_SCAN_MAX_ENTRIES)
+}
+
+// ---------- Connection commands (Phase 2a) ----------
+
+/// Open a new SFTP connection. Returns the registry id so the frontend
+/// can refer to it in subsequent commands. The label shown in the
+/// sidebar is `user@host:port`.
+#[tauri::command]
+pub async fn conn_create_sftp(
+    config: SftpConfig,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<String> {
+    if config.password.is_none() && config.private_key_path.is_none() {
+        return Err("password or privateKeyPath required".into());
+    }
+    let label = format!("{}@{}:{}", config.user, config.host, config.port);
+    let client = SftpClient::connect(config).await?;
+    let id = registry.insert(
+        ConnectionKind::Sftp,
+        label,
+        Connection::Sftp(Arc::new(client)),
+    );
+    Ok(id)
+}
+
+/// Drop a live connection. Idempotent — disconnecting an already-gone id
+/// is not an error since the user just clicked "disconnect" twice.
+#[tauri::command]
+pub fn conn_disconnect(id: String, registry: State<'_, Arc<Registry>>) -> FsResult<()> {
+    registry.remove(&id);
+    Ok(())
+}
+
+/// List currently-connected hosts for the sidebar / Connections page.
+#[tauri::command]
+pub fn conn_list(registry: State<'_, Arc<Registry>>) -> FsResult<Vec<ConnectionInfo>> {
+    Ok(registry.list())
+}
+
+/// Remote `list_dir`. Mirrors `fs_list_dir` but routes through the
+/// registry-resolved client. We accept the connection id as the first
+/// param so the frontend's wrapper signature stays a clean
+/// `(id, path, options)`.
+#[tauri::command]
+pub async fn conn_list_dir(
+    id: String,
+    path: String,
+    options: Option<ListOptions>,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<Vec<Entry>> {
+    let client = registry.get_sftp(&id)?;
+    client
+        .list_dir(&path, options.unwrap_or_default())
+        .await
+}
+
+#[tauri::command]
+pub async fn conn_stat(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<Entry> {
+    let client = registry.get_sftp(&id)?;
+    client.stat(&path).await
+}
+
+#[tauri::command]
+pub async fn conn_read_text(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<String> {
+    let client = registry.get_sftp(&id)?;
+    client.read_text(&path, TEXT_PREVIEW_MAX_BYTES).await
+}
+
+#[tauri::command]
+pub async fn conn_read_base64(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<String> {
+    let client = registry.get_sftp(&id)?;
+    client.read_base64(&path, IMAGE_PREVIEW_MAX_BYTES).await
+}
+
+#[tauri::command]
+pub async fn conn_dir_summary(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<DirSummary> {
+    let client = registry.get_sftp(&id)?;
+    client.dir_summary(&path, DIR_SCAN_MAX_ENTRIES).await
 }
