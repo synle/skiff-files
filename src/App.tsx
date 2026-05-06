@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import ShortcutsModal from "./components/ShortcutsModal";
 import ConflictModal from "./components/ConflictModal";
-import Browser from "./pages/Browser";
+import BrowserTabs from "./components/BrowserTabs";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -72,7 +72,7 @@ export default function App() {
         }}
       >
         <Routes>
-          <Route path="/" element={<Browser />} />
+          <Route path="/" element={<BrowserTabs home={home} />} />
           <Route path="/connections" element={<ConnectionsPage />} />
           <Route path="/transfers" element={<TransfersPage />} />
           <Route path="/settings" element={<SettingsPage />} />

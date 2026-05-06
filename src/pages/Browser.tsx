@@ -29,6 +29,13 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
   initialPath?: string;
+  /** When false, this Browser is mounted but hidden by the tab strip.
+   *  Global window listeners (drag-drop, Delete, Cmd/Ctrl+F, sidebar
+   *  navigate event) skip themselves so only the visible tab acts. */
+  isActive?: boolean;
+  /** Fires when the active path changes (navigation, back, forward,
+   *  sidebar drop). Tab strip uses it to keep tab labels in sync. */
+  onPathChange?: (path: string) => void;
 }
 
 /**
@@ -41,7 +48,11 @@ interface History {
   forward: string[];
 }
 
-export default function Browser({ initialPath }: Props) {
+export default function Browser({
+  initialPath,
+  isActive = true,
+  onPathChange,
+}: Props) {
   const { settings, update } = useSettings();
   const [home, setHome] = useState<string>("");
   const [history, setHistory] = useState<History>({ back: [], forward: [] });
@@ -122,9 +133,17 @@ export default function Browser({ initialPath }: Props) {
     if (path) void refresh(path);
   }, [path, refresh]);
 
-  // Listen for sidebar-driven navigations. Decoupling via a window event keeps
-  // the Sidebar from needing a reference to setHistory.
+  // Bubble path changes up to the tab strip so the tab label tracks
+  // the active path.
   useEffect(() => {
+    if (path) onPathChange?.(path);
+  }, [path, onPathChange]);
+
+  // Listen for sidebar-driven navigations. Decoupling via a window event keeps
+  // the Sidebar from needing a reference to setHistory. Only the active tab
+  // responds — otherwise N tabs would all jump on a single sidebar click.
+  useEffect(() => {
+    if (!isActive) return;
     const onExternalNavigate = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       if (detail) {
@@ -136,14 +155,16 @@ export default function Browser({ initialPath }: Props) {
     };
     window.addEventListener(NAVIGATE_EVENT, onExternalNavigate);
     return () => window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
-  }, []);
+  }, [isActive]);
 
   // OS-level drag-and-drop. Tauri emits a unified event for enter / over
   // / drop / leave. On drop, we route each dropped path through
   // sync_start_local so the user gets a progress bar in the Transfers
   // page; for directories we nest under the basename so the dropped
   // folder lands AT the cursor target rather than flattening into it.
+  // Inactive tabs skip — only the foreground tab responds to drops.
   useEffect(() => {
+    if (!isActive) return;
     let unlisten: UnlistenFn | null = null;
     let cancelled = false;
     void (async () => {
@@ -198,11 +219,14 @@ export default function Browser({ initialPath }: Props) {
       cancelled = true;
       unlisten?.();
     };
-  }, [path, refresh]);
+  }, [path, refresh, isActive]);
 
   // Cmd/Ctrl + F → focus the toolbar search input. Doesn't fire if the
   // user is already in an input (so it doesn't hijack the path bar).
+  // Only the active tab responds; otherwise hidden tabs would steal
+  // focus to their own (invisible) search box.
   useEffect(() => {
+    if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "f") return;
       const t = e.target as HTMLElement | null;
@@ -213,13 +237,15 @@ export default function Browser({ initialPath }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [isActive]);
 
   // Delete-key → send selection to OS trash. Backspace alone is reserved
   // for "go up", so we use the dedicated Delete key (Mac users can hit
   // Fn+Backspace which the OS rewrites to Delete). Skips input focus so
-  // typing in the path bar / connection form isn't hijacked.
+  // typing in the path bar / connection form isn't hijacked. Inactive
+  // tabs ignore — otherwise a Delete keypress would purge from every tab.
   useEffect(() => {
+    if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Delete") return;
       const t = e.target as HTMLElement | null;
@@ -244,7 +270,7 @@ export default function Browser({ initialPath }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedPaths, path, refresh]);
+  }, [selectedPaths, path, refresh, isActive]);
 
   /** Push a path onto history (the canonical way to navigate). */
   const navigate = useCallback((target: string) => {
