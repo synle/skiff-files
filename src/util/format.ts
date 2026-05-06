@@ -31,13 +31,34 @@ export function formatMtime(unixSeconds: number | null | undefined): string {
 
 /**
  * Split a filesystem path into ancestor segments suitable for a breadcrumb.
- * Works for both POSIX (`/a/b/c`) and Windows (`C:\\a\\b`) inputs.
+ * Works for POSIX (`/a/b/c`), Windows (`C:\\a\\b`), and remote
+ * (`sftp://<id>/a/b`) inputs.
  *
- * Returns an array of `{ label, path }` pairs where each path is the absolute
- * path up to and including that segment.
+ * Returns an array of `{ label, path }` pairs where each `path` is the full
+ * address-bar form up to and including that segment. Remote segments keep
+ * their scheme prefix so clicking them re-navigates through the same backend.
  */
 export function pathSegments(path: string): { label: string; path: string }[] {
   if (!path) return [];
+
+  // Remote (sftp://id/a/b/c) — first segment is the connection id; the rest
+  // are POSIX-shaped within the remote root.
+  if (path.startsWith("sftp://")) {
+    const rest = path.slice("sftp://".length);
+    const slash = rest.indexOf("/");
+    const id = slash < 0 ? rest : rest.slice(0, slash);
+    const remote = slash < 0 ? "/" : rest.slice(slash) || "/";
+    const out: { label: string; path: string }[] = [];
+    out.push({ label: id, path: `sftp://${id}/` });
+    const parts = remote.split("/").filter(Boolean);
+    let acc = "";
+    for (const p of parts) {
+      acc += `/${p}`;
+      out.push({ label: p, path: `sftp://${id}${acc}` });
+    }
+    return out;
+  }
+
   // Detect Windows-style by leading drive letter; otherwise treat as POSIX.
   const isWin = /^[A-Za-z]:[\\/]/.test(path);
   const sep = isWin ? "\\" : "/";
@@ -65,7 +86,8 @@ export function pathSegments(path: string): { label: string; path: string }[] {
   return out;
 }
 
-/** Parent of `path`. Returns the path itself for filesystem roots. */
+/** Parent of `path`. Returns the path itself for filesystem roots
+ *  (including remote roots like `sftp://id/`). */
 export function parentPath(path: string): string {
   if (!path) return path;
   const segs = pathSegments(path);

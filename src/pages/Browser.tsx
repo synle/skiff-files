@@ -9,8 +9,10 @@ import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
-import { fsHomeDir, fsListDir, fsMkdir, type Entry } from "../api/fs";
+import { fsHomeDir, fsMkdir, type Entry } from "../api/fs";
+import { listDir as clientListDir } from "../api/client";
 import { parentPath } from "../util/format";
+import { isRemote } from "../util/location";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
 import { NAVIGATE_EVENT } from "../App";
@@ -73,12 +75,16 @@ export default function Browser({ initialPath }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Fetch the directory listing for `path` and update local state. */
+  /** Fetch the directory listing for `path` and update local state.
+   *  Routes through the unified client so remote paths (`sftp://...`)
+   *  hit the registry instead of the local fs. */
   const refresh = useCallback(
     async (target: string) => {
       if (!target) return;
       try {
-        const list = await fsListDir(target, { showHidden: settings.showHidden });
+        const list = await clientListDir(target, {
+          showHidden: settings.showHidden,
+        });
         setEntries(list);
         setError(null);
       } catch (e) {
@@ -154,6 +160,13 @@ export default function Browser({ initialPath }: Props) {
 
   const handleNewFolder = async () => {
     if (!path) return;
+    // mkdir on remote backends lands in a follow-up — Phase 2a only ships
+    // the read-side of SFTP. Skip silently rather than throwing a confusing
+    // "command not found" error at the user.
+    if (isRemote(path)) {
+      setError("Remote mkdir is not supported yet.");
+      return;
+    }
     // Auto-name "New Folder", "New Folder 2", ... so we don't need a modal
     // on the first cut. A rename-on-create flow lands with the context menu.
     const existing = new Set(entries.map((e) => e.name));

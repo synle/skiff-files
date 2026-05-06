@@ -9,13 +9,8 @@
 // because `fs_dir_summary` can take seconds on large trees.
 import { Box, Divider, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import {
-  fsDirSummary,
-  fsReadBase64,
-  fsReadText,
-  type DirSummary,
-  type Entry,
-} from "../api/fs";
+import { type DirSummary, type Entry } from "../api/fs";
+import { dirSummary, readBase64, readText } from "../api/client";
 import { formatBytes, formatMtime } from "../util/format";
 import { isImage, mimeForPath } from "../util/mime";
 import IconForKind from "./IconForKind";
@@ -54,7 +49,7 @@ function ImageBody({ entry }: { entry: Entry }) {
     let cancelled = false;
     setSrc(null);
     setError(null);
-    fsReadBase64(entry.path)
+    readBase64(entry.path)
       .then((b64) => {
         if (cancelled) return;
         const mime = mimeForPath(entry.path) ?? "application/octet-stream";
@@ -104,7 +99,7 @@ function TextBody({ entry }: { entry: Entry }) {
     let cancelled = false;
     setText(null);
     setError(null);
-    fsReadText(entry.path)
+    readText(entry.path)
       .then((t) => !cancelled && setText(t))
       .catch((e) => !cancelled && setError(String(e)));
     return () => {
@@ -155,7 +150,7 @@ function FolderBody({ entry }: { entry: Entry }) {
     let cancelled = false;
     setSummary(null);
     setError(null);
-    fsDirSummary(entry.path)
+    dirSummary(entry.path)
       .then((s) => !cancelled && setSummary(s))
       .catch((e) => !cancelled && setError(String(e)));
     return () => {

@@ -68,4 +68,29 @@ describe("parentPath", () => {
   it("handles empty input as identity", () => {
     expect(parentPath("")).toBe("");
   });
+
+  it("walks up an sftp path", () => {
+    expect(parentPath("sftp://abc/home/foo/bar")).toBe("sftp://abc/home/foo");
+    expect(parentPath("sftp://abc/home")).toBe("sftp://abc/");
+  });
+
+  it("stops at the sftp root", () => {
+    expect(parentPath("sftp://abc/")).toBe("sftp://abc/");
+  });
+});
+
+describe("pathSegments — sftp", () => {
+  it("breaks down an sftp path with the connection id as the first segment", () => {
+    const segs = pathSegments("sftp://abc/home/foo");
+    expect(segs).toEqual([
+      { label: "abc", path: "sftp://abc/" },
+      { label: "home", path: "sftp://abc/home" },
+      { label: "foo", path: "sftp://abc/home/foo" },
+    ]);
+  });
+
+  it("renders an sftp root with just the id", () => {
+    const segs = pathSegments("sftp://abc/");
+    expect(segs).toEqual([{ label: "abc", path: "sftp://abc/" }]);
+  });
 });

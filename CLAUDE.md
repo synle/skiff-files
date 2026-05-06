@@ -37,7 +37,7 @@ Two layers, talking via `invoke()`:
 - **Phase 1** — ✅ local file explorer (browse, navigate, mkdir, rename, remove, copy; virtualized list; light/dark/system theme; settings page)
 - **Phase 1.5** — ✅ right-side preview pane (image / text / markdown / folder summary; toolbar toggle; `previewMode` setting: off / images-only / always; pdf + audio/video previews still pending — covered by later polish)
 - **Phase 2a** — ✅ SFTP backend (russh + russh-sftp, pure-Rust), connection registry as Tauri State, conn_* commands, Connections page (add/list/disconnect/save drafts), Sidebar live-host list. Real SFTP integration tests deferred to Phase 3 (need docker harness).
-- **Phase 2b** — pending — wire SFTP into Browser via `sftp://<connection_id>/<path>` scheme; mkdir/rename/remove/upload on remote; ssh-config import; known-hosts TOFU.
+- **Phase 2b** — ✅ Browser remote integration: `sftp://<connection_id>/<path>` scheme parsed by `util/location.ts`; `api/client.ts` unifies fs_*/conn_* dispatch; pathSegments / parentPath are scheme-aware; clicking a host in the Sidebar opens that connection in the Browser. mkdir/rename/remove/upload on remote, ssh-config import, and known-hosts TOFU still pending — schedule those when Phase 3 lands docker-based integration tests.
 - **Phase 3** — pending — FTP/FTPS + SMB
 - **Phase 4** — pending — Skiffsync engine (TeraCopy-style conflict resolution)
 - **Phase 5+** — see TODO.md

@@ -133,7 +133,12 @@ export default function Sidebar({ home, onNavigate }: Props) {
           <List dense disablePadding>
             {connections.map((c) => (
               <ListItem key={c.id} disablePadding>
-                <ListItemButton component={RouterLink} to="/connections">
+                <ListItemButton
+                  onClick={() =>
+                    onNavigate(`sftp://${c.id}/`)
+                  }
+                  aria-label={`Browse ${c.label}`}
+                >
                   <ListItemIcon sx={{ minWidth: 32 }}>
                     <Tooltip title="Connected">
                       <CircleIcon

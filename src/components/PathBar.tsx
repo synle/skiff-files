@@ -15,6 +15,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import { useEffect, useState } from "react";
 import { fsCanonicalize } from "../api/fs";
 import { pathSegments } from "../util/format";
+import { isRemote } from "../util/location";
 
 interface Props {
   path: string;
@@ -36,6 +37,13 @@ export default function PathBar({ path, onNavigate, onHome }: Props) {
   const commit = async () => {
     const target = draft.trim();
     if (!target) {
+      setEditing(false);
+      return;
+    }
+    // Remote paths are already absolute — there's no `~` expansion in
+    // `sftp://` and we don't have a remote canonicalize endpoint yet.
+    if (isRemote(target)) {
+      onNavigate(target);
       setEditing(false);
       return;
     }
