@@ -679,6 +679,7 @@ export default function Browser({
           isActive={isActive}
           density={settings.density}
           showExtensions={settings.showExtensions}
+          groupFoldersFirst={settings.groupFoldersFirst}
         />
         {effectivePreviewOpen && (
           <PreviewPane

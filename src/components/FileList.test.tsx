@@ -88,6 +88,7 @@ function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
           isActive={props?.isActive ?? true}
           density={props?.density ?? "comfortable"}
           showExtensions={props?.showExtensions ?? true}
+          groupFoldersFirst={props?.groupFoldersFirst ?? true}
         />
       </div>
     </ThemeProvider>,
@@ -105,6 +106,19 @@ describe("FileList", () => {
     renderList({ sortKey: "name", sortDir: "asc" });
     const rows = screen.getAllByTestId("file-row");
     expect(rows[0].textContent).toContain("child-folder");
+  });
+
+  it("intermixes folders + files when groupFoldersFirst=false", () => {
+    // Sorting by name asc: alpha.txt < child-folder < zeta.md.
+    renderList({
+      sortKey: "name",
+      sortDir: "asc",
+      groupFoldersFirst: false,
+    });
+    const rows = screen.getAllByTestId("file-row");
+    expect(rows[0].textContent).toContain("alpha.txt");
+    expect(rows[1].textContent).toContain("child-folder");
+    expect(rows[2].textContent).toContain("zeta.md");
   });
 
   it("clicking a column header calls onSortChange", () => {

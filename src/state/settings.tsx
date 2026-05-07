@@ -81,6 +81,11 @@ export interface Settings {
   syncDefaultMaxSizeGb: number;
   /** Default lookback-days for the skip-if-unchanged heuristic. */
   syncDefaultLookbackDays: number;
+  /** When true (Finder default), folders are grouped above files
+   *  regardless of the active sort. When false, folders and files
+   *  intermix according to the chosen sort key — useful for sorting
+   *  by mtime to find "most recently touched" without folder bias. */
+  groupFoldersFirst: boolean;
   /** When true, the OS window title shows the active tab's full path
    *  (e.g. "/Users/syle/git/skiff" instead of just "Skiff Files").
    *  Off by default to match Finder; Explorer power users sometimes
@@ -149,6 +154,7 @@ export const DEFAULTS: Settings = {
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
+  groupFoldersFirst: true,
   showFullPathInTitle: false,
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,

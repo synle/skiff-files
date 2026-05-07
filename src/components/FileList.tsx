@@ -42,15 +42,22 @@ interface Props {
   onContext?: (entry: Entry, x: number, y: number) => void;
   density: Density;
   showExtensions: boolean;
+  /** When true (default), folders sort above files regardless of the
+   *  active sort key. When false, folders and files intermix purely
+   *  by the chosen sort. Settings → Default View → "Group folders
+   *  before files" controls this. */
+  groupFoldersFirst?: boolean;
 }
 
-/** Folders-on-top, then the requested sort within each group. */
-function sortEntries(entries: Entry[], key: SortKey, dir: SortDir): Entry[] {
+/** Sort entries either with folders-first (Finder default) or fully
+ *  intermixed depending on `groupFoldersFirst`. */
+function sortEntries(
+  entries: Entry[],
+  key: SortKey,
+  dir: SortDir,
+  groupFoldersFirst: boolean,
+): Entry[] {
   const mul = dir === "asc" ? 1 : -1;
-  const groups = { dirs: [] as Entry[], files: [] as Entry[] };
-  for (const e of entries) {
-    (e.isDir ? groups.dirs : groups.files).push(e);
-  }
   const cmp = (a: Entry, b: Entry): number => {
     switch (key) {
       case "size":
@@ -64,6 +71,13 @@ function sortEntries(entries: Entry[], key: SortKey, dir: SortDir): Entry[] {
         return a.name.localeCompare(b.name, undefined, { numeric: true }) * mul;
     }
   };
+  if (!groupFoldersFirst) {
+    return [...entries].sort(cmp);
+  }
+  const groups = { dirs: [] as Entry[], files: [] as Entry[] };
+  for (const e of entries) {
+    (e.isDir ? groups.dirs : groups.files).push(e);
+  }
   groups.dirs.sort(cmp);
   groups.files.sort(cmp);
   return [...groups.dirs, ...groups.files];
@@ -156,12 +170,13 @@ export default function FileList(props: Props) {
     density,
     showExtensions,
     isActive = true,
+    groupFoldersFirst = true,
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
   const sorted = useMemo(
-    () => sortEntries(entries, sortKey, sortDir),
-    [entries, sortKey, sortDir],
+    () => sortEntries(entries, sortKey, sortDir, groupFoldersFirst),
+    [entries, sortKey, sortDir, groupFoldersFirst],
   );
 
   const [selected, setSelected] = useState<Set<string>>(new Set());

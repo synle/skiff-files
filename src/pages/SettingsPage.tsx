@@ -165,6 +165,18 @@ export default function SettingsPage() {
           <FormControlLabel
             control={
               <Switch
+                checked={settings.groupFoldersFirst}
+                onChange={(e) =>
+                  update("groupFoldersFirst", e.target.checked)
+                }
+              />
+            }
+            label="Group folders before files"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
                 checked={settings.showHidden}
                 onChange={(e) => update("showHidden", e.target.checked)}
               />
