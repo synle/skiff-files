@@ -19,11 +19,17 @@ export type ConflictPolicy =
   | "renameOlderTarget"
   | "prompt";
 
-/** Mirror of `crate::sync::types::ConflictPromptDecision`. */
+/** Mirror of `crate::sync::types::ConflictPromptDecision`.
+ *  The `*All` variants are the TeraCopy "Apply to all remaining"
+ *  buttons in the modal; the engine's per-job closure caches them
+ *  and skips prompting for subsequent conflicts. */
 export type ConflictPromptDecision =
   | "overwrite"
   | "skip"
   | "keepBoth"
+  | "overwriteAll"
+  | "skipAll"
+  | "keepBothAll"
   | "cancelJob";
 
 /** Mirror of `crate::sync::types::ConflictPrompt`. */

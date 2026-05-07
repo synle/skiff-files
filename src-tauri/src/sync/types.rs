@@ -46,17 +46,55 @@ pub enum ConflictPolicy {
 
 /// What the user picks in the TeraCopy-style modal. Maps onto a
 /// per-file [`crate::sync::engine::ConflictDecision`] in the engine.
+///
+/// The `All` variants are the "Apply to all remaining" buttons in the
+/// modal — once picked, the engine's closure caches the corresponding
+/// non-All decision and never prompts again for this job. The user
+/// can still cancel, which unblocks via the cancel token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ConflictPromptDecision {
     Overwrite,
     Skip,
     KeepBoth,
+    /// Apply Overwrite to this conflict and every subsequent one in
+    /// the same job.
+    OverwriteAll,
+    /// Apply Skip to this conflict and every subsequent one.
+    SkipAll,
+    /// Apply Keep both to this conflict and every subsequent one.
+    KeepBothAll,
     /// Frontend sends this when the user clicks "Cancel" inside the
     /// modal. Engine treats it the same as a `sync_cancel` for the rest
     /// of the job — the wait unblocks, current file is skipped, and
     /// the job exits with `cancelled = true`.
     CancelJob,
+}
+
+impl ConflictPromptDecision {
+    /// True iff this decision applies to every remaining conflict in
+    /// the job. The closures in the command layer cache the non-All
+    /// equivalent after seeing one of these.
+    pub fn is_apply_to_all(&self) -> bool {
+        matches!(
+            self,
+            ConflictPromptDecision::OverwriteAll
+                | ConflictPromptDecision::SkipAll
+                | ConflictPromptDecision::KeepBothAll
+        )
+    }
+
+    /// Convert an "All" variant to its per-file equivalent. No-op for
+    /// the non-All variants — they pass through unchanged so callers
+    /// can use this as a normalization step.
+    pub fn normalized(&self) -> ConflictPromptDecision {
+        match self {
+            ConflictPromptDecision::OverwriteAll => ConflictPromptDecision::Overwrite,
+            ConflictPromptDecision::SkipAll => ConflictPromptDecision::Skip,
+            ConflictPromptDecision::KeepBothAll => ConflictPromptDecision::KeepBoth,
+            other => *other,
+        }
+    }
 }
 
 /// Frontend-bound payload for `sync:conflict` events. The hub

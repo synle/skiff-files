@@ -158,35 +158,77 @@ export default function ConflictModal() {
             </Stack>
           )}
 
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ flexWrap: "wrap" }}
-            useFlexGap
-          >
-            <Button
-              variant="contained"
-              onClick={() => void decide("overwrite")}
+          <Stack spacing={1.5}>
+            {/* Per-file row */}
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ flexWrap: "wrap" }}
+              useFlexGap
             >
-              Overwrite
-            </Button>
-            <Button variant="outlined" onClick={() => void decide("skip")}>
-              Skip
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => void decide("keepBoth")}
-            >
-              Keep both
-            </Button>
-            <Box sx={{ flex: 1 }} />
-            <Button
-              variant="text"
-              color="error"
-              onClick={() => void decide("cancelJob")}
-            >
-              Cancel job
-            </Button>
+              <Button
+                variant="contained"
+                onClick={() => void decide("overwrite")}
+              >
+                Overwrite
+              </Button>
+              <Button variant="outlined" onClick={() => void decide("skip")}>
+                Skip
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => void decide("keepBoth")}
+              >
+                Keep both
+              </Button>
+              <Box sx={{ flex: 1 }} />
+              <Button
+                variant="text"
+                color="error"
+                onClick={() => void decide("cancelJob")}
+              >
+                Cancel job
+              </Button>
+            </Stack>
+
+            {/* Apply-to-all row. Only shown when there's more than one
+                conflict pending — for a single conflict, the "all"
+                buttons would be misleading. */}
+            {queue.length > 1 && (
+              <>
+                <Typography variant="caption" color="text.secondary">
+                  Apply to all {queue.length} pending conflicts:
+                </Typography>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ flexWrap: "wrap" }}
+                  useFlexGap
+                >
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => void decide("overwriteAll")}
+                  >
+                    Overwrite all
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => void decide("skipAll")}
+                  >
+                    Skip all
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => void decide("keepBothAll")}
+                  >
+                    Keep both for all
+                  </Button>
+                </Stack>
+              </>
+            )}
           </Stack>
 
           {queue.length > 1 && (

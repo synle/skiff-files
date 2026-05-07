@@ -143,6 +143,31 @@ describe("ConflictModal", () => {
     );
   });
 
+  it("Apply-to-all buttons appear when more than one conflict is queued", async () => {
+    const { fire } = renderAndCapture();
+    fire({ ...samplePayload, conflictId: "c-1" });
+    fire({ ...samplePayload, conflictId: "c-2", dest: "/dest/b.txt" });
+    await waitFor(() =>
+      expect(screen.getByText("Overwrite all")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByText("Overwrite all"));
+    await waitFor(() =>
+      expect(mockedInvoke).toHaveBeenCalledWith(
+        "sync_resolve_conflict",
+        expect.objectContaining({ decision: "overwriteAll" }),
+      ),
+    );
+  });
+
+  it("Apply-to-all row is hidden for single-conflict prompts", async () => {
+    const { fire } = renderAndCapture();
+    fire(samplePayload);
+    await waitFor(() =>
+      expect(screen.getByText("Overwrite")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Overwrite all")).not.toBeInTheDocument();
+  });
+
   it("queues additional conflicts and shows them in turn", async () => {
     const { fire } = renderAndCapture();
     fire({ ...samplePayload, conflictId: "c-1" });

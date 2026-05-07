@@ -248,14 +248,24 @@ enum ConflictDecision {
 }
 
 /// Translate a frontend prompt decision into our internal one. Used by
-/// `process_file` after a `PromptUser` outcome resolves.
+/// `process_file` after a `PromptUser` outcome resolves. The "Apply
+/// to all" variants normalize to their per-file equivalents — the
+/// command-layer closure is responsible for caching the All choice so
+/// subsequent conflicts skip the modal.
 fn from_prompt_decision(d: ConflictPromptDecision) -> ConflictDecision {
-    match d {
+    match d.normalized() {
         ConflictPromptDecision::Overwrite => ConflictDecision::Copy,
         ConflictPromptDecision::Skip => ConflictDecision::Skip("user skipped".into()),
         ConflictPromptDecision::KeepBoth => ConflictDecision::KeepBoth,
         ConflictPromptDecision::CancelJob => {
             ConflictDecision::Skip("job cancelled".into())
+        }
+        // normalized() removes the All variants; the unreachable arm
+        // is purely a safety net for future enum expansion.
+        ConflictPromptDecision::OverwriteAll
+        | ConflictPromptDecision::SkipAll
+        | ConflictPromptDecision::KeepBothAll => {
+            unreachable!("normalized() drops the All variants")
         }
     }
 }

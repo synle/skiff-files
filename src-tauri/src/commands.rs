@@ -390,6 +390,13 @@ fn run_job(
         let hub_for_prompt = hub.clone();
         let cancel_for_prompt = cancel.clone();
 
+        // Sticky cache for "Apply to all" decisions. Once the user
+        // clicks Overwrite-all / Skip-all / Keep-both-all, the closure
+        // returns the per-file equivalent for every subsequent
+        // conflict without prompting again. Cleared when the user
+        // cancels (irrelevant — job exits) or when the job ends.
+        let sticky: std::sync::Arc<std::sync::Mutex<Option<ConflictPromptDecision>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(None));
         let summary: Summary = execute_sync(
             &id,
             &files,
@@ -404,6 +411,9 @@ fn run_job(
             // cancel — engine treats that as a per-file skip and the
             // outer cancel-check exits the loop next iteration.
             move |file, dest_md| {
+                if let Some(d) = *sticky.lock().expect("sticky poisoned") {
+                    return Some(d);
+                }
                 let conflict_id = uuid::Uuid::new_v4().to_string();
                 let payload = ConflictPrompt {
                     job_id: id_for_prompt.clone(),
@@ -420,7 +430,13 @@ fn run_job(
                         .map(|d| d.as_secs() as i64),
                 };
                 let _ = app_prompt.emit("sync:conflict", &payload);
-                hub_for_prompt.wait_for(&conflict_id, &cancel_for_prompt)
+                let answer = hub_for_prompt.wait_for(&conflict_id, &cancel_for_prompt);
+                if let Some(a) = answer {
+                    if a.is_apply_to_all() {
+                        *sticky.lock().expect("sticky poisoned") = Some(a.normalized());
+                    }
+                }
+                answer
             },
         );
 
@@ -708,6 +724,10 @@ pub fn sync_start_cross(
             let id_for_prompt = id_for_plan.clone();
             let hub_for_prompt = hub_arc.clone();
             let cancel_for_prompt_outer = cancel.clone();
+            // Sticky cache for "Apply to all" decisions, scoped to
+            // this job. Same pattern as sync_start_local.
+            let sticky_cross: Arc<std::sync::Mutex<Option<ConflictPromptDecision>>> =
+                Arc::new(std::sync::Mutex::new(None));
             let summary = execute_cross(
                 &id_for_plan,
                 plan,
@@ -724,7 +744,11 @@ pub fn sync_start_cross(
                     let job_id = id_for_prompt.clone();
                     let hub = hub_for_prompt.clone();
                     let cancel = cancel_for_prompt_outer.clone();
+                    let sticky = sticky_cross.clone();
                     async move {
+                        if let Some(d) = *sticky.lock().expect("sticky poisoned") {
+                            return Some(d);
+                        }
                         let conflict_id = uuid::Uuid::new_v4().to_string();
                         let payload = ConflictPrompt {
                             job_id,
@@ -737,7 +761,14 @@ pub fn sync_start_cross(
                             dest_mtime: dest_meta.mtime,
                         };
                         let _ = app.emit("sync:conflict", &payload);
-                        hub.wait_for(&conflict_id, &cancel)
+                        let answer = hub.wait_for(&conflict_id, &cancel);
+                        if let Some(a) = answer {
+                            if a.is_apply_to_all() {
+                                *sticky.lock().expect("sticky poisoned") =
+                                    Some(a.normalized());
+                            }
+                        }
+                        answer
                     }
                 },
             )

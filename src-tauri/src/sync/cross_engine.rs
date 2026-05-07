@@ -370,8 +370,12 @@ where
             ConflictPolicy::Prompt => {
                 // Park on the resolver hub via the closure. None
                 // (cancel) treated as Skip for this file; the outer
-                // cancel-check exits the loop next iteration.
-                let decision = on_prompt(file.clone(), dm).await;
+                // cancel-check exits the loop next iteration. The
+                // closure is also responsible for caching "Apply to
+                // all" decisions so subsequent conflicts skip the
+                // modal — by the time we get here, any "All" answer
+                // has been normalized into its per-file equivalent.
+                let decision = on_prompt(file.clone(), dm).await.map(|d| d.normalized());
                 match decision {
                     Some(ConflictPromptDecision::Overwrite) => true,
                     Some(ConflictPromptDecision::Skip) | None => false,
@@ -393,6 +397,12 @@ where
                         // this file a conflict and the outer loop
                         // bails on next iteration when is_cancelled().
                         false
+                    }
+                    // normalized() guarantees these can't appear here.
+                    Some(ConflictPromptDecision::OverwriteAll)
+                    | Some(ConflictPromptDecision::SkipAll)
+                    | Some(ConflictPromptDecision::KeepBothAll) => {
+                        unreachable!("normalized() drops the All variants")
                     }
                 }
             }
