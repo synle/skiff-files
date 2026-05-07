@@ -83,6 +83,10 @@ export interface Settings {
   syncDefaultLookbackDays: number;
   /** Default bandwidth cap (KB/s) for new sync jobs. 0 = unlimited. */
   syncDefaultBandwidthKbps: number;
+  /** Default for the "verify after copy" toggle on new sync jobs.
+   *  When true, the engine re-stats each dest file and surfaces a
+   *  per-file error on size mismatch. */
+  syncDefaultVerifyAfterCopy: boolean;
   /** When true (Finder default), folders are grouped above files
    *  regardless of the active sort. When false, folders and files
    *  intermix according to the chosen sort key — useful for sorting
@@ -162,6 +166,7 @@ export const DEFAULTS: Settings = {
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
   syncDefaultBandwidthKbps: 0,
+  syncDefaultVerifyAfterCopy: false,
   groupFoldersFirst: true,
   showFullPathInTitle: false,
   sidebarVisible: true,

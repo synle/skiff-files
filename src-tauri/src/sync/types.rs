@@ -150,6 +150,14 @@ pub struct JobOptions {
     /// when this is set; cross-protocol loops chunked anyway.
     #[serde(default)]
     pub bandwidth_kbps: u64,
+    /// When true, the engine re-stats the destination after every copy
+    /// and confirms its byte count matches the source. Mismatches are
+    /// surfaced as per-file errors so the user knows the copy didn't
+    /// land cleanly. Optional MD5 verification is a future extension —
+    /// size match is enough to catch the common truncation / network-
+    /// hiccup failure modes.
+    #[serde(default)]
+    pub verify_after_copy: bool,
 }
 
 fn default_max_gb() -> u64 {

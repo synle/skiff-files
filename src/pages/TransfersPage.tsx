@@ -75,6 +75,9 @@ interface SavedJob {
   /** Optional — pre-bandwidth-cap saved jobs (older than 0.2.51) won't
    *  have this; the runner falls back to the current settings default. */
   bandwidthKbps?: number;
+  /** Optional — added in 0.2.53. Pre-existing saves fall back to the
+   *  current settings default at run time. */
+  verifyAfterCopy?: boolean;
 }
 
 const SAVED_JOBS_KEY = "skiff-files.savedJobs.v1";
@@ -119,6 +122,9 @@ export default function TransfersPage() {
   );
   const [bandwidthKbps, setBandwidthKbps] = useState(
     settings.syncDefaultBandwidthKbps,
+  );
+  const [verifyAfterCopy, setVerifyAfterCopy] = useState(
+    settings.syncDefaultVerifyAfterCopy,
   );
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -230,6 +236,7 @@ export default function TransfersPage() {
         conflictPolicy,
         dryRun,
         bandwidthKbps,
+        verifyAfterCopy,
       });
       setJobs((prev) => ({
         ...prev,
@@ -320,6 +327,7 @@ export default function TransfersPage() {
       lookbackDays,
       conflictPolicy,
       bandwidthKbps,
+      verifyAfterCopy,
     };
     setSavedJobs((prev) => [...prev, job]);
   };
@@ -351,6 +359,8 @@ export default function TransfersPage() {
         // current Settings default rather than 0 so existing saves
         // honor the user's current cap.
         bandwidthKbps: j.bandwidthKbps ?? settings.syncDefaultBandwidthKbps,
+        verifyAfterCopy:
+          j.verifyAfterCopy ?? settings.syncDefaultVerifyAfterCopy,
       });
       setJobs((prev) => ({
         ...prev,
@@ -489,6 +499,15 @@ export default function TransfersPage() {
                 />
               }
               label="Dry run (report what would happen, write nothing)"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={verifyAfterCopy}
+                  onChange={(e) => setVerifyAfterCopy(e.target.checked)}
+                />
+              }
+              label="Verify after copy (re-stat dest size)"
             />
             <Stack direction="row" spacing={1}>
               <Button

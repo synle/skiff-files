@@ -443,6 +443,38 @@ async fn do_copy_one(
         .await
     {
         Ok(bytes) => {
+            if opts.verify_after_copy {
+                match dest_backend.metadata(target).await {
+                    Ok(Some(md)) if md.size != file.size => {
+                        summary.errors += 1;
+                        return FileOutcome::Error {
+                            src: file.src.clone(),
+                            dest: target.to_string(),
+                            error: format!(
+                                "verify failed: src {} bytes, dest {} bytes",
+                                file.size, md.size
+                            ),
+                        };
+                    }
+                    Ok(None) => {
+                        summary.errors += 1;
+                        return FileOutcome::Error {
+                            src: file.src.clone(),
+                            dest: target.to_string(),
+                            error: "verify failed: dest missing after copy".to_string(),
+                        };
+                    }
+                    Err(e) => {
+                        summary.errors += 1;
+                        return FileOutcome::Error {
+                            src: file.src.clone(),
+                            dest: target.to_string(),
+                            error: format!("verify stat failed: {e}"),
+                        };
+                    }
+                    _ => {}
+                }
+            }
             summary.copied += 1;
             summary.bytes_copied += bytes;
             FileOutcome::Copied {
@@ -508,6 +540,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::Overwrite,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -538,6 +571,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::Overwrite,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -578,6 +612,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::KeepBoth,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -625,6 +660,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::Overwrite,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -668,6 +704,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::Prompt,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -708,6 +745,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::Prompt,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -751,6 +789,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::Prompt,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -791,6 +830,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::RenameTarget,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,
@@ -838,6 +878,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::RenameOlderTarget,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             CancelToken::new(),
             Backend::Local,

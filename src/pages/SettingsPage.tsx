@@ -299,6 +299,17 @@ export default function SettingsPage() {
             helperText="0 = unlimited. Local-to-local jobs skip the kernel-accelerated copy when this is set."
             sx={{ maxWidth: 240 }}
           />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.syncDefaultVerifyAfterCopy}
+                onChange={(e) =>
+                  update("syncDefaultVerifyAfterCopy", e.target.checked)
+                }
+              />
+            }
+            label="Verify after copy (re-stat dest size)"
+          />
         </Section>
 
         <Divider />

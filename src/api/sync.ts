@@ -55,6 +55,10 @@ export interface JobOptions {
    *  the cap. Local-to-local sync skips the kernel-accelerated copy
    *  path (which can't be throttled) when this is non-zero. */
   bandwidthKbps?: number;
+  /** When true, the engine re-stats the destination after each copy
+   *  and confirms its byte count matches the source. Mismatches surface
+   *  as per-file errors. */
+  verifyAfterCopy?: boolean;
 }
 
 /** Mirror of `crate::sync::types::JobState`. */

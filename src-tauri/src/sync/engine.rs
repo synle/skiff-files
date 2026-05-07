@@ -399,6 +399,34 @@ fn do_copy(
     }
     match copy_with_fallback(&file.src, target, opts.bandwidth_kbps) {
         Ok(n) => {
+            // Optional post-copy size-match verify. Catches truncations
+            // and partial writes that wouldn't otherwise surface until
+            // the user opened the destination later.
+            if opts.verify_after_copy {
+                match fs::metadata(target) {
+                    Ok(md) if md.len() != file.size => {
+                        summary.errors += 1;
+                        return FileOutcome::Error {
+                            src: src_str,
+                            dest: dest_str,
+                            error: format!(
+                                "verify failed: src {} bytes, dest {} bytes",
+                                file.size,
+                                md.len()
+                            ),
+                        };
+                    }
+                    Err(e) => {
+                        summary.errors += 1;
+                        return FileOutcome::Error {
+                            src: src_str,
+                            dest: dest_str,
+                            error: format!("verify stat failed: {e}"),
+                        };
+                    }
+                    _ => {}
+                }
+            }
             summary.copied += 1;
             summary.bytes_copied += n;
             FileOutcome::Copied {
@@ -605,6 +633,7 @@ mod tests {
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: false,
             bandwidth_kbps: 0,
+            verify_after_copy: false,
         });
         assert_eq!(s.copied, 2);
         assert_eq!(s.errors, 0);
@@ -623,6 +652,7 @@ mod tests {
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: false,
             bandwidth_kbps: 0,
+            verify_after_copy: false,
         });
         let s2 = run_default(&src, &dest, JobOptions {
             max_size_gb: 1,
@@ -630,6 +660,7 @@ mod tests {
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: false,
             bandwidth_kbps: 0,
+            verify_after_copy: false,
         });
         assert_eq!(s2.copied, 0);
         assert_eq!(s2.skipped, 2);
@@ -652,6 +683,7 @@ mod tests {
             conflict_policy: ConflictPolicy::Skip,
             dry_run: false,
             bandwidth_kbps: 0,
+            verify_after_copy: false,
         });
         // Different sizes -> not "unchanged"; policy=skip -> conflict, no overwrite.
         assert!(s.conflicts >= 1);
@@ -675,6 +707,7 @@ mod tests {
             conflict_policy: ConflictPolicy::KeepBoth,
             dry_run: false,
             bandwidth_kbps: 0,
+            verify_after_copy: false,
         });
         // a.txt remains the "existing-different" file; the new copy lands
         // at a (2).txt.
@@ -695,6 +728,7 @@ mod tests {
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: true,
             bandwidth_kbps: 0,
+            verify_after_copy: false,
         });
         assert_eq!(s.copied, 2);
         assert!(!dest.join("a.txt").exists());
@@ -730,6 +764,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::OverwriteOlder,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
         );
         assert!(s.copied >= 1, "expected at least one overwrite, got {s:?}");
@@ -756,6 +791,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::OverwriteOlder,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
         );
         assert!(s.conflicts >= 1);
@@ -780,6 +816,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::ReplaceSmaller,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
         );
         assert!(s.copied >= 1);
@@ -802,6 +839,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::ReplaceSmaller,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
         );
         assert!(s.conflicts >= 1);
@@ -823,6 +861,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::ReplaceIfSizeDifferent,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
         );
         assert!(s.copied >= 1);
@@ -844,6 +883,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::RenameTarget,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
         );
         assert!(s.copied >= 1);
@@ -871,6 +911,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::RenameOlderTarget,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
         );
         assert!(s.conflicts >= 1);
@@ -899,6 +940,7 @@ mod tests {
                     conflict_policy: ConflictPolicy::Overwrite,
                     dry_run: false,
                     bandwidth_kbps: 0,
+                    verify_after_copy: false,
                 },
                 token_for_runner,
                 |_| {},
@@ -936,6 +978,7 @@ mod tests {
                     conflict_policy: ConflictPolicy::Overwrite,
                     dry_run: false,
                     bandwidth_kbps: 0,
+                    verify_after_copy: false,
                 },
                 token_for_runner,
                 |_| {},
@@ -967,6 +1010,7 @@ mod tests {
                 conflict_policy: ConflictPolicy::Overwrite,
                 dry_run: false,
                 bandwidth_kbps: 0,
+                verify_after_copy: false,
             },
             token,
             |_| {},

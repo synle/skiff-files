@@ -666,6 +666,7 @@ pub fn sync_start_local(
         conflict_policy: Default::default(),
         dry_run: false,
         bandwidth_kbps: 0,
+        verify_after_copy: false,
     });
     let id = Uuid::new_v4().to_string();
     let info = JobInfo {
@@ -826,6 +827,7 @@ pub fn sync_start_cross(
         conflict_policy: Default::default(),
         dry_run: false,
         bandwidth_kbps: 0,
+        verify_after_copy: false,
     });
     let id = Uuid::new_v4().to_string();
     let info = JobInfo {
@@ -1003,6 +1005,7 @@ pub fn sync_start_repo(
         conflict_policy: Default::default(),
         dry_run: false,
         bandwidth_kbps: 0,
+        verify_after_copy: false,
     });
     let id = Uuid::new_v4().to_string();
     let info = JobInfo {
