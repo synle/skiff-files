@@ -83,6 +83,16 @@ export const fsRevealInOs = (path: string): Promise<void> =>
 export const fsOpenWithDefault = (path: string): Promise<void> =>
   invoke<void>("fs_open_with_default", { path });
 
+/** Filesystem totals for the partition that hosts `path`. Bytes. */
+export interface DiskSpace {
+  total: number;
+  free: number;
+}
+
+/** Returns the host filesystem's total + free byte counts. */
+export const fsDiskSpace = (path: string): Promise<DiskSpace> =>
+  invoke<DiskSpace>("fs_disk_space", { path });
+
 export const fsCopyFile = (from: string, to: string): Promise<number> =>
   invoke<number>("fs_copy_file", { from, to });
 

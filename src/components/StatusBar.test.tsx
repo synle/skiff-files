@@ -50,4 +50,26 @@ describe("StatusBar", () => {
     expect(screen.getByText("boom")).toBeInTheDocument();
     expect(screen.queryByText(/3 of 14 selected/)).not.toBeInTheDocument();
   });
+
+  it("renders disk free / total when supplied", () => {
+    r({
+      totalEntries: 5,
+      selectedEntries: 0,
+      selectedSize: 0,
+      diskFree: 250 * 1024 * 1024 * 1024,
+      diskTotal: 1024 * 1024 * 1024 * 1024,
+    });
+    expect(screen.getByText(/free of/)).toBeInTheDocument();
+  });
+
+  it("hides disk readout when diskFree is null", () => {
+    r({
+      totalEntries: 5,
+      selectedEntries: 0,
+      selectedSize: 0,
+      diskFree: null,
+      diskTotal: null,
+    });
+    expect(screen.queryByText(/free of/)).not.toBeInTheDocument();
+  });
 });

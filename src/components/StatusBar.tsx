@@ -8,6 +8,11 @@ interface Props {
   selectedEntries: number;
   selectedSize: number;
   errorMessage?: string | null;
+  /** Optional disk-space readout for the current path's filesystem.
+   *  When provided, renders alongside the selection summary as
+   *  "X free of Y". Local paths only — remotes pass `null`. */
+  diskFree?: number | null;
+  diskTotal?: number | null;
 }
 
 export default function StatusBar({
@@ -15,6 +20,8 @@ export default function StatusBar({
   selectedEntries,
   selectedSize,
   errorMessage,
+  diskFree,
+  diskTotal,
 }: Props) {
   // Errors take precedence — a directory listing error matters more than the
   // empty-selection summary it would otherwise render alongside.
@@ -52,6 +59,11 @@ export default function StatusBar({
           ? `${selectedEntries} of ${totalEntries} selected · ${formatBytes(selectedSize)}`
           : `${totalEntries} item${totalEntries === 1 ? "" : "s"}`}
       </Typography>
+      {diskFree != null && diskTotal != null && (
+        <Typography variant="caption" color="text.secondary">
+          · {formatBytes(diskFree)} free of {formatBytes(diskTotal)}
+        </Typography>
+      )}
     </Box>
   );
 }

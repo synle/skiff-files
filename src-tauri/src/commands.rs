@@ -161,6 +161,29 @@ pub fn fs_open_with_default(path: String) -> FsResult<()> {
     open::that(&path).map_err(|e| format!("open {path}: {e}"))
 }
 
+/// Total + free bytes on the filesystem that hosts `path`. Used by the
+/// StatusBar to show "X free of Y" alongside the selection summary.
+/// `fs4` reads the per-platform filesystem stats (statvfs / GetDiskFreeSpaceEx)
+/// so we don't have to per-OS this ourselves.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiskSpace {
+    pub total: u64,
+    pub free: u64,
+}
+
+#[tauri::command]
+pub fn fs_disk_space(path: String) -> FsResult<DiskSpace> {
+    let p = std::path::Path::new(&path);
+    // `available_space` = bytes free for the current user (after quota
+    // / reserved). `total_space` = the whole partition's capacity.
+    let free = fs4::available_space(p)
+        .map_err(|e| format!("available_space({path}): {e}"))?;
+    let total = fs4::total_space(p)
+        .map_err(|e| format!("total_space({path}): {e}"))?;
+    Ok(DiskSpace { total, free })
+}
+
 /// Multi-path trash. Cheaper than N round-trips through `invoke` when
 /// the user deletes a multi-selection. The crate's `delete_all` is
 /// atomic per path: any failures collect, the rest still succeed.

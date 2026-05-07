@@ -10,11 +10,13 @@ import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
 import {
+  fsDiskSpace,
   fsFind,
   fsHomeDir,
   fsOpenWithDefault,
   fsRevealInOs,
   fsStat,
+  type DiskSpace,
   type Entry,
 } from "../api/fs";
 import {
@@ -98,6 +100,9 @@ export default function Browser({
   } | null>(null);
   /** When non-null, the Properties dialog is open against this entry. */
   const [propertiesTarget, setPropertiesTarget] = useState<Entry | null>(null);
+  /** Filesystem totals for the current path. Local paths only — remote
+   *  paths set this to null and the StatusBar hides the readout. */
+  const [diskSpace, setDiskSpace] = useState<DiskSpace | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -149,6 +154,23 @@ export default function Browser({
   useEffect(() => {
     if (path) void refresh(path);
   }, [path, refresh]);
+
+  // Fetch disk space for the current path. Skipped for sftp:// paths
+  // since fs4 only knows about local filesystems; the StatusBar hides
+  // the readout when diskSpace is null.
+  useEffect(() => {
+    if (!path || path.startsWith("sftp://")) {
+      setDiskSpace(null);
+      return;
+    }
+    let cancelled = false;
+    fsDiskSpace(path)
+      .then((s) => !cancelled && setDiskSpace(s))
+      .catch(() => !cancelled && setDiskSpace(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
 
   // Bubble path changes up to the tab strip so the tab label tracks
   // the active path.
@@ -528,6 +550,8 @@ export default function Browser({
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
         }
         errorMessage={error}
+        diskFree={diskSpace?.free ?? null}
+        diskTotal={diskSpace?.total ?? null}
       />
       <EntryContextMenu
         state={contextMenu}
