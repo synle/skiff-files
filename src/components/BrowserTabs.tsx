@@ -60,6 +60,15 @@ export default function BrowserTabs({ home }: Props) {
       },
     ];
   });
+  /** LRU stack of recently-closed tabs. Not persisted — restoring
+   *  closed tabs across restarts would conflict with the saved-tabs
+   *  flow. Capped at 10 so a hyperactive user doesn't grow memory
+   *  unbounded. We only ever read this through the functional setter
+   *  inside `restoreClosedTab`, so the state value is intentionally
+   *  unused at render time. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_closedStack, setClosedStack] = useState<TabRow[]>([]);
+
   const [activeId, setActiveId] = useState<string>(() => {
     const saved = settings.savedActiveTabId;
     if (saved && settings.savedTabs.some((t) => t.id === saved)) return saved;
@@ -130,7 +139,13 @@ export default function BrowserTabs({ home }: Props) {
         return;
       }
       const k = e.key.toLowerCase();
-      if (k === "t") {
+      if (k === "t" && e.shiftKey) {
+        // Cmd/Ctrl+Shift+T → restore the most-recently-closed tab.
+        // Browser convention.
+        e.preventDefault();
+        restoreClosedTab();
+        return;
+      } else if (k === "t") {
         e.preventDefault();
         addTab();
         return;
@@ -171,11 +186,39 @@ export default function BrowserTabs({ home }: Props) {
       // Keep at least one tab open so the user always has a Browser.
       if (prev.length <= 1) return prev;
       const idx = prev.findIndex((t) => t.id === id);
+      const closed = prev[idx];
       const next = prev.filter((t) => t.id !== id);
       if (id === activeId && next.length > 0) {
         setActiveId(next[Math.max(0, idx - 1)].id);
       }
+      // Push onto the LRU stack so Cmd+Shift+T can restore.
+      if (closed && closed.currentPath) {
+        setClosedStack((stack) =>
+          [closed, ...stack.filter((t) => t.id !== closed.id)].slice(0, 10),
+        );
+      }
       return next;
+    });
+  };
+
+  /** Pop the most recently closed tab back to life, focused. */
+  const restoreClosedTab = () => {
+    setClosedStack((stack) => {
+      if (stack.length === 0) return stack;
+      const [restored, ...rest] = stack;
+      // Fresh id so a subsequent close + restore doesn't collide.
+      const id = crypto.randomUUID();
+      setTabs((prev) => [
+        ...prev,
+        {
+          id,
+          label: restored.label,
+          initialPath: restored.currentPath,
+          currentPath: restored.currentPath,
+        },
+      ]);
+      setActiveId(id);
+      return rest;
     });
   };
 

@@ -63,6 +63,16 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    title: "Tabs",
+    items: [
+      { keys: "Cmd / Ctrl + T", description: "New tab" },
+      { keys: "Cmd / Ctrl + W", description: "Close active tab" },
+      { keys: "Cmd / Ctrl + Shift + T", description: "Restore last closed tab" },
+      { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
+      { keys: "Middle-click folder", description: "Open folder in new tab" },
+    ],
+  },
+  {
     title: "Help",
     items: [
       { keys: "?", description: "Show this cheatsheet" },
