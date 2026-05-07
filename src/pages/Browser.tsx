@@ -68,8 +68,13 @@ export default function Browser({
   const [history, setHistory] = useState<History>({ back: [], forward: [] });
   const [entries, setEntries] = useState<Entry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  // Sort state. The Toolbar's column-header click cycles direction,
+  // so we keep these locally — but read the *initial* value from
+  // settings (per-folder override → app default → "name asc"). On
+  // every change we mirror back into Settings so the choice survives
+  // tab switches + restarts.
+  const [sortKey, setSortKey] = useState<SortKey>(settings.defaultSortKey);
+  const [sortDir, setSortDir] = useState<SortDir>(settings.defaultSortDir);
   /** Last-clicked entry — drives the preview pane. */
   const [primarySelected, setPrimarySelected] = useState<Entry | null>(null);
   /** Multi-select set, reported by FileList. We compute aggregate stats
@@ -422,11 +427,33 @@ export default function Browser({
   }, [path, navigate]);
 
   const handleSort = (key: SortKey) => {
+    let nextKey = sortKey;
+    let nextDir: SortDir = sortDir;
     if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      nextDir = sortDir === "asc" ? "desc" : "asc";
+      setSortDir(nextDir);
     } else {
-      setSortKey(key);
-      setSortDir("asc");
+      nextKey = key;
+      nextDir = "asc";
+      setSortKey(nextKey);
+      setSortDir(nextDir);
+    }
+    // Persist the choice in folderSort so navigating away and back
+    // preserves it. Same 200-entry cap as folderViewMode.
+    if (!path) return;
+    const next = {
+      ...settings.folderSort,
+      [path]: { key: nextKey, dir: nextDir },
+    };
+    const keys = Object.keys(next);
+    if (keys.length > 200) {
+      const trimmed: typeof next = {};
+      for (const k of keys.slice(keys.length - 200)) {
+        trimmed[k] = next[k];
+      }
+      update("folderSort", trimmed);
+    } else {
+      update("folderSort", next);
     }
   };
 
@@ -517,6 +544,24 @@ export default function Browser({
   // the previous folder would surface a stale path in the preview pane.
   useEffect(() => {
     setPrimarySelected(null);
+  }, [path]);
+
+  // Apply per-folder sort overrides on every navigation. Falls back
+  // to the app-wide defaults when a folder has no override.
+  useEffect(() => {
+    if (!path) return;
+    const override = settings.folderSort[path];
+    if (override) {
+      setSortKey(override.key);
+      setSortDir(override.dir);
+    } else {
+      setSortKey(settings.defaultSortKey);
+      setSortDir(settings.defaultSortDir);
+    }
+    // Intentionally don't depend on the settings.folderSort identity —
+    // recomputing on every settings update would clobber the user's
+    // choice mid-session. We only read on path change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
   // Honor the preview policy. `imagesOnly` only opens the pane when the

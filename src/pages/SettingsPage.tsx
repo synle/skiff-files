@@ -110,6 +110,45 @@ export default function SettingsPage() {
             </Select>
           </FormControl>
 
+          <Stack direction="row" spacing={2}>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel id="default-sort-key-label">Default sort</InputLabel>
+              <Select
+                labelId="default-sort-key-label"
+                label="Default sort"
+                value={settings.defaultSortKey}
+                onChange={(e) =>
+                  update(
+                    "defaultSortKey",
+                    e.target.value as typeof settings.defaultSortKey,
+                  )
+                }
+              >
+                <MenuItem value="name">Name</MenuItem>
+                <MenuItem value="size">Size</MenuItem>
+                <MenuItem value="mtime">Modified</MenuItem>
+                <MenuItem value="kind">Kind</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="default-sort-dir-label">Direction</InputLabel>
+              <Select
+                labelId="default-sort-dir-label"
+                label="Direction"
+                value={settings.defaultSortDir}
+                onChange={(e) =>
+                  update(
+                    "defaultSortDir",
+                    e.target.value as typeof settings.defaultSortDir,
+                  )
+                }
+              >
+                <MenuItem value="asc">Ascending</MenuItem>
+                <MenuItem value="desc">Descending</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+
           <FormControlLabel
             control={
               <Switch

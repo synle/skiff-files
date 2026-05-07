@@ -18,6 +18,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import type { ThemeMode } from "../theme";
 import type { ConflictPolicy } from "../api/sync";
+import type { SortDir, SortKey } from "../components/FileList";
 
 /** What rendering style the file list uses. Per-folder overrides land later. */
 export type ViewMode = "list" | "tile" | "gallery" | "column";
@@ -65,6 +66,13 @@ export interface Settings {
    *  Capped at FOLDER_VIEW_MAX (LRU-style: oldest entries dropped
    *  on overflow) to keep settings.json bounded. */
   folderViewMode: Record<string, ViewMode>;
+  /** Sort key applied to folders without a per-folder override. */
+  defaultSortKey: SortKey;
+  /** Sort direction applied to folders without a per-folder override. */
+  defaultSortDir: SortDir;
+  /** Per-folder sort override. Same LRU-bounded pattern as
+   *  `folderViewMode`. */
+  folderSort: Record<string, { key: SortKey; dir: SortDir }>;
   /** Default conflict policy for new sync jobs. The Transfers form
    *  reads this on mount; saved-job templates always carry their
    *  own policy and ignore this. */
@@ -95,6 +103,9 @@ export const DEFAULTS: Settings = {
   bookmarks: [],
   recentPaths: [],
   folderViewMode: {},
+  defaultSortKey: "name",
+  defaultSortDir: "asc",
+  folderSort: {},
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
