@@ -22,6 +22,7 @@ import HubIcon from "@mui/icons-material/Hub";
 import CircleIcon from "@mui/icons-material/Circle";
 import BookmarkIcon from "@mui/icons-material/Bookmark";
 import CloseIcon from "@mui/icons-material/Close";
+import HistoryIcon from "@mui/icons-material/History";
 import { Link as RouterLink } from "react-router";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
@@ -159,6 +160,47 @@ export default function Sidebar({ home, onNavigate }: Props) {
                   </ListItemButton>
                 </ListItem>
               ))}
+            </List>
+          </>
+        )}
+
+        {settings.recentPaths.length > 0 && (
+          <>
+            <Typography
+              variant="overline"
+              sx={{ px: 2, pt: 1.5, color: "text.secondary", display: "block" }}
+            >
+              Recent
+            </Typography>
+            <List dense disablePadding>
+              {settings.recentPaths.slice(0, 5).map((p) => {
+                // Pretty label: basename + a short parent hint so the
+                // list isn't ambiguous when multiple folders share a
+                // basename ("src" in two different repos, etc.).
+                const segs = p.split(/[\\/]/).filter(Boolean);
+                const label = segs.at(-1) ?? p;
+                const parent = segs.length >= 2 ? segs[segs.length - 2] : "";
+                return (
+                  <ListItem key={p} disablePadding>
+                    <ListItemButton onClick={() => onNavigate(p)}>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <HistoryIcon
+                          fontSize="small"
+                          sx={{ color: "text.secondary" }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={label}
+                        secondary={parent || undefined}
+                        slotProps={{
+                          primary: { variant: "body2", noWrap: true },
+                          secondary: { variant: "caption", noWrap: true },
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              })}
             </List>
           </>
         )}

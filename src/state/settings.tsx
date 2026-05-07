@@ -55,7 +55,15 @@ export interface Settings {
   startPath: string;
   /** Pinned paths that show up in the sidebar's Bookmarks section. */
   bookmarks: Bookmark[];
+  /** Auto-tracked navigation history. Most-recent first. Capped at
+   *  RECENT_PATHS_MAX so the list doesn't grow unbounded. Surfaces in
+   *  the sidebar's Recent section. */
+  recentPaths: string[];
 }
+
+/** Max entries kept in `recentPaths`. 10 is enough to cover a normal
+ *  day's navigation without making the sidebar scroll forever. */
+export const RECENT_PATHS_MAX = 10;
 
 export const DEFAULTS: Settings = {
   themeMode: "system",
@@ -67,6 +75,7 @@ export const DEFAULTS: Settings = {
   previewWidth: 320,
   startPath: "",
   bookmarks: [],
+  recentPaths: [],
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

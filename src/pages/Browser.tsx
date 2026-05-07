@@ -149,6 +149,24 @@ export default function Browser({
     if (path) onPathChange?.(path);
   }, [path, onPathChange]);
 
+  // Track navigation history globally — surfaces in the sidebar's
+  // Recent section. We dedup against the head: arriving at the same
+  // path twice in a row doesn't double-record. Only the active tab
+  // contributes so multiple inactive tabs don't pollute history.
+  useEffect(() => {
+    if (!isActive || !path) return;
+    if (settings.recentPaths[0] === path) return;
+    const next = [
+      path,
+      ...settings.recentPaths.filter((p) => p !== path),
+    ].slice(0, 10);
+    update("recentPaths", next);
+    // We deliberately don't depend on `settings.recentPaths` — the
+    // update function reads its current value through useState, and
+    // depending here would cause a feedback loop on every update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, isActive]);
+
   // Listen for sidebar-driven navigations. Decoupling via a window event keeps
   // the Sidebar from needing a reference to setHistory. Only the active tab
   // responds — otherwise N tabs would all jump on a single sidebar click.
