@@ -8,6 +8,7 @@ import Sidebar from "./components/Sidebar";
 import ShortcutsModal from "./components/ShortcutsModal";
 import ConflictModal from "./components/ConflictModal";
 import BrowserTabs from "./components/BrowserTabs";
+import QuickJump from "./components/QuickJump";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -25,7 +26,23 @@ export const NAVIGATE_EVENT = "skiff:navigate";
  */
 export default function App() {
   const [home, setHome] = useState("");
+  const [quickJumpOpen, setQuickJumpOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Cmd/Ctrl+K → toggle the quick-jump palette. Skips when an input
+  // is focused so the shortcut doesn't hijack typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "k") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      e.preventDefault();
+      setQuickJumpOpen((o) => !o);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +103,19 @@ export default function App() {
           can fire while the user is on Settings / Connections; the modal
           must surface regardless of route. */}
       <ConflictModal />
+      {/* Cmd+K palette. Routes selections through the same nav event
+          + route switch the sidebar uses so the Browser stays in sync. */}
+      <QuickJump
+        open={quickJumpOpen}
+        onClose={() => setQuickJumpOpen(false)}
+        home={home}
+        onJump={(p) => {
+          navigate("/");
+          queueMicrotask(() =>
+            window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: p })),
+          );
+        }}
+      />
     </Box>
   );
 }
