@@ -482,6 +482,22 @@ export default function FileList(props: Props) {
                   role="row"
                   aria-selected={isSel}
                   data-testid="file-row"
+                  draggable
+                  onDragStart={(evt) => {
+                    // Drag payload: newline-joined paths from the
+                    // multi-selection (or just this row when nothing
+                    // is multi-selected). Sidebar host items consume
+                    // this to start a Skiffsync.
+                    const payload =
+                      selected.size > 0 && selected.has(e.path)
+                        ? Array.from(selected).join("\n")
+                        : e.path;
+                    evt.dataTransfer.setData(
+                      "application/x-skiff-paths",
+                      payload,
+                    );
+                    evt.dataTransfer.effectAllowed = "copy";
+                  }}
                   onClick={(evt) => onRowClick(e, evt)}
                   onMouseDown={(evt) => onRowMouseDown(e, evt)}
                   onDoubleClick={() => onRowDouble(e)}

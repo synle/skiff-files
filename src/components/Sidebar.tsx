@@ -33,6 +33,13 @@ import {
   SIDEBAR_WIDTH_MIN,
   useSettings,
 } from "../state/settings";
+import { startSync } from "../api/client";
+
+/** MIME type the FileList row uses to carry dragged paths. Newline-
+ *  joined for multi-select drops. Sidebar host items handle this MIME
+ *  in onDrop; OS drag-drop into the Browser pane uses Tauri's separate
+ *  drag-drop event so the two flows don't collide. */
+export const SKIFF_DRAG_MIME = "application/x-skiff-paths";
 
 interface Favorite {
   label: string;
@@ -340,6 +347,41 @@ export default function Sidebar({ home, onNavigate }: Props) {
                   onClick={() =>
                     onNavigate(`sftp://${c.id}/`)
                   }
+                  // Drag-drop target: dropping a Skiff selection here
+                  // starts a Skiffsync job from the dragged paths to a
+                  // user-prompted destination on the remote. Uses the
+                  // custom MIME so OS-file drags fall through to the
+                  // Browser pane's existing drop handler.
+                  onDragOver={(e) => {
+                    if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "copy";
+                    }
+                  }}
+                  onDrop={(e) => {
+                    const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+                    if (!raw) return;
+                    e.preventDefault();
+                    const paths = raw.split("\n").filter(Boolean);
+                    if (paths.length === 0) return;
+                    const remoteDest = window.prompt(
+                      `Sync ${paths.length} item${paths.length === 1 ? "" : "s"} to ${c.label}. Destination path on remote:`,
+                      "/",
+                    );
+                    if (!remoteDest) return;
+                    for (const p of paths) {
+                      // Nest each entry under <dest>/<basename>.
+                      const segs = p.split(/[\\/]/).filter(Boolean);
+                      const base = segs.at(-1) ?? p;
+                      const target = `sftp://${c.id}${remoteDest.endsWith("/") ? remoteDest : remoteDest + "/"}${base}`;
+                      void startSync(p, target, {
+                        maxSizeGb: 100,
+                        conflictPolicy: "skip",
+                      }).catch(() => {
+                        /* errors surface in TransfersPage */
+                      });
+                    }
+                  }}
                   aria-label={`Browse ${c.label}`}
                 >
                   <ListItemIcon sx={{ minWidth: 32 }}>
