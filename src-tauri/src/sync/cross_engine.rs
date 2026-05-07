@@ -129,16 +129,58 @@ fn unchanged_reason(
     }
 }
 
+/// Pick the aside-renamed path for rename-target. Walks `(old)`,
+/// `(old 2)`, `(old 3)`, ... until the dest backend reports no
+/// existing file. Mirrors the local engine's `aside_rename_existing`
+/// suffix scheme so users see consistent names regardless of mode.
+async fn aside_rename_path(dest_backend: &Backend, dest: &str) -> String {
+    let (stem, ext) = split_stem_ext(dest);
+    let make = |suffix: String| -> String {
+        match ext {
+            Some(e) => format!("{stem} ({suffix}).{e}"),
+            None => format!("{stem} ({suffix})"),
+        }
+    };
+    // First try `(old)`, then `(old 2)`, `(old 3)` if races / leftover
+    // aside-renames already occupied the slot.
+    let mut candidate = make("old".into());
+    let mut n = 2;
+    while dest_backend
+        .metadata(&candidate)
+        .await
+        .map(|m| m.is_some())
+        .unwrap_or(false)
+    {
+        candidate = make(format!("old {n}"));
+        n += 1;
+        if n > 1_000_000 {
+            // Astronomically unlikely; fall back so we at least surface
+            // a real rename error rather than spinning.
+            return make("old".into());
+        }
+    }
+    candidate
+}
+
+/// Split a path into (stem, ext) at the last dot in the basename.
+/// Used by both keep_both and aside-rename so the suffix scheme is
+/// consistent.
+fn split_stem_ext(path: &str) -> (&str, Option<&str>) {
+    let last_sep = path
+        .rfind('/')
+        .max(path.rfind('\\'))
+        .unwrap_or(0);
+    let dot = path.rfind('.');
+    match dot {
+        Some(i) if i > last_sep => (&path[..i], Some(&path[i + 1..])),
+        _ => (path, None),
+    }
+}
+
 /// Pick the keep-both sibling path on the dest side. Walks `(2)`,
 /// `(3)`, ... until `dest.exists()` returns false.
 async fn keep_both_path(dest_backend: &Backend, dest: &str) -> String {
-    let dot = dest.rfind('.');
-    let (stem, ext) = match dot {
-        Some(i) if i > 0 && i > dest.rfind('/').unwrap_or(0) => {
-            (&dest[..i], Some(&dest[i + 1..]))
-        }
-        _ => (dest, None),
-    };
+    let (stem, ext) = split_stem_ext(dest);
     for n in 2..1_000_000 {
         let candidate = match ext {
             Some(e) => format!("{stem} ({n}).{e}"),
@@ -287,11 +329,43 @@ where
             }
             ConflictPolicy::ReplaceSmaller => dm.size < file.size,
             ConflictPolicy::ReplaceIfSizeDifferent => dm.size != file.size,
-            ConflictPolicy::RenameTarget | ConflictPolicy::RenameOlderTarget => {
-                // Cross-mode aside-rename lands in 0.2.5. For now,
-                // surface as a conflict so the user sees what
-                // happened rather than silently overwriting.
-                false
+            ConflictPolicy::RenameTarget => {
+                // Move existing dest aside, then fall through to copy
+                // under the original name. The aside-rename uses
+                // Backend::rename which is same-backend; the
+                // subsequent copy can still be cross-backend (src and
+                // dest backends may differ).
+                let aside = aside_rename_path(dest_backend, &file.dest).await;
+                if let Err(e) = dest_backend.rename(&file.dest, &aside).await {
+                    summary.errors += 1;
+                    return FileOutcome::Error {
+                        src: file.src.clone(),
+                        dest: file.dest.clone(),
+                        error: e,
+                    };
+                }
+                true
+            }
+            ConflictPolicy::RenameOlderTarget => {
+                let dest_older = file
+                    .mtime
+                    .zip(dm.mtime)
+                    .map(|(s, d)| d < s)
+                    .unwrap_or(false);
+                if !dest_older {
+                    false
+                } else {
+                    let aside = aside_rename_path(dest_backend, &file.dest).await;
+                    if let Err(e) = dest_backend.rename(&file.dest, &aside).await {
+                        summary.errors += 1;
+                        return FileOutcome::Error {
+                            src: file.src.clone(),
+                            dest: file.dest.clone(),
+                            error: e,
+                        };
+                    }
+                    true
+                }
             }
             ConflictPolicy::Prompt => {
                 // Park on the resolver hub via the closure. None
@@ -670,6 +744,99 @@ mod tests {
         assert_eq!(fs::read(dest.join("a (2).txt")).unwrap(), b"new");
         let _ = fs::remove_dir_all(src);
         let _ = fs::remove_dir_all(dest);
+    }
+
+    #[tokio::test]
+    async fn cross_mode_rename_target_aside_renames_existing() {
+        let src = std::env::temp_dir().join(format!("skiff-cross-rt-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-rt-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(src.join("a.txt"), b"new").unwrap();
+        fs::write(dest.join("a.txt"), b"PREVIOUS").unwrap();
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        let s = execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::RenameTarget,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+            |_, _| async { None },
+        )
+        .await;
+        assert_eq!(s.copied, 1);
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"new");
+        assert_eq!(fs::read(dest.join("a (old).txt")).unwrap(), b"PREVIOUS");
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[tokio::test]
+    async fn cross_mode_rename_older_target_skips_when_dest_newer() {
+        let src = std::env::temp_dir().join(format!("skiff-cross-rot-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-rot-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(src.join("a.txt"), b"older-content").unwrap();
+        // Set src mtime to 1 hour ago, dest mtime to now → dest is newer.
+        let now = std::time::SystemTime::now();
+        let one_hour_ago = now - std::time::Duration::from_secs(3600);
+        let _ = filetime::set_file_mtime(
+            src.join("a.txt"),
+            filetime::FileTime::from_system_time(one_hour_ago),
+        );
+        fs::write(dest.join("a.txt"), b"newer-content-different-size").unwrap();
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        let s = execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::RenameOlderTarget,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+            |_, _| async { None },
+        )
+        .await;
+        // Dest newer → skip; no aside-rename.
+        assert!(s.conflicts >= 1);
+        assert!(!dest.join("a (old).txt").exists());
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[test]
+    fn split_stem_ext_handles_typical_paths() {
+        assert_eq!(split_stem_ext("/x/foo.txt"), ("/x/foo", Some("txt")));
+        assert_eq!(split_stem_ext("/x/foo"), ("/x/foo", None));
+        // Dot in the directory name shouldn't be picked as the extension.
+        assert_eq!(split_stem_ext("/x.y/foo"), ("/x.y/foo", None));
     }
 
     #[test]
