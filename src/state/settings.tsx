@@ -30,6 +30,16 @@ export type Density = "comfortable" | "compact";
  *  - `always` — always show, render placeholder when no selection */
 export type PreviewMode = "off" | "imagesOnly" | "always";
 
+/** A user-pinned path for the sidebar. `label` defaults to the
+ *  basename of the path but is editable; `path` is the address-bar
+ *  form (so `sftp://<id>/<remote>` works alongside local paths). */
+export interface Bookmark {
+  /** Stable id so renames + reorders don't trip React keys. */
+  id: string;
+  label: string;
+  path: string;
+}
+
 /** Persisted settings shape. Add new keys with sensible defaults — see DEFAULTS. */
 export interface Settings {
   themeMode: ThemeMode;
@@ -43,6 +53,8 @@ export interface Settings {
   previewWidth: number;
   /** Where the Browser opens on launch. Empty = home dir (resolved at runtime). */
   startPath: string;
+  /** Pinned paths that show up in the sidebar's Bookmarks section. */
+  bookmarks: Bookmark[];
 }
 
 export const DEFAULTS: Settings = {
@@ -54,6 +66,7 @@ export const DEFAULTS: Settings = {
   previewMode: "imagesOnly",
   previewWidth: 320,
   startPath: "",
+  bookmarks: [],
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

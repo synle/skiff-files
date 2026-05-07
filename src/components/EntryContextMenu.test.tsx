@@ -28,6 +28,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onTrash: vi.fn(),
     onCopyPath: vi.fn(),
     onProperties: vi.fn(),
+    onBookmark: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>
@@ -79,5 +80,18 @@ describe("EntryContextMenu", () => {
     const h = r({ entry: file, x: 10, y: 10 });
     fireEvent.click(screen.getByText("Properties…"));
     expect(h.onProperties).toHaveBeenCalledWith(file);
+  });
+
+  it("Add to bookmarks shows only for directories and calls onBookmark", () => {
+    // Files don't get the bookmark item.
+    const h1 = r({ entry: file, x: 10, y: 10 });
+    expect(screen.queryByText("Add to bookmarks")).not.toBeInTheDocument();
+    expect(h1.onBookmark).not.toHaveBeenCalled();
+  });
+
+  it("directories show Add to bookmarks and call onBookmark", () => {
+    const h = r({ entry: folder, x: 10, y: 10 });
+    fireEvent.click(screen.getByText("Add to bookmarks"));
+    expect(h.onBookmark).toHaveBeenCalledWith(folder);
   });
 });

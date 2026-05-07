@@ -13,6 +13,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
+import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
 import type { Entry } from "../api/fs";
 
 interface Props {
@@ -24,6 +25,10 @@ interface Props {
   onTrash: (entry: Entry) => void;
   onCopyPath: (entry: Entry) => void;
   onProperties: (entry: Entry) => void;
+  /** Only invoked for directories (the bookmark item is hidden for
+   *  files since "bookmark a file" doesn't have a clear meaning in
+   *  this app). */
+  onBookmark: (entry: Entry) => void;
 }
 
 export default function EntryContextMenu({
@@ -34,6 +39,7 @@ export default function EntryContextMenu({
   onTrash,
   onCopyPath,
   onProperties,
+  onBookmark,
 }: Props) {
   const open = state != null;
   return (
@@ -81,6 +87,19 @@ export default function EntryContextMenu({
         </ListItemIcon>
         <ListItemText>Copy path</ListItemText>
       </MenuItem>
+      {state?.entry.isDir && (
+        <MenuItem
+          onClick={() => {
+            if (state) onBookmark(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <BookmarkIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Add to bookmarks</ListItemText>
+        </MenuItem>
+      )}
       <MenuItem
         onClick={() => {
           if (state) onProperties(state.entry);

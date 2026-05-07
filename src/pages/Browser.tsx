@@ -529,6 +529,16 @@ export default function Browser({
           }
         }}
         onProperties={(e) => setPropertiesTarget(e)}
+        onBookmark={(e) => {
+          // Append a fresh bookmark with a UUID id; the basename
+          // becomes the default label. Settings are persisted via
+          // the existing settings provider.
+          if (settings.bookmarks.some((b) => b.path === e.path)) return;
+          update("bookmarks", [
+            ...settings.bookmarks,
+            { id: crypto.randomUUID(), label: e.name, path: e.path },
+          ]);
+        }}
       />
       <PropertiesDialog
         entry={propertiesTarget}

@@ -3,6 +3,7 @@
 import {
   Box,
   CircularProgress,
+  IconButton,
   List,
   ListItem,
   ListItemButton,
@@ -19,9 +20,12 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import HubIcon from "@mui/icons-material/Hub";
 import CircleIcon from "@mui/icons-material/Circle";
+import BookmarkIcon from "@mui/icons-material/Bookmark";
+import CloseIcon from "@mui/icons-material/Close";
 import { Link as RouterLink } from "react-router";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
+import { useSettings } from "../state/settings";
 
 interface Favorite {
   label: string;
@@ -50,6 +54,14 @@ export default function Sidebar({ home, onNavigate }: Props) {
   // POSIX-style join is fine here — Tauri normalizes the slashes for us when
   // we hand the path to canonicalize / list_dir.
   const join = (rel: string) => (rel ? `${home}/${rel}` : home);
+
+  const { settings, update } = useSettings();
+  const removeBookmark = (id: string) => {
+    update(
+      "bookmarks",
+      settings.bookmarks.filter((b) => b.id !== id),
+    );
+  };
 
   // Live connections, refreshed on mount + when other code dispatches the
   // 'skiff:connections-changed' event (Connections page does that on
@@ -105,6 +117,51 @@ export default function Sidebar({ home, onNavigate }: Props) {
             </ListItem>
           ))}
         </List>
+
+        {settings.bookmarks.length > 0 && (
+          <>
+            <Typography
+              variant="overline"
+              sx={{ px: 2, pt: 1.5, color: "text.secondary", display: "block" }}
+            >
+              Bookmarks
+            </Typography>
+            <List dense disablePadding>
+              {settings.bookmarks.map((b) => (
+                <ListItem
+                  key={b.id}
+                  disablePadding
+                  secondaryAction={
+                    <IconButton
+                      size="small"
+                      edge="end"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeBookmark(b.id);
+                      }}
+                      aria-label={`Remove bookmark ${b.label}`}
+                      sx={{ p: 0.25 }}
+                    >
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  }
+                >
+                  <ListItemButton onClick={() => onNavigate(b.path)}>
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <BookmarkIcon fontSize="small" color="primary" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={b.label}
+                      slotProps={{
+                        primary: { variant: "body2", noWrap: true },
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
 
         <Typography
           variant="overline"
