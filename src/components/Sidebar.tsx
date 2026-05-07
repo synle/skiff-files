@@ -63,6 +63,24 @@ export default function Sidebar({ home, onNavigate }: Props) {
   const join = (rel: string) => (rel ? `${home}/${rel}` : home);
 
   const { settings, update } = useSettings();
+  /** Rename a bookmark's display label without changing its target
+   *  path. Uses a native `window.prompt` to keep this change tiny —
+   *  a richer inline edit affordance can land later if users ask. */
+  const renameBookmark = (id: string) => {
+    const current = settings.bookmarks.find((b) => b.id === id);
+    if (!current) return;
+    const next = window.prompt("Rename bookmark", current.label);
+    if (next == null) return; // user cancelled
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === current.label) return;
+    update(
+      "bookmarks",
+      settings.bookmarks.map((b) =>
+        b.id === id ? { ...b, label: trimmed } : b,
+      ),
+    );
+  };
+
   const removeBookmark = (id: string) => {
     update(
       "bookmarks",
@@ -226,7 +244,14 @@ export default function Sidebar({ home, onNavigate }: Props) {
                     </IconButton>
                   }
                 >
-                  <ListItemButton onClick={() => onNavigate(b.path)}>
+                  <ListItemButton
+                    onClick={() => onNavigate(b.path)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      renameBookmark(b.id);
+                    }}
+                    title="Right-click to rename"
+                  >
                     <ListItemIcon sx={{ minWidth: 32 }}>
                       <BookmarkIcon fontSize="small" color="primary" />
                     </ListItemIcon>
