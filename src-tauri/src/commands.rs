@@ -225,6 +225,24 @@ pub fn settings_load(app: tauri::AppHandle) -> FsResult<Option<String>> {
     Ok(Some(body))
 }
 
+/// Returns the absolute path of the app data directory. Used by the
+/// Settings → Advanced "Reveal app data directory" button so power
+/// users can manually inspect settings.json + see whatever else
+/// future versions stash there (thumbnail cache, job DB, etc.).
+#[tauri::command]
+pub fn settings_app_data_dir(app: tauri::AppHandle) -> FsResult<String> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app_data_dir: {e}"))?;
+    // Make sure it exists — a fresh install with no saved settings
+    // yet would otherwise hit "Reveal" against a missing path and
+    // confuse the OS file manager.
+    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir({}): {e}", dir.display()))?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
 /// Persist the settings blob. We write atomically via a temp file +
 /// rename so a partial write doesn't corrupt user state on a crash.
 #[tauri::command]

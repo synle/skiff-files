@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.26** — ✅ **Reveal app data folder**. Settings → Advanced gets a button that opens the OS app data directory in the native file manager. New `settings_app_data_dir` Tauri command resolves + mkdir-p's the path so revealing on a fresh install doesn't fail. Closes a TODO that's been on the spec since the Settings page was first sketched.
 - **0.2.25** — ✅ **Collapsible sidebar sections**. Each Sidebar section header (Favorites / Bookmarks / Recent / Hosts / Devices) is now a clickable button with a chevron that toggles the collapsed state. Persisted via new `Settings.sidebarCollapsed: Record<id, bool>` so the user's section preferences survive restarts. Sections default to expanded.
 - **0.2.24** — ✅ **Persisted tabs**. New `Settings.savedTabs` + `savedActiveTabId` round-trip the full tab strip across restarts. BrowserTabs seeds from settings on mount (falls back to a fresh Home tab on first launch); writes back on every tabs / activeId change. Capped at `TABS_MAX = 20` so a runaway browsing session doesn't bloat settings.json.
 - **0.2.23** — ✅ **Sidebar toggle (Cmd/Ctrl+B)**. The cheatsheet's been advertising this since 0.1.2; finally implemented. New `Settings.sidebarVisible` (default true) controls whether the Sidebar renders; persisted across restarts. App-level keydown handler picks Cmd/Ctrl+B and flips the flag. Quick-jump (Cmd/Ctrl+K) is now in the same handler so they share the input-focus guard.

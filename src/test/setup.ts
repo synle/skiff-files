@@ -69,6 +69,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "settings_load") return null;
     if (cmd === "settings_save") return null;
+    if (cmd === "settings_app_data_dir") return "/test/app-data-dir";
     return null;
   }),
 }));

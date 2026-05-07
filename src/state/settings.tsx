@@ -196,6 +196,18 @@ export async function saveSettingsToDisk(s: Settings): Promise<void> {
   }
 }
 
+/** Path to the OS app data directory. Resolved by Tauri (varies by
+ *  platform: ~/Library/Application Support/com.synle.skiff-files on
+ *  macOS, %APPDATA%\com.synle.skiff-files on Windows, etc.). The
+ *  Rust side mkdir-p's it before returning. */
+export async function appDataDir(): Promise<string | null> {
+  try {
+    return await invoke<string>("settings_app_data_dir");
+  } catch {
+    return null;
+  }
+}
+
 interface Ctx {
   settings: Settings;
   setSettings: Dispatch<SetStateAction<Settings>>;

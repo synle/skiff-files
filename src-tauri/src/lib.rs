@@ -15,7 +15,8 @@ use commands::{
     conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, fs_canonicalize,
     fs_copy_file, fs_dir_summary, fs_find, fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64,
     fs_disk_space, fs_open_with_default, fs_read_text, fs_remove, fs_rename, fs_reveal_in_os,
-    fs_stat, fs_trash, fs_trash_many, get_app_version, settings_load, settings_save,
+    fs_stat, fs_trash, fs_trash_many, get_app_version, settings_app_data_dir, settings_load,
+    settings_save,
     ssh_config_hosts, sync_cancel, sync_cpstamp, sync_dedup,
     sync_list, sync_pause, sync_resolve_conflict, sync_resume, sync_start_cross, sync_start_local,
     sync_start_repo,
@@ -58,6 +59,7 @@ pub fn run() {
             fs_disk_space,
             settings_load,
             settings_save,
+            settings_app_data_dir,
             ssh_config_hosts,
             // connections
             conn_create_sftp,

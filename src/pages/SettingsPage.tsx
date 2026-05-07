@@ -16,7 +16,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useSettings } from "../state/settings";
+import { appDataDir, useSettings } from "../state/settings";
+import { fsRevealInOs } from "../api/fs";
 
 /** Generic section wrapper so spacing stays consistent across groups. */
 function Section({
@@ -256,9 +257,21 @@ export default function SettingsPage() {
 
         <Section
           title="Advanced"
-          description="Other sections (Connections, Transfers, Keyboard) will appear as later phases land."
+          description="Reveal the on-disk settings file or wipe everything back to defaults."
         >
-          <Box>
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={async () => {
+                const dir = await appDataDir();
+                if (dir) {
+                  void fsRevealInOs(dir);
+                }
+              }}
+            >
+              Reveal app data folder
+            </Button>
             <Button
               variant="outlined"
               color="warning"
