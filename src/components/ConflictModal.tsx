@@ -17,7 +17,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   onConflict,
   syncResolveConflict,
@@ -25,6 +25,7 @@ import {
   type ConflictPromptPayload,
 } from "../api/sync";
 import { formatBytes, formatMtime } from "../util/format";
+import { useSettings } from "../state/settings";
 
 /** Side-by-side metadata block. Shows the same fields TeraCopy does:
  *  size, mtime, with "Same date / Same size" badges when applicable. */
@@ -63,11 +64,23 @@ export default function ConflictModal() {
    *  user clicks anything. Pop the head when each is resolved so the
    *  next one shows up automatically. */
   const [queue, setQueue] = useState<ConflictPromptPayload[]>([]);
+  const { settings } = useSettings();
+  // Mirror the suppress flag into a ref so the long-lived event
+  // listener reads the latest value without us tearing down +
+  // re-attaching on every settings tweak.
+  const suppressRef = useRef(settings.syncSuppressConflictPrompts);
+  useEffect(() => {
+    suppressRef.current = settings.syncSuppressConflictPrompts;
+  }, [settings.syncSuppressConflictPrompts]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     void (async () => {
       unlisten = await onConflict((payload) => {
+        if (suppressRef.current) {
+          void syncResolveConflict(payload.jobId, payload.conflictId, "skip");
+          return;
+        }
         setQueue((prev) => [...prev, payload]);
       });
     })();

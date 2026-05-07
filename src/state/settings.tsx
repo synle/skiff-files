@@ -87,6 +87,11 @@ export interface Settings {
    *  When true, the engine re-stats each dest file and surfaces a
    *  per-file error on size mismatch. */
   syncDefaultVerifyAfterCopy: boolean;
+  /** When true, the ConflictModal auto-dispatches a `skip` decision
+   *  for every `sync:conflict` event without showing the modal.
+   *  Useful for unattended runs / CI-style usage. The engine still
+   *  fires the events; only the UI suppresses. */
+  syncSuppressConflictPrompts: boolean;
   /** When true (Finder default), folders are grouped above files
    *  regardless of the active sort. When false, folders and files
    *  intermix according to the chosen sort key — useful for sorting
@@ -173,6 +178,7 @@ export const DEFAULTS: Settings = {
   syncDefaultLookbackDays: 7,
   syncDefaultBandwidthKbps: 0,
   syncDefaultVerifyAfterCopy: false,
+  syncSuppressConflictPrompts: false,
   groupFoldersFirst: true,
   showFullPathInTitle: false,
   sidebarVisible: true,

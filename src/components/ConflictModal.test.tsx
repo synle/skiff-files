@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from "@mui/material";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import ConflictModal from "./ConflictModal";
+import { SettingsProvider } from "../state/settings";
 
 const theme = createTheme();
 const mockedInvoke = vi.mocked(invoke);
@@ -31,7 +32,9 @@ function renderAndCapture(): {
   });
   render(
     <ThemeProvider theme={theme}>
-      <ConflictModal />
+      <SettingsProvider>
+        <ConflictModal />
+      </SettingsProvider>
     </ThemeProvider>,
   );
   return {

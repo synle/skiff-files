@@ -347,6 +347,18 @@ export default function SettingsPage() {
             }
             label="Verify after copy (re-stat dest size)"
           />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.syncSuppressConflictPrompts}
+                onChange={(e) =>
+                  update("syncSuppressConflictPrompts", e.target.checked)
+                }
+              />
+            }
+            label="Never show conflict prompt (auto-skip)"
+          />
         </Section>
 
         <Divider />
