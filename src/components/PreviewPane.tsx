@@ -45,8 +45,16 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-/** Image-specific preview body. Loads on selection change; tracks cancel. */
-function ImageBody({ entry }: { entry: Entry }) {
+/** Image-specific preview body. Loads on selection change; tracks cancel.
+ *  Reports the natural pixel dimensions to the parent via `onDimensions`
+ *  so the properties block can render them. */
+function ImageBody({
+  entry,
+  onDimensions,
+}: {
+  entry: Entry;
+  onDimensions: (d: { w: number; h: number } | null) => void;
+}) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +62,7 @@ function ImageBody({ entry }: { entry: Entry }) {
     let cancelled = false;
     setSrc(null);
     setError(null);
+    onDimensions(null);
     readBase64(entry.path)
       .then((b64) => {
         if (cancelled) return;
@@ -64,6 +73,8 @@ function ImageBody({ entry }: { entry: Entry }) {
     return () => {
       cancelled = true;
     };
+    // onDimensions is stable from the parent's useState setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.path]);
 
   if (error) {
@@ -85,6 +96,12 @@ function ImageBody({ entry }: { entry: Entry }) {
       component="img"
       src={src}
       alt={entry.name}
+      onLoad={(e) => {
+        const img = e.currentTarget as HTMLImageElement;
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          onDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+        }
+      }}
       sx={{
         maxWidth: "100%",
         maxHeight: 360,
@@ -198,9 +215,17 @@ function FolderBody({ entry }: { entry: Entry }) {
 }
 
 /** Decide which body component to render based on the selected entry's kind. */
-function Body({ entry }: { entry: Entry }) {
+function Body({
+  entry,
+  onImageDimensions,
+}: {
+  entry: Entry;
+  onImageDimensions: (d: { w: number; h: number } | null) => void;
+}) {
   if (entry.isDir) return <FolderBody entry={entry} />;
-  if (isImage(entry.path)) return <ImageBody entry={entry} />;
+  if (isImage(entry.path)) {
+    return <ImageBody entry={entry} onDimensions={onImageDimensions} />;
+  }
   // text-ish kinds get the text body. Everything else falls through to
   // properties-only.
   if (
@@ -219,6 +244,13 @@ function Body({ entry }: { entry: Entry }) {
 
 export default function PreviewPane({ selected, width }: Props) {
   const { update } = useSettings();
+  /** Natural pixel dimensions of the currently-rendered image, if any.
+   *  Reset on selection change by ImageBody so a stale value from the
+   *  previous image doesn't surface for the next one. */
+  const [imageDimensions, setImageDimensions] = useState<{
+    w: number;
+    h: number;
+  } | null>(null);
 
   // Drag-resize from the LEFT edge — the pane lives on the right of
   // the FileList, so dragging left widens it. Same MouseMove-on-document
@@ -302,7 +334,7 @@ export default function PreviewPane({ selected, width }: Props) {
             </Typography>
           </Box>
 
-          <Body entry={selected} />
+          <Body entry={selected} onImageDimensions={setImageDimensions} />
 
           <Divider />
 
@@ -313,6 +345,12 @@ export default function PreviewPane({ selected, width }: Props) {
               value={selected.isDir ? "—" : formatBytes(selected.size)}
             />
             <Field label="Modified" value={formatMtime(selected.mtime)} />
+            {imageDimensions && (
+              <Field
+                label="Dimensions"
+                value={`${imageDimensions.w} × ${imageDimensions.h}`}
+              />
+            )}
             {selected.mode != null && (
               <Field
                 label="Mode"
