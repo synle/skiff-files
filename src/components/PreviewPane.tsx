@@ -112,6 +112,71 @@ function ImageBody({
   );
 }
 
+/** Audio / video preview. Mounts a native `<audio>` or `<video>` element
+ *  pointed at a base64 data URL. Shares the same 16 MB read cap as
+ *  images — anything larger surfaces an error and falls through to
+ *  properties-only. The webview's native codec support determines what
+ *  actually plays; we don't try to be smart about transcoding. */
+function AVBody({ entry }: { entry: Entry }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const isVideo = entry.kind === "video";
+
+  useEffect(() => {
+    let cancelled = false;
+    setSrc(null);
+    setError(null);
+    readBase64(entry.path)
+      .then((b64) => {
+        if (cancelled) return;
+        const mime = mimeForPath(entry.path) ?? "application/octet-stream";
+        setSrc(`data:${mime};base64,${b64}`);
+      })
+      .catch((e) => !cancelled && setError(String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.path]);
+
+  if (error) {
+    return (
+      <Typography variant="caption" color="error">
+        {error}
+      </Typography>
+    );
+  }
+  if (!src) {
+    return (
+      <Typography variant="caption" color="text.secondary">
+        Loading preview…
+      </Typography>
+    );
+  }
+  return isVideo ? (
+    <Box
+      component="video"
+      src={src}
+      controls
+      preload="metadata"
+      sx={{
+        maxWidth: "100%",
+        maxHeight: 360,
+        borderRadius: 1,
+        display: "block",
+        bgcolor: "common.black",
+      }}
+    />
+  ) : (
+    <Box
+      component="audio"
+      src={src}
+      controls
+      preload="metadata"
+      sx={{ width: "100%", display: "block" }}
+    />
+  );
+}
+
 /** Text-file preview body. Capped at the server-side limit. */
 function TextBody({ entry }: { entry: Entry }) {
   const [text, setText] = useState<string | null>(null);
@@ -225,6 +290,9 @@ function Body({
   if (entry.isDir) return <FolderBody entry={entry} />;
   if (isImage(entry.path)) {
     return <ImageBody entry={entry} onDimensions={onImageDimensions} />;
+  }
+  if (entry.kind === "audio" || entry.kind === "video") {
+    return <AVBody entry={entry} />;
   }
   // text-ish kinds get the text body. Everything else falls through to
   // properties-only.
