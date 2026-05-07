@@ -23,6 +23,8 @@ import CircleIcon from "@mui/icons-material/Circle";
 import BookmarkIcon from "@mui/icons-material/Bookmark";
 import CloseIcon from "@mui/icons-material/Close";
 import HistoryIcon from "@mui/icons-material/History";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import { Link as RouterLink } from "react-router";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
@@ -64,6 +66,57 @@ export default function Sidebar({ home, onNavigate }: Props) {
     );
   };
 
+  /** Are we currently collapsed for a section? Missing key = expanded. */
+  const isCollapsed = (id: string): boolean =>
+    !!settings.sidebarCollapsed[id];
+  const toggleSection = (id: string) => {
+    update("sidebarCollapsed", {
+      ...settings.sidebarCollapsed,
+      [id]: !isCollapsed(id),
+    });
+  };
+
+  /** Section header — clickable; flips the chevron and toggles
+   *  collapsed state. Pure presentation; the children are rendered
+   *  by the caller and gated separately. */
+  const SectionHeader = ({ id, label }: { id: string; label: string }) => {
+    const collapsed = isCollapsed(id);
+    return (
+      <Box
+        component="button"
+        onClick={() => toggleSection(id)}
+        aria-expanded={!collapsed}
+        aria-controls={`sidebar-section-${id}`}
+        sx={{
+          appearance: "none",
+          background: "transparent",
+          border: 0,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 0.5,
+          width: "100%",
+          textAlign: "left",
+          px: 2,
+          pt: 1.5,
+          color: "text.secondary",
+          fontSize: "0.6875rem",
+          fontWeight: 500,
+          letterSpacing: "0.08333em",
+          textTransform: "uppercase",
+          "&:hover": { color: "text.primary" },
+        }}
+      >
+        {collapsed ? (
+          <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
+        ) : (
+          <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
+        )}
+        {label}
+      </Box>
+    );
+  };
+
   // Live connections, refreshed on mount + when other code dispatches the
   // 'skiff:connections-changed' event (Connections page does that on
   // connect/disconnect). A poll loop would be wasted work given how rare
@@ -99,35 +152,28 @@ export default function Sidebar({ home, onNavigate }: Props) {
       }}
     >
       <Box sx={{ flex: 1, overflow: "auto" }}>
-        <Typography
-          variant="overline"
-          sx={{ px: 2, pt: 1.5, color: "text.secondary" }}
-        >
-          Favorites
-        </Typography>
-        <List dense disablePadding>
-          {FAVORITES.map((f) => (
-            <ListItem key={f.label} disablePadding>
-              <ListItemButton
-                disabled={!home}
-                onClick={() => onNavigate(join(f.rel))}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>{f.icon}</ListItemIcon>
-                <ListItemText primary={f.label} />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
+        <SectionHeader id="favorites" label="Favorites" />
+        {!isCollapsed("favorites") && (
+          <List dense disablePadding id="sidebar-section-favorites">
+            {FAVORITES.map((f) => (
+              <ListItem key={f.label} disablePadding>
+                <ListItemButton
+                  disabled={!home}
+                  onClick={() => onNavigate(join(f.rel))}
+                >
+                  <ListItemIcon sx={{ minWidth: 32 }}>{f.icon}</ListItemIcon>
+                  <ListItemText primary={f.label} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        )}
 
         {settings.bookmarks.length > 0 && (
           <>
-            <Typography
-              variant="overline"
-              sx={{ px: 2, pt: 1.5, color: "text.secondary", display: "block" }}
-            >
-              Bookmarks
-            </Typography>
-            <List dense disablePadding>
+            <SectionHeader id="bookmarks" label="Bookmarks" />
+            {!isCollapsed("bookmarks") && (
+            <List dense disablePadding id="sidebar-section-bookmarks">
               {settings.bookmarks.map((b) => (
                 <ListItem
                   key={b.id}
@@ -161,18 +207,15 @@ export default function Sidebar({ home, onNavigate }: Props) {
                 </ListItem>
               ))}
             </List>
+            )}
           </>
         )}
 
         {settings.recentPaths.length > 0 && (
           <>
-            <Typography
-              variant="overline"
-              sx={{ px: 2, pt: 1.5, color: "text.secondary", display: "block" }}
-            >
-              Recent
-            </Typography>
-            <List dense disablePadding>
+            <SectionHeader id="recent" label="Recent" />
+            {!isCollapsed("recent") && (
+            <List dense disablePadding id="sidebar-section-recent">
               {settings.recentPaths.slice(0, 5).map((p) => {
                 // Pretty label: basename + a short parent hint so the
                 // list isn't ambiguous when multiple folders share a
@@ -202,15 +245,13 @@ export default function Sidebar({ home, onNavigate }: Props) {
                 );
               })}
             </List>
+            )}
           </>
         )}
 
-        <Typography
-          variant="overline"
-          sx={{ px: 2, pt: 1.5, color: "text.secondary", display: "block" }}
-        >
-          Hosts
-        </Typography>
+        <SectionHeader id="hosts" label="Hosts" />
+        {!isCollapsed("hosts") && (
+        <Box id="sidebar-section-hosts">
         {connections == null ? (
           <Box sx={{ px: 2, py: 0.5 }}>
             <CircularProgress size={14} />
@@ -268,16 +309,19 @@ export default function Sidebar({ home, onNavigate }: Props) {
             </ListItem>
           </List>
         )}
+        </Box>
+        )}
 
-        <Typography
-          variant="overline"
-          sx={{ px: 2, pt: 1.5, color: "text.secondary", display: "block" }}
-        >
-          Devices
-        </Typography>
-        <Typography variant="caption" sx={{ px: 2, color: "text.disabled" }}>
-          (mounted volumes — Phase 5)
-        </Typography>
+        <SectionHeader id="devices" label="Devices" />
+        {!isCollapsed("devices") && (
+          <Typography
+            variant="caption"
+            sx={{ px: 2, color: "text.disabled", display: "block" }}
+            id="sidebar-section-devices"
+          >
+            (mounted volumes — Phase 5)
+          </Typography>
+        )}
       </Box>
 
       <List dense disablePadding sx={{ borderTop: 1, borderColor: "divider" }}>

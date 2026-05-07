@@ -84,6 +84,10 @@ export interface Settings {
   /** Sidebar visibility — toggled via Cmd/Ctrl+B. Persisted so it
    *  survives restarts. */
   sidebarVisible: boolean;
+  /** Per-section collapsed state for the Sidebar. Keys are
+   *  ad-hoc section ids ("favorites" / "bookmarks" / "recent" /
+   *  "hosts" / "devices"); missing key = expanded (default). */
+  sidebarCollapsed: Record<string, boolean>;
   /** Tabs the user had open at last save. Capped at TABS_MAX so a
    *  runaway browsing session doesn't bloat settings.json. Empty
    *  array = no persisted tabs (BrowserTabs will spawn a default). */
@@ -132,6 +136,7 @@ export const DEFAULTS: Settings = {
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
   sidebarVisible: true,
+  sidebarCollapsed: {},
   savedTabs: [],
   savedActiveTabId: null,
 };
