@@ -13,6 +13,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import Browser from "../pages/Browser";
 import { useSettings } from "../state/settings";
+import { OPEN_IN_TAB_EVENT } from "../App";
 
 interface TabRow {
   id: string;
@@ -72,6 +73,21 @@ export default function BrowserTabs({ home }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Cmd/Ctrl+click on a folder in the active tab → spawn a new tab
+  // seeded at that folder's path. The Browser dispatches the event;
+  // we own the tab strip so we react here.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const path = (e as CustomEvent<string>).detail;
+      if (path) addTab(path);
+    };
+    window.addEventListener(OPEN_IN_TAB_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_IN_TAB_EVENT, onOpen);
+    // addTab closes over `home`; the listener should pick up the
+    // freshest one across renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [home]);
+
   // Persist tabs + active id whenever either changes. We trim to
   // TABS_MAX = 20 so a stuck-open run doesn't bloat settings.json.
   useEffect(() => {
@@ -117,6 +133,7 @@ export default function BrowserTabs({ home }: Props) {
       if (k === "t") {
         e.preventDefault();
         addTab();
+        return;
       } else if (k === "w") {
         e.preventDefault();
         closeTab(activeId);
@@ -134,15 +151,16 @@ export default function BrowserTabs({ home }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, tabs]);
 
-  const addTab = () => {
+  const addTab = (initialPath?: string) => {
     const id = crypto.randomUUID();
+    const seed = initialPath ?? home ?? "";
     setTabs((prev) => [
       ...prev,
       {
         id,
-        label: home ? "Home" : "New tab",
-        initialPath: home ?? "",
-        currentPath: home ?? "",
+        label: seed ? labelFor(seed) : "New tab",
+        initialPath: seed,
+        currentPath: seed,
       },
     ]);
     setActiveId(id);
@@ -256,7 +274,7 @@ export default function BrowserTabs({ home }: Props) {
         <Tooltip title="New tab (Cmd/Ctrl+T)">
           <IconButton
             size="small"
-            onClick={addTab}
+            onClick={() => addTab()}
             aria-label="New tab"
             sx={{ mx: 0.5 }}
           >

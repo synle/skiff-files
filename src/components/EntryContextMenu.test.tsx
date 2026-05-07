@@ -32,6 +32,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onOpenWithDefault: vi.fn(),
     onRevealInOs: vi.fn(),
     onOpenInTerminal: vi.fn(),
+    onOpenInNewTab: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>

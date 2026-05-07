@@ -89,6 +89,7 @@ function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
           density={props?.density ?? "comfortable"}
           showExtensions={props?.showExtensions ?? true}
           groupFoldersFirst={props?.groupFoldersFirst ?? true}
+          onOpenDirInNewTab={props?.onOpenDirInNewTab}
         />
       </div>
     </ThemeProvider>,
@@ -187,6 +188,28 @@ describe("FileList", () => {
     expect(onSelectionChange.mock.calls.at(-1)?.[0]).toHaveLength(3);
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onSelectionChange.mock.calls.at(-1)?.[0]).toHaveLength(0);
+  });
+
+  it("middle-click on a folder fires onOpenDirInNewTab", () => {
+    const onOpenDirInNewTab = vi.fn();
+    renderList({ onOpenDirInNewTab });
+    const folderRow = screen
+      .getAllByTestId("file-row")
+      .find((r) => r.textContent?.includes("child-folder"))!;
+    fireEvent.mouseDown(folderRow, { button: 1 });
+    expect(onOpenDirInNewTab).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "child-folder" }),
+    );
+  });
+
+  it("middle-click on a file does NOT fire onOpenDirInNewTab", () => {
+    const onOpenDirInNewTab = vi.fn();
+    renderList({ onOpenDirInNewTab });
+    const fileRow = screen
+      .getAllByTestId("file-row")
+      .find((r) => r.textContent?.includes("alpha.txt"))!;
+    fireEvent.mouseDown(fileRow, { button: 1 });
+    expect(onOpenDirInNewTab).not.toHaveBeenCalled();
   });
 
   it("Enter on a focused folder fires onOpenDir", () => {

@@ -22,6 +22,12 @@ import { pruneStaleBookmarks, pruneStalePaths } from "./util/pruneStale";
  *  currently mounted. */
 export const NAVIGATE_EVENT = "skiff:navigate";
 
+/** Custom DOM event the Browser emits when the user Cmd/Ctrl+clicks a
+ *  folder. BrowserTabs listens and spawns a new tab seeded at the
+ *  folder's path. Same window-event pattern as NAVIGATE_EVENT so the
+ *  Browser doesn't have to know about its tab strip parent. */
+export const OPEN_IN_TAB_EVENT = "skiff:open-in-new-tab";
+
 /**
  * Resolves the home directory once at the layout level so navigating between
  * Settings and Browser doesn't re-issue the Rust call on every route change.

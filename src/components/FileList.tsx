@@ -25,6 +25,12 @@ interface Props {
   onSortChange: (key: SortKey) => void;
   /** Called when a folder is double-clicked or Enter pressed on it. */
   onOpenDir: (entry: Entry) => void;
+  /** Called when a folder is middle-clicked (mouse button 1). The
+   *  Browser routes this through a window event so BrowserTabs can
+   *  spawn a new tab. Matches browser muscle memory: middle-click =
+   *  open in new tab. Cmd/Ctrl+click stays reserved for additive
+   *  multi-select to match Finder / Explorer conventions. */
+  onOpenDirInNewTab?: (entry: Entry) => void;
   /** When false, keyboard nav handlers are disabled — for tabs that
    *  aren't in the foreground. */
   isActive?: boolean;
@@ -164,6 +170,7 @@ export default function FileList(props: Props) {
     sortDir,
     onSortChange,
     onOpenDir,
+    onOpenDirInNewTab,
     onPrimarySelect,
     onSelectionChange,
     onContext,
@@ -317,6 +324,19 @@ export default function FileList(props: Props) {
     const idx = sorted.findIndex((s) => s.path === e.path);
     if (idx >= 0) setFocusedIdx(idx);
   };
+  /** Middle-click on a folder → open in a new tab (browser muscle
+   *  memory). We hook `onMouseDown` rather than `onAuxClick` because
+   *  the click event with button 1 doesn't bubble through React's
+   *  primary-click pipeline in some webview / jsdom setups; mousedown
+   *  fires unconditionally and gives us the button index. */
+  const onRowMouseDown = (e: Entry, evt: React.MouseEvent) => {
+    if (evt.button !== 1) return;
+    if (!e.isDir || !onOpenDirInNewTab) return;
+    // preventDefault stops the OS's auto-scroll cursor that middle-click
+    // would otherwise summon.
+    evt.preventDefault();
+    onOpenDirInNewTab(e);
+  };
   const onRowDouble = (e: Entry) => {
     if (e.isDir) onOpenDir(e);
   };
@@ -405,6 +425,7 @@ export default function FileList(props: Props) {
                   aria-selected={isSel}
                   data-testid="file-row"
                   onClick={(evt) => onRowClick(e, evt)}
+                  onMouseDown={(evt) => onRowMouseDown(e, evt)}
                   onDoubleClick={() => onRowDouble(e)}
                   onContextMenu={(evt) => {
                     evt.preventDefault();

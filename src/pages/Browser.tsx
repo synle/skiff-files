@@ -34,7 +34,7 @@ import BulkRenameDialog from "../components/BulkRenameDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
-import { NAVIGATE_EVENT } from "../App";
+import { NAVIGATE_EVENT, OPEN_IN_TAB_EVENT } from "../App";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 interface Props {
@@ -674,6 +674,11 @@ export default function Browser({
           sortDir={sortDir}
           onSortChange={handleSort}
           onOpenDir={(e) => navigate(e.path)}
+          onOpenDirInNewTab={(e) => {
+            window.dispatchEvent(
+              new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
+            );
+          }}
           onPrimarySelect={setPrimarySelected}
           onSelectionChange={setSelectedPaths}
           onContext={(entry, x, y) => setContextMenu({ entry, x, y })}
@@ -733,6 +738,11 @@ export default function Browser({
         }}
         onOpenInTerminal={(e) => {
           void fsOpenInTerminal(e.path).catch((err) => setError(String(err)));
+        }}
+        onOpenInNewTab={(e) => {
+          window.dispatchEvent(
+            new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
+          );
         }}
         onBookmark={(e) => {
           // Append a fresh bookmark with a UUID id; the basename

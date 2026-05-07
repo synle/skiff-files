@@ -15,6 +15,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
 import LaunchIcon from "@mui/icons-material/Launch";
+import TabIcon from "@mui/icons-material/Tab";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import type { Entry } from "../api/fs";
@@ -40,6 +41,9 @@ interface Props {
   /** Open the OS terminal at this directory. Only shown for local
    *  folders — remote / file entries hide the action. */
   onOpenInTerminal: (entry: Entry) => void;
+  /** Open the directory in a new tab. Only shown for folders — files
+   *  open into the preview pane / OS app and don't have a tab concept. */
+  onOpenInNewTab: (entry: Entry) => void;
 }
 
 export default function EntryContextMenu({
@@ -54,6 +58,7 @@ export default function EntryContextMenu({
   onOpenWithDefault,
   onRevealInOs,
   onOpenInTerminal,
+  onOpenInNewTab,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
@@ -78,6 +83,19 @@ export default function EntryContextMenu({
             <OpenIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Open</ListItemText>
+        </MenuItem>
+      )}
+      {state?.entry.isDir && (
+        <MenuItem
+          onClick={() => {
+            onOpenInNewTab(state!.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <TabIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Open in new tab</ListItemText>
         </MenuItem>
       )}
       {!isRemote && state && !state.entry.isDir && (
