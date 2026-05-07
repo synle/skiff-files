@@ -22,6 +22,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
@@ -170,6 +171,26 @@ export default function ConnectionsPage() {
 
   const handleDeleteDraft = (id: string) => {
     setDrafts((d) => d.filter((x) => x.id !== id));
+  };
+
+  /** Clone a draft as a new entry the user can edit independently —
+   *  useful for "I want a 'staging' variant of my 'production' setup
+   *  without retyping host/user". The label gets a " (copy)" suffix
+   *  (or " (copy 2)" / "… (copy 3)" if collisions exist) so the list
+   *  stays readable. */
+  const handleDuplicateDraft = (id: string) => {
+    setDrafts((d) => {
+      const original = d.find((x) => x.id === id);
+      if (!original) return d;
+      const baseLabel = `${original.label} (copy)`;
+      const existing = new Set(d.map((x) => x.label));
+      let label = baseLabel;
+      let n = 2;
+      while (existing.has(label)) {
+        label = `${original.label} (copy ${n++})`;
+      }
+      return [...d, { ...original, id: crypto.randomUUID(), label }];
+    });
   };
 
   const loadDraft = (d: SftpDraft) => {
@@ -391,13 +412,32 @@ export default function ConnectionsPage() {
                 <ListItem
                   key={d.id}
                   secondaryAction={
-                    <IconButton
-                      edge="end"
-                      onClick={() => handleDeleteDraft(d.id)}
-                      aria-label={`Delete ${d.label}`}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                    <Stack direction="row" spacing={0.5}>
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicateDraft(d.id);
+                        }}
+                        aria-label={`Duplicate ${d.label}`}
+                        title="Duplicate"
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDraft(d.id);
+                        }}
+                        aria-label={`Delete ${d.label}`}
+                        title="Delete"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   }
                   onClick={() => loadDraft(d)}
                   sx={{ cursor: "pointer" }}
