@@ -317,17 +317,23 @@ export default function Browser({
     return () => window.removeEventListener("keydown", onKey);
   }, [isActive, primarySelected, selectedPaths, entries]);
 
-  // Cmd/Ctrl+R → refresh the current folder. Cmd/Ctrl+Shift+N →
-  // new folder. Both have been documented in the cheatsheet since
-  // 0.1.2; finally implementing. Skip on input focus so typing in
-  // the path bar doesn't trigger them.
+  // Cmd/Ctrl+R → refresh the current folder. F5 is also a refresh
+  // alias (Windows Explorer muscle memory; takes no modifier).
+  // Cmd/Ctrl+Shift+N → new folder. Skip on input focus so typing
+  // in the path bar doesn't trigger them.
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      // F5 — bare keypress, no modifier.
+      if (e.key === "F5" && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        if (path) void refresh(path);
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey)) return;
       const k = e.key.toLowerCase();
       if (k === "r" && !e.shiftKey) {
         e.preventDefault();
