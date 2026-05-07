@@ -25,6 +25,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import HistoryIcon from "@mui/icons-material/History";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { Link as RouterLink } from "react-router";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
@@ -86,6 +87,20 @@ export default function Sidebar({ home, onNavigate }: Props) {
         b.id === id ? { ...b, label: trimmed } : b,
       ),
     );
+  };
+
+  /** Move a bookmark one slot in the list. Clamped at the boundary
+   *  so the up/down icons can stay always-rendered without cluttering
+   *  the row with disabled-state styling. */
+  const moveBookmark = (id: string, direction: "up" | "down") => {
+    const idx = settings.bookmarks.findIndex((b) => b.id === id);
+    if (idx < 0) return;
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (target < 0 || target >= settings.bookmarks.length) return;
+    const next = [...settings.bookmarks];
+    const [moved] = next.splice(idx, 1);
+    next.splice(target, 0, moved);
+    update("bookmarks", next);
   };
 
   const removeBookmark = (id: string) => {
@@ -251,23 +266,51 @@ export default function Sidebar({ home, onNavigate }: Props) {
             <SectionHeader id="bookmarks" label="Bookmarks" />
             {!isCollapsed("bookmarks") && (
             <List dense disablePadding id="sidebar-section-bookmarks">
-              {settings.bookmarks.map((b) => (
+              {settings.bookmarks.map((b, i) => (
                 <ListItem
                   key={b.id}
                   disablePadding
                   secondaryAction={
-                    <IconButton
-                      size="small"
-                      edge="end"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeBookmark(b.id);
-                      }}
-                      aria-label={`Remove bookmark ${b.label}`}
-                      sx={{ p: 0.25 }}
-                    >
-                      <CloseIcon sx={{ fontSize: 14 }} />
-                    </IconButton>
+                    <Box sx={{ display: "flex", gap: 0.25 }}>
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        disabled={i === 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveBookmark(b.id, "up");
+                        }}
+                        aria-label={`Move ${b.label} up`}
+                        sx={{ p: 0.25 }}
+                      >
+                        <KeyboardArrowUpIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        disabled={i === settings.bookmarks.length - 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveBookmark(b.id, "down");
+                        }}
+                        aria-label={`Move ${b.label} down`}
+                        sx={{ p: 0.25 }}
+                      >
+                        <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeBookmark(b.id);
+                        }}
+                        aria-label={`Remove bookmark ${b.label}`}
+                        sx={{ p: 0.25 }}
+                      >
+                        <CloseIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Box>
                   }
                 >
                   <ListItemButton

@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.67** — ✅ **Bookmark reorder**. Each Bookmarks-section row gets up + down arrow icons next to the existing × delete button. Up disabled at index 0, down at the last index. New `moveBookmark(id, direction)` splices the bookmark to its new position so the change persists through `update("bookmarks")`.
 - **0.2.66** — ✅ **Connection-status dot toggle**. New `Settings.sidebarShowStatusDots` (default true) controls whether each Hosts-section entry shows the colored connectivity dot. When off, the icon column falls back to the generic HubIcon to keep the layout balanced. Closes the spec's Sidebar "Show connection-status dots" bullet.
 - **0.2.65** — ✅ **Show extensions enum**. `Settings.showExtensions` graduated from `boolean` to `"always" | "never" | "whenAmbiguous"`. New `whenAmbiguous` mode keeps the extension for kinds without a recognizable icon (binary / unknown / symlink) and hides it for image / video / audio / pdf / text / markdown / code / archive / spreadsheet / document — closes the spec's three-mode option. Settings load path migrates legacy `boolean` payloads (`true → "always"`, `false → "never"`) so existing settings.json round-trips cleanly.
 - **0.2.64** — ✅ **Show status bar toggle**. New `Settings.showStatusBar` (default true) gates the StatusBar render in Browser. Hidden = the bottom strip disappears, freeing a row of vertical space for the file list. Closes the spec's Appearance "Show status bar" bullet.
