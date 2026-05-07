@@ -59,6 +59,7 @@ const GROUPS: Group[] = [
       { keys: "Cmd / Ctrl + I", description: "Toggle preview pane" },
       { keys: "Cmd / Ctrl + R", description: "Refresh current folder" },
       { keys: "Cmd / Ctrl + Shift + N", description: "New folder" },
+      { keys: "F2", description: "Rename selected entry" },
     ],
   },
   {

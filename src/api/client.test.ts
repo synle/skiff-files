@@ -199,4 +199,39 @@ describe("client.mkdir / removeOrTrashMany dispatch", () => {
       expect.objectContaining({ src: "/src", dest: "sftp://abc/x" }),
     );
   });
+
+  it("rename routes local through fs_rename", async () => {
+    mocked.mockResolvedValueOnce(undefined);
+    const { rename } = await import("./client");
+    await rename("/x/old.txt", "/x/new.txt");
+    expect(mocked).toHaveBeenLastCalledWith("fs_rename", {
+      from: "/x/old.txt",
+      to: "/x/new.txt",
+    });
+  });
+
+  it("rename routes sftp through conn_rename with strippped paths", async () => {
+    mocked.mockResolvedValueOnce(undefined);
+    const { rename } = await import("./client");
+    await rename("sftp://abc/x/old.txt", "sftp://abc/x/new.txt");
+    expect(mocked).toHaveBeenLastCalledWith("conn_rename", {
+      id: "abc",
+      from: "/x/old.txt",
+      to: "/x/new.txt",
+    });
+  });
+
+  it("rename rejects cross-backend rename", async () => {
+    const { rename } = await import("./client");
+    await expect(rename("/local", "sftp://abc/remote")).rejects.toThrow(
+      /across backends/,
+    );
+  });
+
+  it("rename rejects rename across different sftp connections", async () => {
+    const { rename } = await import("./client");
+    await expect(
+      rename("sftp://abc/x", "sftp://def/x"),
+    ).rejects.toThrow(/different sftp connections/);
+  });
 });

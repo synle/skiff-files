@@ -13,9 +13,11 @@ import { fsFind, fsHomeDir, fsStat, type Entry } from "../api/fs";
 import {
   listDir as clientListDir,
   mkdir as clientMkdir,
+  rename as clientRename,
   removeOrTrashMany,
   startSync,
 } from "../api/client";
+import RenameDialog from "../components/RenameDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
@@ -77,6 +79,8 @@ export default function Browser({
   /** True while a Tauri drag-drop is hovering the window. Drives the
    *  semi-transparent overlay rendered at the bottom of this component. */
   const [dragOver, setDragOver] = useState(false);
+  /** When non-null, the rename dialog is open against this entry. */
+  const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -213,6 +217,23 @@ export default function Browser({
       unlisten?.();
     };
   }, [path, refresh, isActive]);
+
+  // F2 on the primary selection → open rename dialog. Skips when an
+  // input is focused so typing F2 elsewhere doesn't hijack focus.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "F2") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      if (!primarySelected) return;
+      e.preventDefault();
+      setRenameTarget(primarySelected);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isActive, primarySelected]);
 
   // Cmd/Ctrl + F → focus the toolbar search input. Doesn't fire if the
   // user is already in an input (so it doesn't hijack the path bar).
@@ -471,6 +492,24 @@ export default function Browser({
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
         }
         errorMessage={error}
+      />
+      <RenameDialog
+        open={!!renameTarget}
+        originalName={renameTarget?.name ?? ""}
+        originalPath={renameTarget?.path ?? ""}
+        onClose={() => setRenameTarget(null)}
+        onRename={async (newName) => {
+          if (!renameTarget) return;
+          // Compute the destination path: same parent, new basename.
+          // For sftp paths the address-bar form is `sftp://<id>/...`
+          // — splitting on the last separator works for both shapes.
+          const sep = renameTarget.path.lastIndexOf("/");
+          const parent =
+            sep > 0 ? renameTarget.path.slice(0, sep) : renameTarget.path;
+          const dest = `${parent}/${newName}`;
+          await clientRename(renameTarget.path, dest);
+          if (path) await refresh(path);
+        }}
       />
       {dragOver && (
         // Pointer-events: none so the OS drag operation isn't intercepted

@@ -6,6 +6,7 @@
 import {
   fsListDir,
   fsMkdir,
+  fsRename,
   fsStat,
   fsReadText,
   fsReadBase64,
@@ -22,6 +23,7 @@ import {
   connReadBase64,
   connReadText,
   connRemove,
+  connRename,
   connStat,
 } from "./conn";
 import { formatSftp, isRemote, parseLocation } from "../util/location";
@@ -96,6 +98,33 @@ export async function mkdir(path: string): Promise<void> {
     return connMkdir(loc.backend.connectionId, loc.remotePath);
   }
   return fsMkdir(path);
+}
+
+/** Backend-agnostic rename / same-FS move. Both `from` and `to` must
+ *  live on the same backend; cross-backend rename should go through a
+ *  sync_start_cross job (copy + remove). The frontend currently calls
+ *  this from the F2 rename dialog where both paths share the same
+ *  parent, so the same-backend assumption holds trivially. */
+export async function rename(from: string, to: string): Promise<void> {
+  const fromLoc = parseLocation(from);
+  const toLoc = parseLocation(to);
+  if (fromLoc.backend.kind !== toLoc.backend.kind) {
+    throw new Error("rename across backends is not supported");
+  }
+  if (fromLoc.backend.kind === "sftp") {
+    if (toLoc.backend.kind !== "sftp") {
+      throw new Error("rename across backends is not supported");
+    }
+    if (fromLoc.backend.connectionId !== toLoc.backend.connectionId) {
+      throw new Error("rename across different sftp connections");
+    }
+    return connRename(
+      fromLoc.backend.connectionId,
+      fromLoc.remotePath,
+      toLoc.remotePath,
+    );
+  }
+  return fsRename(from, to);
 }
 
 /** Backend-agnostic sync starter. Pure local-to-local goes through
