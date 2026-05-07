@@ -12,10 +12,12 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import HomeIcon from "@mui/icons-material/Home";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fsCanonicalize } from "../api/fs";
+import { listDir } from "../api/client";
 import { pathSegments } from "../util/format";
 import { isRemote } from "../util/location";
+import { completePath, splitForCompletion } from "../util/autocomplete";
 
 interface Props {
   path: string;
@@ -27,6 +29,10 @@ interface Props {
 export default function PathBar({ path, onNavigate, onHome }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(path);
+  /** Cache of the last parent listing, keyed by parent path. Avoids
+   *  re-issuing list_dir on every Tab press. Cleared when the parent
+   *  changes (the next Tab refetches). */
+  const cacheRef = useRef<{ parent: string; entries: { name: string; isDir: boolean }[] } | null>(null);
 
   // Keep the draft in sync with the current path so typing in edit mode
   // starts from the latest value, not the value when the component mounted.
@@ -58,6 +64,27 @@ export default function PathBar({ path, onNavigate, onHome }: Props) {
     setEditing(false);
   };
 
+  /** Tab handler: fetch the parent's entries (cached per-parent) and
+   *  rewrite `draft` with the completed value via the pure helper.
+   *  Silent on no-progress / no-match — the user just sees Tab do
+   *  nothing, matching shell autocomplete behavior. */
+  const completeWithTab = async () => {
+    const { parent } = splitForCompletion(draft);
+    if (!parent) return;
+    let entries = cacheRef.current?.parent === parent ? cacheRef.current.entries : null;
+    if (!entries) {
+      try {
+        const list = await listDir(parent);
+        entries = list.map((e) => ({ name: e.name, isDir: e.isDir }));
+        cacheRef.current = { parent, entries };
+      } catch {
+        return; // parent doesn't exist / unreachable — silently bail
+      }
+    }
+    const next = completePath(draft, entries);
+    if (next != null) setDraft(next);
+  };
+
   return (
     <Box
       sx={{
@@ -87,6 +114,13 @@ export default function PathBar({ path, onNavigate, onHome }: Props) {
             if (e.key === "Escape") {
               setDraft(path);
               setEditing(false);
+            }
+            if (e.key === "Tab") {
+              // Don't let Tab leave the input; that would break the
+              // typical shell-style "press Tab again to keep
+              // completing" muscle memory.
+              e.preventDefault();
+              void completeWithTab();
             }
           }}
           onBlur={() => setEditing(false)}
