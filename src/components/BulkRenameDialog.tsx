@@ -41,6 +41,8 @@ export default function BulkRenameDialog({
 }: Props) {
   const [find, setFind] = useState("");
   const [replace, setReplace] = useState("");
+  const [prefix, setPrefix] = useState("");
+  const [suffix, setSuffix] = useState("");
   const [regex, setRegex] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
@@ -54,6 +56,8 @@ export default function BulkRenameDialog({
     if (entries.length > 0) {
       setFind("");
       setReplace("");
+      setPrefix("");
+      setSuffix("");
       setRegex(false);
       setBusy(false);
       setProgress(null);
@@ -62,8 +66,15 @@ export default function BulkRenameDialog({
   }, [entries]);
 
   const results = useMemo(
-    () => applyBulkRename(entries.map((e) => e.name), find, replace, regex),
-    [entries, find, replace, regex],
+    () =>
+      applyBulkRename(
+        entries.map((e) => e.name),
+        find,
+        replace,
+        regex,
+        { prefix, suffix },
+      ),
+    [entries, find, replace, regex, prefix, suffix],
   );
 
   const changed = results.filter((r) => r.changed);
@@ -139,6 +150,29 @@ export default function BulkRenameDialog({
             }
             label="Regular expression (use $1, $2 for capture groups)"
           />
+          <Stack direction="row" spacing={2}>
+            <TextField
+              label="Prefix"
+              size="small"
+              value={prefix}
+              onChange={(e) => setPrefix(e.target.value)}
+              fullWidth
+              helperText="Prepended to every name."
+            />
+            <TextField
+              label="Suffix"
+              size="small"
+              value={suffix}
+              onChange={(e) => setSuffix(e.target.value)}
+              fullWidth
+              helperText="Inserted before the extension."
+            />
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Tip: <code>{"{n}"}</code> in the Replace field expands to
+            a sequence number (1, 2, 3, …). Use <code>{"{n:03}"}</code>
+            for zero-padded (001, 002, …).
+          </Typography>
           {regexErr && (
             <Typography variant="caption" color="error">
               {regexErr}
