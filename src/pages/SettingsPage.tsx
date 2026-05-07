@@ -230,15 +230,24 @@ export default function SettingsPage() {
             label="Show hidden files (dotfiles)"
           />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.showExtensions}
-                onChange={(e) => update("showExtensions", e.target.checked)}
-              />
-            }
-            label="Show file extensions"
-          />
+          <FormControl size="small" sx={{ maxWidth: 280 }}>
+            <InputLabel id="show-ext-label">Show file extensions</InputLabel>
+            <Select
+              labelId="show-ext-label"
+              label="Show file extensions"
+              value={settings.showExtensions}
+              onChange={(e) =>
+                update(
+                  "showExtensions",
+                  e.target.value as typeof settings.showExtensions,
+                )
+              }
+            >
+              <MenuItem value="always">Always</MenuItem>
+              <MenuItem value="never">Never</MenuItem>
+              <MenuItem value="whenAmbiguous">When ambiguous</MenuItem>
+            </Select>
+          </FormControl>
 
           <FormControl size="small" sx={{ maxWidth: 240 }}>
             <InputLabel id="preview-mode-label">Preview pane</InputLabel>

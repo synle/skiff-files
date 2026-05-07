@@ -12,7 +12,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
 import { formatBytes, formatMtime } from "../util/format";
-import type { Density } from "../state/settings";
+import type { Density, ShowExtensions } from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "kind";
 export type SortDir = "asc" | "desc";
@@ -47,7 +47,7 @@ interface Props {
    *  cursor. */
   onContext?: (entry: Entry, x: number, y: number) => void;
   density: Density;
-  showExtensions: boolean;
+  showExtensions: ShowExtensions;
   /** When true (default), folders sort above files regardless of the
    *  active sort key. When false, folders and files intermix purely
    *  by the chosen sort. Settings → Default View → "Group folders
@@ -93,9 +93,30 @@ function sortEntries(
   return [...groups.dirs, ...groups.files];
 }
 
-/** Strip the extension if Settings says to hide them. Folders are unchanged. */
-function displayName(e: Entry, showExtensions: boolean): string {
-  if (e.isDir || showExtensions) return e.name;
+/** Kinds whose icon is recognizable enough that the extension isn't
+ *  load-bearing for "what is this". Used by the `whenAmbiguous` extension
+ *  policy. Binary / unknown / symlink fall through and keep their tail. */
+const RECOGNIZABLE_KINDS = new Set([
+  "image",
+  "video",
+  "audio",
+  "pdf",
+  "text",
+  "markdown",
+  "code",
+  "archive",
+  "spreadsheet",
+  "document",
+]);
+
+/** Strip the extension based on the policy. Folders never have their
+ *  name rewritten; symlinks behave as their target's kind. */
+function displayName(e: Entry, showExtensions: ShowExtensions): string {
+  if (e.isDir) return e.name;
+  if (showExtensions === "always") return e.name;
+  if (showExtensions === "whenAmbiguous" && !RECOGNIZABLE_KINDS.has(e.kind)) {
+    return e.name;
+  }
   const dot = e.name.lastIndexOf(".");
   return dot > 0 ? e.name.slice(0, dot) : e.name;
 }

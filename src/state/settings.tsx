@@ -29,6 +29,14 @@ export type Density = "comfortable" | "compact";
 /** Global font size scale. Maps to MUI's `typography.fontSize`. */
 export type FontSize = "small" | "medium" | "large";
 
+/** Extension display policy:
+ *  - `always` — append extensions to every file name (default — Explorer convention).
+ *  - `never` — strip extensions from every file name (Finder default).
+ *  - `whenAmbiguous` — strip for kinds with a recognizable icon (image,
+ *    audio, video, pdf, text, markdown, code, archive); keep for
+ *    binary / unknown so users still see what they're dealing with. */
+export type ShowExtensions = "always" | "never" | "whenAmbiguous";
+
 /** Preview pane visibility policy:
  *  - `off` — never show the pane
  *  - `imagesOnly` — auto-open when an image is selected, otherwise hidden
@@ -53,7 +61,7 @@ export interface Settings {
   /** Global font size scale. Mapped to MUI's `typography.fontSize`. */
   fontSize: FontSize;
   showHidden: boolean;
-  showExtensions: boolean;
+  showExtensions: ShowExtensions;
   /** Right-side preview pane policy. */
   previewMode: PreviewMode;
   /** Width of the preview pane in pixels. Persisted across sessions. */
@@ -182,7 +190,7 @@ export const DEFAULTS: Settings = {
   density: "comfortable",
   fontSize: "medium",
   showHidden: false,
-  showExtensions: true,
+  showExtensions: "always",
   previewMode: "imagesOnly",
   previewWidth: 320,
   startPath: "",
@@ -213,6 +221,16 @@ export const DEFAULTS: Settings = {
 
 const STORAGE_KEY = "skiff-files.settings.v1";
 
+/** Migrate a parsed payload from older schema shapes. Currently:
+ *  - `showExtensions` was a `boolean` until 0.2.65; coerce it to the
+ *    new enum so Settings.json round-trips cleanly across versions. */
+function migrate(parsed: Record<string, unknown>): Partial<Settings> {
+  if (typeof parsed.showExtensions === "boolean") {
+    parsed.showExtensions = parsed.showExtensions ? "always" : "never";
+  }
+  return parsed as Partial<Settings>;
+}
+
 /** Read settings from localStorage, merging missing keys against DEFAULTS so a
  *  newer build picking up an older payload doesn't end up with `undefined`s. */
 export function loadSettings(): Settings {
@@ -220,7 +238,7 @@ export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULTS };
-    const parsed = JSON.parse(raw) as Partial<Settings>;
+    const parsed = migrate(JSON.parse(raw) as Record<string, unknown>);
     return { ...DEFAULTS, ...parsed };
   } catch {
     // Corrupt JSON should not brick the app — fall back to defaults silently.
@@ -248,7 +266,7 @@ export async function loadSettingsFromDisk(): Promise<Settings | null> {
   try {
     const raw = await invoke<string | null>("settings_load");
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<Settings>;
+    const parsed = migrate(JSON.parse(raw) as Record<string, unknown>);
     return { ...DEFAULTS, ...parsed };
   } catch {
     return null;

@@ -87,7 +87,7 @@ function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
           onSelectionChange={onSelectionChange}
           isActive={props?.isActive ?? true}
           density={props?.density ?? "comfortable"}
-          showExtensions={props?.showExtensions ?? true}
+          showExtensions={props?.showExtensions ?? "always"}
           groupFoldersFirst={props?.groupFoldersFirst ?? true}
           onOpenDirInNewTab={props?.onOpenDirInNewTab}
         />
@@ -162,10 +162,27 @@ describe("FileList", () => {
     expect(last).toContain("/x/alpha.txt");
   });
 
-  it("hides extensions when showExtensions=false", () => {
-    renderList({ showExtensions: false });
+  it("hides extensions when showExtensions='never'", () => {
+    renderList({ showExtensions: "never" });
     expect(screen.queryByText("alpha.txt")).not.toBeInTheDocument();
     expect(screen.getByText("alpha")).toBeInTheDocument();
+  });
+
+  it("whenAmbiguous keeps extension for unknown kinds, hides for known", () => {
+    const entries: Entry[] = [
+      // Recognizable kind (text) → extension hidden.
+      { ...ENTRIES[0], name: "alpha.txt", path: "/x/alpha.txt", kind: "text" },
+      // Unknown kind → extension kept so the user can tell what it is.
+      {
+        ...ENTRIES[0],
+        name: "weird.xyz",
+        path: "/x/weird.xyz",
+        kind: "binary",
+      },
+    ];
+    renderList({ entries, showExtensions: "whenAmbiguous" });
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    expect(screen.getByText("weird.xyz")).toBeInTheDocument();
   });
 
   it("shows the empty-folder message when no entries", () => {
