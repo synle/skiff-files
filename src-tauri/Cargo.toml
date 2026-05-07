@@ -31,6 +31,7 @@ russh = "0.45"
 russh-sftp = "2"
 russh-keys = "0.45"
 uuid = { version = "1", features = ["v4"] }
+kamadak-exif = "0.6"
 
 [dev-dependencies]
 filetime = "0.2"

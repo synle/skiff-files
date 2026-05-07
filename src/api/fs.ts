@@ -88,6 +88,24 @@ export const fsOpenWithDefault = (path: string): Promise<void> =>
 export const fsOpenInTerminal = (path: string): Promise<void> =>
   invoke<void>("fs_open_in_terminal", { path });
 
+/** EXIF metadata for an image file. All fields are optional — `null`
+ *  means the image lacks the corresponding tag (or isn't a JPEG/TIFF). */
+export interface ImageExif {
+  dateTaken: string | null;
+  cameraMake: string | null;
+  cameraModel: string | null;
+  lens: string | null;
+  iso: string | null;
+  exposure: string | null;
+  aperture: string | null;
+  focalLength: string | null;
+}
+
+/** Read EXIF off a local image. Returns an all-`null` struct when the
+ *  file isn't EXIF-bearing rather than throwing. */
+export const fsImageExif = (path: string): Promise<ImageExif> =>
+  invoke<ImageExif>("fs_image_exif", { path });
+
 /** Filesystem totals for the partition that hosts `path`. Bytes. */
 export interface DiskSpace {
   total: number;

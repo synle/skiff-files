@@ -9,7 +9,12 @@
 // because `fs_dir_summary` can take seconds on large trees.
 import { Box, Divider, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import { type DirSummary, type Entry } from "../api/fs";
+import {
+  fsImageExif,
+  type DirSummary,
+  type Entry,
+  type ImageExif,
+} from "../api/fs";
 import { dirSummary, readBase64, readText } from "../api/client";
 import { formatBytes, formatMtime } from "../util/format";
 import { isImage, mimeForPath } from "../util/mime";
@@ -319,6 +324,43 @@ export default function PreviewPane({ selected, width }: Props) {
     w: number;
     h: number;
   } | null>(null);
+  /** EXIF for the currently-selected image, or `null` for non-images
+   *  / no metadata. Surfaced in the properties block as Date taken /
+   *  Camera / etc. Reset on selection change. */
+  const [imageExif, setImageExif] = useState<ImageExif | null>(null);
+
+  // Fetch EXIF whenever an image is selected. Best-effort — failures
+  // (non-image, missing tags, remote path) silently leave EXIF null.
+  // Skips remote paths since `fs_image_exif` is a local-only command.
+  useEffect(() => {
+    setImageExif(null);
+    if (!selected || selected.isDir) return;
+    if (selected.path.startsWith("sftp://")) return;
+    // Cheap mime check via the same isImage helper used to pick the
+    // body component. EXIF lives in JPEG/TIFF/HEIC; the underlying
+    // crate returns "no metadata" for the rest.
+    if (
+      !/\.(jpe?g|tiff?|heic|heif|webp|png)$/i.test(selected.path) ||
+      !/(image)/i.test(selected.kind)
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void fsImageExif(selected.path)
+      .then((e) => {
+        if (cancelled) return;
+        // Filter out the all-null payload — no point rendering empty
+        // fields when the image just doesn't carry EXIF.
+        const hasAny = Object.values(e).some((v) => v != null);
+        setImageExif(hasAny ? e : null);
+      })
+      .catch(() => {
+        /* best-effort — preview still renders without EXIF */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   // Drag-resize from the LEFT edge — the pane lives on the right of
   // the FileList, so dragging left widens it. Same MouseMove-on-document
@@ -417,6 +459,35 @@ export default function PreviewPane({ selected, width }: Props) {
               <Field
                 label="Dimensions"
                 value={`${imageDimensions.w} × ${imageDimensions.h}`}
+              />
+            )}
+            {imageExif?.dateTaken && (
+              <Field label="Taken" value={imageExif.dateTaken} />
+            )}
+            {(imageExif?.cameraMake || imageExif?.cameraModel) && (
+              <Field
+                label="Camera"
+                value={[imageExif?.cameraMake, imageExif?.cameraModel]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim()}
+              />
+            )}
+            {imageExif?.lens && <Field label="Lens" value={imageExif.lens} />}
+            {(imageExif?.exposure ||
+              imageExif?.aperture ||
+              imageExif?.iso ||
+              imageExif?.focalLength) && (
+              <Field
+                label="Exposure"
+                value={[
+                  imageExif?.focalLength,
+                  imageExif?.aperture,
+                  imageExif?.exposure,
+                  imageExif?.iso ? `ISO ${imageExif.iso}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               />
             )}
             {selected.mode != null && (

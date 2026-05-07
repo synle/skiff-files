@@ -248,6 +248,53 @@ pub fn fs_open_in_terminal(path: String) -> FsResult<()> {
     Err(format!("open_in_terminal: unsupported platform for {path}"))
 }
 
+/// EXIF metadata read off a local image. Optional fields — every key
+/// is `null` when the image lacks the corresponding tag (or isn't a
+/// JPEG/TIFF where EXIF lives). Used by the PreviewPane to surface
+/// "Date taken" / "Camera" alongside the inline image.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageExif {
+    pub date_taken: Option<String>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub lens: Option<String>,
+    pub iso: Option<String>,
+    pub exposure: Option<String>,
+    pub aperture: Option<String>,
+    pub focal_length: Option<String>,
+}
+
+/// Read EXIF from `path`. Returns an empty struct (all `None`) when
+/// the file isn't an EXIF-bearing image — callers treat that as "no
+/// metadata" rather than as an error so the preview pane stays quiet
+/// for PNG / SVG / etc.
+#[tauri::command]
+pub fn fs_image_exif(path: String) -> FsResult<ImageExif> {
+    let file = std::fs::File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
+    let mut reader = std::io::BufReader::new(file);
+    let exif_reader = exif::Reader::new();
+    let exif = match exif_reader.read_from_container(&mut reader) {
+        Ok(e) => e,
+        Err(_) => return Ok(ImageExif::default()),
+    };
+    let pick = |tag: exif::Tag| -> Option<String> {
+        exif.get_field(tag, exif::In::PRIMARY).map(|f| {
+            f.display_value().with_unit(&exif).to_string()
+        })
+    };
+    Ok(ImageExif {
+        date_taken: pick(exif::Tag::DateTimeOriginal).or_else(|| pick(exif::Tag::DateTime)),
+        camera_make: pick(exif::Tag::Make),
+        camera_model: pick(exif::Tag::Model),
+        lens: pick(exif::Tag::LensModel),
+        iso: pick(exif::Tag::PhotographicSensitivity),
+        exposure: pick(exif::Tag::ExposureTime),
+        aperture: pick(exif::Tag::FNumber),
+        focal_length: pick(exif::Tag::FocalLength),
+    })
+}
+
 /// Total + free bytes on the filesystem that hosts `path`. Used by the
 /// StatusBar to show "X free of Y" alongside the selection summary.
 /// `fs4` reads the per-platform filesystem stats (statvfs / GetDiskFreeSpaceEx)
