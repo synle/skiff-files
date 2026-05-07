@@ -298,6 +298,17 @@ export default function SettingsPage() {
             </Button>
             <Button
               variant="outlined"
+              size="small"
+              disabled={settings.recentPaths.length === 0}
+              onClick={() => update("recentPaths", [])}
+            >
+              Clear recent paths
+              {settings.recentPaths.length > 0
+                ? ` (${settings.recentPaths.length})`
+                : ""}
+            </Button>
+            <Button
+              variant="outlined"
               color="warning"
               onClick={() => {
                 // Confirm before nuking — this drops every persisted
