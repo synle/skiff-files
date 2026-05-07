@@ -13,6 +13,20 @@ export interface ConnectionInfo {
   label: string;
 }
 
+/** Mirror of `crate::fs::ssh_config::SshConfigHost`. */
+export interface SshConfigHost {
+  name: string;
+  hostName: string | null;
+  user: string | null;
+  port: number | null;
+  identityFile: string | null;
+}
+
+/** Importable hosts from `~/.ssh/config`. Empty when the file doesn't
+ *  exist or contains no parseable entries. */
+export const sshConfigHosts = (): Promise<SshConfigHost[]> =>
+  invoke<SshConfigHost[]>("ssh_config_hosts");
+
 /** Mirror of `crate::fs::sftp::SftpConfig`. Auth is exactly one of
  *  `password` or `privateKeyPath` — the backend rejects empty/both. */
 export interface SftpConfig {

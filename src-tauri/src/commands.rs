@@ -8,6 +8,7 @@
 use crate::fs::local::{self, DirSummary};
 use crate::fs::registry::{Connection, ConnectionInfo, ConnectionKind, Registry};
 use crate::fs::sftp::{SftpClient, SftpConfig};
+use crate::fs::ssh_config::{load_ssh_config_hosts, SshConfigHost};
 use crate::fs::types::{Entry, FsResult, ListOptions};
 use crate::sync::backend::Backend;
 use crate::sync::cross_engine::{execute_cross, plan_cross};
@@ -253,6 +254,15 @@ pub fn conn_disconnect(id: String, registry: State<'_, Arc<Registry>>) -> FsResu
 #[tauri::command]
 pub fn conn_list(registry: State<'_, Arc<Registry>>) -> FsResult<Vec<ConnectionInfo>> {
     Ok(registry.list())
+}
+
+/// Importable hosts pulled from `~/.ssh/config`. The frontend uses
+/// these to pre-fill the new-connection form so users don't re-type
+/// host / user / port / identity-file paths they've already
+/// configured for `ssh`. Missing config file → empty list.
+#[tauri::command]
+pub fn ssh_config_hosts() -> FsResult<Vec<SshConfigHost>> {
+    Ok(load_ssh_config_hosts())
 }
 
 /// Remote `list_dir`. Mirrors `fs_list_dir` but routes through the

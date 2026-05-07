@@ -30,8 +30,10 @@ import {
   connCreateSftp,
   connDisconnect,
   connList,
+  sshConfigHosts,
   type ConnectionInfo,
   type SftpConfig,
+  type SshConfigHost,
 } from "../api/conn";
 
 const STORAGE_KEY = "skiff-files.connections.sftp.v1";
@@ -87,6 +89,16 @@ export default function ConnectionsPage() {
   useEffect(() => {
     saveDrafts(drafts);
   }, [drafts]);
+
+  /** Imported entries from `~/.ssh/config`. Loaded once on mount; the
+   *  user shouldn't expect mid-session changes to surface without a
+   *  refresh. */
+  const [sshHosts, setSshHosts] = useState<SshConfigHost[]>([]);
+  useEffect(() => {
+    sshConfigHosts()
+      .then(setSshHosts)
+      .catch(() => setSshHosts([]));
+  }, []);
 
   // Refresh the live-connection list once on mount and after every
   // successful connect/disconnect. Polling would be overkill for Phase 2a.
@@ -186,6 +198,42 @@ export default function ConnectionsPage() {
             New SFTP connection
           </Typography>
           <Stack spacing={2}>
+            {sshHosts.length > 0 && (
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Typography variant="caption" color="text.secondary">
+                  Import from <code>~/.ssh/config</code>:
+                </Typography>
+                <Select
+                  size="small"
+                  displayEmpty
+                  value=""
+                  onChange={(e) => {
+                    const name = e.target.value as string;
+                    const h = sshHosts.find((x) => x.name === name);
+                    if (!h) return;
+                    setHost(h.hostName ?? h.name);
+                    if (h.user) setUser(h.user);
+                    if (h.port) setPort(h.port);
+                    if (h.identityFile) {
+                      setAuthMode("privateKey");
+                      setPrivateKeyPath(h.identityFile);
+                    }
+                  }}
+                  sx={{ minWidth: 200 }}
+                  aria-label="Import host from ssh config"
+                >
+                  <MenuItem value="" disabled>
+                    Pick a host…
+                  </MenuItem>
+                  {sshHosts.map((h) => (
+                    <MenuItem key={h.name} value={h.name}>
+                      {h.name}
+                      {h.hostName ? ` (${h.hostName})` : ""}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Stack>
+            )}
             <Stack direction="row" spacing={2}>
               <TextField
                 label="Host"

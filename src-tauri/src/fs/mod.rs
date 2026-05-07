@@ -6,4 +6,5 @@ pub mod icons;
 pub mod local;
 pub mod registry;
 pub mod sftp;
+pub mod ssh_config;
 pub mod types;
