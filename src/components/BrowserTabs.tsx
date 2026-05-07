@@ -18,6 +18,9 @@ interface TabRow {
   id: string;
   label: string;
   initialPath: string;
+  /** Most recent path the inner Browser navigated to. Drives the
+   *  optional full-path window title. */
+  currentPath: string;
 }
 
 interface Props {
@@ -44,6 +47,7 @@ export default function BrowserTabs({ home }: Props) {
         id: t.id,
         label: t.label || "Home",
         initialPath: t.initialPath,
+        currentPath: t.initialPath,
       }));
     }
     return [
@@ -51,6 +55,7 @@ export default function BrowserTabs({ home }: Props) {
         id: crypto.randomUUID(),
         label: "Home",
         initialPath: "",
+        currentPath: "",
       },
     ];
   });
@@ -91,7 +96,7 @@ export default function BrowserTabs({ home }: Props) {
     setTabs((prev) =>
       prev.map((t) =>
         t.initialPath === "" && t.label === "Home"
-          ? { ...t, initialPath: home }
+          ? { ...t, initialPath: home, currentPath: home }
           : t,
       ),
     );
@@ -133,7 +138,12 @@ export default function BrowserTabs({ home }: Props) {
     const id = crypto.randomUUID();
     setTabs((prev) => [
       ...prev,
-      { id, label: home ? "Home" : "New tab", initialPath: home ?? "" },
+      {
+        id,
+        label: home ? "Home" : "New tab",
+        initialPath: home ?? "",
+        currentPath: home ?? "",
+      },
     ]);
     setActiveId(id);
   };
@@ -156,10 +166,32 @@ export default function BrowserTabs({ home }: Props) {
   const updateLabel = (id: string, path: string) => {
     setTabs((prev) =>
       prev.map((t) =>
-        t.id === id ? { ...t, label: labelFor(path) } : t,
+        t.id === id ? { ...t, label: labelFor(path), currentPath: path } : t,
       ),
     );
   };
+
+  // Sync the OS window title with either "Skiff Files" or the active
+  // tab's full path, depending on the `showFullPathInTitle` setting.
+  // Wrapped in try/catch + dynamic import so tests + browser-mode dev
+  // (no Tauri runtime) silently no-op.
+  const activePath =
+    tabs.find((t) => t.id === activeId)?.currentPath ?? "";
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const win = getCurrentWindow();
+        const next =
+          settings.showFullPathInTitle && activePath
+            ? `${activePath} — Skiff Files`
+            : "Skiff Files";
+        await win.setTitle(next);
+      } catch {
+        /* outside Tauri — no-op */
+      }
+    })();
+  }, [activePath, settings.showFullPathInTitle]);
 
   return (
     <Box

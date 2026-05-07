@@ -81,6 +81,11 @@ export interface Settings {
   syncDefaultMaxSizeGb: number;
   /** Default lookback-days for the skip-if-unchanged heuristic. */
   syncDefaultLookbackDays: number;
+  /** When true, the OS window title shows the active tab's full path
+   *  (e.g. "/Users/syle/git/skiff" instead of just "Skiff Files").
+   *  Off by default to match Finder; Explorer power users sometimes
+   *  want this so they can read the path from their dock / taskbar. */
+  showFullPathInTitle: boolean;
   /** Sidebar visibility — toggled via Cmd/Ctrl+B. Persisted so it
    *  survives restarts. */
   sidebarVisible: boolean;
@@ -144,6 +149,7 @@ export const DEFAULTS: Settings = {
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
+  showFullPathInTitle: false,
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarCollapsed: {},

@@ -86,6 +86,18 @@ export default function SettingsPage() {
               <MenuItem value="compact">Compact</MenuItem>
             </Select>
           </FormControl>
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.showFullPathInTitle}
+                onChange={(e) =>
+                  update("showFullPathInTitle", e.target.checked)
+                }
+              />
+            }
+            label="Show full path in window title"
+          />
         </Section>
 
         <Divider />

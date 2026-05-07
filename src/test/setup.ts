@@ -74,6 +74,15 @@ vi.mock("@tauri-apps/api/core", () => ({
   }),
 }));
 
+vi.mock("@tauri-apps/api/window", () => ({
+  // BrowserTabs imports this to mirror the active path into the OS
+  // window title. Tests don't need the real window — return a stub
+  // so the dynamic import resolves cleanly.
+  getCurrentWindow: () => ({
+    setTitle: vi.fn(async () => {}),
+  }),
+}));
+
 vi.mock("@tauri-apps/api/event", () => ({
   // listen returns an unlisten fn; default to a no-op so mount/unmount
   // doesn't blow up when components subscribe to drag-drop or sync events.
