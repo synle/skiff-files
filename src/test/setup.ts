@@ -63,6 +63,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "fs_trash_many") return null;
     if (cmd === "fs_reveal_in_os") return null;
     if (cmd === "fs_open_with_default") return null;
+    if (cmd === "fs_open_in_terminal") return null;
     if (cmd === "fs_disk_space") {
       // 1 TB partition with 250 GB free.
       return { total: 1024 * 1024 * 1024 * 1024, free: 250 * 1024 * 1024 * 1024 };

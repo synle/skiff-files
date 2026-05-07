@@ -13,6 +13,7 @@ import {
   fsDiskSpace,
   fsFind,
   fsHomeDir,
+  fsOpenInTerminal,
   fsOpenWithDefault,
   fsRevealInOs,
   fsStat,
@@ -729,6 +730,9 @@ export default function Browser({
         }}
         onRevealInOs={(e) => {
           void fsRevealInOs(e.path).catch((err) => setError(String(err)));
+        }}
+        onOpenInTerminal={(e) => {
+          void fsOpenInTerminal(e.path).catch((err) => setError(String(err)));
         }}
         onBookmark={(e) => {
           // Append a fresh bookmark with a UUID id; the basename

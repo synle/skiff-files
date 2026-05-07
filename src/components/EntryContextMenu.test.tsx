@@ -31,6 +31,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onBookmark: vi.fn(),
     onOpenWithDefault: vi.fn(),
     onRevealInOs: vi.fn(),
+    onOpenInTerminal: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>
@@ -118,5 +119,23 @@ describe("EntryContextMenu", () => {
     const h = r({ entry: folder, x: 10, y: 10 });
     fireEvent.click(screen.getByText("Reveal in OS"));
     expect(h.onRevealInOs).toHaveBeenCalledWith(folder);
+  });
+
+  it("Open in terminal appears only for local folders", () => {
+    // file → no terminal item (only folders make sense)
+    r({ entry: file, x: 10, y: 10 });
+    expect(screen.queryByText("Open in terminal")).not.toBeInTheDocument();
+  });
+
+  it("Open in terminal calls onOpenInTerminal for local folders", () => {
+    const h = r({ entry: folder, x: 10, y: 10 });
+    fireEvent.click(screen.getByText("Open in terminal"));
+    expect(h.onOpenInTerminal).toHaveBeenCalledWith(folder);
+  });
+
+  it("Open in terminal is hidden for remote folders", () => {
+    const remoteFolder: Entry = { ...folder, path: "sftp://abc/sub" };
+    r({ entry: remoteFolder, x: 10, y: 10 });
+    expect(screen.queryByText("Open in terminal")).not.toBeInTheDocument();
   });
 });

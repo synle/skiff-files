@@ -83,6 +83,11 @@ export const fsRevealInOs = (path: string): Promise<void> =>
 export const fsOpenWithDefault = (path: string): Promise<void> =>
   invoke<void>("fs_open_with_default", { path });
 
+/** Open the user's preferred terminal at `path`. Path must be a
+ *  directory; the context menu hides this action for files. */
+export const fsOpenInTerminal = (path: string): Promise<void> =>
+  invoke<void>("fs_open_in_terminal", { path });
+
 /** Filesystem totals for the partition that hosts `path`. Bytes. */
 export interface DiskSpace {
   total: number;

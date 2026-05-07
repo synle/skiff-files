@@ -15,6 +15,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
 import LaunchIcon from "@mui/icons-material/Launch";
+import TerminalIcon from "@mui/icons-material/Terminal";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import type { Entry } from "../api/fs";
 
@@ -36,6 +37,9 @@ interface Props {
   onOpenWithDefault: (entry: Entry) => void;
   /** Reveal in the OS file manager. Same remote restriction. */
   onRevealInOs: (entry: Entry) => void;
+  /** Open the OS terminal at this directory. Only shown for local
+   *  folders — remote / file entries hide the action. */
+  onOpenInTerminal: (entry: Entry) => void;
 }
 
 export default function EntryContextMenu({
@@ -49,6 +53,7 @@ export default function EntryContextMenu({
   onBookmark,
   onOpenWithDefault,
   onRevealInOs,
+  onOpenInTerminal,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
@@ -99,6 +104,19 @@ export default function EntryContextMenu({
             <VisibilityIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Reveal in OS</ListItemText>
+        </MenuItem>
+      )}
+      {!isRemote && state?.entry.isDir && (
+        <MenuItem
+          onClick={() => {
+            onOpenInTerminal(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <TerminalIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Open in terminal</ListItemText>
         </MenuItem>
       )}
       <MenuItem

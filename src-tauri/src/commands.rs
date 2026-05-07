@@ -161,6 +161,93 @@ pub fn fs_open_with_default(path: String) -> FsResult<()> {
     open::that(&path).map_err(|e| format!("open {path}: {e}"))
 }
 
+/// Open the OS's default terminal at `path`. The `path` should be a
+/// directory (the context-menu hides this action for files); falling
+/// through to a file's parent isn't useful since most users invoke
+/// this on a folder anyway.
+///
+/// Per-OS dispatch: macOS → `open -a Terminal`, Windows → `wt -d`
+/// (Windows Terminal) with a `cmd` fallback, Linux → walks a small
+/// list of common terminal emulators (gnome-terminal / konsole /
+/// xterm / x-terminal-emulator).
+#[tauri::command]
+pub fn fs_open_in_terminal(path: String) -> FsResult<()> {
+    use std::process::Command;
+    let dir = std::path::Path::new(&path);
+    if !dir.is_dir() {
+        return Err(format!("open_in_terminal: {path} is not a directory"));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg("-a")
+            .arg("Terminal")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("open -a Terminal {path}: {e}"))?;
+        return Ok(());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // Windows Terminal first; falls back to cmd if `wt` isn't
+        // installed (older Windows 10 builds + Server SKUs).
+        if Command::new("wt")
+            .arg("-d")
+            .arg(&path)
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+        Command::new("cmd")
+            .args(["/C", "start", "", "cmd", "/K"])
+            .arg(format!("cd /d \"{path}\""))
+            .spawn()
+            .map_err(|e| format!("cmd start {path}: {e}"))?;
+        return Ok(());
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // Try the Debian alternatives meta-binary first; fall through
+        // to whatever DE-specific terminal is installed. Ordering
+        // matches what most "open terminal here" Nautilus/Dolphin
+        // extensions probe for.
+        let candidates: &[(&str, &[&str])] = &[
+            ("x-terminal-emulator", &["--working-directory"]),
+            ("gnome-terminal", &["--working-directory"]),
+            ("konsole", &["--workdir"]),
+            ("xfce4-terminal", &["--working-directory"]),
+            ("alacritty", &["--working-directory"]),
+            ("kitty", &["-d"]),
+            ("xterm", &["-e", "bash", "-c"]),
+        ];
+        for (bin, flags) in candidates {
+            let mut cmd = Command::new(bin);
+            if *bin == "xterm" {
+                // xterm has no `cwd` flag — wrap in `cd … && bash`.
+                cmd.arg("-e").arg("bash").arg("-c").arg(format!(
+                    "cd '{}' && exec bash",
+                    path.replace('\'', "'\\''")
+                ));
+            } else {
+                for f in flags.iter() {
+                    cmd.arg(f);
+                }
+                cmd.arg(&path);
+            }
+            if cmd.spawn().is_ok() {
+                return Ok(());
+            }
+        }
+        return Err(format!(
+            "open_in_terminal: no supported terminal emulator found"
+        ));
+    }
+    #[allow(unreachable_code)]
+    Err(format!("open_in_terminal: unsupported platform for {path}"))
+}
+
 /// Total + free bytes on the filesystem that hosts `path`. Used by the
 /// StatusBar to show "X free of Y" alongside the selection summary.
 /// `fs4` reads the per-platform filesystem stats (statvfs / GetDiskFreeSpaceEx)
