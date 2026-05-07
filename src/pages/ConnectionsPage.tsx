@@ -117,6 +117,49 @@ export default function ConnectionsPage() {
     void refreshLive();
   }, []);
 
+  /** True after a successful test, false after failure, null for idle.
+   *  Drives a small inline message under the form so the user sees
+   *  whether their settings actually work without having to keep the
+   *  connection open or check the live list. */
+  const [testResult, setTestResult] = useState<
+    { ok: boolean; message: string } | null
+  >(null);
+
+  /** Establish + immediately tear down a connection just to verify
+   *  host/port/auth work. Useful before saving a draft you don't
+   *  want to actually start browsing. */
+  const handleTest = async () => {
+    setError(null);
+    setTestResult(null);
+    setBusy(true);
+    const config: SftpConfig = {
+      host,
+      port,
+      user,
+      password: authMode === "password" ? password : undefined,
+      privateKeyPath: authMode === "privateKey" ? privateKeyPath : undefined,
+      privateKeyPassphrase:
+        authMode === "privateKey" && privateKeyPassphrase
+          ? privateKeyPassphrase
+          : undefined,
+    };
+    try {
+      const id = await connCreateSftp(config);
+      // Tear down immediately — the goal is verification, not browsing.
+      try {
+        await connDisconnect(id);
+      } catch {
+        /* best-effort — leaking a connection is recoverable via
+           "Disconnect all" in the live list */
+      }
+      setTestResult({ ok: true, message: `Connected to ${host}:${port} as ${user}.` });
+    } catch (e) {
+      setTestResult({ ok: false, message: String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleConnect = async () => {
     setError(null);
     setBusy(true);
@@ -319,7 +362,7 @@ export default function ConnectionsPage() {
               </Stack>
             )}
 
-            <Box>
+            <Stack direction="row" spacing={1}>
               <Button
                 variant="contained"
                 disabled={busy || !host || !user}
@@ -327,7 +370,23 @@ export default function ConnectionsPage() {
               >
                 {busy ? "Connecting…" : "Connect"}
               </Button>
-            </Box>
+              <Button
+                variant="outlined"
+                disabled={busy || !host || !user}
+                onClick={() => void handleTest()}
+              >
+                Test
+              </Button>
+            </Stack>
+            {testResult && (
+              <Alert
+                severity={testResult.ok ? "success" : "error"}
+                onClose={() => setTestResult(null)}
+                sx={{ mt: 1 }}
+              >
+                {testResult.message}
+              </Alert>
+            )}
           </Stack>
         </Paper>
 
