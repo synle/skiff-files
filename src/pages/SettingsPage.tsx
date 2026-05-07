@@ -309,6 +309,29 @@ export default function SettingsPage() {
             </Button>
             <Button
               variant="outlined"
+              size="small"
+              disabled={
+                Object.keys(settings.folderViewMode).length === 0 &&
+                Object.keys(settings.folderSort).length === 0
+              }
+              onClick={() => {
+                const total =
+                  Object.keys(settings.folderViewMode).length +
+                  Object.keys(settings.folderSort).length;
+                if (
+                  window.confirm(
+                    `Forget per-folder view + sort overrides for ${total} folder${total === 1 ? "" : "s"}?`,
+                  )
+                ) {
+                  update("folderViewMode", {});
+                  update("folderSort", {});
+                }
+              }}
+            >
+              Forget per-folder overrides
+            </Button>
+            <Button
+              variant="outlined"
               color="warning"
               onClick={() => {
                 // Confirm before nuking — this drops every persisted
