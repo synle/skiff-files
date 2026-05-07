@@ -287,6 +287,18 @@ export default function SettingsPage() {
             label="Accordion mode (only one section open at a time)"
           />
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.sidebarShowStatusDots}
+                onChange={(e) =>
+                  update("sidebarShowStatusDots", e.target.checked)
+                }
+              />
+            }
+            label="Show connection-status dots"
+          />
+
           {(["favorites", "bookmarks", "recent", "hosts", "devices"] as const).map(
             (id) => {
               const labels = {

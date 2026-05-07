@@ -400,11 +400,15 @@ export default function Sidebar({ home, onNavigate }: Props) {
                   aria-label={`Browse ${c.label}`}
                 >
                   <ListItemIcon sx={{ minWidth: 32 }}>
-                    <Tooltip title="Connected">
-                      <CircleIcon
-                        sx={{ fontSize: 10, color: "success.main" }}
-                      />
-                    </Tooltip>
+                    {settings.sidebarShowStatusDots ? (
+                      <Tooltip title="Connected">
+                        <CircleIcon
+                          sx={{ fontSize: 10, color: "success.main" }}
+                        />
+                      </Tooltip>
+                    ) : (
+                      <HubIcon fontSize="small" />
+                    )}
                   </ListItemIcon>
                   <ListItemText
                     primary={c.label}

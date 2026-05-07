@@ -144,6 +144,10 @@ export interface Settings {
    *  expanded at a time. Expanding one auto-collapses the others.
    *  Default false (Finder-style: any number open simultaneously). */
   sidebarAccordion: boolean;
+  /** Show colored status dots next to each Hosts-section entry.
+   *  Default true. Hidden = the host icon column collapses to the
+   *  fallback HubIcon to keep visual balance. */
+  sidebarShowStatusDots: boolean;
   /** Tabs the user had open at last save. Capped at TABS_MAX so a
    *  runaway browsing session doesn't bloat settings.json. Empty
    *  array = no persisted tabs (BrowserTabs will spawn a default). */
@@ -215,6 +219,7 @@ export const DEFAULTS: Settings = {
   sidebarCollapsed: {},
   sidebarSectionsVisible: {},
   sidebarAccordion: false,
+  sidebarShowStatusDots: true,
   savedTabs: [],
   savedActiveTabId: null,
 };
