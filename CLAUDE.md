@@ -8,7 +8,13 @@ Guidance for Claude Code when working in this repository.
 
 Supports local FS, SSH/SFTP, FTP/FTPS, SMB/Samba, and (optional) NTFS mounts. Headline feature is **Skiffsync**, a `cpsync`-inspired smart-copy engine that skips unchanged files across protocols.
 
-The phased implementation plan is in [`TODO.md`](./TODO.md). Always consult it before starting a new feature.
+## Companion docs
+
+Read these first when picking up new work:
+
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — high-level map of the major modules, how IPC flows, why we split the sync engine in two, conventions per layer.
+- [`DEV.md`](./DEV.md) — local setup, day-to-day commands, project layout, common gotchas, where-to-look table.
+- [`TODO.md`](./TODO.md) — phased implementation plan + the deferred backlog. Always consult before starting a new feature.
 
 ## Build commands
 

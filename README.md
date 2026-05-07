@@ -46,6 +46,12 @@ npm install
 npx tauri dev
 ```
 
+For deeper dives:
+- **[DEV.md](./DEV.md)** — local setup, day-to-day commands, project layout
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — how the major modules fit together
+- **[TODO.md](./TODO.md)** — phased roadmap + deferred backlog
+- **[CLAUDE.md](./CLAUDE.md)** — guidance for Claude Code working in this repo
+
 Useful scripts:
 
 ```bash
