@@ -7,7 +7,11 @@ import { CssBaseline, ThemeProvider } from "@mui/material";
 import { HashRouter } from "react-router";
 import App from "./App";
 import { SettingsProvider, useSettings } from "./state/settings";
-import { themeFor, useEffectiveMode } from "./theme";
+import {
+  themeForWithMotion,
+  useEffectiveMode,
+  usePrefersReducedMotion,
+} from "./theme";
 
 /**
  * Reads `themeMode` from settings and resolves it to a concrete MUI theme.
@@ -17,7 +21,16 @@ import { themeFor, useEffectiveMode } from "./theme";
 function EffectiveThemeProvider({ children }: { children: React.ReactNode }) {
   const { settings } = useSettings();
   const effective = useEffectiveMode(settings.themeMode);
-  return <ThemeProvider theme={themeFor(effective)}>{children}</ThemeProvider>;
+  // Reduced motion is auto-detected via prefers-reduced-motion, with
+  // a Settings override (`reduceMotion`) for users who want it on
+  // unconditionally regardless of OS preference.
+  const prefersReduced = usePrefersReducedMotion();
+  const reducedMotion = settings.reduceMotion || prefersReduced;
+  return (
+    <ThemeProvider theme={themeForWithMotion(effective, reducedMotion)}>
+      {children}
+    </ThemeProvider>
+  );
 }
 
 // Use HashRouter so deep links work under the `tauri://` protocol without

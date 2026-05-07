@@ -99,6 +99,16 @@ export default function SettingsPage() {
             label="Show full path in window title"
           />
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.reduceMotion}
+                onChange={(e) => update("reduceMotion", e.target.checked)}
+              />
+            }
+            label="Reduce motion (also auto-detects from OS)"
+          />
+
           <TextField
             label="Default start path"
             size="small"

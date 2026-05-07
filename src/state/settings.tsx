@@ -97,6 +97,11 @@ export interface Settings {
    *  intermix according to the chosen sort key — useful for sorting
    *  by mtime to find "most recently touched" without folder bias. */
   groupFoldersFirst: boolean;
+  /** Force reduced-motion regardless of OS preference. The app already
+   *  honors `prefers-reduced-motion: reduce` automatically; this lets
+   *  users opt in unconditionally (e.g. for VM / RDP sessions where
+   *  the OS preference doesn't surface). */
+  reduceMotion: boolean;
   /** When true, the OS window title shows the active tab's full path
    *  (e.g. "/Users/syle/git/skiff" instead of just "Skiff Files").
    *  Off by default to match Finder; Explorer power users sometimes
@@ -180,6 +185,7 @@ export const DEFAULTS: Settings = {
   syncDefaultVerifyAfterCopy: false,
   syncSuppressConflictPrompts: false,
   groupFoldersFirst: true,
+  reduceMotion: false,
   showFullPathInTitle: false,
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,

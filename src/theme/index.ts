@@ -79,3 +79,39 @@ export function useEffectiveMode(mode: ThemeMode): EffectiveMode {
 export function themeFor(effective: EffectiveMode): Theme {
   return effective === "dark" ? darkTheme : lightTheme;
 }
+
+/** Hook that returns true when the user has requested reduced motion
+ *  via the OS (`prefers-reduced-motion`). Drives the `transitions.create`
+ *  short-circuit in MUI's theme. */
+export function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+/** Builds a theme that respects the reduced-motion preference. When
+ *  reduced, MUI's `transitions.create` returns `none` so component
+ *  fades / accordions / drawers don't animate. */
+export function themeForWithMotion(
+  effective: EffectiveMode,
+  reducedMotion: boolean,
+): Theme {
+  if (!reducedMotion) return themeFor(effective);
+  const base = effective === "dark" ? darkTheme : lightTheme;
+  return createTheme({
+    ...base,
+    transitions: {
+      ...base.transitions,
+      create: () => "none",
+    },
+  });
+}
