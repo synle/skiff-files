@@ -6,6 +6,8 @@
 // parent Browser owns navigation, refresh, and the underlying entries array.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Box, Typography, Checkbox } from "@mui/material";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
@@ -74,7 +76,12 @@ function displayName(e: Entry, showExtensions: boolean): string {
   return dot > 0 ? e.name.slice(0, dot) : e.name;
 }
 
-/** Header cell with click-to-sort + indicator arrow. */
+/** Header cell with click-to-sort + indicator arrow.
+ *  Active column is rendered in `text.primary` with a 14 px MUI arrow
+ *  icon; inactive columns reveal a faint arrow on hover so the column
+ *  advertises that it's sortable without occupying visual weight when
+ *  idle. The icon lives in a fixed-width 18 px slot so column widths
+ *  stay stable when the active sort flips between columns. */
 function HeaderCell({
   label,
   active,
@@ -88,6 +95,7 @@ function HeaderCell({
   onClick: () => void;
   width: CSSProperties["width"];
 }) {
+  const Arrow = dir === "asc" ? ArrowUpwardIcon : ArrowDownwardIcon;
   return (
     <Box
       role="columnheader"
@@ -98,14 +106,39 @@ function HeaderCell({
         width,
         cursor: "pointer",
         userSelect: "none",
-        fontWeight: 600,
+        fontWeight: active ? 700 : 600,
         fontSize: "0.8125rem",
-        color: "text.secondary",
+        color: active ? "text.primary" : "text.secondary",
         px: 1,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 0.5,
+        "&:hover": { color: "text.primary" },
+        "&:hover .sort-indicator-hint": { opacity: 0.4 },
       }}
     >
-      {label}
-      {active ? (dir === "asc" ? " ↑" : " ↓") : ""}
+      <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+        {label}
+      </Box>
+      <Box
+        component="span"
+        sx={{
+          width: 18,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          flexShrink: 0,
+        }}
+      >
+        {active ? (
+          <Arrow sx={{ fontSize: 14 }} />
+        ) : (
+          <ArrowUpwardIcon
+            className="sort-indicator-hint"
+            sx={{ fontSize: 14, opacity: 0, transition: "opacity 120ms" }}
+          />
+        )}
+      </Box>
     </Box>
   );
 }
