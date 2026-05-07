@@ -29,6 +29,7 @@ import {
 import RenameDialog from "../components/RenameDialog";
 import EntryContextMenu from "../components/EntryContextMenu";
 import PropertiesDialog from "../components/PropertiesDialog";
+import BulkRenameDialog from "../components/BulkRenameDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
@@ -103,6 +104,10 @@ export default function Browser({
   /** Filesystem totals for the current path. Local paths only — remote
    *  paths set this to null and the StatusBar hides the readout. */
   const [diskSpace, setDiskSpace] = useState<DiskSpace | null>(null);
+  /** When non-empty, the BulkRenameDialog is open against this set of
+   *  entries. Triggered by F2 with multi-select; single-select F2
+   *  still opens the per-file RenameDialog. */
+  const [bulkRenameTargets, setBulkRenameTargets] = useState<Entry[]>([]);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -286,11 +291,18 @@ export default function Browser({
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
       if (!primarySelected) return;
       e.preventDefault();
-      setRenameTarget(primarySelected);
+      // Multi-selection → bulk dialog; single → per-file dialog.
+      if (selectedPaths.length > 1) {
+        const set = new Set(selectedPaths);
+        const selectedEntries = entries.filter((en) => set.has(en.path));
+        setBulkRenameTargets(selectedEntries);
+      } else {
+        setRenameTarget(primarySelected);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isActive, primarySelected]);
+  }, [isActive, primarySelected, selectedPaths, entries]);
 
   // Cmd/Ctrl + F → focus the toolbar search input. Doesn't fire if the
   // user is already in an input (so it doesn't hijack the path bar).
@@ -649,6 +661,13 @@ export default function Browser({
       <PropertiesDialog
         entry={propertiesTarget}
         onClose={() => setPropertiesTarget(null)}
+      />
+      <BulkRenameDialog
+        entries={bulkRenameTargets}
+        onClose={() => setBulkRenameTargets([])}
+        onDone={() => {
+          if (path) void refresh(path);
+        }}
       />
       <RenameDialog
         open={!!renameTarget}
