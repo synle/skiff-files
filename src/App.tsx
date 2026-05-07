@@ -12,8 +12,9 @@ import QuickJump from "./components/QuickJump";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
-import { fsHomeDir } from "./api/fs";
+import { fsHomeDir, fsStat } from "./api/fs";
 import { useSettings } from "./state/settings";
+import { pruneStaleBookmarks, pruneStalePaths } from "./util/pruneStale";
 
 /** A custom DOM event the Sidebar emits to ask the Browser to navigate. We
  *  use a window event rather than lifting state because it stays
@@ -63,6 +64,35 @@ export default function App() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // One-shot prune pass on mount: drop recent paths + bookmarks
+  // whose target no longer exists. Local paths only — remote
+  // entries are kept unconditionally since stat'ing them needs an
+  // active SFTP session. The pure helpers return reference-stable
+  // arrays when nothing was pruned, so this no-ops for clean
+  // settings.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [prunedRecent, prunedBookmarks] = await Promise.all([
+        pruneStalePaths(settings.recentPaths, fsStat),
+        pruneStaleBookmarks(settings.bookmarks, fsStat),
+      ]);
+      if (cancelled) return;
+      if (prunedRecent !== settings.recentPaths) {
+        update("recentPaths", prunedRecent);
+      }
+      if (prunedBookmarks !== settings.bookmarks) {
+        update("bookmarks", prunedBookmarks);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Run once on mount only — re-running on every settings change
+    // would create a feedback loop with the update calls above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
