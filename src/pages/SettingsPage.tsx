@@ -299,7 +299,15 @@ export default function SettingsPage() {
             <Button
               variant="outlined"
               color="warning"
-              onClick={reset}
+              onClick={() => {
+                // Confirm before nuking — this drops every persisted
+                // tweak (theme, sort defaults, bookmarks, recent
+                // paths, saved tabs) which is hard to recover from.
+                const ok = window.confirm(
+                  "Reset all settings to defaults? This drops your bookmarks, recent paths, saved tabs, and all per-folder overrides.",
+                );
+                if (ok) reset();
+              }}
               size="small"
             >
               Reset all settings
