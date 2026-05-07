@@ -14,9 +14,12 @@
 //! kernel-accelerated path (`clonefile`, `copy_file_range`,
 //! `FICLONE`) keeps working.
 
-use super::backend::{walk_files, Backend};
+use super::backend::{walk_files, Backend, PathMeta};
 use super::engine::CancelToken;
-use super::types::{ConflictPolicy, FileOutcome, JobOptions, Progress, Summary};
+use super::types::{
+    ConflictPolicy, ConflictPromptDecision, FileOutcome, JobOptions, Progress, Summary,
+};
+use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -156,7 +159,12 @@ async fn keep_both_path(dest_backend: &Backend, dest: &str) -> String {
 /// Execute a cross-protocol plan. Mirrors the local engine's loop
 /// shape (cancel check, process file, emit progress) but every
 /// metadata + IO call is async.
-pub async fn execute_cross(
+///
+/// `on_prompt` runs only when the policy is [`ConflictPolicy::Prompt`].
+/// The command layer wires it to the [`crate::sync::resolver::ResolverHub`]
+/// so the modal in the frontend gets a chance to answer; for tests
+/// you can pass `|_, _| async { None }`.
+pub async fn execute_cross<P, Fut>(
     job_id: &str,
     plan: Vec<CrossPlannedFile>,
     total_bytes: u64,
@@ -165,7 +173,12 @@ pub async fn execute_cross(
     src_backend: Backend,
     dest_backend: Backend,
     mut on_progress: impl FnMut(Progress),
-) -> Summary {
+    mut on_prompt: P,
+) -> Summary
+where
+    P: FnMut(CrossPlannedFile, PathMeta) -> Fut,
+    Fut: Future<Output = Option<ConflictPromptDecision>>,
+{
     let mut summary = Summary {
         job_id: job_id.to_string(),
         copied: 0,
@@ -187,7 +200,15 @@ pub async fn execute_cross(
             summary.cancelled = true;
             return summary;
         }
-        let outcome = process_one(file, opts, &src_backend, &dest_backend, &mut summary).await;
+        let outcome = process_one(
+            file,
+            opts,
+            &src_backend,
+            &dest_backend,
+            &mut summary,
+            &mut on_prompt,
+        )
+        .await;
         bytes_seen += file.size;
         on_progress(Progress {
             job_id: job_id.to_string(),
@@ -202,17 +223,25 @@ pub async fn execute_cross(
 }
 
 /// Per-file step. Returns a [`FileOutcome`] and updates counters.
-/// Conflict policies handled in 0.2.0: Skip / Overwrite / KeepBoth.
-/// Smart-batch policies (overwriteOlder etc.) are honored too, since
-/// the per-file decision is a pure metadata comparison. Prompt is NOT
-/// supported here yet — falls through to Skip with a marker reason.
-async fn process_one(
+/// Conflict policies handled here: skip / overwrite / keepBoth +
+/// the metadata-only smart-batch variants (overwriteOlder /
+/// replaceSmaller / replaceIfSizeDifferent) + prompt (via the
+/// `on_prompt` callback wired by the command layer to the resolver
+/// hub). Rename* policies fall through to skip in cross mode (they
+/// require a same-backend aside-rename + copy, which the engine
+/// hasn't grown yet — landing in 0.2.5).
+async fn process_one<P, Fut>(
     file: &CrossPlannedFile,
     opts: &JobOptions,
     src_backend: &Backend,
     dest_backend: &Backend,
     summary: &mut Summary,
-) -> FileOutcome {
+    on_prompt: &mut P,
+) -> FileOutcome
+where
+    P: FnMut(CrossPlannedFile, PathMeta) -> Fut,
+    Fut: Future<Output = Option<ConflictPromptDecision>>,
+{
     // Stat dest once. None = doesn't exist; we just copy.
     let dest_meta = match dest_backend.metadata(&file.dest).await {
         Ok(m) => m,
@@ -258,14 +287,40 @@ async fn process_one(
             }
             ConflictPolicy::ReplaceSmaller => dm.size < file.size,
             ConflictPolicy::ReplaceIfSizeDifferent => dm.size != file.size,
-            ConflictPolicy::RenameTarget
-            | ConflictPolicy::RenameOlderTarget
-            | ConflictPolicy::Prompt => {
-                // Cross-mode doesn't yet implement aside-rename or the
-                // prompt protocol — surface as a conflict so the user
-                // sees why nothing happened, rather than silently
-                // overwriting.
+            ConflictPolicy::RenameTarget | ConflictPolicy::RenameOlderTarget => {
+                // Cross-mode aside-rename lands in 0.2.5. For now,
+                // surface as a conflict so the user sees what
+                // happened rather than silently overwriting.
                 false
+            }
+            ConflictPolicy::Prompt => {
+                // Park on the resolver hub via the closure. None
+                // (cancel) treated as Skip for this file; the outer
+                // cancel-check exits the loop next iteration.
+                let decision = on_prompt(file.clone(), dm).await;
+                match decision {
+                    Some(ConflictPromptDecision::Overwrite) => true,
+                    Some(ConflictPromptDecision::Skip) | None => false,
+                    Some(ConflictPromptDecision::KeepBoth) => {
+                        let renamed = keep_both_path(dest_backend, &file.dest).await;
+                        return do_copy_one(
+                            file,
+                            &renamed,
+                            src_backend,
+                            dest_backend,
+                            opts,
+                            summary,
+                        )
+                        .await;
+                    }
+                    Some(ConflictPromptDecision::CancelJob) => {
+                        // The command layer flips the cancel token
+                        // alongside resolving — but be defensive: mark
+                        // this file a conflict and the outer loop
+                        // bails on next iteration when is_cancelled().
+                        false
+                    }
+                }
             }
         };
         if !proceed {
@@ -370,6 +425,7 @@ mod tests {
             Backend::Local,
             Backend::Local,
             |_| {},
+            |_, _| async { None },
         )
         .await;
         assert_eq!(s.copied, 2);
@@ -398,6 +454,7 @@ mod tests {
             Backend::Local,
             Backend::Local,
             |_| {},
+            |_, _| async { None },
         )
         .await;
         assert_eq!(s2.skipped, 2);
@@ -436,6 +493,7 @@ mod tests {
             Backend::Local,
             Backend::Local,
             |_| {},
+            |_, _| async { None },
         )
         .await;
         // Original untouched; sibling created.
@@ -481,6 +539,7 @@ mod tests {
             Backend::Local,
             Backend::Local,
             |_| {},
+            |_, _| async { None },
         )
         .await;
         assert_eq!(s.copied, 1);
@@ -489,6 +548,126 @@ mod tests {
             std::fs::metadata(dest.join("big.bin")).unwrap().len(),
             big.len() as u64
         );
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[tokio::test]
+    async fn cross_mode_prompt_overwrite_decision_overwrites() {
+        let src = std::env::temp_dir().join(format!("skiff-cross-prompt-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-prompt-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(src.join("a.txt"), b"new-content").unwrap();
+        fs::write(dest.join("a.txt"), b"old-existing-different").unwrap();
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        let s = execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::Prompt,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+            // Always answer "Overwrite".
+            |_, _| async { Some(ConflictPromptDecision::Overwrite) },
+        )
+        .await;
+        assert_eq!(s.copied, 1);
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"new-content");
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[tokio::test]
+    async fn cross_mode_prompt_skip_decision_leaves_dest_alone() {
+        let src = std::env::temp_dir().join(format!("skiff-cross-prompt-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-prompt-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(src.join("a.txt"), b"new-content").unwrap();
+        fs::write(dest.join("a.txt"), b"different-size-existing").unwrap();
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        let s = execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::Prompt,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+            |_, _| async { Some(ConflictPromptDecision::Skip) },
+        )
+        .await;
+        assert_eq!(s.conflicts, 1);
+        assert_eq!(s.copied, 0);
+        assert_eq!(
+            fs::read(dest.join("a.txt")).unwrap(),
+            b"different-size-existing"
+        );
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[tokio::test]
+    async fn cross_mode_prompt_keep_both_writes_a_renamed_sibling() {
+        let src = std::env::temp_dir().join(format!("skiff-cross-prompt-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-prompt-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(src.join("a.txt"), b"new").unwrap();
+        fs::write(dest.join("a.txt"), b"existing-different").unwrap();
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::Prompt,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+            |_, _| async { Some(ConflictPromptDecision::KeepBoth) },
+        )
+        .await;
+        // Original untouched, sibling created with the new content.
+        assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"existing-different");
+        assert_eq!(fs::read(dest.join("a (2).txt")).unwrap(), b"new");
         let _ = fs::remove_dir_all(src);
         let _ = fs::remove_dir_all(dest);
     }

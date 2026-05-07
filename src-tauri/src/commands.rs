@@ -603,6 +603,7 @@ pub fn sync_start_cross(
     options: Option<JobOptions>,
     jobs: State<'_, Arc<JobRegistry>>,
     fs_registry: State<'_, Arc<Registry>>,
+    hub: State<'_, Arc<ResolverHub>>,
     app: tauri::AppHandle,
 ) -> FsResult<String> {
     let opts = options.unwrap_or(JobOptions {
@@ -622,6 +623,7 @@ pub fn sync_start_cross(
 
     let jobs_arc = (*jobs).clone();
     let fs_registry_arc = (*fs_registry).clone();
+    let hub_arc = (*hub).clone();
     let id_for_plan = id.clone();
     let app_for_plan = app.clone();
 
@@ -698,6 +700,14 @@ pub fn sync_start_cross(
             }
             jobs_arc.set_state(&id_for_plan, JobState::Running);
             let app_progress = app_for_plan.clone();
+            // Clone the hub + cancel + app handle once for the prompt
+            // closure. The closure body runs once per Prompt-policy
+            // conflict; each run gets a fresh conflict_id so multiple
+            // parked waits coexist without collision.
+            let app_for_prompt = app_for_plan.clone();
+            let id_for_prompt = id_for_plan.clone();
+            let hub_for_prompt = hub_arc.clone();
+            let cancel_for_prompt_outer = cancel.clone();
             let summary = execute_cross(
                 &id_for_plan,
                 plan,
@@ -708,6 +718,27 @@ pub fn sync_start_cross(
                 dest_backend,
                 move |p| {
                     let _ = app_progress.emit("sync:progress", &p);
+                },
+                move |file, dest_meta| {
+                    let app = app_for_prompt.clone();
+                    let job_id = id_for_prompt.clone();
+                    let hub = hub_for_prompt.clone();
+                    let cancel = cancel_for_prompt_outer.clone();
+                    async move {
+                        let conflict_id = uuid::Uuid::new_v4().to_string();
+                        let payload = ConflictPrompt {
+                            job_id,
+                            conflict_id: conflict_id.clone(),
+                            src: file.src,
+                            dest: file.dest,
+                            src_size: file.size,
+                            dest_size: dest_meta.size,
+                            src_mtime: file.mtime,
+                            dest_mtime: dest_meta.mtime,
+                        };
+                        let _ = app.emit("sync:conflict", &payload);
+                        hub.wait_for(&conflict_id, &cancel)
+                    }
                 },
             )
             .await;
