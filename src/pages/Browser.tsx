@@ -18,6 +18,7 @@ import {
   startSync,
 } from "../api/client";
 import RenameDialog from "../components/RenameDialog";
+import EntryContextMenu from "../components/EntryContextMenu";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
@@ -81,6 +82,12 @@ export default function Browser({
   const [dragOver, setDragOver] = useState(false);
   /** When non-null, the rename dialog is open against this entry. */
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
+  /** When non-null, the right-click menu is open at these coordinates. */
+  const [contextMenu, setContextMenu] = useState<{
+    entry: Entry;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -475,6 +482,7 @@ export default function Browser({
           onOpenDir={(e) => navigate(e.path)}
           onPrimarySelect={setPrimarySelected}
           onSelectionChange={setSelectedPaths}
+          onContext={(entry, x, y) => setContextMenu({ entry, x, y })}
           density={settings.density}
           showExtensions={settings.showExtensions}
         />
@@ -492,6 +500,31 @@ export default function Browser({
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
         }
         errorMessage={error}
+      />
+      <EntryContextMenu
+        state={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onOpen={(e) => navigate(e.path)}
+        onRename={(e) => setRenameTarget(e)}
+        onTrash={(e) => {
+          // Single-entry trash. Reuses the same confirm + remote
+          // wording as the multi-select Delete-key path.
+          const isRemoteEntry = e.path.startsWith("sftp://");
+          const verb = isRemoteEntry ? "Permanently delete" : "Move to Trash";
+          if (!window.confirm(`${verb} "${e.name}"?`)) return;
+          void removeOrTrashMany([e.path])
+            .then(() => {
+              if (path) void refresh(path);
+            })
+            .catch((err) => setError(String(err)));
+        }}
+        onCopyPath={(e) => {
+          // Best-effort — falls back silently in tests / browser
+          // contexts without clipboard access.
+          if (typeof navigator !== "undefined" && navigator.clipboard) {
+            void navigator.clipboard.writeText(e.path);
+          }
+        }}
       />
       <RenameDialog
         open={!!renameTarget}

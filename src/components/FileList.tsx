@@ -30,6 +30,11 @@ interface Props {
   /** Fires whenever the multi-selection set changes. The parent uses
    *  this to drive the StatusBar count + total-size display. */
   onSelectionChange?: (selectedPaths: string[]) => void;
+  /** Right-click handler — Browser wraps this in the actual context
+   *  menu so the FileList stays focused on rendering. We forward both
+   *  the entry and the click coords so the menu can anchor near the
+   *  cursor. */
+  onContext?: (entry: Entry, x: number, y: number) => void;
   density: Density;
   showExtensions: boolean;
 }
@@ -111,6 +116,7 @@ export default function FileList(props: Props) {
     onOpenDir,
     onPrimarySelect,
     onSelectionChange,
+    onContext,
     density,
     showExtensions,
   } = props;
@@ -250,6 +256,14 @@ export default function FileList(props: Props) {
                   data-testid="file-row"
                   onClick={(evt) => onRowClick(e, evt)}
                   onDoubleClick={() => onRowDouble(e)}
+                  onContextMenu={(evt) => {
+                    evt.preventDefault();
+                    // Promote the right-clicked row to primary so the
+                    // preview pane and context-menu actions agree on
+                    // which entry is "current".
+                    onPrimarySelect?.(e);
+                    onContext?.(e, evt.clientX, evt.clientY);
+                  }}
                   sx={{
                     position: "absolute",
                     top: 0,
