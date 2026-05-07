@@ -304,6 +304,26 @@ export default function FileList(props: Props) {
           setSelected(new Set(sorted.map((s) => s.path)));
           break;
         }
+        case "c":
+        case "C": {
+          // Cmd/Ctrl+C copies selected paths (or the focused row's
+          // path when nothing is multi-selected) to the OS clipboard,
+          // newline-separated. Best-effort — falls back silently in
+          // environments without clipboard access (tests).
+          if (!cmd) return;
+          const targets =
+            selected.size > 0
+              ? Array.from(selected)
+              : focusedIdx >= 0 && focusedIdx < sorted.length
+                ? [sorted[focusedIdx].path]
+                : [];
+          if (targets.length === 0) return;
+          e.preventDefault();
+          if (typeof navigator !== "undefined" && navigator.clipboard) {
+            void navigator.clipboard.writeText(targets.join("\n"));
+          }
+          break;
+        }
         case " ": {
           // Space toggles the focused row's selection — matches Finder's
           // muscle memory.
