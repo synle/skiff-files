@@ -154,17 +154,23 @@ impl Backend {
     /// `std::fs::copy` so the kernel-accelerated path
     /// (`copy_file_range` / `clonefile`) keeps working.
     ///
-    /// Returns the bytes written.
+    /// `bandwidth_kbps` of `0` means unlimited; any positive value
+    /// forces the chunked path so we can interleave sleeps and pace
+    /// the copy. Returns the bytes written.
     pub async fn copy_file(
         &self,
         src_path: &str,
         dest: &Backend,
         dest_path: &str,
+        bandwidth_kbps: u64,
     ) -> Result<u64, String> {
-        // Fast path: local→local. Picks up `clonefile` on macOS,
-        // `FICLONE` on Linux btrfs/xfs, etc. — no userspace bytes
-        // shuffled.
-        if matches!(self, Backend::Local) && matches!(dest, Backend::Local) {
+        // Fast path: local→local without a bandwidth cap. Picks up
+        // `clonefile` on macOS, `FICLONE` on Linux btrfs/xfs, etc. —
+        // no userspace bytes shuffled.
+        if matches!(self, Backend::Local)
+            && matches!(dest, Backend::Local)
+            && bandwidth_kbps == 0
+        {
             // Make the parent dir before std::fs::copy so a copy into
             // a fresh subtree doesn't fail with NotFound.
             if let Some(parent) = Path::new(dest_path).parent() {
@@ -197,9 +203,20 @@ impl Backend {
         }
         let mut reader = self.open_read(src_path).await?;
         let mut writer = dest.open_write(dest_path).await?;
-        let bytes = tokio::io::copy(&mut reader, &mut writer)
-            .await
-            .map_err(|e| format!("copy({src_path} -> {dest_path}): {e}"))?;
+        let bytes = if bandwidth_kbps == 0 {
+            tokio::io::copy(&mut reader, &mut writer)
+                .await
+                .map_err(|e| format!("copy({src_path} -> {dest_path}): {e}"))?
+        } else {
+            copy_throttled_async(
+                &mut reader,
+                &mut writer,
+                bandwidth_kbps,
+                src_path,
+                dest_path,
+            )
+            .await?
+        };
         // SFTP needs an explicit shutdown to flush the final packet —
         // the local sink is a no-op shutdown.
         writer
@@ -253,6 +270,46 @@ impl Backend {
 
 /// POSIX-style parent. SFTP paths are always /-separated so we don't
 /// need PathBuf gymnastics.
+/// Async chunked read+write+sleep loop, matching `engine::copy_throttled`
+/// but for the streaming `AsyncRead`/`AsyncWrite` path used by cross-
+/// protocol jobs. Pacing tracks "expected elapsed at this byte count"
+/// so jitter in upstream IO doesn't drift the running average.
+async fn copy_throttled_async(
+    reader: &mut Pin<Box<dyn AsyncRead + Send>>,
+    writer: &mut Pin<Box<dyn AsyncWrite + Send>>,
+    bandwidth_kbps: u64,
+    src_path: &str,
+    dest_path: &str,
+) -> Result<u64, String> {
+    use std::time::{Duration, Instant};
+    use tokio::io::AsyncReadExt;
+
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut total: u64 = 0;
+    let bytes_per_sec = bandwidth_kbps.saturating_mul(1024);
+    let start = Instant::now();
+    loop {
+        let n = reader
+            .read(&mut buf)
+            .await
+            .map_err(|e| format!("read({src_path}): {e}"))?;
+        if n == 0 {
+            break;
+        }
+        writer
+            .write_all(&buf[..n])
+            .await
+            .map_err(|e| format!("write({dest_path}): {e}"))?;
+        total += n as u64;
+        let expected_ms = (total.saturating_mul(1000)) / bytes_per_sec.max(1);
+        let actual_ms = start.elapsed().as_millis() as u64;
+        if expected_ms > actual_ms {
+            tokio::time::sleep(Duration::from_millis(expected_ms - actual_ms)).await;
+        }
+    }
+    Ok(total)
+}
+
 fn parent_posix(path: &str) -> Option<String> {
     let trimmed = path.trim_end_matches('/');
     let i = trimmed.rfind('/')?;

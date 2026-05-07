@@ -438,7 +438,10 @@ async fn do_copy_one(
             bytes: file.size,
         };
     }
-    match src_backend.copy_file(&file.src, dest_backend, target).await {
+    match src_backend
+        .copy_file(&file.src, dest_backend, target, opts.bandwidth_kbps)
+        .await
+    {
         Ok(bytes) => {
             summary.copied += 1;
             summary.bytes_copied += bytes;
