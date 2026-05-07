@@ -84,7 +84,26 @@ export interface Settings {
   /** Sidebar visibility — toggled via Cmd/Ctrl+B. Persisted so it
    *  survives restarts. */
   sidebarVisible: boolean;
+  /** Tabs the user had open at last save. Capped at TABS_MAX so a
+   *  runaway browsing session doesn't bloat settings.json. Empty
+   *  array = no persisted tabs (BrowserTabs will spawn a default). */
+  savedTabs: SavedTab[];
+  /** Active tab id at last save. The matching savedTabs entry is
+   *  selected on launch; if it's missing the first tab wins. */
+  savedActiveTabId: string | null;
 }
+
+/** Persisted tab descriptor — id is stable across restarts so the
+ *  user-visible position survives. */
+export interface SavedTab {
+  id: string;
+  label: string;
+  initialPath: string;
+}
+
+/** Max tabs we restore. 20 is well past anyone's reasonable usage
+ *  but cheap to cap. */
+export const TABS_MAX = 20;
 
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
  *  day's navigation without making the sidebar scroll forever. */
@@ -113,6 +132,8 @@ export const DEFAULTS: Settings = {
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
   sidebarVisible: true,
+  savedTabs: [],
+  savedActiveTabId: null,
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

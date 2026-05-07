@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import { MemoryRouter } from "react-router";
@@ -6,6 +6,12 @@ import BrowserTabs from "./BrowserTabs";
 import { SettingsProvider } from "../state/settings";
 
 const theme = createTheme();
+
+// Settings (including saved tabs) round-trip via localStorage; clear
+// between tests so a previous test's tab list doesn't leak.
+beforeEach(() => {
+  localStorage.clear();
+});
 
 // jsdom needs a viewport for the virtualized FileList that lives inside
 // each Browser; same shim as Browser/FileList tests.

@@ -12,6 +12,7 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import Browser from "../pages/Browser";
+import { useSettings } from "../state/settings";
 
 interface TabRow {
   id: string;
@@ -33,14 +34,54 @@ function labelFor(path: string): string {
 }
 
 export default function BrowserTabs({ home }: Props) {
-  const [tabs, setTabs] = useState<TabRow[]>(() => [
-    {
-      id: crypto.randomUUID(),
-      label: "Home",
-      initialPath: "",
-    },
-  ]);
-  const [activeId, setActiveId] = useState(tabs[0].id);
+  // Seed tabs from persisted settings. Empty saved list → spawn the
+  // default Home tab. Settings is also our write-back target so the
+  // tabs survive restart.
+  const { settings, update } = useSettings();
+  const [tabs, setTabs] = useState<TabRow[]>(() => {
+    if (settings.savedTabs.length > 0) {
+      return settings.savedTabs.map((t) => ({
+        id: t.id,
+        label: t.label || "Home",
+        initialPath: t.initialPath,
+      }));
+    }
+    return [
+      {
+        id: crypto.randomUUID(),
+        label: "Home",
+        initialPath: "",
+      },
+    ];
+  });
+  const [activeId, setActiveId] = useState<string>(() => {
+    const saved = settings.savedActiveTabId;
+    if (saved && settings.savedTabs.some((t) => t.id === saved)) return saved;
+    return (settings.savedTabs[0]?.id ?? null) ?? "";
+  });
+  // First-run default-tab case: activeId would be "" because there
+  // were no saved tabs and the seed tabs[0].id is fresh. Fix that
+  // here rather than complicating the initializer.
+  useEffect(() => {
+    if (!activeId && tabs[0]) setActiveId(tabs[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist tabs + active id whenever either changes. We trim to
+  // TABS_MAX = 20 so a stuck-open run doesn't bloat settings.json.
+  useEffect(() => {
+    const slice = tabs.slice(0, 20);
+    update(
+      "savedTabs",
+      slice.map((t) => ({
+        id: t.id,
+        label: t.label,
+        initialPath: t.initialPath,
+      })),
+    );
+    update("savedActiveTabId", activeId || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabs, activeId]);
 
   /** Replace the seed tab's initial path once the home dir resolves —
    *  this is what the Browser hands its history `back` stack on first
