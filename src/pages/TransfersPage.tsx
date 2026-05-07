@@ -72,6 +72,9 @@ interface SavedJob {
   maxSizeGb: number;
   lookbackDays: number;
   conflictPolicy: ConflictPolicy;
+  /** Optional — pre-bandwidth-cap saved jobs (older than 0.2.51) won't
+   *  have this; the runner falls back to the current settings default. */
+  bandwidthKbps?: number;
 }
 
 const SAVED_JOBS_KEY = "skiff-files.savedJobs.v1";
@@ -113,6 +116,9 @@ export default function TransfersPage() {
   );
   const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>(
     settings.syncDefaultConflictPolicy,
+  );
+  const [bandwidthKbps, setBandwidthKbps] = useState(
+    settings.syncDefaultBandwidthKbps,
   );
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -223,6 +229,7 @@ export default function TransfersPage() {
         lookbackDays,
         conflictPolicy,
         dryRun,
+        bandwidthKbps,
       });
       setJobs((prev) => ({
         ...prev,
@@ -312,6 +319,7 @@ export default function TransfersPage() {
       maxSizeGb,
       lookbackDays,
       conflictPolicy,
+      bandwidthKbps,
     };
     setSavedJobs((prev) => [...prev, job]);
   };
@@ -339,6 +347,10 @@ export default function TransfersPage() {
         lookbackDays: j.lookbackDays,
         conflictPolicy: j.conflictPolicy,
         dryRun: false,
+        // Saved jobs predate the bandwidth field; fall back to the
+        // current Settings default rather than 0 so existing saves
+        // honor the user's current cap.
+        bandwidthKbps: j.bandwidthKbps ?? settings.syncDefaultBandwidthKbps,
       });
       setJobs((prev) => ({
         ...prev,
@@ -427,6 +439,17 @@ export default function TransfersPage() {
                 value={lookbackDays}
                 onChange={(e) => setLookbackDays(Number(e.target.value) || 0)}
                 sx={{ width: 140 }}
+              />
+              <TextField
+                label="Bandwidth (KB/s)"
+                size="small"
+                type="number"
+                value={bandwidthKbps}
+                onChange={(e) =>
+                  setBandwidthKbps(Math.max(0, Number(e.target.value) || 0))
+                }
+                helperText="0 = unlimited"
+                sx={{ width: 160 }}
               />
               <FormControl size="small" sx={{ minWidth: 200 }}>
                 <InputLabel id="conflict-policy-label">Conflict policy</InputLabel>

@@ -81,6 +81,8 @@ export interface Settings {
   syncDefaultMaxSizeGb: number;
   /** Default lookback-days for the skip-if-unchanged heuristic. */
   syncDefaultLookbackDays: number;
+  /** Default bandwidth cap (KB/s) for new sync jobs. 0 = unlimited. */
+  syncDefaultBandwidthKbps: number;
   /** When true (Finder default), folders are grouped above files
    *  regardless of the active sort. When false, folders and files
    *  intermix according to the chosen sort key — useful for sorting
@@ -159,6 +161,7 @@ export const DEFAULTS: Settings = {
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
+  syncDefaultBandwidthKbps: 0,
   groupFoldersFirst: true,
   showFullPathInTitle: false,
   sidebarVisible: true,

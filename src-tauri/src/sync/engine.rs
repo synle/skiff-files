@@ -397,7 +397,7 @@ fn do_copy(
     if let Some(parent) = target.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    match copy_with_fallback(&file.src, target) {
+    match copy_with_fallback(&file.src, target, opts.bandwidth_kbps) {
         Ok(n) => {
             summary.copied += 1;
             summary.bytes_copied += n;
@@ -422,18 +422,74 @@ fn do_copy(
 /// (`fs::copy` uses `copy_file_range` / `FICLONE` on Linux and
 /// `clonefile` on macOS), and fall back to plain read+write on EPERM —
 /// SMB / NTFS network mounts reject the accelerated paths.
-fn copy_with_fallback(src: &std::path::Path, dest: &std::path::Path) -> Result<u64, String> {
-    match fs::copy(src, dest) {
-        Ok(n) => Ok(n),
-        Err(_) => {
-            let bytes = fs::read(src)
-                .map_err(|e| format!("read({}): {e}", src.display()))?;
-            let len = bytes.len() as u64;
-            fs::write(dest, bytes)
-                .map_err(|e| format!("write({}): {e}", dest.display()))?;
-            Ok(len)
+///
+/// `bandwidth_kbps == 0` keeps the kernel-accelerated path for
+/// maximum throughput. Any non-zero cap forces the chunked path so we
+/// can interleave sleeps between writes — there's no way to throttle
+/// `fs::copy`.
+fn copy_with_fallback(
+    src: &std::path::Path,
+    dest: &std::path::Path,
+    bandwidth_kbps: u64,
+) -> Result<u64, String> {
+    if bandwidth_kbps == 0 {
+        return match fs::copy(src, dest) {
+            Ok(n) => Ok(n),
+            Err(_) => {
+                let bytes = fs::read(src)
+                    .map_err(|e| format!("read({}): {e}", src.display()))?;
+                let len = bytes.len() as u64;
+                fs::write(dest, bytes)
+                    .map_err(|e| format!("write({}): {e}", dest.display()))?;
+                Ok(len)
+            }
+        };
+    }
+    copy_throttled(src, dest, bandwidth_kbps)
+}
+
+/// Chunked read+write+sleep loop. Sleeps between chunks so the running
+/// average byte rate stays at or below `bandwidth_kbps`. 64 KB chunks
+/// match the tokio default + give a reasonable sleep granularity (at
+/// 1 MB/s the loop sleeps ~64 ms per chunk; at 100 MB/s, ~640 µs).
+fn copy_throttled(
+    src: &std::path::Path,
+    dest: &std::path::Path,
+    bandwidth_kbps: u64,
+) -> Result<u64, String> {
+    use std::io::{Read, Write};
+    use std::time::{Duration, Instant};
+    let mut reader = fs::File::open(src)
+        .map_err(|e| format!("open({}): {e}", src.display()))?;
+    let mut writer = fs::File::create(dest)
+        .map_err(|e| format!("create({}): {e}", dest.display()))?;
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut total: u64 = 0;
+    let bytes_per_sec = bandwidth_kbps.saturating_mul(1024);
+    let start = Instant::now();
+    loop {
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| format!("read({}): {e}", src.display()))?;
+        if n == 0 {
+            break;
+        }
+        writer
+            .write_all(&buf[..n])
+            .map_err(|e| format!("write({}): {e}", dest.display()))?;
+        total += n as u64;
+        // Pace via "expected elapsed at this byte count" — drift-free
+        // even when the underlying IO is bursty.
+        let expected_ms = (total.saturating_mul(1000)) / bytes_per_sec.max(1);
+        let actual_ms = start.elapsed().as_millis() as u64;
+        if expected_ms > actual_ms {
+            std::thread::sleep(Duration::from_millis(expected_ms - actual_ms));
         }
     }
+    writer
+        .flush()
+        .map_err(|e| format!("flush({}): {e}", dest.display()))?;
+    Ok(total)
 }
 
 /// Execute a planned job. `on_progress` is called after each file with
@@ -548,6 +604,7 @@ mod tests {
             lookback_days: 0,
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: false,
+            bandwidth_kbps: 0,
         });
         assert_eq!(s.copied, 2);
         assert_eq!(s.errors, 0);
@@ -565,12 +622,14 @@ mod tests {
             lookback_days: 0,
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: false,
+            bandwidth_kbps: 0,
         });
         let s2 = run_default(&src, &dest, JobOptions {
             max_size_gb: 1,
             lookback_days: 0,
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: false,
+            bandwidth_kbps: 0,
         });
         assert_eq!(s2.copied, 0);
         assert_eq!(s2.skipped, 2);
@@ -592,6 +651,7 @@ mod tests {
             lookback_days: 0,
             conflict_policy: ConflictPolicy::Skip,
             dry_run: false,
+            bandwidth_kbps: 0,
         });
         // Different sizes -> not "unchanged"; policy=skip -> conflict, no overwrite.
         assert!(s.conflicts >= 1);
@@ -614,6 +674,7 @@ mod tests {
             lookback_days: 0,
             conflict_policy: ConflictPolicy::KeepBoth,
             dry_run: false,
+            bandwidth_kbps: 0,
         });
         // a.txt remains the "existing-different" file; the new copy lands
         // at a (2).txt.
@@ -633,6 +694,7 @@ mod tests {
             lookback_days: 0,
             conflict_policy: ConflictPolicy::Overwrite,
             dry_run: true,
+            bandwidth_kbps: 0,
         });
         assert_eq!(s.copied, 2);
         assert!(!dest.join("a.txt").exists());
@@ -667,6 +729,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::OverwriteOlder,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
         );
         assert!(s.copied >= 1, "expected at least one overwrite, got {s:?}");
@@ -692,6 +755,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::OverwriteOlder,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
         );
         assert!(s.conflicts >= 1);
@@ -715,6 +779,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::ReplaceSmaller,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
         );
         assert!(s.copied >= 1);
@@ -736,6 +801,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::ReplaceSmaller,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
         );
         assert!(s.conflicts >= 1);
@@ -756,6 +822,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::ReplaceIfSizeDifferent,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
         );
         assert!(s.copied >= 1);
@@ -776,6 +843,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::RenameTarget,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
         );
         assert!(s.copied >= 1);
@@ -802,6 +870,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::RenameOlderTarget,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
         );
         assert!(s.conflicts >= 1);
@@ -829,6 +898,7 @@ mod tests {
                     lookback_days: 0,
                     conflict_policy: ConflictPolicy::Overwrite,
                     dry_run: false,
+                    bandwidth_kbps: 0,
                 },
                 token_for_runner,
                 |_| {},
@@ -865,6 +935,7 @@ mod tests {
                     lookback_days: 0,
                     conflict_policy: ConflictPolicy::Overwrite,
                     dry_run: false,
+                    bandwidth_kbps: 0,
                 },
                 token_for_runner,
                 |_| {},
@@ -895,6 +966,7 @@ mod tests {
                 lookback_days: 0,
                 conflict_policy: ConflictPolicy::Overwrite,
                 dry_run: false,
+                bandwidth_kbps: 0,
             },
             token,
             |_| {},

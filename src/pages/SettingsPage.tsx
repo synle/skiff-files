@@ -285,6 +285,20 @@ export default function SettingsPage() {
             }
             sx={{ maxWidth: 180 }}
           />
+          <TextField
+            label="Bandwidth cap (KB/s)"
+            size="small"
+            type="number"
+            value={settings.syncDefaultBandwidthKbps}
+            onChange={(e) =>
+              update(
+                "syncDefaultBandwidthKbps",
+                Math.max(0, Number(e.target.value) || 0),
+              )
+            }
+            helperText="0 = unlimited. Local-to-local jobs skip the kernel-accelerated copy when this is set."
+            sx={{ maxWidth: 240 }}
+          />
         </Section>
 
         <Divider />

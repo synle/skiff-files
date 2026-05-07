@@ -665,6 +665,7 @@ pub fn sync_start_local(
         lookback_days: 7,
         conflict_policy: Default::default(),
         dry_run: false,
+        bandwidth_kbps: 0,
     });
     let id = Uuid::new_v4().to_string();
     let info = JobInfo {
@@ -824,6 +825,7 @@ pub fn sync_start_cross(
         lookback_days: 7,
         conflict_policy: Default::default(),
         dry_run: false,
+        bandwidth_kbps: 0,
     });
     let id = Uuid::new_v4().to_string();
     let info = JobInfo {
@@ -1000,6 +1002,7 @@ pub fn sync_start_repo(
         lookback_days: 7,
         conflict_policy: Default::default(),
         dry_run: false,
+        bandwidth_kbps: 0,
     });
     let id = Uuid::new_v4().to_string();
     let info = JobInfo {

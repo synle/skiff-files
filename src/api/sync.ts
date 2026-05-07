@@ -50,6 +50,11 @@ export interface JobOptions {
   lookbackDays?: number;
   conflictPolicy?: ConflictPolicy;
   dryRun?: boolean;
+  /** Bandwidth cap in KB/s. `0` (default) = unlimited. The engine
+   *  paces the chunked copy loop so the running average stays within
+   *  the cap. Local-to-local sync skips the kernel-accelerated copy
+   *  path (which can't be throttled) when this is non-zero. */
+  bandwidthKbps?: number;
 }
 
 /** Mirror of `crate::sync::types::JobState`. */

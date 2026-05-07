@@ -144,6 +144,12 @@ pub struct JobOptions {
     /// Used by the dry-run preview.
     #[serde(default)]
     pub dry_run: bool,
+    /// Bandwidth cap in KB/s. `0` (default) = unlimited. When non-zero,
+    /// the copy loop pauses between chunks so the running average stays
+    /// within the cap. Local-to-local skips the kernel-accelerated path
+    /// when this is set; cross-protocol loops chunked anyway.
+    #[serde(default)]
+    pub bandwidth_kbps: u64,
 }
 
 fn default_max_gb() -> u64 {
