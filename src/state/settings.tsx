@@ -26,6 +26,9 @@ export type ViewMode = "list" | "tile" | "gallery" | "column";
 /** Visual density of list rows. */
 export type Density = "comfortable" | "compact";
 
+/** Global font size scale. Maps to MUI's `typography.fontSize`. */
+export type FontSize = "small" | "medium" | "large";
+
 /** Preview pane visibility policy:
  *  - `off` — never show the pane
  *  - `imagesOnly` — auto-open when an image is selected, otherwise hidden
@@ -47,6 +50,8 @@ export interface Settings {
   themeMode: ThemeMode;
   defaultView: ViewMode;
   density: Density;
+  /** Global font size scale. Mapped to MUI's `typography.fontSize`. */
+  fontSize: FontSize;
   showHidden: boolean;
   showExtensions: boolean;
   /** Right-side preview pane policy. */
@@ -171,6 +176,7 @@ export const DEFAULTS: Settings = {
   themeMode: "system",
   defaultView: "list",
   density: "comfortable",
+  fontSize: "medium",
   showHidden: false,
   showExtensions: true,
   previewMode: "imagesOnly",

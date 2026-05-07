@@ -8,7 +8,7 @@ import { HashRouter } from "react-router";
 import App from "./App";
 import { SettingsProvider, useSettings } from "./state/settings";
 import {
-  themeForWithMotion,
+  themeForFull,
   useEffectiveMode,
   usePrefersReducedMotion,
 } from "./theme";
@@ -27,7 +27,9 @@ function EffectiveThemeProvider({ children }: { children: React.ReactNode }) {
   const prefersReduced = usePrefersReducedMotion();
   const reducedMotion = settings.reduceMotion || prefersReduced;
   return (
-    <ThemeProvider theme={themeForWithMotion(effective, reducedMotion)}>
+    <ThemeProvider
+      theme={themeForFull(effective, reducedMotion, settings.fontSize)}
+    >
       {children}
     </ThemeProvider>
   );

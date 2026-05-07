@@ -115,3 +115,32 @@ export function themeForWithMotion(
     },
   });
 }
+
+/** Maps the user's font-size choice to MUI's base font size in pixels.
+ *  MUI's default is 14; we step ±2 for S/L. */
+export function fontSizePx(
+  size: "small" | "medium" | "large",
+): number {
+  if (size === "small") return 12;
+  if (size === "large") return 16;
+  return 14;
+}
+
+/** Compose `themeForWithMotion` + a font-size override. The MUI theme
+ *  builder picks up `typography.fontSize` and rescales every variant
+ *  proportionally. */
+export function themeForFull(
+  effective: EffectiveMode,
+  reducedMotion: boolean,
+  fontSize: "small" | "medium" | "large",
+): Theme {
+  const base = themeForWithMotion(effective, reducedMotion);
+  if (fontSize === "medium") return base;
+  return createTheme({
+    ...base,
+    typography: {
+      ...base.typography,
+      fontSize: fontSizePx(fontSize),
+    },
+  });
+}

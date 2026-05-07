@@ -73,6 +73,22 @@ export default function SettingsPage() {
           </FormControl>
 
           <FormControl size="small" sx={{ maxWidth: 240 }}>
+            <InputLabel id="font-size-label">Font size</InputLabel>
+            <Select
+              labelId="font-size-label"
+              label="Font size"
+              value={settings.fontSize}
+              onChange={(e) =>
+                update("fontSize", e.target.value as typeof settings.fontSize)
+              }
+            >
+              <MenuItem value="small">Small</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="large">Large</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ maxWidth: 240 }}>
             <InputLabel id="density-label">Density</InputLabel>
             <Select
               labelId="density-label"
