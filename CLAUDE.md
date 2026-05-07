@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.69** — ✅ **Tab right-click menu**. Right-clicking any tab pops a Menu with Close / Close others / Close tabs to the right (VS Code / Chrome convention). New `closeOtherTabs(keepId)` helper plus an inline closure for "to the right" that splices via index. Items disabled when only one tab is open so the user doesn't get stranded.
 - **0.2.68** — ✅ **Find result count in StatusBar**. When recursive find is active, the StatusBar swaps "N items" for "N matches" (or "N+ matches" when the result count hit the Rust-side 1000 cap, signaling the user should refine the query). New `findActive` + `findHitCap` props on StatusBar; Browser threads through `searchRecursive` + `findResults`.
 - **0.2.67** — ✅ **Bookmark reorder**. Each Bookmarks-section row gets up + down arrow icons next to the existing × delete button. Up disabled at index 0, down at the last index. New `moveBookmark(id, direction)` splices the bookmark to its new position so the change persists through `update("bookmarks")`.
 - **0.2.66** — ✅ **Connection-status dot toggle**. New `Settings.sidebarShowStatusDots` (default true) controls whether each Hosts-section entry shows the colored connectivity dot. When off, the icon column falls back to the generic HubIcon to keep the layout balanced. Closes the spec's Sidebar "Show connection-status dots" bullet.

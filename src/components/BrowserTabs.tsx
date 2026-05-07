@@ -7,7 +7,15 @@
 // selection, multi-select — everything that lives in Browser's local
 // useState. The tab itself only carries a label + the path it last
 // opened, used for the tab strip.
-import { Box, IconButton, Tab, Tabs, Tooltip } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  Tab,
+  Tabs,
+  Tooltip,
+} from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState, type SyntheticEvent } from "react";
@@ -126,6 +134,20 @@ export default function BrowserTabs({ home }: Props) {
       ),
     );
   }, [home]);
+
+  /** Right-click menu state — anchor element + the tab the menu
+   *  acts on. Null = closed. */
+  const [tabMenu, setTabMenu] = useState<{
+    anchor: HTMLElement;
+    tabId: string;
+  } | null>(null);
+
+  /** Close every tab whose id !== keepId. Keeps the kept tab as the
+   *  active one even if it wasn't the active one before. */
+  const closeOtherTabs = (keepId: string) => {
+    setTabs((prev) => prev.filter((t) => t.id === keepId));
+    setActiveId(keepId);
+  };
 
   /** Reorder the active tab left or right by one position. No-op at
    *  the boundary. Used by Cmd/Ctrl+Shift+Left/Right. */
@@ -301,6 +323,10 @@ export default function BrowserTabs({ home }: Props) {
             <Tab
               key={t.id}
               value={t.id}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setTabMenu({ anchor: e.currentTarget, tabId: t.id });
+              }}
               sx={{ minHeight: 36, py: 0.5, textTransform: "none" }}
               label={
                 <Box
@@ -344,6 +370,51 @@ export default function BrowserTabs({ home }: Props) {
           </IconButton>
         </Tooltip>
       </Box>
+
+      {/* Right-click context menu for tabs. Lets users close many
+          tabs at once without clicking each ×. */}
+      <Menu
+        open={tabMenu !== null}
+        anchorEl={tabMenu?.anchor ?? null}
+        onClose={() => setTabMenu(null)}
+        slotProps={{ list: { dense: true } }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (tabMenu) closeTab(tabMenu.tabId);
+            setTabMenu(null);
+          }}
+        >
+          Close
+        </MenuItem>
+        <MenuItem
+          disabled={tabs.length <= 1}
+          onClick={() => {
+            if (tabMenu) closeOtherTabs(tabMenu.tabId);
+            setTabMenu(null);
+          }}
+        >
+          Close others
+        </MenuItem>
+        <MenuItem
+          disabled={tabs.length <= 1}
+          onClick={() => {
+            // Close every tab that's strictly to the right of the
+            // right-clicked one — convention from VS Code / Chrome.
+            if (!tabMenu) return;
+            const idx = tabs.findIndex((t) => t.id === tabMenu.tabId);
+            if (idx >= 0) {
+              setTabs((prev) => prev.slice(0, idx + 1));
+              if (!tabs.slice(0, idx + 1).some((t) => t.id === activeId)) {
+                setActiveId(tabMenu.tabId);
+              }
+            }
+            setTabMenu(null);
+          }}
+        >
+          Close tabs to the right
+        </MenuItem>
+      </Menu>
 
       {/* All Browsers stay mounted so switching tabs is instant.
           `display: none` on inactive tabs hides them; isActive prop
