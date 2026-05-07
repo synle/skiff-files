@@ -9,8 +9,10 @@
 
 use crate::fs::sftp::SftpClient;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 /// What the backend reports for a single path. Shared shape regardless
 /// of protocol so the cross-engine's conflict-resolution + skip-if-
@@ -142,6 +144,109 @@ impl Backend {
             Backend::Local => std::fs::rename(from, to)
                 .map_err(|e| format!("rename({from} -> {to}): {e}")),
             Backend::Sftp(client) => client.rename(from, to).await,
+        }
+    }
+
+    /// Stream-copy `src_path` from this backend to `dest_path` on
+    /// `dest`. Removes the in-memory cap that `read_full` / `write_full`
+    /// imposed in 0.2.0; arbitrary-size files are copied in 64 KB
+    /// chunks via `tokio::io::copy`. Local-to-local short-circuits to
+    /// `std::fs::copy` so the kernel-accelerated path
+    /// (`copy_file_range` / `clonefile`) keeps working.
+    ///
+    /// Returns the bytes written.
+    pub async fn copy_file(
+        &self,
+        src_path: &str,
+        dest: &Backend,
+        dest_path: &str,
+    ) -> Result<u64, String> {
+        // Fast path: local→local. Picks up `clonefile` on macOS,
+        // `FICLONE` on Linux btrfs/xfs, etc. — no userspace bytes
+        // shuffled.
+        if matches!(self, Backend::Local) && matches!(dest, Backend::Local) {
+            // Make the parent dir before std::fs::copy so a copy into
+            // a fresh subtree doesn't fail with NotFound.
+            if let Some(parent) = Path::new(dest_path).parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            // Match the local engine's cross-device fallback: if the
+            // accelerated path returns EPERM (NFS / SMB mounts on
+            // Linux), fall back to read+write. We don't get the bytes
+            // count from the fallback path, so estimate from the
+            // source file size.
+            return match std::fs::copy(src_path, dest_path) {
+                Ok(n) => Ok(n),
+                Err(_) => {
+                    let bytes = std::fs::read(src_path)
+                        .map_err(|e| format!("read({src_path}): {e}"))?;
+                    let len = bytes.len() as u64;
+                    std::fs::write(dest_path, bytes)
+                        .map_err(|e| format!("write({dest_path}): {e}"))?;
+                    Ok(len)
+                }
+            };
+        }
+
+        // Streaming path. Make sure the dest's parent exists first
+        // (every supported backend errors writing to a missing dir).
+        if let Some(parent) = parent_posix(dest_path) {
+            if !parent.is_empty() {
+                dest.mkdir_p(&parent).await?;
+            }
+        }
+        let mut reader = self.open_read(src_path).await?;
+        let mut writer = dest.open_write(dest_path).await?;
+        let bytes = tokio::io::copy(&mut reader, &mut writer)
+            .await
+            .map_err(|e| format!("copy({src_path} -> {dest_path}): {e}"))?;
+        // SFTP needs an explicit shutdown to flush the final packet —
+        // the local sink is a no-op shutdown.
+        writer
+            .shutdown()
+            .await
+            .map_err(|e| format!("shutdown({dest_path}): {e}"))?;
+        Ok(bytes)
+    }
+
+    /// Open a streaming reader. The Box is `Send + Unpin` so callers
+    /// can pass it straight to `tokio::io::copy`.
+    pub async fn open_read(
+        &self,
+        path: &str,
+    ) -> Result<Pin<Box<dyn AsyncRead + Send>>, String> {
+        match self {
+            Backend::Local => {
+                let f = tokio::fs::File::open(path)
+                    .await
+                    .map_err(|e| format!("open({path}): {e}"))?;
+                Ok(Box::pin(f))
+            }
+            Backend::Sftp(client) => {
+                let f = client.open_read(path).await?;
+                Ok(Box::pin(f))
+            }
+        }
+    }
+
+    /// Open a streaming writer. Truncates / creates as needed; the
+    /// caller is expected to have ensured the parent dir exists (the
+    /// `copy_file` helper above does that for you).
+    pub async fn open_write(
+        &self,
+        path: &str,
+    ) -> Result<Pin<Box<dyn AsyncWrite + Send>>, String> {
+        match self {
+            Backend::Local => {
+                let f = tokio::fs::File::create(path)
+                    .await
+                    .map_err(|e| format!("create({path}): {e}"))?;
+                Ok(Box::pin(f))
+            }
+            Backend::Sftp(client) => {
+                let f = client.open_write(path).await?;
+                Ok(Box::pin(f))
+            }
         }
     }
 }

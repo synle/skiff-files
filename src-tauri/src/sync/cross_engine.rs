@@ -8,20 +8,17 @@
 //! intentionally not supported here yet — the resolver hub doesn't
 //! know about cross jobs and that plumbing is a separate slice.
 //!
-//! Per-file copies are buffered in memory up to a 256 MB cap; larger
-//! files surface as per-file errors rather than choking the cross
-//! engine. Streaming (read-chunk → write-chunk) lands in 0.2.1.
+//! Per-file copies stream via `tokio::io::copy` against
+//! [`Backend::open_read`] / [`Backend::open_write`] — no in-memory
+//! cap. Local-to-local short-circuits to `std::fs::copy` so the
+//! kernel-accelerated path (`clonefile`, `copy_file_range`,
+//! `FICLONE`) keeps working.
 
 use super::backend::{walk_files, Backend};
 use super::engine::CancelToken;
 use super::types::{ConflictPolicy, FileOutcome, JobOptions, Progress, Summary};
 use std::path::Path;
 use std::sync::Arc;
-
-/// Hard cap for in-memory per-file copies. We could in principle stream
-/// — Phase 0.2.1 will — but for now larger files become a per-file
-/// error so the rest of the job continues.
-const PER_FILE_CAP_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Same shape as [`crate::sync::plan::PlannedFile`] but with String
 /// paths because remote paths can't round-trip through `PathBuf` on
@@ -302,42 +299,24 @@ async fn do_copy_one(
             bytes: file.size,
         };
     }
-    if file.size > PER_FILE_CAP_BYTES {
-        summary.errors += 1;
-        return FileOutcome::Error {
-            src: file.src.clone(),
-            dest: target.to_string(),
-            error: format!(
-                "file too large for in-memory cross-copy: {} bytes (limit {})",
-                file.size, PER_FILE_CAP_BYTES
-            ),
-        };
-    }
-    let bytes = match src_backend.read_full(&file.src, PER_FILE_CAP_BYTES).await {
-        Ok(b) => b,
+    match src_backend.copy_file(&file.src, dest_backend, target).await {
+        Ok(bytes) => {
+            summary.copied += 1;
+            summary.bytes_copied += bytes;
+            FileOutcome::Copied {
+                src: file.src.clone(),
+                dest: target.to_string(),
+                bytes,
+            }
+        }
         Err(e) => {
             summary.errors += 1;
-            return FileOutcome::Error {
+            FileOutcome::Error {
                 src: file.src.clone(),
                 dest: target.to_string(),
                 error: e,
-            };
+            }
         }
-    };
-    if let Err(e) = dest_backend.write_full(target, &bytes).await {
-        summary.errors += 1;
-        return FileOutcome::Error {
-            src: file.src.clone(),
-            dest: target.to_string(),
-            error: e,
-        };
-    }
-    summary.copied += 1;
-    summary.bytes_copied += bytes.len() as u64;
-    FileOutcome::Copied {
-        src: file.src.clone(),
-        dest: target.to_string(),
-        bytes: bytes.len() as u64,
     }
 }
 
@@ -462,6 +441,54 @@ mod tests {
         // Original untouched; sibling created.
         assert_eq!(fs::read(dest.join("a.txt")).unwrap(), b"existing");
         assert!(dest.join("a (2).txt").exists());
+        let _ = fs::remove_dir_all(src);
+        let _ = fs::remove_dir_all(dest);
+    }
+
+    #[tokio::test]
+    async fn local_to_local_streams_large_file_past_old_inmemory_cap() {
+        // The 0.2.0 cap was 256 MB. Use 4 MB for a fast test that
+        // proves the streaming path doesn't materialize the whole file.
+        let src = std::env::temp_dir().join(format!("skiff-cross-stream-src-{}", uniq()));
+        let dest = std::env::temp_dir().join(format!("skiff-cross-stream-dest-{}", uniq()));
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        // 4 MB of zeros — content doesn't matter, just the size.
+        let big = vec![0u8; 4 * 1024 * 1024];
+        fs::write(src.join("big.bin"), &big).unwrap();
+
+        let (plan, total) = plan_cross(
+            &Backend::Local,
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(plan.len(), 1);
+        assert_eq!(total, big.len() as u64);
+
+        let s = execute_cross(
+            "test",
+            plan,
+            total,
+            &JobOptions {
+                max_size_gb: 1,
+                lookback_days: 0,
+                conflict_policy: ConflictPolicy::Overwrite,
+                dry_run: false,
+            },
+            CancelToken::new(),
+            Backend::Local,
+            Backend::Local,
+            |_| {},
+        )
+        .await;
+        assert_eq!(s.copied, 1);
+        assert_eq!(s.errors, 0);
+        assert_eq!(
+            std::fs::metadata(dest.join("big.bin")).unwrap().len(),
+            big.len() as u64
+        );
         let _ = fs::remove_dir_all(src);
         let _ = fs::remove_dir_all(dest);
     }

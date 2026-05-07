@@ -314,6 +314,35 @@ impl SftpClient {
             .map_err(|e| format!("rename({from} -> {to}): {e}"))
     }
 
+    /// Open a remote file for reading. Returns the russh-sftp `File`
+    /// which implements `tokio::io::AsyncRead` so the cross-engine can
+    /// stream chunks rather than buffering the whole payload.
+    ///
+    /// Critically, the returned `File` outlives the lock guard: the
+    /// underlying `SftpSession` is `Clone` and `open_with_flags`
+    /// internally clones the session into the File. We can release the
+    /// guard while still holding a working File. This is what lets the
+    /// cross-engine pipeline reads + writes concurrently against the
+    /// same SftpClient.
+    pub async fn open_read(&self, path: &str) -> FsResult<russh_sftp::client::fs::File> {
+        let sftp = self.sftp.lock().await;
+        sftp.open_with_flags(path, OpenFlags::READ)
+            .await
+            .map_err(|e| format!("open_for_read({path}): {e}"))
+    }
+
+    /// Open a remote file for writing (create + truncate). Same
+    /// outlives-the-lock argument as [`open_read`].
+    pub async fn open_write(&self, path: &str) -> FsResult<russh_sftp::client::fs::File> {
+        let sftp = self.sftp.lock().await;
+        sftp.open_with_flags(
+            path,
+            OpenFlags::WRITE | OpenFlags::CREATE | OpenFlags::TRUNCATE,
+        )
+        .await
+        .map_err(|e| format!("open_for_write({path}): {e}"))
+    }
+
     /// Write a buffer as a remote file. Used by the cross-protocol
     /// engine when the destination is SFTP. Truncates if the file
     /// exists; the conflict-resolution layer is upstream.
