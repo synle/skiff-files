@@ -316,6 +316,33 @@ export default function Browser({
     return () => window.removeEventListener("keydown", onKey);
   }, [isActive, primarySelected, selectedPaths, entries]);
 
+  // Cmd/Ctrl+R → refresh the current folder. Cmd/Ctrl+Shift+N →
+  // new folder. Both have been documented in the cheatsheet since
+  // 0.1.2; finally implementing. Skip on input focus so typing in
+  // the path bar doesn't trigger them.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      const k = e.key.toLowerCase();
+      if (k === "r" && !e.shiftKey) {
+        e.preventDefault();
+        if (path) void refresh(path);
+      } else if (k === "n" && e.shiftKey) {
+        e.preventDefault();
+        void handleNewFolder();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // handleNewFolder + refresh are stable enough; we list path so the
+    // refresh handler reads the current value via closure capture.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, path]);
+
   // Cmd/Ctrl + F → focus the toolbar search input. Doesn't fire if the
   // user is already in an input (so it doesn't hijack the path bar).
   // Only the active tab responds; otherwise hidden tabs would steal
