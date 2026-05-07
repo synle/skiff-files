@@ -9,7 +9,14 @@ import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
-import { fsFind, fsHomeDir, fsStat, type Entry } from "../api/fs";
+import {
+  fsFind,
+  fsHomeDir,
+  fsOpenWithDefault,
+  fsRevealInOs,
+  fsStat,
+  type Entry,
+} from "../api/fs";
 import {
   listDir as clientListDir,
   mkdir as clientMkdir,
@@ -547,6 +554,12 @@ export default function Browser({
           }
         }}
         onProperties={(e) => setPropertiesTarget(e)}
+        onOpenWithDefault={(e) => {
+          void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
+        }}
+        onRevealInOs={(e) => {
+          void fsRevealInOs(e.path).catch((err) => setError(String(err)));
+        }}
         onBookmark={(e) => {
           // Append a fresh bookmark with a UUID id; the basename
           // becomes the default label. Settings are persisted via

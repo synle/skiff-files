@@ -61,6 +61,8 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "sync_resolve_conflict") return null;
     if (cmd === "fs_trash") return null;
     if (cmd === "fs_trash_many") return null;
+    if (cmd === "fs_reveal_in_os") return null;
+    if (cmd === "fs_open_with_default") return null;
     if (cmd === "settings_load") return null;
     if (cmd === "settings_save") return null;
     return null;

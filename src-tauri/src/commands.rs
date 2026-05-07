@@ -102,6 +102,65 @@ pub fn fs_trash(path: String) -> FsResult<()> {
     trash::delete(&path).map_err(|e| format!("trash({path}): {e}"))
 }
 
+/// Reveal a path in the OS file manager (with the entry highlighted
+/// when the platform supports it). Uses the platform-native command
+/// rather than the cross-platform `open` crate because every native
+/// file manager has a different "highlight this child" syntax — and
+/// using the OS shell tool keeps us out of the GUI integration
+/// rabbit hole.
+#[tauri::command]
+pub fn fs_reveal_in_os(path: String) -> FsResult<()> {
+    use std::process::Command;
+    #[cfg(target_os = "macos")]
+    {
+        // -R reveals the file (selects it inside the parent folder).
+        Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("open -R {path}: {e}"))?;
+        return Ok(());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // explorer /select,<path> highlights the entry inside its
+        // parent folder.
+        Command::new("explorer")
+            .arg(format!("/select,{path}"))
+            .spawn()
+            .map_err(|e| format!("explorer /select {path}: {e}"))?;
+        return Ok(());
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // No standardized "select-this-child" verb on Linux — open
+        // the parent dir via xdg-open. Falls back to opening the
+        // path itself if there's no parent (e.g. root).
+        let parent = std::path::Path::new(&path)
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::path::PathBuf::from(&path));
+        Command::new("xdg-open")
+            .arg(&parent)
+            .spawn()
+            .map_err(|e| format!("xdg-open {}: {e}", parent.display()))?;
+        return Ok(());
+    }
+    // The compiler should have proven all three branches above are
+    // exhaustive on supported platforms, but cover the unreachable
+    // case so downstream builds for, say, BSD don't fail to compile.
+    #[allow(unreachable_code)]
+    Err(format!("reveal_in_os: unsupported platform for {path}"))
+}
+
+/// Open a path with the OS's default application. Uses the `open`
+/// crate so we don't have to write per-platform shell commands —
+/// it dispatches to `open` / `xdg-open` / `start` internally.
+#[tauri::command]
+pub fn fs_open_with_default(path: String) -> FsResult<()> {
+    open::that(&path).map_err(|e| format!("open {path}: {e}"))
+}
+
 /// Multi-path trash. Cheaper than N round-trips through `invoke` when
 /// the user deletes a multi-selection. The crate's `delete_all` is
 /// atomic per path: any failures collect, the rest still succeed.

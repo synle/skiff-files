@@ -29,6 +29,8 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onCopyPath: vi.fn(),
     onProperties: vi.fn(),
     onBookmark: vi.fn(),
+    onOpenWithDefault: vi.fn(),
+    onRevealInOs: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>
@@ -93,5 +95,28 @@ describe("EntryContextMenu", () => {
     const h = r({ entry: folder, x: 10, y: 10 });
     fireEvent.click(screen.getByText("Add to bookmarks"));
     expect(h.onBookmark).toHaveBeenCalledWith(folder);
+  });
+
+  it("file shows Open with default + Reveal in OS for local entries", () => {
+    const h = r({ entry: file, x: 10, y: 10 });
+    expect(screen.getByText("Open with default app")).toBeInTheDocument();
+    expect(screen.getByText("Reveal in OS")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Open with default app"));
+    expect(h.onOpenWithDefault).toHaveBeenCalledWith(file);
+  });
+
+  it("hides OS-shell items for remote (sftp://) entries", () => {
+    const remote: Entry = { ...file, path: "sftp://abc/x.txt" };
+    r({ entry: remote, x: 10, y: 10 });
+    expect(
+      screen.queryByText("Open with default app"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Reveal in OS")).not.toBeInTheDocument();
+  });
+
+  it("Reveal in OS calls onRevealInOs for local entries", () => {
+    const h = r({ entry: folder, x: 10, y: 10 });
+    fireEvent.click(screen.getByText("Reveal in OS"));
+    expect(h.onRevealInOs).toHaveBeenCalledWith(folder);
   });
 });

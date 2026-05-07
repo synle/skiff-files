@@ -14,6 +14,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
+import LaunchIcon from "@mui/icons-material/Launch";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import type { Entry } from "../api/fs";
 
 interface Props {
@@ -29,6 +31,11 @@ interface Props {
    *  files since "bookmark a file" doesn't have a clear meaning in
    *  this app). */
   onBookmark: (entry: Entry) => void;
+  /** Open with the OS default application. Hidden for remote entries
+   *  since the local OS can't open them directly without download. */
+  onOpenWithDefault: (entry: Entry) => void;
+  /** Reveal in the OS file manager. Same remote restriction. */
+  onRevealInOs: (entry: Entry) => void;
 }
 
 export default function EntryContextMenu({
@@ -40,7 +47,10 @@ export default function EntryContextMenu({
   onCopyPath,
   onProperties,
   onBookmark,
+  onOpenWithDefault,
+  onRevealInOs,
 }: Props) {
+  const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
   return (
     <Menu
@@ -63,6 +73,32 @@ export default function EntryContextMenu({
             <OpenIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Open</ListItemText>
+        </MenuItem>
+      )}
+      {!isRemote && state && !state.entry.isDir && (
+        <MenuItem
+          onClick={() => {
+            onOpenWithDefault(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <LaunchIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Open with default app</ListItemText>
+        </MenuItem>
+      )}
+      {!isRemote && state && (
+        <MenuItem
+          onClick={() => {
+            onRevealInOs(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <VisibilityIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Reveal in OS</ListItemText>
         </MenuItem>
       )}
       <MenuItem

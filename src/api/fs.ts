@@ -73,6 +73,16 @@ export const fsTrash = (path: string): Promise<void> =>
 export const fsTrashMany = (paths: string[]): Promise<void> =>
   invoke<void>("fs_trash_many", { paths });
 
+/** Reveal a path in the OS file manager (Finder / Explorer / xdg-open).
+ *  Highlights the entry inside its parent folder where the platform
+ *  supports it; otherwise opens the parent. */
+export const fsRevealInOs = (path: string): Promise<void> =>
+  invoke<void>("fs_reveal_in_os", { path });
+
+/** Open a path with the OS default application. */
+export const fsOpenWithDefault = (path: string): Promise<void> =>
+  invoke<void>("fs_open_with_default", { path });
+
 export const fsCopyFile = (from: string, to: string): Promise<number> =>
   invoke<number>("fs_copy_file", { from, to });
 
