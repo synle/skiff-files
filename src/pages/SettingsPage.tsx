@@ -240,6 +240,18 @@ export default function SettingsPage() {
           title="Sidebar"
           description="Hide sections you never use. Hidden sections drop both their header and contents."
         >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.sidebarAccordion}
+                onChange={(e) =>
+                  update("sidebarAccordion", e.target.checked)
+                }
+              />
+            }
+            label="Accordion mode (only one section open at a time)"
+          />
+
           {(["favorites", "bookmarks", "recent", "hosts", "devices"] as const).map(
             (id) => {
               const labels = {

@@ -123,6 +123,10 @@ export interface Settings {
    *  uses bookmarks can hide that header entirely instead of just
    *  collapsing it). */
   sidebarSectionsVisible: Record<string, boolean>;
+  /** Accordion mode for the Sidebar — only one section may be
+   *  expanded at a time. Expanding one auto-collapses the others.
+   *  Default false (Finder-style: any number open simultaneously). */
+  sidebarAccordion: boolean;
   /** Tabs the user had open at last save. Capped at TABS_MAX so a
    *  runaway browsing session doesn't bloat settings.json. Empty
    *  array = no persisted tabs (BrowserTabs will spawn a default). */
@@ -191,6 +195,7 @@ export const DEFAULTS: Settings = {
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarCollapsed: {},
   sidebarSectionsVisible: {},
+  sidebarAccordion: false,
   savedTabs: [],
   savedActiveTabId: null,
 };

@@ -99,9 +99,24 @@ export default function Sidebar({ home, onNavigate }: Props) {
   const isCollapsed = (id: string): boolean =>
     !!settings.sidebarCollapsed[id];
   const toggleSection = (id: string) => {
+    const collapsed = isCollapsed(id);
+    if (settings.sidebarAccordion && collapsed) {
+      // Accordion mode: expanding one auto-collapses every other
+      // visible section. Hidden sections aren't touched (their
+      // collapsed state is moot). Keys are derived from the section
+      // IDs the Sidebar renders.
+      const ALL_IDS = ["favorites", "bookmarks", "recent", "hosts", "devices"];
+      const next: Record<string, boolean> = { ...settings.sidebarCollapsed };
+      for (const k of ALL_IDS) {
+        if (k !== id) next[k] = true;
+      }
+      next[id] = false;
+      update("sidebarCollapsed", next);
+      return;
+    }
     update("sidebarCollapsed", {
       ...settings.sidebarCollapsed,
-      [id]: !isCollapsed(id),
+      [id]: !collapsed,
     });
   };
   /** Is the section visible at all? Missing key = visible (default).
