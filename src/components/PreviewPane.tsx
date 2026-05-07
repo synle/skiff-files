@@ -7,7 +7,9 @@
 // Selection-driven: the parent passes the currently selected Entry. We
 // cancel any in-flight load if selection changes mid-fetch — important
 // because `fs_dir_summary` can take seconds on large trees.
-import { Box, Divider, Stack, Typography } from "@mui/material";
+import { Box, Divider, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import RotateLeftIcon from "@mui/icons-material/RotateLeft";
+import RotateRightIcon from "@mui/icons-material/RotateRight";
 import { useEffect, useState } from "react";
 import {
   fsImageExif,
@@ -62,11 +64,15 @@ function ImageBody({
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Rotation in degrees, applied via CSS transform. Resets to 0
+   *  whenever the selection changes so the next image starts upright. */
+  const [rotation, setRotation] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
     setSrc(null);
     setError(null);
+    setRotation(0);
     onDimensions(null);
     readBase64(entry.path)
       .then((b64) => {
@@ -97,23 +103,51 @@ function ImageBody({
     );
   }
   return (
-    <Box
-      component="img"
-      src={src}
-      alt={entry.name}
-      onLoad={(e) => {
-        const img = e.currentTarget as HTMLImageElement;
-        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-          onDimensions({ w: img.naturalWidth, h: img.naturalHeight });
-        }
-      }}
-      sx={{
-        maxWidth: "100%",
-        maxHeight: 360,
-        borderRadius: 1,
-        display: "block",
-      }}
-    />
+    <Box>
+      <Box
+        component="img"
+        src={src}
+        alt={entry.name}
+        onLoad={(e) => {
+          const img = e.currentTarget as HTMLImageElement;
+          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+            onDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+          }
+        }}
+        sx={{
+          maxWidth: "100%",
+          maxHeight: 360,
+          borderRadius: 1,
+          display: "block",
+          transform: `rotate(${rotation}deg)`,
+          // Keep the rotated image inside the pane bounds — without
+          // `transform-origin: center` rotation pivots from top-left
+          // and the image walks off screen on quarter turns.
+          transformOrigin: "center",
+          transition: "transform 200ms",
+        }}
+      />
+      <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+        <Tooltip title="Rotate left">
+          <IconButton
+            size="small"
+            onClick={() => setRotation((r) => r - 90)}
+            aria-label="Rotate image left"
+          >
+            <RotateLeftIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Rotate right">
+          <IconButton
+            size="small"
+            onClick={() => setRotation((r) => r + 90)}
+            aria-label="Rotate image right"
+          >
+            <RotateRightIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    </Box>
   );
 }
 
