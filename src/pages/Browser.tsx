@@ -348,6 +348,10 @@ export default function Browser({
         // Browser muscle memory: Cmd/Ctrl+L = jump to address bar.
         e.preventDefault();
         setPathBarFocusRequest((c) => c + 1);
+      } else if (k === "i" && !e.shiftKey) {
+        // Finder muscle memory: Cmd+I = Get Info / preview toggle.
+        e.preventDefault();
+        setPreviewOpen((o) => !o);
       }
     };
     window.addEventListener("keydown", onKey);
