@@ -107,6 +107,12 @@ export interface Settings {
    *  ad-hoc section ids ("favorites" / "bookmarks" / "recent" /
    *  "hosts" / "devices"); missing key = expanded (default). */
   sidebarCollapsed: Record<string, boolean>;
+  /** Per-section visibility for the Sidebar. Same key set as
+   *  `sidebarCollapsed`; missing key = visible (default). Lets
+   *  users hide sections they don't use (e.g. someone who never
+   *  uses bookmarks can hide that header entirely instead of just
+   *  collapsing it). */
+  sidebarSectionsVisible: Record<string, boolean>;
   /** Tabs the user had open at last save. Capped at TABS_MAX so a
    *  runaway browsing session doesn't bloat settings.json. Empty
    *  array = no persisted tabs (BrowserTabs will spawn a default). */
@@ -172,6 +178,7 @@ export const DEFAULTS: Settings = {
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarCollapsed: {},
+  sidebarSectionsVisible: {},
   savedTabs: [],
   savedActiveTabId: null,
 };

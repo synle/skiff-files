@@ -97,6 +97,10 @@ export default function Sidebar({ home, onNavigate }: Props) {
       [id]: !isCollapsed(id),
     });
   };
+  /** Is the section visible at all? Missing key = visible (default).
+   *  Hidden sections render nothing — neither header nor body. */
+  const isVisible = (id: string): boolean =>
+    settings.sidebarSectionsVisible[id] !== false;
 
   /** Section header — clickable; flips the chevron and toggles
    *  collapsed state. Pure presentation; the children are rendered
@@ -203,8 +207,8 @@ export default function Sidebar({ home, onNavigate }: Props) {
       }}
     >
       <Box sx={{ flex: 1, overflow: "auto" }}>
-        <SectionHeader id="favorites" label="Favorites" />
-        {!isCollapsed("favorites") && (
+        {isVisible("favorites") && <SectionHeader id="favorites" label="Favorites" />}
+        {isVisible("favorites") && !isCollapsed("favorites") && (
           <List dense disablePadding id="sidebar-section-favorites">
             {FAVORITES.map((f) => (
               <ListItem key={f.label} disablePadding>
@@ -220,7 +224,7 @@ export default function Sidebar({ home, onNavigate }: Props) {
           </List>
         )}
 
-        {settings.bookmarks.length > 0 && (
+        {isVisible("bookmarks") && settings.bookmarks.length > 0 && (
           <>
             <SectionHeader id="bookmarks" label="Bookmarks" />
             {!isCollapsed("bookmarks") && (
@@ -269,7 +273,7 @@ export default function Sidebar({ home, onNavigate }: Props) {
           </>
         )}
 
-        {settings.recentPaths.length > 0 && (
+        {isVisible("recent") && settings.recentPaths.length > 0 && (
           <>
             <SectionHeader id="recent" label="Recent" />
             {!isCollapsed("recent") && (
@@ -307,8 +311,8 @@ export default function Sidebar({ home, onNavigate }: Props) {
           </>
         )}
 
-        <SectionHeader id="hosts" label="Hosts" />
-        {!isCollapsed("hosts") && (
+        {isVisible("hosts") && <SectionHeader id="hosts" label="Hosts" />}
+        {isVisible("hosts") && !isCollapsed("hosts") && (
         <Box id="sidebar-section-hosts">
         {connections == null ? (
           <Box sx={{ px: 2, py: 0.5 }}>
@@ -370,8 +374,8 @@ export default function Sidebar({ home, onNavigate }: Props) {
         </Box>
         )}
 
-        <SectionHeader id="devices" label="Devices" />
-        {!isCollapsed("devices") && (
+        {isVisible("devices") && <SectionHeader id="devices" label="Devices" />}
+        {isVisible("devices") && !isCollapsed("devices") && (
           <Typography
             variant="caption"
             sx={{ px: 2, color: "text.disabled", display: "block" }}

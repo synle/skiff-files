@@ -227,6 +227,43 @@ export default function SettingsPage() {
         <Divider />
 
         <Section
+          title="Sidebar"
+          description="Hide sections you never use. Hidden sections drop both their header and contents."
+        >
+          {(["favorites", "bookmarks", "recent", "hosts", "devices"] as const).map(
+            (id) => {
+              const labels = {
+                favorites: "Favorites",
+                bookmarks: "Bookmarks",
+                recent: "Recent",
+                hosts: "Hosts",
+                devices: "Devices",
+              };
+              const visible = settings.sidebarSectionsVisible[id] !== false;
+              return (
+                <FormControlLabel
+                  key={id}
+                  control={
+                    <Switch
+                      checked={visible}
+                      onChange={(e) =>
+                        update("sidebarSectionsVisible", {
+                          ...settings.sidebarSectionsVisible,
+                          [id]: e.target.checked,
+                        })
+                      }
+                    />
+                  }
+                  label={`Show ${labels[id]}`}
+                />
+              );
+            },
+          )}
+        </Section>
+
+        <Divider />
+
+        <Section
           title="Transfers"
           description="Defaults applied to new Skiffsync jobs. Saved templates keep their own values regardless."
         >
