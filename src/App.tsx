@@ -54,6 +54,12 @@ export default function App() {
       } else if (k === "b") {
         e.preventDefault();
         update("sidebarVisible", !settings.sidebarVisible);
+      } else if (e.key === "," ) {
+        // Mac convention: Cmd+, opens app preferences. We honor it
+        // on Linux/Windows too via Ctrl+, since users coming from
+        // VS Code expect this binding everywhere.
+        e.preventDefault();
+        navigate("/settings");
       }
     };
     window.addEventListener("keydown", onKey);
