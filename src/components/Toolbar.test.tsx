@@ -23,6 +23,9 @@ function r(overrides?: Partial<Parameters<typeof Toolbar>[0]>) {
     onSearchChange: vi.fn(),
     searchRecursive: false,
     onSearchRecursiveChange: vi.fn(),
+    backHistory: [],
+    forwardHistory: [],
+    onHistoryJump: vi.fn(),
     ...overrides,
   };
   render(
@@ -77,5 +80,35 @@ describe("Toolbar search", () => {
     expect(
       screen.getByPlaceholderText(/Find in subfolders/),
     ).toBeInTheDocument();
+  });
+
+  it("right-click on Back opens a history dropdown when entries exist", () => {
+    r({
+      canGoBack: true,
+      backHistory: ["/a", "/a/b", "/a/b/c"],
+    });
+    fireEvent.contextMenu(screen.getByLabelText("Back"));
+    // Reversed in the menu — so the most recent (deepest) appears first.
+    const items = screen.getAllByRole("menuitem");
+    expect(items).toHaveLength(3);
+    expect(items[0].textContent).toBe("c");
+  });
+
+  it("clicking a history item calls onHistoryJump with the right step count", () => {
+    const props = r({
+      canGoBack: true,
+      backHistory: ["/a", "/a/b", "/a/b/c"],
+    });
+    fireEvent.contextMenu(screen.getByLabelText("Back"));
+    const items = screen.getAllByRole("menuitem");
+    // Click the second one (= "b") — that's 2 steps back.
+    fireEvent.click(items[1]);
+    expect(props.onHistoryJump).toHaveBeenCalledWith("back", 2);
+  });
+
+  it("does not open the dropdown when history is empty", () => {
+    r({ canGoBack: true, backHistory: [] });
+    fireEvent.contextMenu(screen.getByLabelText("Back"));
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
   });
 });

@@ -10,10 +10,12 @@ import {
   Divider,
   TextField,
   InputAdornment,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
-import { type Ref } from "react";
+import { useState, type Ref, type MouseEvent as ReactMouseEvent } from "react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -34,6 +36,14 @@ interface Props {
   onBack: () => void;
   onForward: () => void;
   onUp: () => void;
+  /** Back-history entries (most recent last). Right-clicking the back
+   *  arrow opens a menu of these so users can jump multiple steps. */
+  backHistory?: string[];
+  /** Forward-history entries (next-most-recent first). */
+  forwardHistory?: string[];
+  /** Jump multiple steps in the indicated direction. The toolbar
+   *  invokes this when the user picks an item from a history menu. */
+  onHistoryJump?: (direction: "back" | "forward", steps: number) => void;
   onRefresh: () => void;
   onNewFolder: () => void;
   view: ViewMode;
@@ -74,7 +84,37 @@ export default function Toolbar(props: Props) {
     searchRecursive,
     onSearchRecursiveChange,
     searchInputRef,
+    backHistory = [],
+    forwardHistory = [],
+    onHistoryJump,
   } = props;
+
+  // Anchor for the history dropdowns. We share one state slot for both
+  // arrows since only one menu is ever open at a time.
+  const [historyMenu, setHistoryMenu] = useState<{
+    el: HTMLElement;
+    direction: "back" | "forward";
+  } | null>(null);
+
+  /** Last segment of a path — used as the menu label so the user
+   *  doesn't see the full absolute path on every line. */
+  const labelFor = (p: string): string => {
+    const segs = p.split(/[\\/]/).filter(Boolean);
+    return segs.at(-1) ?? p;
+  };
+
+  const openBackMenu = (e: ReactMouseEvent<HTMLElement>) => {
+    e.preventDefault();
+    if (backHistory.length > 0) {
+      setHistoryMenu({ el: e.currentTarget, direction: "back" });
+    }
+  };
+  const openForwardMenu = (e: ReactMouseEvent<HTMLElement>) => {
+    e.preventDefault();
+    if (forwardHistory.length > 0) {
+      setHistoryMenu({ el: e.currentTarget, direction: "forward" });
+    }
+  };
 
   return (
     <Box
@@ -88,30 +128,55 @@ export default function Toolbar(props: Props) {
         borderColor: "divider",
       }}
     >
-      <Tooltip title="Back">
+      <Tooltip title="Back (right-click for history)">
         <span>
           <IconButton
             size="small"
             disabled={!canGoBack}
             onClick={onBack}
+            onContextMenu={openBackMenu}
             aria-label="Back"
           >
             <ArrowBackIcon fontSize="small" />
           </IconButton>
         </span>
       </Tooltip>
-      <Tooltip title="Forward">
+      <Tooltip title="Forward (right-click for history)">
         <span>
           <IconButton
             size="small"
             disabled={!canGoForward}
             onClick={onForward}
+            onContextMenu={openForwardMenu}
             aria-label="Forward"
           >
             <ArrowForwardIcon fontSize="small" />
           </IconButton>
         </span>
       </Tooltip>
+      <Menu
+        anchorEl={historyMenu?.el ?? null}
+        open={historyMenu != null}
+        onClose={() => setHistoryMenu(null)}
+        slotProps={{ list: { dense: true } }}
+      >
+        {(historyMenu?.direction === "back"
+          ? // Most recent first → reverse so the closest entry is at
+            //the top of the menu (clicking it = one step back).
+            [...backHistory].reverse()
+          : forwardHistory
+        ).map((p, idx) => (
+          <MenuItem
+            key={`${p}-${idx}`}
+            onClick={() => {
+              onHistoryJump?.(historyMenu!.direction, idx + 1);
+              setHistoryMenu(null);
+            }}
+          >
+            {labelFor(p)}
+          </MenuItem>
+        ))}
+      </Menu>
       <Tooltip title="Up">
         <span>
           <IconButton

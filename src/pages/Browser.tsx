@@ -368,6 +368,34 @@ export default function Browser({
     });
   }, []);
 
+  /** Jump multiple steps back/forward — used by the toolbar's
+   *  right-click history dropdowns. `steps` is the 1-indexed count
+   *  in the chosen direction (so 1 == one step back == clicking the
+   *  back arrow). */
+  const jumpHistory = useCallback(
+    (direction: "back" | "forward", steps: number) => {
+      setHistory((h) => {
+        if (direction === "back") {
+          if (steps <= 0 || steps >= h.back.length) return h;
+          // Take the top `steps` entries off `back`, push them onto
+          // `forward` (in reverse so the most-recent is at the head).
+          const moved = h.back.slice(h.back.length - steps).reverse();
+          return {
+            back: h.back.slice(0, h.back.length - steps),
+            forward: [...moved, ...h.forward],
+          };
+        }
+        if (steps <= 0 || steps > h.forward.length) return h;
+        const moved = h.forward.slice(0, steps);
+        return {
+          back: [...h.back, ...moved],
+          forward: h.forward.slice(steps),
+        };
+      });
+    },
+    [],
+  );
+
   const goUp = useCallback(() => {
     if (!path) return;
     const p = parentPath(path);
@@ -511,6 +539,11 @@ export default function Browser({
         onBack={goBack}
         onForward={goForward}
         onUp={goUp}
+        // Slice off the current path (top of `back`) so the menu only
+        // lists destinations the user could actually go back to.
+        backHistory={history.back.slice(0, -1)}
+        forwardHistory={history.forward}
+        onHistoryJump={jumpHistory}
         onRefresh={() => path && void refresh(path)}
         onNewFolder={() => void handleNewFolder()}
         view={settings.defaultView}
