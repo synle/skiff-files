@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.28** — ✅ **Resizable sidebar**. Thin drag handle on the sidebar's right edge (with primary-tint on hover so it's discoverable). Drag updates `Settings.sidebarWidth` (clamped 180–400 px). MouseMove listener attaches to the document so a fast drag past the handle's own bounds doesn't drop the pointer. Default 220 px.
 - **0.2.27** — ✅ **Cmd/Ctrl+R refresh + Cmd/Ctrl+Shift+N new folder**. Both keybindings have been documented in the ShortcutsModal since 0.1.2 but never wired. Now they are. Browser-level keydown handler, gated on `isActive` + not-input-focused so typing in the path bar / connection form doesn't trigger them.
 - **0.2.26** — ✅ **Reveal app data folder**. Settings → Advanced gets a button that opens the OS app data directory in the native file manager. New `settings_app_data_dir` Tauri command resolves + mkdir-p's the path so revealing on a fresh install doesn't fail. Closes a TODO that's been on the spec since the Settings page was first sketched.
 - **0.2.25** — ✅ **Collapsible sidebar sections**. Each Sidebar section header (Favorites / Bookmarks / Recent / Hosts / Devices) is now a clickable button with a chevron that toggles the collapsed state. Persisted via new `Settings.sidebarCollapsed: Record<id, bool>` so the user's section preferences survive restarts. Sections default to expanded.

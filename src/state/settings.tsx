@@ -84,6 +84,9 @@ export interface Settings {
   /** Sidebar visibility — toggled via Cmd/Ctrl+B. Persisted so it
    *  survives restarts. */
   sidebarVisible: boolean;
+  /** Sidebar width in pixels. Drag-resize persists into here, clamped
+   *  to SIDEBAR_WIDTH_MIN..SIDEBAR_WIDTH_MAX. */
+  sidebarWidth: number;
   /** Per-section collapsed state for the Sidebar. Keys are
    *  ad-hoc section ids ("favorites" / "bookmarks" / "recent" /
    *  "hosts" / "devices"); missing key = expanded (default). */
@@ -108,6 +111,12 @@ export interface SavedTab {
 /** Max tabs we restore. 20 is well past anyone's reasonable usage
  *  but cheap to cap. */
 export const TABS_MAX = 20;
+
+/** Sidebar width clamps. Below the min the sections are unreadable;
+ *  above the max the file pane gets cramped on small windows. */
+export const SIDEBAR_WIDTH_MIN = 180;
+export const SIDEBAR_WIDTH_MAX = 400;
+export const SIDEBAR_WIDTH_DEFAULT = 220;
 
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
  *  day's navigation without making the sidebar scroll forever. */
@@ -136,6 +145,7 @@ export const DEFAULTS: Settings = {
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
   sidebarVisible: true,
+  sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarCollapsed: {},
   savedTabs: [],
   savedActiveTabId: null,

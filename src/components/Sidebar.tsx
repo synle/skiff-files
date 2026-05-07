@@ -28,7 +28,11 @@ import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import { Link as RouterLink } from "react-router";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
-import { useSettings } from "../state/settings";
+import {
+  SIDEBAR_WIDTH_MAX,
+  SIDEBAR_WIDTH_MIN,
+  useSettings,
+} from "../state/settings";
 
 interface Favorite {
   label: string;
@@ -137,18 +141,47 @@ export default function Sidebar({ home, onNavigate }: Props) {
     };
   }, []);
 
+  /** Drag-to-resize. The handle is a thin Box on the sidebar's right
+   *  edge with cursor:col-resize. mouseDown captures the starting
+   *  coordinates; mousemove updates the width; mouseup tears down
+   *  the listeners. We use document-level mousemove rather than the
+   *  handle's own so a fast drag past the edge doesn't drop the
+   *  pointer outside our listener. */
+  const startDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = settings.sidebarWidth;
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const next = Math.max(
+        SIDEBAR_WIDTH_MIN,
+        Math.min(SIDEBAR_WIDTH_MAX, startW + dx),
+      );
+      update("sidebarWidth", next);
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   return (
     <Box
       component="nav"
       aria-label="Sidebar"
       sx={{
-        width: 220,
+        width: settings.sidebarWidth,
         flexShrink: 0,
         borderRight: 1,
         borderColor: "divider",
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.paper",
+        // Position relative so the absolute resize handle anchors
+        // here, not at the document root.
+        position: "relative",
       }}
     >
       <Box sx={{ flex: 1, overflow: "auto" }}>
@@ -342,6 +375,29 @@ export default function Sidebar({ home, onNavigate }: Props) {
           </ListItemButton>
         </ListItem>
       </List>
+
+      {/* Resize handle — thin column on the right edge. We make it
+          slightly wider than 1px so the cursor target is forgiving;
+          the visible divider is the parent Box's border. */}
+      <Box
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        onMouseDown={startDrag}
+        sx={{
+          position: "absolute",
+          top: 0,
+          right: -3,
+          bottom: 0,
+          width: 6,
+          cursor: "col-resize",
+          // Light primary tint on hover so the user discovers the
+          // handle. Stays invisible at rest.
+          transition: "background-color 120ms",
+          "&:hover": { backgroundColor: "primary.light" },
+          zIndex: 1,
+        }}
+      />
     </Box>
   );
 }
