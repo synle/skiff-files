@@ -352,6 +352,18 @@ export default function Browser({
         // Finder muscle memory: Cmd+I = Get Info / preview toggle.
         e.preventDefault();
         setPreviewOpen((o) => !o);
+      } else if (k === "d" && !e.shiftKey) {
+        // Browser muscle memory: Cmd/Ctrl+D = bookmark current page.
+        // No-op when the current path is already bookmarked.
+        if (!path) return;
+        e.preventDefault();
+        if (settings.bookmarks.some((b) => b.path === path)) return;
+        const segs = path.split(/[\\/]/).filter(Boolean);
+        const label = segs.at(-1) || path;
+        update("bookmarks", [
+          ...settings.bookmarks,
+          { id: crypto.randomUUID(), label, path },
+        ]);
       }
     };
     window.addEventListener("keydown", onKey);
