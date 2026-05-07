@@ -121,4 +121,20 @@ describe("loadSettingsFromDisk / saveSettingsToDisk", () => {
       json: expect.stringContaining('"themeMode":"dark"'),
     });
   });
+
+  it("DEFAULTS includes the new folderViewMode + recentPaths + bookmarks fields", () => {
+    expect(DEFAULTS.folderViewMode).toEqual({});
+    expect(DEFAULTS.recentPaths).toEqual([]);
+    expect(DEFAULTS.bookmarks).toEqual([]);
+  });
+
+  it("saved settings without folderViewMode get merged against DEFAULTS", () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({ themeMode: "dark" }),
+    );
+    const out = loadSettings();
+    expect(out.themeMode).toBe("dark");
+    expect(out.folderViewMode).toEqual({});
+  });
 });

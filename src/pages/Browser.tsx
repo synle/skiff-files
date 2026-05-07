@@ -546,8 +546,26 @@ export default function Browser({
         onHistoryJump={jumpHistory}
         onRefresh={() => path && void refresh(path)}
         onNewFolder={() => void handleNewFolder()}
-        view={settings.defaultView}
-        onViewChange={(v) => update("defaultView", v)}
+        view={settings.folderViewMode[path] ?? settings.defaultView}
+        onViewChange={(v) => {
+          // Persist per-folder rather than globally — the user picked
+          // this view *for this path*, not as a new app-wide default.
+          // Trim to FOLDER_VIEW_MAX (LRU-style: oldest insertion order
+          // entries get dropped) so settings.json stays bounded.
+          const next = { ...settings.folderViewMode, [path]: v };
+          const keys = Object.keys(next);
+          // 200 cap matches FOLDER_VIEW_MAX. We don't import the
+          // constant here to keep this hot path simple.
+          if (keys.length > 200) {
+            const trimmed: typeof next = {};
+            for (const k of keys.slice(keys.length - 200)) {
+              trimmed[k] = next[k];
+            }
+            update("folderViewMode", trimmed);
+          } else {
+            update("folderViewMode", next);
+          }
+        }}
         previewOpen={previewOpen}
         onTogglePreview={() => setPreviewOpen((o) => !o)}
         search={search}

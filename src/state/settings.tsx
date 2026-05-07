@@ -59,11 +59,20 @@ export interface Settings {
    *  RECENT_PATHS_MAX so the list doesn't grow unbounded. Surfaces in
    *  the sidebar's Recent section. */
   recentPaths: string[];
+  /** Per-folder view mode override. The Browser falls back to
+   *  `defaultView` when there's no entry for the current path.
+   *  Capped at FOLDER_VIEW_MAX (LRU-style: oldest entries dropped
+   *  on overflow) to keep settings.json bounded. */
+  folderViewMode: Record<string, ViewMode>;
 }
 
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
  *  day's navigation without making the sidebar scroll forever. */
 export const RECENT_PATHS_MAX = 10;
+
+/** Max entries kept in `folderViewMode`. Settings.json grows by ~80
+ *  bytes per entry; 200 caps the file at ~16 KB. */
+export const FOLDER_VIEW_MAX = 200;
 
 export const DEFAULTS: Settings = {
   themeMode: "system",
@@ -76,6 +85,7 @@ export const DEFAULTS: Settings = {
   startPath: "",
   bookmarks: [],
   recentPaths: [],
+  folderViewMode: {},
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";
