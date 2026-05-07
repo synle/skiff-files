@@ -207,9 +207,20 @@ export default function BrowserTabs({ home }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, tabs]);
 
+  // Pre-compute active path so addTab below can read it without
+  // relying on a forward-declared const.
+  const activePathForSeed =
+    tabs.find((t) => t.id === activeId)?.currentPath ?? "";
+
   const addTab = (initialPath?: string) => {
     const id = crypto.randomUUID();
-    const seed = initialPath ?? home ?? "";
+    // Seeding precedence: explicit caller arg > "open at current
+    // path" setting > home directory.
+    const seed =
+      initialPath ??
+      (settings.openNewTabAtCurrent && activePathForSeed
+        ? activePathForSeed
+        : home ?? "");
     setTabs((prev) => [
       ...prev,
       {

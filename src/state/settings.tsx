@@ -148,6 +148,12 @@ export interface Settings {
    *  Default true. Hidden = the host icon column collapses to the
    *  fallback HubIcon to keep visual balance. */
   sidebarShowStatusDots: boolean;
+  /** When true, Cmd/Ctrl+T (and the toolbar +) seeds the new tab at
+   *  the active tab's current path instead of the home directory.
+   *  Useful for power users who frequently spawn parallel tabs from
+   *  the folder they're already viewing. Default false (Chrome
+   *  convention: new tab = home). */
+  openNewTabAtCurrent: boolean;
   /** Tabs the user had open at last save. Capped at TABS_MAX so a
    *  runaway browsing session doesn't bloat settings.json. Empty
    *  array = no persisted tabs (BrowserTabs will spawn a default). */
@@ -220,6 +226,7 @@ export const DEFAULTS: Settings = {
   sidebarSectionsVisible: {},
   sidebarAccordion: false,
   sidebarShowStatusDots: true,
+  openNewTabAtCurrent: false,
   savedTabs: [],
   savedActiveTabId: null,
 };

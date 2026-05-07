@@ -144,6 +144,18 @@ export default function SettingsPage() {
             helperText="Where new tabs / launches open. Leave blank to use the home directory."
             sx={{ maxWidth: 480 }}
           />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.openNewTabAtCurrent}
+                onChange={(e) =>
+                  update("openNewTabAtCurrent", e.target.checked)
+                }
+              />
+            }
+            label="New tabs open at the active tab's path (instead of home)"
+          />
         </Section>
 
         <Divider />

@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.72** — ✅ **New tab opens at current path option**. New `Settings.openNewTabAtCurrent` (default false). When on, Cmd/Ctrl+T (and the toolbar +) seeds the new tab at the active tab's current path instead of home — matches the expectation of users who frequently spawn parallel tabs from a folder they're already viewing. Seeding precedence: explicit caller arg > setting > home.
 - **0.2.71** — ✅ **Cmd/Ctrl+, opens Settings**. Mac convention for Preferences (also matches VS Code on every OS). App-level keydown handler navigates to `/settings`. Cheatsheet updated.
 - **0.2.70** — ✅ **Image rotate buttons in preview**. ImageBody grew rotate-left + rotate-right `<IconButton>`s under the inline image. Rotation is local component state applied as a CSS `transform: rotate(Ndeg)`; `transform-origin: center` keeps the image inside the pane on quarter turns; 200 ms transition gives the rotation a tactile feel. State resets to 0 on selection change so the next image starts upright. Closes the spec's "Image rotate / batch rename / EXIF strip" stretch bullet — first item.
 - **0.2.69** — ✅ **Tab right-click menu**. Right-clicking any tab pops a Menu with Close / Close others / Close tabs to the right (VS Code / Chrome convention). New `closeOtherTabs(keepId)` helper plus an inline closure for "to the right" that splices via index. Items disabled when only one tab is open so the user doesn't get stranded.
