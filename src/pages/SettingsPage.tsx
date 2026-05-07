@@ -125,6 +125,16 @@ export default function SettingsPage() {
             label="Reduce motion (also auto-detects from OS)"
           />
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.showStatusBar}
+                onChange={(e) => update("showStatusBar", e.target.checked)}
+              />
+            }
+            label="Show status bar"
+          />
+
           <TextField
             label="Default start path"
             size="small"

@@ -102,6 +102,10 @@ export interface Settings {
    *  intermix according to the chosen sort key — useful for sorting
    *  by mtime to find "most recently touched" without folder bias. */
   groupFoldersFirst: boolean;
+  /** When false, the StatusBar at the bottom of the Browser is
+   *  hidden — selection summary / disk space / errors don't render.
+   *  Default true. */
+  showStatusBar: boolean;
   /** Force reduced-motion regardless of OS preference. The app already
    *  honors `prefers-reduced-motion: reduce` automatically; this lets
    *  users opt in unconditionally (e.g. for VM / RDP sessions where
@@ -196,6 +200,7 @@ export const DEFAULTS: Settings = {
   syncSuppressConflictPrompts: false,
   groupFoldersFirst: true,
   reduceMotion: false,
+  showStatusBar: true,
   showFullPathInTitle: false,
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,

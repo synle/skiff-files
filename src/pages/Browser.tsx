@@ -725,7 +725,7 @@ export default function Browser({
           />
         )}
       </Box>
-      <StatusBar
+      {settings.showStatusBar && <StatusBar
         totalEntries={entries.length}
         selectedEntries={selectionStats.count}
         selectedSize={
@@ -735,7 +735,7 @@ export default function Browser({
         onDismissError={() => setError(null)}
         diskFree={diskSpace?.free ?? null}
         diskTotal={diskSpace?.total ?? null}
-      />
+      />}
       <EntryContextMenu
         state={contextMenu}
         onClose={() => setContextMenu(null)}
