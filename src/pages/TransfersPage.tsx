@@ -47,6 +47,7 @@ import {
 } from "../api/sync";
 import { startSync } from "../api/client";
 import { formatBytes } from "../util/format";
+import { useSettings } from "../state/settings";
 
 /** UI-side per-job aggregate, blending JobInfo with the latest progress
  *  payload + the final summary if the job finished. We track this map
@@ -99,11 +100,20 @@ export default function TransfersPage() {
   // Form state for "New job". The mode picker switches between the
   // local/cprepo planners; cpstamp + dedup live in their own
   // collapsible sections below since their inputs differ.
+  // Form-state initial values come from Settings so the user's
+  // configured defaults flow through. Saved-job templates carry their
+  // own policy + caps and don't read from this — they're independent
+  // of changes the user makes after saving.
+  const { settings } = useSettings();
   const [src, setSrc] = useState("");
   const [dest, setDest] = useState("");
-  const [maxSizeGb, setMaxSizeGb] = useState(1);
-  const [lookbackDays, setLookbackDays] = useState(7);
-  const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>("skip");
+  const [maxSizeGb, setMaxSizeGb] = useState(settings.syncDefaultMaxSizeGb);
+  const [lookbackDays, setLookbackDays] = useState(
+    settings.syncDefaultLookbackDays,
+  );
+  const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>(
+    settings.syncDefaultConflictPolicy,
+  );
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
   const [planner, setPlanner] = useState<"local" | "repo">("local");

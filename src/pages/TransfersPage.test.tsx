@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from "@mui/material";
 import { MemoryRouter } from "react-router";
 import { invoke } from "@tauri-apps/api/core";
 import TransfersPage from "./TransfersPage";
+import { SettingsProvider } from "../state/settings";
 
 const theme = createTheme();
 const mocked = vi.mocked(invoke);
@@ -15,11 +16,13 @@ beforeEach(() => {
 
 function r() {
   return render(
-    <ThemeProvider theme={theme}>
-      <MemoryRouter>
-        <TransfersPage />
-      </MemoryRouter>
-    </ThemeProvider>,
+    <SettingsProvider>
+      <ThemeProvider theme={theme}>
+        <MemoryRouter>
+          <TransfersPage />
+        </MemoryRouter>
+      </ThemeProvider>
+    </SettingsProvider>,
   );
 }
 

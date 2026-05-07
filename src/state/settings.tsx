@@ -17,6 +17,7 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ThemeMode } from "../theme";
+import type { ConflictPolicy } from "../api/sync";
 
 /** What rendering style the file list uses. Per-folder overrides land later. */
 export type ViewMode = "list" | "tile" | "gallery" | "column";
@@ -64,6 +65,14 @@ export interface Settings {
    *  Capped at FOLDER_VIEW_MAX (LRU-style: oldest entries dropped
    *  on overflow) to keep settings.json bounded. */
   folderViewMode: Record<string, ViewMode>;
+  /** Default conflict policy for new sync jobs. The Transfers form
+   *  reads this on mount; saved-job templates always carry their
+   *  own policy and ignore this. */
+  syncDefaultConflictPolicy: ConflictPolicy;
+  /** Default max-size cap (GB) for new sync jobs. */
+  syncDefaultMaxSizeGb: number;
+  /** Default lookback-days for the skip-if-unchanged heuristic. */
+  syncDefaultLookbackDays: number;
 }
 
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
@@ -86,6 +95,9 @@ export const DEFAULTS: Settings = {
   bookmarks: [],
   recentPaths: [],
   folderViewMode: {},
+  syncDefaultConflictPolicy: "skip",
+  syncDefaultMaxSizeGb: 1,
+  syncDefaultLookbackDays: 7,
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

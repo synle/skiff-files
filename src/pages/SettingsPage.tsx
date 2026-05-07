@@ -13,6 +13,7 @@ import {
   Select,
   Stack,
   Switch,
+  TextField,
   Typography,
 } from "@mui/material";
 import { useSettings } from "../state/settings";
@@ -147,6 +148,69 @@ export default function SettingsPage() {
               <MenuItem value="always">Always show</MenuItem>
             </Select>
           </FormControl>
+        </Section>
+
+        <Divider />
+
+        <Section
+          title="Transfers"
+          description="Defaults applied to new Skiffsync jobs. Saved templates keep their own values regardless."
+        >
+          <FormControl size="small" sx={{ maxWidth: 280 }}>
+            <InputLabel id="sync-conflict-label">Conflict policy</InputLabel>
+            <Select
+              labelId="sync-conflict-label"
+              label="Conflict policy"
+              value={settings.syncDefaultConflictPolicy}
+              onChange={(e) =>
+                update(
+                  "syncDefaultConflictPolicy",
+                  e.target.value as typeof settings.syncDefaultConflictPolicy,
+                )
+              }
+            >
+              <MenuItem value="skip">Skip</MenuItem>
+              <MenuItem value="overwrite">Overwrite</MenuItem>
+              <MenuItem value="keepBoth">Keep both</MenuItem>
+              <MenuItem value="overwriteOlder">Overwrite older</MenuItem>
+              <MenuItem value="replaceSmaller">Replace smaller</MenuItem>
+              <MenuItem value="replaceIfSizeDifferent">
+                Replace if size differs
+              </MenuItem>
+              <MenuItem value="renameTarget">Rename target</MenuItem>
+              <MenuItem value="renameOlderTarget">
+                Rename older target
+              </MenuItem>
+              <MenuItem value="prompt">Ask each time…</MenuItem>
+            </Select>
+          </FormControl>
+
+          <TextField
+            label="Max size (GB)"
+            size="small"
+            type="number"
+            value={settings.syncDefaultMaxSizeGb}
+            onChange={(e) =>
+              update(
+                "syncDefaultMaxSizeGb",
+                Math.max(1, Number(e.target.value) || 1),
+              )
+            }
+            sx={{ maxWidth: 180 }}
+          />
+          <TextField
+            label="Lookback days"
+            size="small"
+            type="number"
+            value={settings.syncDefaultLookbackDays}
+            onChange={(e) =>
+              update(
+                "syncDefaultLookbackDays",
+                Math.max(0, Number(e.target.value) || 0),
+              )
+            }
+            sx={{ maxWidth: 180 }}
+          />
         </Section>
 
         <Divider />
