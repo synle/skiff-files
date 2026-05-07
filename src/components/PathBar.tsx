@@ -23,12 +23,38 @@ interface Props {
   path: string;
   onNavigate: (path: string) => void;
   onHome: () => void;
+  /** Counter that flips the bar into edit mode whenever it changes.
+   *  Browser increments it in response to Cmd/Ctrl+L. We use a counter
+   *  rather than a boolean so repeated presses re-focus even when the
+   *  bar is already editing (matches browser address-bar muscle memory). */
+  focusRequest?: number;
 }
 
 /** Two modes: breadcrumb (default) and editable text. Toggle via the pencil. */
-export default function PathBar({ path, onNavigate, onHome }: Props) {
+export default function PathBar({ path, onNavigate, onHome, focusRequest }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(path);
+
+  // External "please focus me" pulses (Cmd/Ctrl+L from Browser). The
+  // counter pattern means repeated presses re-fire even when we're
+  // already in edit mode; the autoFocus on the TextField handles the
+  // first transition and the explicit focus() the subsequent ones.
+  useEffect(() => {
+    if (focusRequest === undefined || focusRequest === 0) return;
+    setEditing(true);
+    setDraft(path);
+    // Wait a tick so the TextField mounts before we focus / select.
+    queueMicrotask(() => {
+      const el = document.querySelector<HTMLInputElement>(
+        'input[aria-label="Path"]',
+      );
+      el?.focus();
+      el?.select();
+    });
+    // Intentionally don't depend on `path` — only fire when the
+    // counter changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest]);
   /** Cache of the last parent listing, keyed by parent path. Avoids
    *  re-issuing list_dir on every Tab press. Cleared when the parent
    *  changes (the next Tab refetches). */

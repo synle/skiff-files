@@ -118,6 +118,9 @@ export default function Browser({
    *  entries. Triggered by F2 with multi-select; single-select F2
    *  still opens the per-file RenameDialog. */
   const [bulkRenameTargets, setBulkRenameTargets] = useState<Entry[]>([]);
+  /** Counter the PathBar watches — incrementing flips it into edit
+   *  mode and selects the text. Driven by Cmd/Ctrl+L. */
+  const [pathBarFocusRequest, setPathBarFocusRequest] = useState(0);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -341,6 +344,10 @@ export default function Browser({
       } else if (k === "n" && e.shiftKey) {
         e.preventDefault();
         void handleNewFolder();
+      } else if (k === "l" && !e.shiftKey) {
+        // Browser muscle memory: Cmd/Ctrl+L = jump to address bar.
+        e.preventDefault();
+        setPathBarFocusRequest((c) => c + 1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -629,6 +636,7 @@ export default function Browser({
         path={path}
         onNavigate={navigate}
         onHome={() => home && navigate(home)}
+        focusRequest={pathBarFocusRequest}
       />
       <Toolbar
         canGoBack={history.back.length > 1}
