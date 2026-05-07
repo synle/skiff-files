@@ -13,6 +13,7 @@ import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
 import { fsHomeDir } from "./api/fs";
+import { useSettings } from "./state/settings";
 
 /** A custom DOM event the Sidebar emits to ask the Browser to navigate. We
  *  use a window event rather than lifting state because it stays
@@ -28,21 +29,29 @@ export default function App() {
   const [home, setHome] = useState("");
   const [quickJumpOpen, setQuickJumpOpen] = useState(false);
   const navigate = useNavigate();
+  const { settings, update } = useSettings();
 
-  // Cmd/Ctrl+K → toggle the quick-jump palette. Skips when an input
-  // is focused so the shortcut doesn't hijack typing.
+  // Cmd/Ctrl+K → toggle the quick-jump palette. Cmd/Ctrl+B → toggle
+  // the sidebar (persisted in Settings so it survives restart).
+  // Both skip when an input is focused so they don't hijack typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "k") return;
+      if (!(e.metaKey || e.ctrlKey)) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
-      e.preventDefault();
-      setQuickJumpOpen((o) => !o);
+      const k = e.key.toLowerCase();
+      if (k === "k") {
+        e.preventDefault();
+        setQuickJumpOpen((o) => !o);
+      } else if (k === "b") {
+        e.preventDefault();
+        update("sidebarVisible", !settings.sidebarVisible);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [settings.sidebarVisible, update]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,19 +75,24 @@ export default function App() {
         overflow: "hidden",
       }}
     >
-      <Sidebar
-        home={home}
-        onNavigate={(p) => {
-          // Switch to the Browser route first, then dispatch the path. Order
-          // matters: if we're on /settings the Browser isn't mounted yet, so
-          // dispatching first would no-op.
-          navigate("/");
-          // queueMicrotask so the route change commits before the listener fires
-          queueMicrotask(() =>
-            window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: p })),
-          );
-        }}
-      />
+      {settings.sidebarVisible && (
+        <Sidebar
+          home={home}
+          onNavigate={(p) => {
+            // Switch to the Browser route first, then dispatch the
+            // path. Order matters: if we're on /settings the Browser
+            // isn't mounted yet, so dispatching first would no-op.
+            navigate("/");
+            // queueMicrotask so the route change commits before the
+            // listener fires.
+            queueMicrotask(() =>
+              window.dispatchEvent(
+                new CustomEvent(NAVIGATE_EVENT, { detail: p }),
+              ),
+            );
+          }}
+        />
+      )}
       <Box
         component="main"
         sx={{

@@ -81,6 +81,9 @@ export interface Settings {
   syncDefaultMaxSizeGb: number;
   /** Default lookback-days for the skip-if-unchanged heuristic. */
   syncDefaultLookbackDays: number;
+  /** Sidebar visibility — toggled via Cmd/Ctrl+B. Persisted so it
+   *  survives restarts. */
+  sidebarVisible: boolean;
 }
 
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
@@ -109,6 +112,7 @@ export const DEFAULTS: Settings = {
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
+  sidebarVisible: true,
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

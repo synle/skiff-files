@@ -1,11 +1,18 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import App from "./App";
 import { ThemeProvider, createTheme } from "@mui/material";
 import { SettingsProvider } from "./state/settings";
 
 const theme = createTheme();
+
+// Settings persist via localStorage; clear between tests so a previous
+// test's setting (e.g. sidebarVisible=false from the toggle test) can't
+// leak into the next.
+beforeEach(() => {
+  localStorage.clear();
+});
 
 // Match the FileList test fixture — jsdom doesn't lay things out, so the
 // virtualizer needs a coaxed bounding rect.
@@ -59,5 +66,14 @@ describe("App", () => {
   it("Settings page has the theme selector", () => {
     render(frame("/settings"));
     expect(screen.getByLabelText(/Theme$/)).toBeInTheDocument();
+  });
+
+  it("Cmd/Ctrl+B hides the sidebar", async () => {
+    render(frame("/"));
+    expect(screen.getByText("Favorites")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.queryByText("Favorites")).not.toBeInTheDocument();
+    });
   });
 });
