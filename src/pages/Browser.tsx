@@ -726,7 +726,9 @@ export default function Browser({
         )}
       </Box>
       {settings.showStatusBar && <StatusBar
-        totalEntries={entries.length}
+        totalEntries={
+          searchRecursive && findResults ? findResults.length : entries.length
+        }
         selectedEntries={selectionStats.count}
         selectedSize={
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
@@ -735,6 +737,10 @@ export default function Browser({
         onDismissError={() => setError(null)}
         diskFree={diskSpace?.free ?? null}
         diskTotal={diskSpace?.total ?? null}
+        findActive={searchRecursive && findResults != null}
+        // The Rust-side cap is 1000 results; reaching it is the
+        // user's signal to refine the query.
+        findHitCap={!!findResults && findResults.length >= 1000}
       />}
       <EntryContextMenu
         state={contextMenu}

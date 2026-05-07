@@ -19,6 +19,11 @@ interface Props {
    *  "X free of Y". Local paths only — remotes pass `null`. */
   diskFree?: number | null;
   diskTotal?: number | null;
+  /** When true, the active listing is the recursive-find result set.
+   *  Status text switches to "N matches" (or "N+ matches" when the
+   *  result count hit the engine's hard cap of 1000). */
+  findActive?: boolean;
+  findHitCap?: boolean;
 }
 
 export default function StatusBar({
@@ -29,6 +34,8 @@ export default function StatusBar({
   onDismissError,
   diskFree,
   diskTotal,
+  findActive = false,
+  findHitCap = false,
 }: Props) {
   // Errors take precedence — a directory listing error matters more than the
   // empty-selection summary it would otherwise render alongside.
@@ -79,7 +86,9 @@ export default function StatusBar({
       <Typography variant="caption" color="text.secondary">
         {selectedEntries > 0
           ? `${selectedEntries} of ${totalEntries} selected · ${formatBytes(selectedSize)}`
-          : `${totalEntries} item${totalEntries === 1 ? "" : "s"}`}
+          : findActive
+            ? `${totalEntries}${findHitCap ? "+" : ""} match${totalEntries === 1 ? "" : "es"}`
+            : `${totalEntries} item${totalEntries === 1 ? "" : "s"}`}
       </Typography>
       {diskFree != null && diskTotal != null && (
         <Typography variant="caption" color="text.secondary">
