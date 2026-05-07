@@ -19,6 +19,7 @@ import {
 } from "../api/client";
 import RenameDialog from "../components/RenameDialog";
 import EntryContextMenu from "../components/EntryContextMenu";
+import PropertiesDialog from "../components/PropertiesDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
@@ -88,6 +89,8 @@ export default function Browser({
     x: number;
     y: number;
   } | null>(null);
+  /** When non-null, the Properties dialog is open against this entry. */
+  const [propertiesTarget, setPropertiesTarget] = useState<Entry | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -525,6 +528,11 @@ export default function Browser({
             void navigator.clipboard.writeText(e.path);
           }
         }}
+        onProperties={(e) => setPropertiesTarget(e)}
+      />
+      <PropertiesDialog
+        entry={propertiesTarget}
+        onClose={() => setPropertiesTarget(null)}
       />
       <RenameDialog
         open={!!renameTarget}

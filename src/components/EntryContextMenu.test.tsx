@@ -27,6 +27,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onRename: vi.fn(),
     onTrash: vi.fn(),
     onCopyPath: vi.fn(),
+    onProperties: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>
@@ -72,5 +73,11 @@ describe("EntryContextMenu", () => {
     const h = r({ entry: file, x: 10, y: 10 });
     fireEvent.click(screen.getByText("Copy path"));
     expect(h.onCopyPath).toHaveBeenCalledWith(file);
+  });
+
+  it("Properties calls onProperties", () => {
+    const h = r({ entry: file, x: 10, y: 10 });
+    fireEvent.click(screen.getByText("Properties…"));
+    expect(h.onProperties).toHaveBeenCalledWith(file);
   });
 });

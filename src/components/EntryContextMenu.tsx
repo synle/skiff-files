@@ -12,6 +12,7 @@ import OpenIcon from "@mui/icons-material/FolderOpen";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import InfoIcon from "@mui/icons-material/Info";
 import type { Entry } from "../api/fs";
 
 interface Props {
@@ -22,6 +23,7 @@ interface Props {
   onRename: (entry: Entry) => void;
   onTrash: (entry: Entry) => void;
   onCopyPath: (entry: Entry) => void;
+  onProperties: (entry: Entry) => void;
 }
 
 export default function EntryContextMenu({
@@ -31,6 +33,7 @@ export default function EntryContextMenu({
   onRename,
   onTrash,
   onCopyPath,
+  onProperties,
 }: Props) {
   const open = state != null;
   return (
@@ -77,6 +80,17 @@ export default function EntryContextMenu({
           <ContentCopyIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Copy path</ListItemText>
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          if (state) onProperties(state.entry);
+          onClose();
+        }}
+      >
+        <ListItemIcon>
+          <InfoIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Properties…</ListItemText>
       </MenuItem>
       <Divider />
       <MenuItem
