@@ -13,6 +13,11 @@ import { type DirSummary, type Entry } from "../api/fs";
 import { dirSummary, readBase64, readText } from "../api/client";
 import { formatBytes, formatMtime } from "../util/format";
 import { isImage, mimeForPath } from "../util/mime";
+import {
+  PREVIEW_WIDTH_MAX,
+  PREVIEW_WIDTH_MIN,
+  useSettings,
+} from "../state/settings";
 import IconForKind from "./IconForKind";
 
 interface Props {
@@ -213,11 +218,41 @@ function Body({ entry }: { entry: Entry }) {
 }
 
 export default function PreviewPane({ selected, width }: Props) {
+  const { update } = useSettings();
+
+  // Drag-resize from the LEFT edge — the pane lives on the right of
+  // the FileList, so dragging left widens it. Same MouseMove-on-document
+  // pattern the Sidebar uses (0.2.28) so a fast drag past the handle's
+  // own bounds doesn't drop the pointer.
+  const startDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (ev: MouseEvent) => {
+      // dx grows as the mouse moves right; we want the pane to widen
+      // when the mouse moves *left* (since the handle is on the left
+      // edge), so subtract.
+      const dx = ev.clientX - startX;
+      const next = Math.max(
+        PREVIEW_WIDTH_MIN,
+        Math.min(PREVIEW_WIDTH_MAX, startW - dx),
+      );
+      update("previewWidth", next);
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   return (
     <Box
       role="complementary"
       aria-label="Preview pane"
       sx={{
+        position: "relative",
         width,
         flexShrink: 0,
         borderLeft: 1,
@@ -228,6 +263,26 @@ export default function PreviewPane({ selected, width }: Props) {
         overflow: "auto",
       }}
     >
+      {/* Drag handle — thin column on the left edge. Same primary-tint
+          on hover affordance as the Sidebar resizer so the two flow
+          consistently. */}
+      <Box
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize preview pane"
+        onMouseDown={startDrag}
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: -3,
+          bottom: 0,
+          width: 6,
+          cursor: "col-resize",
+          transition: "background-color 120ms",
+          "&:hover": { backgroundColor: "primary.light" },
+          zIndex: 1,
+        }}
+      />
       {!selected ? (
         <Box sx={{ p: 2 }}>
           <Typography variant="body2" color="text.secondary">

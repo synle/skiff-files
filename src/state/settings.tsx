@@ -128,6 +128,11 @@ export const SIDEBAR_WIDTH_MIN = 180;
 export const SIDEBAR_WIDTH_MAX = 400;
 export const SIDEBAR_WIDTH_DEFAULT = 220;
 
+/** Preview pane width clamps. Below the min the image fits in a
+ *  postage stamp; above the max the file list gets cramped. */
+export const PREVIEW_WIDTH_MIN = 240;
+export const PREVIEW_WIDTH_MAX = 720;
+
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
  *  day's navigation without making the sidebar scroll forever. */
 export const RECENT_PATHS_MAX = 10;

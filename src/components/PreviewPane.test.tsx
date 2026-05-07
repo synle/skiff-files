@@ -3,13 +3,16 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import PreviewPane from "./PreviewPane";
 import type { Entry } from "../api/fs";
+import { SettingsProvider } from "../state/settings";
 
 const theme = createTheme();
 
 function r(props: { selected: Entry | null; width?: number }) {
   return render(
     <ThemeProvider theme={theme}>
-      <PreviewPane selected={props.selected} width={props.width ?? 320} />
+      <SettingsProvider>
+        <PreviewPane selected={props.selected} width={props.width ?? 320} />
+      </SettingsProvider>
     </ThemeProvider>,
   );
 }
@@ -107,7 +110,9 @@ describe("PreviewPane", () => {
     // selection swaps the rendered content without leaking the prior one.
     const { rerender } = render(
       <ThemeProvider theme={theme}>
-        <PreviewPane selected={text} width={320} />
+        <SettingsProvider>
+          <PreviewPane selected={text} width={320} />
+        </SettingsProvider>
       </ThemeProvider>,
     );
     await waitFor(() => {
@@ -115,7 +120,9 @@ describe("PreviewPane", () => {
     });
     rerender(
       <ThemeProvider theme={theme}>
-        <PreviewPane selected={folder} width={320} />
+        <SettingsProvider>
+          <PreviewPane selected={folder} width={320} />
+        </SettingsProvider>
       </ThemeProvider>,
     );
     // Folder body replaces text body.
