@@ -704,6 +704,7 @@ export default function Browser({
           density={settings.density}
           showExtensions={settings.showExtensions}
           groupFoldersFirst={settings.groupFoldersFirst}
+          highlightQuery={search}
         />
         {effectivePreviewOpen && (
           <PreviewPane

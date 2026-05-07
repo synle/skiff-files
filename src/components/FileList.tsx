@@ -53,6 +53,10 @@ interface Props {
    *  by the chosen sort. Settings → Default View → "Group folders
    *  before files" controls this. */
   groupFoldersFirst?: boolean;
+  /** Optional substring to highlight inside each row's name. Drives
+   *  the bold-highlight visual when the user is filtering or
+   *  recursive-finding. Empty / undefined disables highlighting. */
+  highlightQuery?: string;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -94,6 +98,39 @@ function displayName(e: Entry, showExtensions: boolean): string {
   if (e.isDir || showExtensions) return e.name;
   const dot = e.name.lastIndexOf(".");
   return dot > 0 ? e.name.slice(0, dot) : e.name;
+}
+
+/** Render `name` with the first case-insensitive occurrence of `query`
+ *  wrapped in a `<strong>`. Returns the plain string when there's no
+ *  match or the query is empty. Pure helper — split out so the FileList
+ *  row can stay tight. */
+function renderHighlighted(name: string, query: string): React.ReactNode {
+  if (!query) return name;
+  const lower = name.toLowerCase();
+  const q = query.toLowerCase();
+  const i = lower.indexOf(q);
+  if (i < 0) return name;
+  const before = name.slice(0, i);
+  const match = name.slice(i, i + query.length);
+  const after = name.slice(i + query.length);
+  return (
+    <>
+      {before}
+      <Box
+        component="strong"
+        sx={{
+          fontWeight: 700,
+          color: "primary.main",
+          backgroundColor: "action.selected",
+          borderRadius: 0.5,
+          px: 0.25,
+        }}
+      >
+        {match}
+      </Box>
+      {after}
+    </>
+  );
 }
 
 /** Header cell with click-to-sort + indicator arrow.
@@ -178,6 +215,7 @@ export default function FileList(props: Props) {
     showExtensions,
     isActive = true,
     groupFoldersFirst = true,
+    highlightQuery = "",
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
@@ -492,7 +530,10 @@ export default function FileList(props: Props) {
                       sx={{ flex: 1 }}
                       title={e.name}
                     >
-                      {displayName(e, showExtensions)}
+                      {renderHighlighted(
+                        displayName(e, showExtensions),
+                        highlightQuery,
+                      )}
                       {e.isSymlink ? " ↪" : ""}
                     </Typography>
                   </Box>

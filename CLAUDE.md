@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.47** — ✅ **Highlight matched substring in filenames**. While the in-pane filter (or recursive find) is active, FileList wraps the first case-insensitive match in each visible name with a primary-tinted bold span. Pure helper `renderHighlighted` so the row stays tight; no-op when the query is empty so the non-search render path doesn't pay any extra cost.
 - **0.2.46** — ✅ **Clear recent paths button**. Settings → Advanced grew a one-click button that wipes `Settings.recentPaths`. Disabled when the list is already empty; shows the current count in the label so the user knows how much they're about to drop ("Clear recent paths (7)"). Useful when sharing a screen / handing off the laptop.
 - **0.2.45** — ✅ **Rename bookmark label**. Right-clicking a bookmark in the Sidebar pops a native prompt to edit its `label` (path target stays unchanged). Tooltip on the bookmark row hints "Right-click to rename" so the affordance is discoverable. Trimmed empty / unchanged input is a no-op so accidentally-canceling-then-Enter doesn't blank the label.
 - **0.2.44** — ✅ **Settings reset confirms before wiping**. The "Reset all settings" button used to fire `reset()` immediately on click, which would silently drop bookmarks / recent paths / saved tabs / per-folder sort + view overrides. Now it pops a `window.confirm` enumerating what gets dropped so a stray click can't nuke a session's worth of curation.
