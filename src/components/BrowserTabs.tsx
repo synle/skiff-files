@@ -127,9 +127,25 @@ export default function BrowserTabs({ home }: Props) {
     );
   }, [home]);
 
+  /** Reorder the active tab left or right by one position. No-op at
+   *  the boundary. Used by Cmd/Ctrl+Shift+Left/Right. */
+  const moveActiveTab = (direction: "left" | "right") => {
+    setTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === activeId);
+      if (idx < 0) return prev;
+      const target = direction === "left" ? idx - 1 : idx + 1;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(idx, 1);
+      next.splice(target, 0, moved);
+      return next;
+    });
+  };
+
   // Keyboard shortcuts. Cmd/Ctrl+T = new tab, Cmd/Ctrl+W = close active,
-  // Cmd/Ctrl+1..9 = switch to nth tab. Skipped while the user is in an
-  // input so typing 'w' in the path bar doesn't close the tab.
+  // Cmd/Ctrl+1..9 = switch to nth tab, Cmd/Ctrl+Shift+←/→ = reorder
+  // active tab. Skipped while the user is in an input so typing 'w'
+  // in the path bar doesn't close the tab.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -158,6 +174,9 @@ export default function BrowserTabs({ home }: Props) {
           e.preventDefault();
           setActiveId(tabs[idx].id);
         }
+      } else if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        moveActiveTab(e.key === "ArrowLeft" ? "left" : "right");
       }
     };
     window.addEventListener("keydown", onKey);

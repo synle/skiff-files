@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.50** — ✅ **Reorder tabs via keyboard**. Cmd/Ctrl+Shift+← / → moves the active tab one slot left / right (no-op at boundaries). New `moveActiveTab` helper inside BrowserTabs splices the active tab to a fresh index without dropping its identity / Browser instance, so history + selection state survive the move. Cheatsheet updated.
 - **0.2.49** — ✅ **Default start path setting**. Settings → Appearance grew a TextField for `Settings.startPath`. The Browser already consumed this on first mount; until now there was no UI to set it. Empty = home directory (resolved at runtime from `fsHomeDir`).
 - **0.2.48** — ✅ **Forget per-folder overrides button**. Settings → Advanced gets a button that wipes both `folderViewMode` and `folderSort` after a confirm dialog showing the combined entry count. Closes the Phase 1 spec's "Per-folder overrides: keep / forget all" bullet.
 - **0.2.47** — ✅ **Highlight matched substring in filenames**. While the in-pane filter (or recursive find) is active, FileList wraps the first case-insensitive match in each visible name with a primary-tinted bold span. Pure helper `renderHighlighted` so the row stays tight; no-op when the query is empty so the non-search render path doesn't pay any extra cost.
