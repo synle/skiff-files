@@ -98,6 +98,16 @@ export default function SettingsPage() {
             }
             label="Show full path in window title"
           />
+
+          <TextField
+            label="Default start path"
+            size="small"
+            value={settings.startPath}
+            onChange={(e) => update("startPath", e.target.value)}
+            placeholder="(empty = home directory)"
+            helperText="Where new tabs / launches open. Leave blank to use the home directory."
+            sx={{ maxWidth: 480 }}
+          />
         </Section>
 
         <Divider />

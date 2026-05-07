@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.49** — ✅ **Default start path setting**. Settings → Appearance grew a TextField for `Settings.startPath`. The Browser already consumed this on first mount; until now there was no UI to set it. Empty = home directory (resolved at runtime from `fsHomeDir`).
 - **0.2.48** — ✅ **Forget per-folder overrides button**. Settings → Advanced gets a button that wipes both `folderViewMode` and `folderSort` after a confirm dialog showing the combined entry count. Closes the Phase 1 spec's "Per-folder overrides: keep / forget all" bullet.
 - **0.2.47** — ✅ **Highlight matched substring in filenames**. While the in-pane filter (or recursive find) is active, FileList wraps the first case-insensitive match in each visible name with a primary-tinted bold span. Pure helper `renderHighlighted` so the row stays tight; no-op when the query is empty so the non-search render path doesn't pay any extra cost.
 - **0.2.46** — ✅ **Clear recent paths button**. Settings → Advanced grew a one-click button that wipes `Settings.recentPaths`. Disabled when the list is already empty; shows the current count in the label so the user knows how much they're about to drop ("Clear recent paths (7)"). Useful when sharing a screen / handing off the laptop.
