@@ -604,6 +604,7 @@ export default function Browser({
           onPrimarySelect={setPrimarySelected}
           onSelectionChange={setSelectedPaths}
           onContext={(entry, x, y) => setContextMenu({ entry, x, y })}
+          isActive={isActive}
           density={settings.density}
           showExtensions={settings.showExtensions}
         />

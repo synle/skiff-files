@@ -34,12 +34,10 @@ const GROUPS: Group[] = [
   {
     title: "Navigation",
     items: [
-      { keys: "↑ / ↓", description: "Move selection up / down" },
-      { keys: "Enter", description: "Open the selected folder / file" },
+      { keys: "↑ / ↓", description: "Move focus up / down" },
+      { keys: "Enter", description: "Open the focused folder" },
+      { keys: "Space", description: "Toggle the focused row's selection" },
       { keys: "Backspace", description: "Go up one folder" },
-      { keys: "Cmd / Ctrl + ↑", description: "Up one folder" },
-      { keys: "Cmd / Ctrl + ←", description: "Back" },
-      { keys: "Cmd / Ctrl + →", description: "Forward" },
       { keys: "Home / End", description: "Jump to first / last entry" },
     ],
   },

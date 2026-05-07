@@ -85,6 +85,7 @@ function renderList(props?: Partial<Parameters<typeof FileList>[0]>) {
           onOpenDir={onOpenDir}
           onPrimarySelect={onPrimarySelect}
           onSelectionChange={onSelectionChange}
+          isActive={props?.isActive ?? true}
           density={props?.density ?? "comfortable"}
           showExtensions={props?.showExtensions ?? true}
         />
@@ -155,5 +156,47 @@ describe("FileList", () => {
   it("shows the empty-folder message when no entries", () => {
     renderList({ entries: [] });
     expect(screen.getByText(/Empty folder/i)).toBeInTheDocument();
+  });
+
+  it("Cmd/Ctrl+A selects all visible entries", () => {
+    const onSelectionChange = vi.fn();
+    renderList({ onSelectionChange });
+    fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+    const last = onSelectionChange.mock.calls.at(-1)?.[0];
+    expect(last).toHaveLength(3);
+  });
+
+  it("Escape clears the selection", () => {
+    const onSelectionChange = vi.fn();
+    renderList({ onSelectionChange });
+    fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+    expect(onSelectionChange.mock.calls.at(-1)?.[0]).toHaveLength(3);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onSelectionChange.mock.calls.at(-1)?.[0]).toHaveLength(0);
+  });
+
+  it("Enter on a focused folder fires onOpenDir", () => {
+    const { onOpenDir } = renderList();
+    // child-folder is sorted first (folders-on-top), so focusedIdx=0.
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(onOpenDir).toHaveBeenCalled();
+    const arg = (onOpenDir as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+    expect(arg.name).toBe("child-folder");
+  });
+
+  it("ArrowDown moves focus + reports new primary selection", () => {
+    const onPrimarySelect = vi.fn();
+    renderList({ onPrimarySelect });
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    const last = onPrimarySelect.mock.calls.at(-1)?.[0];
+    expect(last?.name).toBe("alpha.txt");
+  });
+
+  it("does NOT respond to keypresses when isActive=false", () => {
+    const onSelectionChange = vi.fn();
+    renderList({ isActive: false, onSelectionChange });
+    fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+    const last = onSelectionChange.mock.calls.at(-1)?.[0];
+    expect(last ?? []).toHaveLength(0);
   });
 });

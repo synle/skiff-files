@@ -23,6 +23,9 @@ interface Props {
   onSortChange: (key: SortKey) => void;
   /** Called when a folder is double-clicked or Enter pressed on it. */
   onOpenDir: (entry: Entry) => void;
+  /** When false, keyboard nav handlers are disabled — for tabs that
+   *  aren't in the foreground. */
+  isActive?: boolean;
   /** Fires whenever a row is clicked. The "primary" selection drives the
    *  preview pane; multi-select is tracked here and reported via
    *  `onSelectionChange`. */
@@ -119,6 +122,7 @@ export default function FileList(props: Props) {
     onContext,
     density,
     showExtensions,
+    isActive = true,
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
@@ -128,13 +132,18 @@ export default function FileList(props: Props) {
   );
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Keyboard-focused row index. Drives the highlighted row visual
+   *  + the scroll-into-view + the Enter/Backspace targets. -1 = no
+   *  row focused (e.g. an empty folder). */
+  const [focusedIdx, setFocusedIdx] = useState<number>(-1);
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // Reset selection when the entries array identity changes — typically
-  // after a navigation. Sticking to a stale path in the previous folder
-  // would surface a wrong size in the StatusBar.
+  // Reset selection + focus when the entries array identity changes —
+  // typically after a navigation. Sticking to a stale path in the
+  // previous folder would surface a wrong size in the StatusBar.
   useEffect(() => {
     setSelected(new Set());
+    setFocusedIdx(entries.length > 0 ? 0 : -1);
   }, [entries]);
 
   // Notify the parent on every selection change. Memoized via an effect
@@ -143,6 +152,96 @@ export default function FileList(props: Props) {
   useEffect(() => {
     onSelectionChange?.(Array.from(selected));
   }, [selected, onSelectionChange]);
+
+  // Keyboard navigation. Active only on the foreground tab and only
+  // when no input is focused (so typing in the path bar / search box
+  // doesn't jump rows). The handler operates on `sorted` so arrow
+  // movement matches what the user actually sees, even when the
+  // sort flips.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      if (sorted.length === 0) return;
+
+      const cmd = e.metaKey || e.ctrlKey;
+      switch (e.key) {
+        case "ArrowDown": {
+          e.preventDefault();
+          setFocusedIdx((i) => Math.min(sorted.length - 1, Math.max(0, i) + 1));
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          setFocusedIdx((i) => Math.max(0, (i < 0 ? 0 : i) - 1));
+          break;
+        }
+        case "Home": {
+          e.preventDefault();
+          setFocusedIdx(0);
+          break;
+        }
+        case "End": {
+          e.preventDefault();
+          setFocusedIdx(sorted.length - 1);
+          break;
+        }
+        case "Enter": {
+          // Only fire when a row is focused. Skips when the focus is
+          // on a checkbox / button (those would have tag === "input"
+          // already and bailed out above, but be defensive).
+          if (focusedIdx < 0 || focusedIdx >= sorted.length) return;
+          e.preventDefault();
+          const row = sorted[focusedIdx];
+          if (row.isDir) onOpenDir(row);
+          break;
+        }
+        case "Escape": {
+          if (selected.size === 0) return;
+          e.preventDefault();
+          setSelected(new Set());
+          break;
+        }
+        case "a":
+        case "A": {
+          if (!cmd) return;
+          e.preventDefault();
+          setSelected(new Set(sorted.map((s) => s.path)));
+          break;
+        }
+        case " ": {
+          // Space toggles the focused row's selection — matches Finder's
+          // muscle memory.
+          if (focusedIdx < 0) return;
+          e.preventDefault();
+          toggleSel(sorted[focusedIdx].path, true);
+          break;
+        }
+        default:
+          return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // `toggleSel` and `onOpenDir` are stable identifiers from the
+    // parent in practice; the dep list intentionally captures only
+    // the values we read inside the handler that change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, sorted, focusedIdx, selected, onOpenDir]);
+
+  // When the focused row moves, update the primary selection + scroll
+  // it into view. We don't toggle the multi-selection set here — that
+  // happens via Space.
+  useEffect(() => {
+    if (focusedIdx < 0 || focusedIdx >= sorted.length) return;
+    onPrimarySelect?.(sorted[focusedIdx]);
+    rowVirtualizer.scrollToIndex(focusedIdx, { align: "auto" });
+    // We deliberately don't depend on `onPrimarySelect` to avoid
+    // re-running on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedIdx, sorted]);
 
   // Row height is the dominant perf knob — keep both densities in sync with
   // the inner row Box height below.
@@ -167,6 +266,8 @@ export default function FileList(props: Props) {
   const onRowClick = (e: Entry, evt: React.MouseEvent) => {
     toggleSel(e.path, evt.metaKey || evt.ctrlKey);
     onPrimarySelect?.(e);
+    const idx = sorted.findIndex((s) => s.path === e.path);
+    if (idx >= 0) setFocusedIdx(idx);
   };
   const onRowDouble = (e: Entry) => {
     if (e.isDir) onOpenDir(e);
@@ -248,6 +349,7 @@ export default function FileList(props: Props) {
             {rowVirtualizer.getVirtualItems().map((vi) => {
               const e = sorted[vi.index];
               const isSel = selected.has(e.path);
+              const isFocused = vi.index === focusedIdx;
               return (
                 <Box
                   key={e.path}
@@ -275,6 +377,11 @@ export default function FileList(props: Props) {
                     alignItems: "center",
                     cursor: e.isDir ? "pointer" : "default",
                     bgcolor: isSel ? "action.selected" : "transparent",
+                    // Focus ring for keyboard users. Inset so the row
+                    // doesn't shift when the focus moves.
+                    boxShadow: isFocused
+                      ? (theme) => `inset 0 0 0 2px ${theme.palette.primary.main}`
+                      : "none",
                     "&:hover": { bgcolor: isSel ? "action.selected" : "action.hover" },
                   }}
                 >
