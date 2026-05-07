@@ -3,6 +3,7 @@
 // land in later phases once Hosts exist.
 import {
   Box,
+  CircularProgress,
   IconButton,
   Tooltip,
   ToggleButton,
@@ -36,6 +37,10 @@ interface Props {
   onBack: () => void;
   onForward: () => void;
   onUp: () => void;
+  /** True while a list_dir is in flight. Swaps the refresh icon for a
+   *  small spinner so the user has visible feedback that the click
+   *  registered (relevant on slow remotes). */
+  isRefreshing?: boolean;
   /** Back-history entries (most recent last). Right-clicking the back
    *  arrow opens a menu of these so users can jump multiple steps. */
   backHistory?: string[];
@@ -87,6 +92,7 @@ export default function Toolbar(props: Props) {
     backHistory = [],
     forwardHistory = [],
     onHistoryJump,
+    isRefreshing = false,
   } = props;
 
   // Anchor for the history dropdowns. We share one state slot for both
@@ -194,7 +200,14 @@ export default function Toolbar(props: Props) {
 
       <Tooltip title="Refresh">
         <IconButton size="small" onClick={onRefresh} aria-label="Refresh">
-          <RefreshIcon fontSize="small" />
+          {isRefreshing ? (
+            // Match the static icon size so the layout doesn't shift
+            // between states. The 16px spinner is roughly the same
+            // visual weight as RefreshIcon at fontSize="small".
+            <CircularProgress size={16} thickness={5} />
+          ) : (
+            <RefreshIcon fontSize="small" />
+          )}
         </IconButton>
       </Tooltip>
       <Tooltip title="New folder">

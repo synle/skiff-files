@@ -1,6 +1,7 @@
 // Bottom status strip — selection count + total size. Free-space / transfer
 // status get added when the Skiffsync engine lands in Phase 4.
-import { Box, Typography } from "@mui/material";
+import { Box, IconButton, Typography } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { formatBytes } from "../util/format";
 
 interface Props {
@@ -8,6 +9,11 @@ interface Props {
   selectedEntries: number;
   selectedSize: number;
   errorMessage?: string | null;
+  /** When provided, renders an inline × on the error pill that
+   *  invokes this. Lets the user clear a dismissable error
+   *  (e.g. "Remote trash is not supported yet.") without having
+   *  to navigate away. */
+  onDismissError?: () => void;
   /** Optional disk-space readout for the current path's filesystem.
    *  When provided, renders alongside the selection summary as
    *  "X free of Y". Local paths only — remotes pass `null`. */
@@ -20,6 +26,7 @@ export default function StatusBar({
   selectedEntries,
   selectedSize,
   errorMessage,
+  onDismissError,
   diskFree,
   diskTotal,
 }: Props) {
@@ -35,10 +42,25 @@ export default function StatusBar({
           borderColor: "divider",
           bgcolor: "error.main",
           color: "error.contrastText",
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
         }}
         role="status"
       >
-        <Typography variant="caption">{errorMessage}</Typography>
+        <Typography variant="caption" sx={{ flex: 1 }}>
+          {errorMessage}
+        </Typography>
+        {onDismissError && (
+          <IconButton
+            size="small"
+            onClick={onDismissError}
+            aria-label="Dismiss error"
+            sx={{ color: "inherit", p: 0.25 }}
+          >
+            <CloseIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        )}
       </Box>
     );
   }

@@ -104,6 +104,10 @@ export default function Browser({
   /** Filesystem totals for the current path. Local paths only — remote
    *  paths set this to null and the StatusBar hides the readout. */
   const [diskSpace, setDiskSpace] = useState<DiskSpace | null>(null);
+  /** True while `refresh()` is in flight. Drives the toolbar's
+   *  refresh-button spinner so the user gets visible feedback that
+   *  the click registered, even when the remote is slow. */
+  const [isRefreshing, setIsRefreshing] = useState(false);
   /** When non-empty, the BulkRenameDialog is open against this set of
    *  entries. Triggered by F2 with multi-select; single-select F2
    *  still opens the per-file RenameDialog. */
@@ -141,6 +145,7 @@ export default function Browser({
   const refresh = useCallback(
     async (target: string) => {
       if (!target) return;
+      setIsRefreshing(true);
       try {
         const list = await clientListDir(target, {
           showHidden: settings.showHidden,
@@ -150,6 +155,8 @@ export default function Browser({
       } catch (e) {
         setEntries([]);
         setError(String(e));
+      } finally {
+        setIsRefreshing(false);
       }
     },
     [settings.showHidden],
@@ -556,6 +563,7 @@ export default function Browser({
         backHistory={history.back.slice(0, -1)}
         forwardHistory={history.forward}
         onHistoryJump={jumpHistory}
+        isRefreshing={isRefreshing}
         onRefresh={() => path && void refresh(path)}
         onNewFolder={() => void handleNewFolder()}
         view={settings.folderViewMode[path] ?? settings.defaultView}
@@ -613,6 +621,7 @@ export default function Browser({
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
         }
         errorMessage={error}
+        onDismissError={() => setError(null)}
         diskFree={diskSpace?.free ?? null}
         diskTotal={diskSpace?.total ?? null}
       />

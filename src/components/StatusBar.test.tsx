@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import StatusBar from "./StatusBar";
 
@@ -71,5 +71,28 @@ describe("StatusBar", () => {
       diskTotal: null,
     });
     expect(screen.queryByText(/free of/)).not.toBeInTheDocument();
+  });
+
+  it("error pill shows a dismiss button when onDismissError is provided", () => {
+    const onDismissError = vi.fn();
+    r({
+      totalEntries: 0,
+      selectedEntries: 0,
+      selectedSize: 0,
+      errorMessage: "boom",
+      onDismissError,
+    });
+    fireEvent.click(screen.getByLabelText("Dismiss error"));
+    expect(onDismissError).toHaveBeenCalled();
+  });
+
+  it("error pill omits the dismiss button when no handler is supplied", () => {
+    r({
+      totalEntries: 0,
+      selectedEntries: 0,
+      selectedSize: 0,
+      errorMessage: "boom",
+    });
+    expect(screen.queryByLabelText("Dismiss error")).not.toBeInTheDocument();
   });
 });

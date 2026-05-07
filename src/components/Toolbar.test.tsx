@@ -111,4 +111,19 @@ describe("Toolbar search", () => {
     fireEvent.contextMenu(screen.getByLabelText("Back"));
     expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
   });
+
+  it("Refresh icon swaps to a spinner while isRefreshing", () => {
+    r({ isRefreshing: true });
+    // The spinner is a `progressbar` role from MUI's CircularProgress.
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("RefreshIcon"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Refresh icon shows the static icon when not refreshing", () => {
+    r();
+    expect(screen.getByTestId("RefreshIcon")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
 });
