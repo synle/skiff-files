@@ -9,6 +9,7 @@
 // while doing something else (Cmd-tab to a terminal etc.).
 import {
   Box,
+  Button,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -17,6 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useEffect, useState } from "react";
 import { dirSummary } from "../api/client";
 import type { DirSummary, Entry } from "../api/fs";
@@ -115,6 +117,46 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
           {entry.isSymlink && <Field label="Symlink" value="yes" />}
           {entry.isHidden && <Field label="Hidden" value="yes" />}
           <Field label="Path" value={entry.path} />
+          <Box sx={{ pt: 1 }}>
+            <Button
+              size="small"
+              startIcon={<ContentCopyIcon fontSize="small" />}
+              onClick={() => {
+                if (
+                  typeof navigator !== "undefined" &&
+                  navigator.clipboard
+                ) {
+                  // JSON dump of the metadata block. Useful for
+                  // bug reports / Slack pastes / pasting into
+                  // scripts (jq-friendly). Folder sizes flow in
+                  // when the recursive scan has finished.
+                  void navigator.clipboard.writeText(
+                    JSON.stringify(
+                      {
+                        name: entry.name,
+                        kind: entry.kind,
+                        size: entry.isDir
+                          ? summary?.totalSize ?? null
+                          : entry.size,
+                        items: entry.isDir
+                          ? summary?.entries ?? null
+                          : null,
+                        modified: entry.mtime,
+                        mode: entry.mode,
+                        isSymlink: entry.isSymlink,
+                        isHidden: entry.isHidden,
+                        path: entry.path,
+                      },
+                      null,
+                      2,
+                    ),
+                  );
+                }
+              }}
+            >
+              Copy info as JSON
+            </Button>
+          </Box>
         </Stack>
       </DialogContent>
     </Dialog>
