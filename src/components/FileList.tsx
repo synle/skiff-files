@@ -25,6 +25,10 @@ interface Props {
   onSortChange: (key: SortKey) => void;
   /** Called when a folder is double-clicked or Enter pressed on it. */
   onOpenDir: (entry: Entry) => void;
+  /** Called when a file is double-clicked. The Browser routes this
+   *  to `fs_open_with_default` so the OS picks the app. Optional —
+   *  when omitted, file double-click is a no-op (current behavior). */
+  onOpenFile?: (entry: Entry) => void;
   /** Called when a folder is middle-clicked (mouse button 1). The
    *  Browser routes this through a window event so BrowserTabs can
    *  spawn a new tab. Matches browser muscle memory: middle-click =
@@ -228,6 +232,7 @@ export default function FileList(props: Props) {
     sortDir,
     onSortChange,
     onOpenDir,
+    onOpenFile,
     onOpenDirInNewTab,
     onPrimarySelect,
     onSelectionChange,
@@ -436,6 +441,7 @@ export default function FileList(props: Props) {
   };
   const onRowDouble = (e: Entry) => {
     if (e.isDir) onOpenDir(e);
+    else if (onOpenFile) onOpenFile(e);
   };
 
   return (

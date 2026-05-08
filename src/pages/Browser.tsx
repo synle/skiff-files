@@ -745,6 +745,13 @@ export default function Browser({
           sortDir={sortDir}
           onSortChange={handleSort}
           onOpenDir={(e) => navigate(e.path)}
+          onOpenFile={(e) => {
+            // Hand off to the OS default app. Skipped for remote
+            // entries since the local OS can't open them without
+            // download.
+            if (e.path.startsWith("sftp://")) return;
+            void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
+          }}
           onOpenDirInNewTab={(e) => {
             window.dispatchEvent(
               new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
