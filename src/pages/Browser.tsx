@@ -540,8 +540,16 @@ export default function Browser({
 
   const totals = useMemo(() => {
     let totalSize = 0;
-    for (const e of entries) totalSize += e.isDir ? 0 : e.size;
-    return { totalSize };
+    let folderCount = 0;
+    let fileCount = 0;
+    for (const e of entries) {
+      if (e.isDir) folderCount++;
+      else {
+        fileCount++;
+        totalSize += e.size;
+      }
+    }
+    return { totalSize, folderCount, fileCount };
   }, [entries]);
 
   /** Filtered entry list — case-insensitive substring match on `name`.
@@ -747,6 +755,8 @@ export default function Browser({
         totalEntries={
           searchRecursive && findResults ? findResults.length : entries.length
         }
+        folderCount={totals.folderCount}
+        fileCount={totals.fileCount}
         selectedEntries={selectionStats.count}
         selectedSize={
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize

@@ -6,6 +6,11 @@ import { formatBytes } from "../util/format";
 
 interface Props {
   totalEntries: number;
+  /** Folder + file split. When both > 0 the status bar shows
+   *  "F folders, G files" instead of the flat "N items" — a
+   *  Finder-style hint about what's in the current directory. */
+  folderCount?: number;
+  fileCount?: number;
   selectedEntries: number;
   selectedSize: number;
   errorMessage?: string | null;
@@ -28,6 +33,8 @@ interface Props {
 
 export default function StatusBar({
   totalEntries,
+  folderCount,
+  fileCount,
   selectedEntries,
   selectedSize,
   errorMessage,
@@ -88,7 +95,12 @@ export default function StatusBar({
           ? `${selectedEntries} of ${totalEntries} selected · ${formatBytes(selectedSize)}`
           : findActive
             ? `${totalEntries}${findHitCap ? "+" : ""} match${totalEntries === 1 ? "" : "es"}`
-            : `${totalEntries} item${totalEntries === 1 ? "" : "s"}`}
+            : folderCount != null &&
+                fileCount != null &&
+                folderCount > 0 &&
+                fileCount > 0
+              ? `${folderCount} folder${folderCount === 1 ? "" : "s"}, ${fileCount} file${fileCount === 1 ? "" : "s"}`
+              : `${totalEntries} item${totalEntries === 1 ? "" : "s"}`}
       </Typography>
       {diskFree != null && diskTotal != null && (
         <Typography variant="caption" color="text.secondary">
