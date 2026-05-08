@@ -37,6 +37,9 @@ interface Props {
   onBack: () => void;
   onForward: () => void;
   onUp: () => void;
+  /** Tooltip hint for the Up button — the path it would navigate to.
+   *  Optional; when omitted the tooltip just says "Up". */
+  upTarget?: string;
   /** True while a list_dir is in flight. Swaps the refresh icon for a
    *  small spinner so the user has visible feedback that the click
    *  registered (relevant on slow remotes). */
@@ -75,6 +78,7 @@ export default function Toolbar(props: Props) {
     canGoBack,
     canGoForward,
     canGoUp,
+    upTarget,
     onBack,
     onForward,
     onUp,
@@ -183,7 +187,7 @@ export default function Toolbar(props: Props) {
           </MenuItem>
         ))}
       </Menu>
-      <Tooltip title="Up">
+      <Tooltip title={upTarget ? `Up to ${upTarget}` : "Up"}>
         <span>
           <IconButton
             size="small"

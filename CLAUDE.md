@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.103** — ✅ **Up button tooltip shows parent path**. Toolbar's Up arrow gets `upTarget?: string` prop. Browser passes the computed parent path so hovering reads "Up to /Users/syle/git" instead of just "Up".
 - **0.2.102** — ✅ **Streaming SHA-256 for remote files**. New `SftpClient::hash_sha256` reads the file via the existing russh-sftp `open_read` reader in 64 KB chunks, feeds each into `sha2::Sha256`. Tauri command `conn_hash_sha256(id, path)`. Frontend api/client.ts grew a backend-agnostic `hashSha256(path)` that dispatches to fs_ vs conn_ by URL scheme. PropertiesDialog now offers Compute SHA-256 for remote (sftp://) files too — file bytes never leave the server's machine in plaintext.
 - **0.2.101** — ✅ **PathBar segment hover tooltip**. Each breadcrumb `<Link>` gets `title={seg.path}` so hovering surfaces the full path up to that segment. Useful when MUI Breadcrumbs truncates with the `maxItems={6}` cap and the user wants to know what a middle segment actually points at.
 - **0.2.100** — ✅ **Dim hidden entries**. When `showHidden` is on, hidden (`isHidden = true`) rows render at 55% opacity so the user can tell them apart from regular content at a glance. Pure CSS — no perf cost on large folders.

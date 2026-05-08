@@ -698,6 +698,7 @@ export default function Browser({
         canGoBack={history.back.length > 1}
         canGoForward={history.forward.length > 0}
         canGoUp={!!path && parentPath(path) !== path}
+        upTarget={path ? parentPath(path) : undefined}
         onBack={goBack}
         onForward={goForward}
         onUp={goUp}
