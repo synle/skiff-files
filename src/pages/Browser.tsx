@@ -1029,18 +1029,29 @@ export default function Browser({
         onOpen={(e) => navigate(e.path)}
         onRename={(e) => setRenameTarget(e)}
         onTrash={(e) => {
-          // Single-entry trash. Modal-based confirm; window.confirm
-          // is suppressed in the Tauri webview.
-          const isRemoteEntry = e.path.startsWith("sftp://");
-          const verb = isRemoteEntry ? "Permanently delete" : "Move to Trash";
+          // If the right-clicked entry is part of a multi-selection,
+          // trash the WHOLE selection — that's what the user expects
+          // when 3 rows are checked and they right-click one. Falls
+          // back to single-entry trash when the right-clicked row
+          // isn't in the selection (or nothing is selected).
+          const targets =
+            selectedPaths.length > 0 && selectedPaths.includes(e.path)
+              ? selectedPaths
+              : [e.path];
+          const hasRemote = targets.some((p) => p.startsWith("sftp://"));
+          const verb = hasRemote ? "Permanently delete" : "Move to Trash";
+          const message =
+            targets.length === 1
+              ? `${verb} "${e.name}"?`
+              : `${verb} ${targets.length} items?`;
           setConfirmDialog({
             title: verb,
-            message: `${verb} "${e.name}"?`,
-            confirmLabel: isRemoteEntry ? "Delete" : "Move to Trash",
+            message,
+            confirmLabel: hasRemote ? "Delete" : "Move to Trash",
             destructive: true,
             onConfirm: () => {
               setConfirmDialog(null);
-              void removeOrTrashMany([e.path])
+              void removeOrTrashMany(targets)
                 .then(() => {
                   if (path) void refresh(path);
                 })

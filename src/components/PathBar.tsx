@@ -169,22 +169,29 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
           }}
           title="Right-click to copy full path"
         >
-          {segments.map((seg) => (
-            <Link
-              key={seg.path}
-              component="button"
-              onClick={() => onNavigate(seg.path)}
-              underline="hover"
-              color="inherit"
-              // Hover surfaces the full path-up-to-here, useful when
-              // the breadcrumb truncates with `maxItems` and the user
-              // wants to know what a middle segment actually points at.
-              title={seg.path}
-              sx={{ fontSize: "0.875rem" }}
-            >
-              {seg.label}
-            </Link>
-          ))}
+          {segments
+            // Skip the leading "/" segment — the breadcrumb reads
+            // cleaner without it and the Home button covers "go to
+            // root" navigation. We keep "/" in the underlying
+            // segments array because `parentPath` + back-navigation
+            // rely on it.
+            .filter((seg) => seg.label !== "/")
+            .map((seg) => (
+              <Link
+                key={seg.path}
+                component="button"
+                onClick={() => onNavigate(seg.path)}
+                underline="hover"
+                color="inherit"
+                // Hover surfaces the full path-up-to-here, useful when
+                // the breadcrumb truncates with `maxItems` and the user
+                // wants to know what a middle segment actually points at.
+                title={seg.path}
+                sx={{ fontSize: "0.875rem" }}
+              >
+                {seg.label}
+              </Link>
+            ))}
         </Breadcrumbs>
       )}
 

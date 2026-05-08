@@ -99,6 +99,9 @@ export function pathSegments(path: string): { label: string; path: string }[] {
       out.push({ label: parts[i], path: acc.replace(/\\$/, "") });
     }
   } else {
+    // Always include the leading "/" segment — `parentPath` and
+    // back-navigation rely on it. The PathBar component hides it
+    // visually so the breadcrumb reads cleaner.
     out.push({ label: "/", path: "/" });
     let acc = "";
     for (const p of parts) {
