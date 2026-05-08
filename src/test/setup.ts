@@ -70,6 +70,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "fs_hash_sha256") return "deadbeef";
     if (cmd === "fs_mounts") return [];
     if (cmd === "fs_create_empty_file") return null;
+    if (cmd === "fs_compress_zip") return null;
     if (cmd === "fs_image_exif") {
       return {
         dateTaken: null,

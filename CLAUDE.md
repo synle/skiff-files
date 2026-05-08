@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.118** — ✅ **Compress to zip**. New `zip` + `walkdir` Cargo deps. `fs_compress_zip(paths, dest_zip)` Tauri command walks each path (folders recursively) and writes a Deflated zip. Right-click → "Compress to zip" wires it: respects multi-selection (zips the whole selection), names the archive after the first basename, and collision-skips with `(2)` / `(3)` siblings.
 - **0.2.117** — ✅ **Status bar shows file clipboard hint**. After Cmd+C / Cmd+X, the StatusBar appends "N items ready to paste" (or "ready to move" for cut). Browser listens to `FILE_CLIPBOARD_EVENT` so the hint updates immediately when the clipboard changes — no polling. Disappears once the clipboard is consumed.
 - **0.2.116** — ✅ **Right-click empty FileList area**. Right-clicking on whitespace (not on a row) pops a small menu with New folder / New file / Paste — Finder/Explorer parity. Paste item disables when nothing's on the file clipboard; otherwise shows the count ("Paste 3 items"). Routes through the same handlers the toolbar buttons / Cmd+V use.
 - **0.2.115** — ✅ **Toolbar "New file" button**. Companion to "New folder". New `fs_create_empty_file` Tauri command writes a 0-byte file (errors on collision). Toolbar grew an optional `onNewFile` prop next to `onNewFolder`. Browser handler suggests "untitled.txt" / "untitled 2.txt" etc., prompts for name (Enter accepts the suggestion). Skipped for remote (`sftp://`) paths until the SFTP backend grows an analogous command.

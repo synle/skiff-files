@@ -106,6 +106,14 @@ export interface ImageExif {
 export const fsCreateEmptyFile = (path: string): Promise<void> =>
   invoke<void>("fs_create_empty_file", { path });
 
+/** Bundle one or more local paths into a zip archive at `destZip`.
+ *  Folders walk recursively. Errors if `destZip` already exists. */
+export const fsCompressZip = (
+  paths: string[],
+  destZip: string,
+): Promise<void> =>
+  invoke<void>("fs_compress_zip", { paths, destZip });
+
 /** Mirror of `crate::commands::MountedVolume`. Used by the Sidebar's
  *  Devices section to show the system disk + any plugged-in
  *  externals. */

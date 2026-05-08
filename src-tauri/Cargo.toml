@@ -34,6 +34,8 @@ uuid = { version = "1", features = ["v4"] }
 kamadak-exif = "0.6"
 sha2 = "0.10"
 sysinfo = "0.32"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+walkdir = "2"
 
 [dev-dependencies]
 filetime = "0.2"

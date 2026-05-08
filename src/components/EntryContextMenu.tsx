@@ -14,6 +14,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
+import ArchiveIcon from "@mui/icons-material/Archive";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import ContentCopyTwoToneIcon from "@mui/icons-material/ContentCopyTwoTone";
 import LaunchIcon from "@mui/icons-material/Launch";
@@ -51,6 +52,9 @@ interface Props {
    *  entries because the engine flow is the same as Skiffsync —
    *  routes through `startSync`. */
   onDuplicate: (entry: Entry) => void;
+  /** Compress the entry (and any other entries in the multi-selection)
+   *  into a sibling zip file. Hidden for remote entries. */
+  onCompressZip: (entry: Entry) => void;
   /** Start a diff against this file. The first call sets the "base"
    *  side; the second call (from another row's right-click) opens
    *  the DiffDialog. Hidden for directories. */
@@ -75,6 +79,7 @@ export default function EntryContextMenu({
   onOpenInNewTab,
   onCompareWith,
   onDuplicate,
+  onCompressZip,
   comparePending = false,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
@@ -187,6 +192,19 @@ export default function EntryContextMenu({
             <ContentCopyTwoToneIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Duplicate</ListItemText>
+        </MenuItem>
+      )}
+      {!isRemote && state && (
+        <MenuItem
+          onClick={() => {
+            onCompressZip(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <ArchiveIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Compress to zip</ListItemText>
         </MenuItem>
       )}
       {state && !state.entry.isDir && (

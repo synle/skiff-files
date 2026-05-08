@@ -35,6 +35,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onOpenInNewTab: vi.fn(),
     onCompareWith: vi.fn(),
     onDuplicate: vi.fn(),
+    onCompressZip: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>

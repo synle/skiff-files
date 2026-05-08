@@ -248,6 +248,98 @@ pub fn fs_open_in_terminal(path: String) -> FsResult<()> {
     Err(format!("open_in_terminal: unsupported platform for {path}"))
 }
 
+/// Bundle one or more local paths into a zip archive at `dest_zip`.
+/// Folders are walked recursively. Errors if `dest_zip` already exists
+/// (caller should pick a unique destination). Used by the right-click
+/// "Compress to zip" action.
+#[tauri::command]
+pub fn fs_compress_zip(
+    paths: Vec<String>,
+    dest_zip: String,
+) -> FsResult<()> {
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use std::path::Path;
+    use walkdir::WalkDir;
+    use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+    if Path::new(&dest_zip).exists() {
+        return Err(format!("destination already exists: {dest_zip}"));
+    }
+    if paths.is_empty() {
+        return Err("no paths to compress".into());
+    }
+    let file = File::create(&dest_zip)
+        .map_err(|e| format!("create({dest_zip}): {e}"))?;
+    let mut zip = ZipWriter::new(file);
+    let opts = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+
+    // Common parent: every entry inside the zip is prefixed by the
+    // basename of the source path. So `/a/b/foo.txt` becomes
+    // `foo.txt` inside the zip; `/a/b/folder/` becomes `folder/...`.
+    for src in &paths {
+        let src_path = Path::new(src);
+        let basename = src_path
+            .file_name()
+            .ok_or_else(|| format!("no basename: {src}"))?
+            .to_string_lossy()
+            .to_string();
+        let md = std::fs::metadata(src_path)
+            .map_err(|e| format!("stat({src}): {e}"))?;
+        if md.is_dir() {
+            for entry in WalkDir::new(src_path).into_iter().filter_map(|e| e.ok()) {
+                let path = entry.path();
+                let rel = path
+                    .strip_prefix(src_path)
+                    .map_err(|e| format!("strip_prefix: {e}"))?;
+                let name = if rel.as_os_str().is_empty() {
+                    basename.clone()
+                } else {
+                    format!("{basename}/{}", rel.to_string_lossy())
+                };
+                if entry.file_type().is_dir() {
+                    zip.add_directory(name, opts)
+                        .map_err(|e| format!("zip dir: {e}"))?;
+                } else if entry.file_type().is_file() {
+                    zip.start_file(name, opts)
+                        .map_err(|e| format!("zip start_file: {e}"))?;
+                    let mut f = File::open(path)
+                        .map_err(|e| format!("open({}): {e}", path.display()))?;
+                    let mut buf = vec![0u8; 64 * 1024];
+                    loop {
+                        let n = f
+                            .read(&mut buf)
+                            .map_err(|e| format!("read({}): {e}", path.display()))?;
+                        if n == 0 {
+                            break;
+                        }
+                        zip.write_all(&buf[..n])
+                            .map_err(|e| format!("zip write: {e}"))?;
+                    }
+                }
+            }
+        } else {
+            zip.start_file(&basename, opts)
+                .map_err(|e| format!("zip start_file: {e}"))?;
+            let mut f = File::open(src_path)
+                .map_err(|e| format!("open({src}): {e}"))?;
+            let mut buf = vec![0u8; 64 * 1024];
+            loop {
+                let n = f
+                    .read(&mut buf)
+                    .map_err(|e| format!("read({src}): {e}"))?;
+                if n == 0 {
+                    break;
+                }
+                zip.write_all(&buf[..n])
+                    .map_err(|e| format!("zip write: {e}"))?;
+            }
+        }
+    }
+    zip.finish().map_err(|e| format!("zip finish: {e}"))?;
+    Ok(())
+}
+
 /// Create an empty file. Errors if the path already exists. Used by
 /// the toolbar's "New file" button — same UX as "New folder".
 #[tauri::command]

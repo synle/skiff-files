@@ -15,6 +15,7 @@ import PreviewPane from "../components/PreviewPane";
 import {
   fsDiskSpace,
   fsFind,
+  fsCompressZip,
   fsCreateEmptyFile,
   fsHomeDir,
   fsOpenInTerminal,
@@ -1042,6 +1043,33 @@ export default function Browser({
           window.dispatchEvent(
             new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
           );
+        }}
+        onCompressZip={(e) => {
+          // If the user right-clicked while multi-selecting, zip
+          // the whole selection. Otherwise just the right-clicked
+          // entry. Names the archive after the first source —
+          // "<basename>.zip" with collision-aware fallback.
+          const sources = selectedPaths.length > 0 && selectedPaths.includes(e.path)
+            ? selectedPaths
+            : [e.path];
+          const sep = e.path.lastIndexOf("/");
+          const parent = sep > 0 ? e.path.slice(0, sep) : "";
+          const baseName =
+            sources.length === 1
+              ? (e.name.replace(/\.[^.]+$/, "") || "archive")
+              : "archive";
+          const existing = new Set(entries.map((x) => x.name));
+          let candidate = `${baseName}.zip`;
+          let n = 2;
+          while (existing.has(candidate)) {
+            candidate = `${baseName} (${n++}).zip`;
+          }
+          const dest = `${parent}/${candidate}`;
+          void fsCompressZip(sources, dest)
+            .then(() => {
+              if (path) void refresh(path);
+            })
+            .catch((err) => setError(String(err)));
         }}
         onDuplicate={(e) => {
           // Build a unique sibling name: `name (copy).ext` →
