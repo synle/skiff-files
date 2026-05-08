@@ -17,6 +17,7 @@ import {
   fsFind,
   fsCompressZip,
   fsCreateEmptyFile,
+  fsExtractZip,
   fsHomeDir,
   fsOpenInTerminal,
   fsOpenWithDefault,
@@ -1043,6 +1044,25 @@ export default function Browser({
           window.dispatchEvent(
             new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
           );
+        }}
+        onExtractZip={(e) => {
+          // Pick a sibling folder named after the zip (sans
+          // extension), with collision-aware fallback.
+          const sep = e.path.lastIndexOf("/");
+          const parent = sep > 0 ? e.path.slice(0, sep) : "";
+          const baseName = e.name.replace(/\.zip$/i, "") || "extracted";
+          const existing = new Set(entries.map((x) => x.name));
+          let candidate = baseName;
+          let n = 2;
+          while (existing.has(candidate)) {
+            candidate = `${baseName} (${n++})`;
+          }
+          const dest = `${parent}/${candidate}`;
+          void fsExtractZip(e.path, dest)
+            .then(() => {
+              if (path) void refresh(path);
+            })
+            .catch((err) => setError(String(err)));
         }}
         onCompressZip={(e) => {
           // If the user right-clicked while multi-selecting, zip

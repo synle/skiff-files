@@ -15,6 +15,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
 import ArchiveIcon from "@mui/icons-material/Archive";
+import UnarchiveIcon from "@mui/icons-material/Unarchive";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import ContentCopyTwoToneIcon from "@mui/icons-material/ContentCopyTwoTone";
 import LaunchIcon from "@mui/icons-material/Launch";
@@ -55,6 +56,9 @@ interface Props {
   /** Compress the entry (and any other entries in the multi-selection)
    *  into a sibling zip file. Hidden for remote entries. */
   onCompressZip: (entry: Entry) => void;
+  /** Extract a zip into a sibling folder. Only shown when the entry's
+   *  basename ends in `.zip`. */
+  onExtractZip: (entry: Entry) => void;
   /** Start a diff against this file. The first call sets the "base"
    *  side; the second call (from another row's right-click) opens
    *  the DiffDialog. Hidden for directories. */
@@ -80,6 +84,7 @@ export default function EntryContextMenu({
   onCompareWith,
   onDuplicate,
   onCompressZip,
+  onExtractZip,
   comparePending = false,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
@@ -205,6 +210,19 @@ export default function EntryContextMenu({
             <ArchiveIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Compress to zip</ListItemText>
+        </MenuItem>
+      )}
+      {!isRemote && state && state.entry.name.toLowerCase().endsWith(".zip") && (
+        <MenuItem
+          onClick={() => {
+            onExtractZip(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <UnarchiveIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Extract here</ListItemText>
         </MenuItem>
       )}
       {state && !state.entry.isDir && (

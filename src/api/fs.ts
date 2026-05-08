@@ -114,6 +114,15 @@ export const fsCompressZip = (
 ): Promise<void> =>
   invoke<void>("fs_compress_zip", { paths, destZip });
 
+/** Extract a zip archive into `destDir`. Creates `destDir` if needed.
+ *  Path-traversal entries (absolute paths, `..` components) are
+ *  silently skipped. */
+export const fsExtractZip = (
+  zipPath: string,
+  destDir: string,
+): Promise<void> =>
+  invoke<void>("fs_extract_zip", { zipPath, destDir });
+
 /** Mirror of `crate::commands::MountedVolume`. Used by the Sidebar's
  *  Devices section to show the system disk + any plugged-in
  *  externals. */

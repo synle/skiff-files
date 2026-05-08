@@ -36,6 +36,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onCompareWith: vi.fn(),
     onDuplicate: vi.fn(),
     onCompressZip: vi.fn(),
+    onExtractZip: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>

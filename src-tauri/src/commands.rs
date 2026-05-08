@@ -248,6 +248,69 @@ pub fn fs_open_in_terminal(path: String) -> FsResult<()> {
     Err(format!("open_in_terminal: unsupported platform for {path}"))
 }
 
+/// Extract a zip archive into `dest_dir`. Creates `dest_dir` if it
+/// doesn't exist; errors if a file already exists at that path. Used
+/// by the right-click "Extract here" action. Best-effort against
+/// path-traversal attacks (entries with absolute paths or `..`
+/// components are skipped).
+#[tauri::command]
+pub fn fs_extract_zip(
+    zip_path: String,
+    dest_dir: String,
+) -> FsResult<()> {
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use std::path::{Path, PathBuf};
+
+    let dest = Path::new(&dest_dir);
+    if dest.exists() && !dest.is_dir() {
+        return Err(format!("not a directory: {dest_dir}"));
+    }
+    std::fs::create_dir_all(dest)
+        .map_err(|e| format!("mkdir({dest_dir}): {e}"))?;
+    let file = File::open(&zip_path)
+        .map_err(|e| format!("open({zip_path}): {e}"))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("read zip({zip_path}): {e}"))?;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("zip entry {i}: {e}"))?;
+        let raw_name = entry.name().to_string();
+        // Path-traversal guard. Paths inside the zip should be
+        // relative; anything trying to escape `dest_dir` gets
+        // skipped silently.
+        let rel = PathBuf::from(&raw_name);
+        if rel.is_absolute() || rel.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            continue;
+        }
+        let target = dest.join(&rel);
+        if entry.is_dir() {
+            std::fs::create_dir_all(&target)
+                .map_err(|e| format!("mkdir({}): {e}", target.display()))?;
+        } else {
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("mkdir parent: {e}"))?;
+            }
+            let mut out = File::create(&target)
+                .map_err(|e| format!("create({}): {e}", target.display()))?;
+            let mut buf = vec![0u8; 64 * 1024];
+            loop {
+                let n = entry
+                    .read(&mut buf)
+                    .map_err(|e| format!("read zip entry: {e}"))?;
+                if n == 0 {
+                    break;
+                }
+                out.write_all(&buf[..n])
+                    .map_err(|e| format!("write({}): {e}", target.display()))?;
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Bundle one or more local paths into a zip archive at `dest_zip`.
 /// Folders are walked recursively. Errors if `dest_zip` already exists
 /// (caller should pick a unique destination). Used by the right-click

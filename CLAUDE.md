@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.119** — ✅ **Extract zip**. Companion to compress. New `fs_extract_zip(zip_path, dest_dir)` Tauri command. Path-traversal guard skips entries with absolute paths or `..` components silently. Right-click → "Extract here" appears for `.zip` files; the destination is a sibling folder named after the zip (sans extension), with collision-skipping. Closes the round-trip on archive workflows for MVP.
 - **0.2.118** — ✅ **Compress to zip**. New `zip` + `walkdir` Cargo deps. `fs_compress_zip(paths, dest_zip)` Tauri command walks each path (folders recursively) and writes a Deflated zip. Right-click → "Compress to zip" wires it: respects multi-selection (zips the whole selection), names the archive after the first basename, and collision-skips with `(2)` / `(3)` siblings.
 - **0.2.117** — ✅ **Status bar shows file clipboard hint**. After Cmd+C / Cmd+X, the StatusBar appends "N items ready to paste" (or "ready to move" for cut). Browser listens to `FILE_CLIPBOARD_EVENT` so the hint updates immediately when the clipboard changes — no polling. Disappears once the clipboard is consumed.
 - **0.2.116** — ✅ **Right-click empty FileList area**. Right-clicking on whitespace (not on a row) pops a small menu with New folder / New file / Paste — Finder/Explorer parity. Paste item disables when nothing's on the file clipboard; otherwise shows the count ("Paste 3 items"). Routes through the same handlers the toolbar buttons / Cmd+V use.
