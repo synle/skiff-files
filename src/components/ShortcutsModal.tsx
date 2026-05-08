@@ -31,7 +31,9 @@ export default function ShortcutsModal() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "?") return;
+      // F1 mirrors the `?` shortcut for users coming from Windows /
+      // many web apps where F1 is the canonical "help" binding.
+      if (e.key !== "?" && e.key !== "F1") return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (

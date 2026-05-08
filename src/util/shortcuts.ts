@@ -70,7 +70,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Help",
     items: [
-      { keys: "?", description: "Show this cheatsheet" },
+      { keys: "? · F1", description: "Show this cheatsheet" },
       { keys: "Esc", description: "Close this cheatsheet" },
     ],
   },
