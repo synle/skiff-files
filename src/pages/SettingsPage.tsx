@@ -499,6 +499,24 @@ export default function SettingsPage() {
           title="Advanced"
           description="Reveal the on-disk settings file or wipe everything back to defaults."
         >
+          <FormControl size="small" sx={{ maxWidth: 240 }}>
+            <InputLabel id="log-level-label">Log level</InputLabel>
+            <Select
+              labelId="log-level-label"
+              label="Log level"
+              value={settings.logLevel}
+              onChange={(e) =>
+                update("logLevel", e.target.value as typeof settings.logLevel)
+              }
+            >
+              <MenuItem value="off">Off</MenuItem>
+              <MenuItem value="error">Error</MenuItem>
+              <MenuItem value="warn">Warn</MenuItem>
+              <MenuItem value="info">Info</MenuItem>
+              <MenuItem value="debug">Debug</MenuItem>
+            </Select>
+          </FormControl>
+
           <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
             <Button
               variant="outlined"

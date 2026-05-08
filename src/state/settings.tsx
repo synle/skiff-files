@@ -29,6 +29,11 @@ export type Density = "comfortable" | "compact";
 /** Global font size scale. Maps to MUI's `typography.fontSize`. */
 export type FontSize = "small" | "medium" | "large";
 
+/** Console-log gate. The frontend `util/log` helpers compare against
+ *  this and skip calls below the configured threshold. `off` mutes
+ *  everything — useful for clean dev console / screencast captures. */
+export type LogLevel = "off" | "error" | "warn" | "info" | "debug";
+
 /** Extension display policy:
  *  - `always` — append extensions to every file name (default — Explorer convention).
  *  - `never` — strip extensions from every file name (Finder default).
@@ -114,6 +119,10 @@ export interface Settings {
    *  hidden — selection summary / disk space / errors don't render.
    *  Default true. */
   showStatusBar: boolean;
+  /** Console log threshold. `off` drops every call routed through
+   *  `util/log`; the standard hierarchy `error > warn > info > debug`
+   *  controls what passes through. Default `warn`. */
+  logLevel: LogLevel;
   /** Force reduced-motion regardless of OS preference. The app already
    *  honors `prefers-reduced-motion: reduce` automatically; this lets
    *  users opt in unconditionally (e.g. for VM / RDP sessions where
@@ -230,6 +239,7 @@ export const DEFAULTS: Settings = {
   syncSuppressConflictPrompts: false,
   groupFoldersFirst: true,
   reduceMotion: false,
+  logLevel: "warn",
   showStatusBar: true,
   showFullPathInTitle: false,
   sidebarVisible: true,
@@ -340,6 +350,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // We then race a Tauri disk-load and overwrite if the on-disk version
   // exists. Tests + browser-mode dev see localStorage only, which is fine.
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
+
+  // Wire the log-level gate so `util/log` reads the live value on every
+  // call. Re-registers after every settings change so a mid-session
+  // toggle takes effect without restarting.
+  useEffect(() => {
+    void import("../util/log").then(({ setLogLevelGetter }) => {
+      setLogLevelGetter(() => settings.logLevel);
+    });
+  }, [settings.logLevel]);
 
   useEffect(() => {
     let cancelled = false;
