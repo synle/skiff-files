@@ -16,8 +16,9 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useEffect, useState } from "react";
 import { appDataDir, useSettings } from "../state/settings";
-import { fsOpenWithDefault, fsRevealInOs } from "../api/fs";
+import { fsOpenWithDefault, fsRevealInOs, getAppVersion } from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
 
 /** Generic section wrapper so spacing stays consistent across groups. */
@@ -45,11 +46,23 @@ function Section({
 
 export default function SettingsPage() {
   const { settings, update, reset } = useSettings();
+  // Build version pulled from Cargo at compile time, surfaced via
+  // `get_app_version` Tauri command. Tests / browser-mode dev see
+  // the fallback string.
+  const [version, setVersion] = useState<string>("unknown");
+  useEffect(() => {
+    getAppVersion()
+      .then(setVersion)
+      .catch(() => setVersion("unknown"));
+  }, []);
 
   return (
     <Box sx={{ p: 3, overflow: "auto", maxWidth: 720 }}>
       <Typography variant="h4" gutterBottom>
         Settings
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+        Skiff Files v{version}
       </Typography>
 
       <Stack spacing={4}>

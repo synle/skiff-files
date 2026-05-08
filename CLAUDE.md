@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.98** — ✅ **App version in Settings**. Settings page header now reads "Skiff Files vX.Y.Z" — pulled from the `get_app_version` Tauri command (which reads `APP_VERSION` env var that `build.rs` injects from `tauri.conf.json`). Useful when filing bug reports or pairing the running build with a release tag.
 - **0.2.97** — ✅ **"Check for updates" button**. Settings → Advanced gets a button that opens the GitHub Releases page in the OS browser via `fs_open_with_default` (the `open` crate handles both files and URLs). Bridges the gap until the Tauri updater is wired (needs code-signing keys); for now the user gets a one-click path to "go see if there's a newer version".
 - **0.2.96** — ✅ **Active transfer badge**. Sidebar's Transfers nav link grew an MUI `Badge` showing the number of in-flight sync jobs. Seeded from `sync_list()` on mount; maintained incrementally via the existing `sync:progress` / `sync:done` / `sync:error` events — no polling. Badge is invisible at zero so the icon doesn't get visually noisy when nothing's running.
 - **0.2.95** — ✅ **Drag onto bookmark triggers sync**. Bookmarks accept `application/x-skiff-paths` drops the same way Sidebar host items do (0.2.59). Dropping a multi-selection onto a bookmark prompts for confirmation, then fans out one `startSync` per dropped entry into `<bookmark.path>/<basename>`. Skips the destination-path prompt since the bookmark already names a target. Tooltip updated to advertise the affordance.
