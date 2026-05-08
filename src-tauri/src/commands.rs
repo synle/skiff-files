@@ -593,6 +593,39 @@ pub fn fs_disk_space(path: String) -> FsResult<DiskSpace> {
     Ok(DiskSpace { total, free })
 }
 
+/// Return the OS-specific Trash / Recycle Bin folder path so the
+/// Sidebar can offer it as a Favorites entry. macOS: `~/.Trash`,
+/// Linux freedesktop: `~/.local/share/Trash/files`. Windows
+/// (Recycle Bin) lives behind a shell namespace and isn't a real
+/// filesystem path — returns `None` so the frontend can hide the
+/// Trash favorite there.
+#[tauri::command]
+pub fn fs_trash_path() -> FsResult<Option<String>> {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return Ok(None),
+    };
+    #[cfg(target_os = "macos")]
+    {
+        return Ok(Some(home.join(".Trash").to_string_lossy().into_owned()));
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return Ok(Some(
+            home.join(".local/share/Trash/files")
+                .to_string_lossy()
+                .into_owned(),
+        ));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = home;
+        return Ok(None);
+    }
+    #[allow(unreachable_code)]
+    Ok(None)
+}
+
 /// Multi-path trash. Cheaper than N round-trips through `invoke` when
 /// the user deletes a multi-selection. The crate's `delete_all` is
 /// atomic per path: any failures collect, the rest still succeed.

@@ -13,6 +13,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import DeleteIcon from "@mui/icons-material/Delete";
 import HomeIcon from "@mui/icons-material/Home";
 import DescriptionIcon from "@mui/icons-material/Description";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
@@ -32,7 +33,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import type { Page } from "../App";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
-import { fsMounts, type MountedVolume } from "../api/fs";
+import { fsMounts, fsTrashPath, type MountedVolume } from "../api/fs";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
@@ -240,6 +241,20 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
    *  interval since plug-events aren't surfaced through Tauri yet —
    *  cheap query (sysinfo's `Disks::new_with_refreshed_list`). */
   const [mounts, setMounts] = useState<MountedVolume[] | null>(null);
+  /** OS Trash / Recycle Bin path — populated by fs_trash_path on
+   *  mount. `null` on Windows (Recycle Bin isn't a real fs path)
+   *  and on platforms where the home dir can't be resolved; in
+   *  both cases we hide the Trash favorite. */
+  const [trashPath, setTrashPath] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void fsTrashPath()
+      .then((p) => !cancelled && setTrashPath(p))
+      .catch(() => !cancelled && setTrashPath(null));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const refresh = () =>
@@ -375,6 +390,16 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                 </ListItemButton>
               </ListItem>
             ))}
+            {trashPath && (
+              <ListItem disablePadding>
+                <ListItemButton onClick={() => onNavigate(trashPath)}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <DeleteIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Trash" />
+                </ListItemButton>
+              </ListItem>
+            )}
           </List>
         )}
 

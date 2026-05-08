@@ -73,6 +73,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "fs_compress_zip") return null;
     if (cmd === "fs_extract_zip") return null;
     if (cmd === "fs_copy_recursive") return null;
+    if (cmd === "fs_trash_path") return "/home/test/.Trash";
     if (cmd === "fs_image_exif") {
       return {
         dateTaken: null,

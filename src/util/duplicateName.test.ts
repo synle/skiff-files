@@ -56,6 +56,25 @@ describe("duplicateName", () => {
       "backup-copy-2026-copy-2026-05-08-13-22.txt",
     );
   });
+
+  it("strips a -copy-<ts>-N collision suffix before re-appending", () => {
+    // Bug: `untitled-copy-2026-05-08-13-32-2.txt` → after re-dup
+    // used to become `untitled-copy-…-32-2-copy-…-22.txt`.
+    expect(
+      duplicateName("untitled-copy-2026-05-08-13-32-2.txt", { now: NOW }),
+    ).toBe("untitled-copy-2026-05-08-13-22.txt");
+  });
+
+  it("strips multiple stacked -copy-<ts> suffixes", () => {
+    // If a previous bug produced a doubled-up name, the next
+    // duplicate should clean it back to the original.
+    expect(
+      duplicateName(
+        "notes-copy-2026-05-08-13-22-2-copy-2026-05-08-13-32.md",
+        { now: NOW },
+      ),
+    ).toBe("notes-copy-2026-05-08-13-22.md");
+  });
 });
 
 describe("uniqueDuplicateName", () => {

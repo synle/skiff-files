@@ -11,9 +11,13 @@
 // for this — they don't want the name to grow indefinitely.
 
 /** Regex that matches the canonical `-copy-YYYY-MM-DD-HH-MM` tail
- *  we append. Anchored at end so middle-name occurrences aren't
- *  stripped. */
-const COPY_SUFFIX_RE = /-copy-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}$/;
+ *  we append, plus the optional `-N` collision suffix (and any
+ *  number of repeats). Anchored at end so middle-name occurrences
+ *  aren't stripped. Without this, re-duplicating
+ *  `untitled-copy-2026-05-08-13-32-2` would produce
+ *  `untitled-copy-2026-05-08-13-32-2-copy-2026-05-08-13-32` —
+ *  user-visible bug. */
+const COPY_SUFFIX_RE = /-copy-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}(?:-\d+)?$/;
 
 /** Format `Date` as `YYYY-MM-DD-HH-MM`. Local time — users expect
  *  the timestamp to match what their wall clock says. */
@@ -47,9 +51,15 @@ export function duplicateName(
   const { stem: rawStem, ext } = isDir
     ? { stem: source, ext: "" }
     : splitExt(source);
-  // Strip a previous `-copy-<timestamp>` so duplicating a
-  // duplicate doesn't make the name grow forever.
-  const stem = rawStem.replace(COPY_SUFFIX_RE, "");
+  // Strip ANY number of previous `-copy-<timestamp>(-N)?` suffixes
+  // so re-duplicating a re-duplicate doesn't grow the name forever
+  // (the previous bug — names like `untitled-copy-…-copy-…-copy-…`).
+  let stem = rawStem;
+  while (true) {
+    const next = stem.replace(COPY_SUFFIX_RE, "");
+    if (next === stem) break;
+    stem = next;
+  }
   return `${stem}-copy-${formatStamp(now)}${ext}`;
 }
 

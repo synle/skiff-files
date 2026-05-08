@@ -113,6 +113,13 @@ export const fsCreateEmptyFile = (path: string): Promise<void> =>
 export const fsCopyRecursive = (from: string, to: string): Promise<void> =>
   invoke<void>("fs_copy_recursive", { from, to });
 
+/** Return the OS Trash / Recycle Bin folder path. macOS: ~/.Trash.
+ *  Linux: ~/.local/share/Trash/files. Windows: `null` (Recycle Bin
+ *  isn't a real filesystem path). Frontend hides the Trash favorite
+ *  on null. */
+export const fsTrashPath = (): Promise<string | null> =>
+  invoke<string | null>("fs_trash_path");
+
 /** Bundle one or more local paths into a zip archive at `destZip`.
  *  Folders walk recursively. Errors if `destZip` already exists. */
 export const fsCompressZip = (
