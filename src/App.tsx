@@ -101,8 +101,10 @@ export default function App() {
               ? "small"
               : "small";
         update("fontSize", next);
-      } else if (e.shiftKey && e.key === ".") {
+      } else if (e.shiftKey && (e.key === "." || e.key === ">" || e.code === "Period")) {
         // Finder muscle memory: Cmd+Shift+. toggles dotfile visibility.
+        // On macOS Shift+. emits ">" (US layout) so we accept both keys
+        // plus the layout-independent `code === "Period"`.
         e.preventDefault();
         update("showHidden", !settings.showHidden);
       }

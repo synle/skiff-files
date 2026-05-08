@@ -20,22 +20,26 @@ const baseTypography = {
 
 const baseShape = { borderRadius: 6 } as const;
 
+const lightPalette = {
+  mode: "light" as const,
+  primary: { main: "#1565c0" },
+  background: { default: "#fafafa", paper: "#ffffff" },
+};
+
+const darkPalette = {
+  mode: "dark" as const,
+  primary: { main: "#64b5f6" },
+  background: { default: "#1a1a1a", paper: "#222222" },
+};
+
 export const lightTheme: Theme = createTheme({
-  palette: {
-    mode: "light",
-    primary: { main: "#1565c0" },
-    background: { default: "#fafafa", paper: "#ffffff" },
-  },
+  palette: lightPalette,
   typography: baseTypography,
   shape: baseShape,
 });
 
 export const darkTheme: Theme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: { main: "#64b5f6" },
-    background: { default: "#1a1a1a", paper: "#222222" },
-  },
+  palette: darkPalette,
   typography: baseTypography,
   shape: baseShape,
 });
@@ -100,17 +104,20 @@ export function usePrefersReducedMotion(): boolean {
 
 /** Builds a theme that respects the reduced-motion preference. When
  *  reduced, MUI's `transitions.create` returns `none` so component
- *  fades / accordions / drawers don't animate. */
+ *  fades / accordions / drawers don't animate. Built with a single
+ *  `createTheme` call so transitions actually take effect — wrapping
+ *  an already-baked theme would leave precomputed transition strings
+ *  on individual components. */
 export function themeForWithMotion(
   effective: EffectiveMode,
   reducedMotion: boolean,
 ): Theme {
   if (!reducedMotion) return themeFor(effective);
-  const base = effective === "dark" ? darkTheme : lightTheme;
   return createTheme({
-    ...base,
+    palette: effective === "dark" ? darkPalette : lightPalette,
+    typography: baseTypography,
+    shape: baseShape,
     transitions: {
-      ...base.transitions,
       create: () => "none",
     },
   });
@@ -126,21 +133,35 @@ export function fontSizePx(
   return 14;
 }
 
-/** Compose `themeForWithMotion` + a font-size override. The MUI theme
- *  builder picks up `typography.fontSize` and rescales every variant
- *  proportionally. */
+/** Build a theme honoring all UI-level user preferences in a single
+ *  `createTheme` call. Critically: typography variants (body1, h1,
+ *  etc.) only rescale when `fontSize` is part of the *initial*
+ *  options — spreading `...base.typography` from an already-baked
+ *  theme bakes in the old variant pixel sizes. Same story for
+ *  `transitions.create`. So we recompose from scratch every time. */
 export function themeForFull(
   effective: EffectiveMode,
   reducedMotion: boolean,
   fontSize: "small" | "medium" | "large",
 ): Theme {
-  const base = themeForWithMotion(effective, reducedMotion);
-  if (fontSize === "medium") return base;
   return createTheme({
-    ...base,
-    typography: {
-      ...base.typography,
-      fontSize: fontSizePx(fontSize),
+    palette: effective === "dark" ? darkPalette : lightPalette,
+    typography: { ...baseTypography, fontSize: fontSizePx(fontSize) },
+    shape: baseShape,
+    ...(reducedMotion
+      ? { transitions: { create: () => "none" } }
+      : {}),
+    components: {
+      // Apply the user's font size at the document root too — MUI's
+      // typography variants scale via pxToRem, so they need both
+      // typography.fontSize *and* a matching root font-size for the
+      // CSS to actually render at the chosen scale.
+      MuiCssBaseline: {
+        styleOverrides: {
+          html: { fontSize: `${fontSizePx(fontSize)}px` },
+          body: { fontSize: `${fontSizePx(fontSize)}px` },
+        },
+      },
     },
   });
 }
