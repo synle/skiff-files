@@ -350,6 +350,17 @@ Goal: port `cpsync`'s spirit to a cross-protocol, cross-platform engine. **The h
 
 These are tracked here so they don't get lost, but the user has asked that they remain inert until they explicitly say "go work on X".
 
+- [ ] **Cloud storage backends** — first-class support alongside SFTP/FTP/SMB for the major consumer + enterprise clouds:
+  - **Google Drive** (OAuth 2.0; Google Drive API v3; `gdrive` Rust crate or REST via `reqwest` + `oauth2` crate).
+  - **Microsoft OneDrive** (OAuth 2.0 via Microsoft Graph API; works for personal + Business / SharePoint accounts).
+  - **Amazon S3** (AWS SDK or `aws-sdk-s3` crate; bucket + prefix as a virtual root; access key / IAM / SSO auth).
+  - **Azure Blob / Azure Files** (`azure_storage` crate; SAS token + connection-string + AAD auth modes).
+  - Each should slot into the same `RemoteFs`-style backend abstraction as SFTP so Skiffsync, the Browser pane, the Sidebar Hosts section, and the connection registry treat them uniformly. Auth tokens go through the OS keychain (`keyring` crate) — never stored in plaintext settings.json.
+  - Path schemes: `gdrive://<conn_id>/<drive>/<path>`, `onedrive://<conn_id>/<path>`, `s3://<conn_id>/<bucket>/<key>`, `azureblob://<conn_id>/<container>/<blob>`. The frontend's `util/location.ts` `isRemote` helper extends to recognize them.
+  - Streaming required — listings can be paginated (S3 `ListObjectsV2`) and large blobs need chunked uploads (S3 multipart, OneDrive resumable, Drive resumable). Reuse the cross-engine's `tokio::io::copy` plumbing.
+  - Settings → Connections gets per-cloud "Add" buttons; each pops a provider-specific config form (OAuth flow opens system browser → loopback redirect → token exchange).
+
+
 - [ ] **Unified progress dialogs for all in-progress operations** *(top priority backlog)* — every long-running operation (delete-to-trash, copy, cut/paste, sync jobs) should surface the **same** progress widget so the UX is deterministic. Spec:
   - **Determinate progress bar** wherever total bytes are known up-front (sync — `bytesDone / bytesTotal`); fall back to indeterminate during the pre-scan.
   - **Files counter** — "N of M files" alongside the bar, regardless of whether the byte count is known. This is the "always-something-deterministic" anchor: even when total bytes are unknown, the user sees how many files are left.

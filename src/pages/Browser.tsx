@@ -545,13 +545,26 @@ export default function Browser({
   }, [entries]);
 
   /** Filtered entry list — case-insensitive substring match on `name`.
-   *  When recursive find is on we substitute the find results instead. */
+   *  When recursive find is on we substitute the find results instead.
+   *  Always pre-filters known OS system-junk filenames when
+   *  `hideSystemFiles` is on so users don't have to toggle `showHidden`
+   *  just to escape `.DS_Store` clutter. */
   const visibleEntries = useMemo(() => {
-    if (searchRecursive && findResults) return findResults;
-    if (!search) return entries;
+    const SYSTEM_NAMES = new Set([
+      ".DS_Store",
+      "Thumbs.db",
+      "desktop.ini",
+      ".localized",
+      "._.DS_Store",
+    ]);
+    let base = searchRecursive && findResults ? findResults : entries;
+    if (settings.hideSystemFiles) {
+      base = base.filter((e) => !SYSTEM_NAMES.has(e.name));
+    }
+    if (!search) return base;
     const q = search.toLowerCase();
-    return entries.filter((e) => e.name.toLowerCase().includes(q));
-  }, [entries, search, searchRecursive, findResults]);
+    return base.filter((e) => e.name.toLowerCase().includes(q));
+  }, [entries, search, searchRecursive, findResults, settings.hideSystemFiles]);
 
   // Reset the query on every navigation — the new folder almost certainly
   // doesn't have files matching the previous folder's search.

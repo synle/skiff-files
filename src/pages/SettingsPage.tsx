@@ -253,6 +253,16 @@ export default function SettingsPage() {
             label="Show hidden files (dotfiles)"
           />
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.hideSystemFiles}
+                onChange={(e) => update("hideSystemFiles", e.target.checked)}
+              />
+            }
+            label="Hide system files (.DS_Store, Thumbs.db, desktop.ini)"
+          />
+
           <FormControl size="small" sx={{ maxWidth: 280 }}>
             <InputLabel id="show-ext-label">Show file extensions</InputLabel>
             <Select

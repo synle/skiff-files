@@ -66,6 +66,11 @@ export interface Settings {
   /** Global font size scale. Mapped to MUI's `typography.fontSize`. */
   fontSize: FontSize;
   showHidden: boolean;
+  /** When true (default), system files like `.DS_Store`, `Thumbs.db`,
+   *  `desktop.ini`, `.localized` are filtered out of the Browser
+   *  listing regardless of `showHidden`. Power users on macOS who
+   *  need to inspect these can disable. */
+  hideSystemFiles: boolean;
   showExtensions: ShowExtensions;
   /** Right-side preview pane policy. */
   previewMode: PreviewMode;
@@ -221,6 +226,7 @@ export const DEFAULTS: Settings = {
   density: "comfortable",
   fontSize: "medium",
   showHidden: false,
+  hideSystemFiles: true,
   showExtensions: "always",
   previewMode: "imagesOnly",
   previewWidth: 320,
