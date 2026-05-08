@@ -33,7 +33,12 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import type { Page } from "../App";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
-import { fsMounts, fsTrashPath, type MountedVolume } from "../api/fs";
+import {
+  fsMounts,
+  fsOpenWithDefault,
+  fsTrashPath,
+  type MountedVolume,
+} from "../api/fs";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
@@ -392,7 +397,15 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             ))}
             {trashPath && (
               <ListItem disablePadding>
-                <ListItemButton onClick={() => onNavigate(trashPath)}>
+                {/* macOS sandboxes ~/.Trash via TCC — read_dir errors with
+                 *  "Operation not permitted" without Full Disk Access. Reveal
+                 *  it in Finder instead, which has the entitlement and a
+                 *  better Trash UI (Empty Trash / Put Back) anyway. */}
+                <ListItemButton
+                  onClick={() => {
+                    void fsOpenWithDefault(trashPath).catch(() => {});
+                  }}
+                >
                   <ListItemIcon sx={{ minWidth: 32 }}>
                     <DeleteIcon fontSize="small" />
                   </ListItemIcon>
