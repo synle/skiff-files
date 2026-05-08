@@ -30,6 +30,11 @@ import HistoryIcon from "@mui/icons-material/History";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import EditIcon from "@mui/icons-material/Edit";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import SidebarContextMenu, {
+  type SidebarContextState,
+} from "./SidebarContextMenu";
 import type { Page } from "../App";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
@@ -267,6 +272,40 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
     });
   };
 
+  /** Anchor + actions for the per-row context menu. Null when no
+   *  menu is open. */
+  const [contextMenu, setContextMenu] = useState<SidebarContextState | null>(
+    null,
+  );
+
+  /** Hide a hardcoded favorite (Home / Desktop / Documents / Downloads
+   *  / Trash). Persisted via `hiddenFavorites: string[]` so the
+   *  setting survives restart. */
+  const hideFavorite = (rel: string) => {
+    if (settings.hiddenFavorites.includes(rel)) return;
+    update("hiddenFavorites", [...settings.hiddenFavorites, rel]);
+  };
+
+  /** Drop a single recent path. The Browser keeps adding paths to
+   *  the head of `recentPaths` on every navigation; this lets the
+   *  user prune entries one-off without nuking the whole list. */
+  const removeRecent = (path: string) => {
+    update(
+      "recentPaths",
+      settings.recentPaths.filter((p) => p !== path),
+    );
+  };
+
+  /** Promote a recent / favorite path to a bookmark in one click.
+   *  Skips when the path already lives in bookmarks. */
+  const bookmarkPath = (path: string, label: string) => {
+    if (settings.bookmarks.some((b) => b.path === path)) return;
+    update("bookmarks", [
+      ...settings.bookmarks,
+      { id: crypto.randomUUID(), label, path },
+    ]);
+  };
+
   /** Closure over toggleSection + isCollapsed for the SectionHeader
    *  child component (defined outside this function so React doesn't
    *  recreate the type on every parent render — that was breaking
@@ -443,18 +482,44 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         {isVisible("favorites") && renderSectionHeader("favorites", "Favorites")}
         {isVisible("favorites") && !isCollapsed("favorites") && (
           <List dense disablePadding id="sidebar-section-favorites">
-            {FAVORITES.map((f) => (
+            {FAVORITES.filter(
+              (f) => !settings.hiddenFavorites.includes(f.rel),
+            ).map((f) => (
               <ListItem key={f.label} disablePadding>
                 <ListItemButton
                   disabled={!home}
                   onClick={() => onNavigate(join(f.rel))}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      section: "favorites",
+                      itemId: f.rel,
+                      actions: [
+                        {
+                          key: "bookmark",
+                          icon: <BookmarkIcon fontSize="small" />,
+                          label: "Add to bookmarks",
+                          onClick: () =>
+                            bookmarkPath(join(f.rel), f.label),
+                        },
+                        {
+                          key: "hide",
+                          icon: <VisibilityOffIcon fontSize="small" />,
+                          label: `Hide "${f.label}"`,
+                          onClick: () => hideFavorite(f.rel),
+                        },
+                      ],
+                    });
+                  }}
                 >
                   <ListItemIcon sx={{ minWidth: 32 }}>{f.icon}</ListItemIcon>
                   <ListItemText primary={f.label} />
                 </ListItemButton>
               </ListItem>
             ))}
-            {trashPath && (
+            {trashPath && !settings.hiddenFavorites.includes("trash") && (
               <ListItem disablePadding>
                 {/* macOS sandboxes ~/.Trash via TCC — read_dir errors with
                  *  "Operation not permitted" without Full Disk Access. Reveal
@@ -463,6 +528,23 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                 <ListItemButton
                   onClick={() => {
                     void fsOpenWithDefault(trashPath).catch(() => {});
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      section: "favorites",
+                      itemId: "trash",
+                      actions: [
+                        {
+                          key: "hide",
+                          icon: <VisibilityOffIcon fontSize="small" />,
+                          label: 'Hide "Trash"',
+                          onClick: () => hideFavorite("trash"),
+                        },
+                      ],
+                    });
                   }}
                 >
                   <ListItemIcon sx={{ minWidth: 32 }}>
@@ -531,7 +613,43 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     onClick={() => onNavigate(b.path)}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      renameBookmark(b.id);
+                      const isFirst = i === 0;
+                      const isLast = i === settings.bookmarks.length - 1;
+                      setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        section: "bookmarks",
+                        itemId: b.id,
+                        actions: [
+                          {
+                            key: "rename",
+                            icon: <EditIcon fontSize="small" />,
+                            label: "Rename…",
+                            onClick: () => renameBookmark(b.id),
+                          },
+                          {
+                            key: "up",
+                            icon: <KeyboardArrowUpIcon fontSize="small" />,
+                            label: "Move up",
+                            disabled: isFirst,
+                            onClick: () => moveBookmark(b.id, "up"),
+                          },
+                          {
+                            key: "down",
+                            icon: <KeyboardArrowDownIcon fontSize="small" />,
+                            label: "Move down",
+                            disabled: isLast,
+                            dividerAfter: true,
+                            onClick: () => moveBookmark(b.id, "down"),
+                          },
+                          {
+                            key: "remove",
+                            icon: <CloseIcon fontSize="small" />,
+                            label: "Remove",
+                            onClick: () => removeBookmark(b.id),
+                          },
+                        ],
+                      });
                     }}
                     // Drop a Skiff selection here to sync into the
                     // bookmark's path. Mirrors the host-drop flow but
@@ -603,7 +721,37 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                 const parent = segs.length >= 2 ? segs[segs.length - 2] : "";
                 return (
                   <ListItem key={p} disablePadding>
-                    <ListItemButton onClick={() => onNavigate(p)}>
+                    <ListItemButton
+                      onClick={() => onNavigate(p)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        const alreadyBookmarked = settings.bookmarks.some(
+                          (bk) => bk.path === p,
+                        );
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          section: "recent",
+                          itemId: p,
+                          actions: [
+                            {
+                              key: "bookmark",
+                              icon: <BookmarkIcon fontSize="small" />,
+                              label: "Add to bookmarks",
+                              disabled: alreadyBookmarked,
+                              dividerAfter: true,
+                              onClick: () => bookmarkPath(p, label),
+                            },
+                            {
+                              key: "remove",
+                              icon: <CloseIcon fontSize="small" />,
+                              label: "Remove from recent",
+                              onClick: () => removeRecent(p),
+                            },
+                          ],
+                        });
+                      }}
+                    >
                       <ListItemIcon sx={{ minWidth: 32 }}>
                         <HistoryIcon
                           fontSize="small"
@@ -828,6 +976,12 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
           "&:hover": { backgroundColor: "primary.light" },
           zIndex: 1,
         }}
+      />
+      {/* Per-section context menu. Sidebar rows set up their own
+          actions; this just renders whatever's in `contextMenu`. */}
+      <SidebarContextMenu
+        state={contextMenu}
+        onClose={() => setContextMenu(null)}
       />
     </Box>
   );

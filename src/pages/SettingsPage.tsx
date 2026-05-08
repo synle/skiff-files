@@ -376,6 +376,21 @@ export default function SettingsPage() {
               );
             },
           )}
+
+          {settings.hiddenFavorites.length > 0 && (
+            <Box sx={{ pt: 1 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Hidden favorites: {settings.hiddenFavorites.join(", ")}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => update("hiddenFavorites", [])}
+              >
+                Restore all hidden favorites
+              </Button>
+            </Box>
+          )}
         </Section>
 
         <Divider />

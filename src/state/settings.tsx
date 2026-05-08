@@ -84,6 +84,11 @@ export interface Settings {
    *  RECENT_PATHS_MAX so the list doesn't grow unbounded. Surfaces in
    *  the sidebar's Recent section. */
   recentPaths: string[];
+  /** Favorites the user has hidden via the sidebar context menu.
+   *  Stored as the relative-from-home segment (e.g. "Desktop") plus
+   *  the special token "trash" for the Trash favorite. Hidden items
+   *  vanish from the Sidebar but stay re-enable-able from Settings. */
+  hiddenFavorites: string[];
   /** Per-folder view mode override. The Browser falls back to
    *  `defaultView` when there's no entry for the current path.
    *  Capped at FOLDER_VIEW_MAX (LRU-style: oldest entries dropped
@@ -237,6 +242,7 @@ export const DEFAULTS: Settings = {
   startPath: "",
   bookmarks: [],
   recentPaths: [],
+  hiddenFavorites: [],
   folderViewMode: {},
   defaultSortKey: "name",
   defaultSortDir: "asc",
