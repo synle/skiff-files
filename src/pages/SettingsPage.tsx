@@ -573,6 +573,73 @@ export default function SettingsPage() {
             <Button
               variant="outlined"
               size="small"
+              disabled={settings.bookmarks.length === 0}
+              onClick={() => {
+                if (
+                  typeof navigator !== "undefined" &&
+                  navigator.clipboard
+                ) {
+                  void navigator.clipboard.writeText(
+                    JSON.stringify(settings.bookmarks, null, 2),
+                  );
+                }
+              }}
+            >
+              Export bookmarks (clipboard)
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                // Paste back the JSON to merge into the current
+                // bookmark list. Validates shape minimally — entries
+                // need string `id`, `label`, and `path`. New entries
+                // get fresh ids so collisions across machines don't
+                // overwrite. Existing paths are skipped to keep the
+                // operation idempotent.
+                const raw = window.prompt(
+                  "Paste bookmarks JSON (array). Existing paths are skipped:",
+                );
+                if (!raw) return;
+                try {
+                  const parsed = JSON.parse(raw) as unknown;
+                  if (!Array.isArray(parsed)) {
+                    window.alert("Bookmarks JSON must be an array.");
+                    return;
+                  }
+                  const existing = new Set(
+                    settings.bookmarks.map((b) => b.path),
+                  );
+                  const incoming = parsed
+                    .filter(
+                      (e): e is { id?: string; label: string; path: string } =>
+                        typeof e === "object" &&
+                        e !== null &&
+                        typeof (e as Record<string, unknown>).label ===
+                          "string" &&
+                        typeof (e as Record<string, unknown>).path === "string",
+                    )
+                    .filter((e) => !existing.has(e.path))
+                    .map((e) => ({
+                      id: crypto.randomUUID(),
+                      label: e.label,
+                      path: e.path,
+                    }));
+                  if (incoming.length === 0) {
+                    window.alert("No new bookmarks to import.");
+                    return;
+                  }
+                  update("bookmarks", [...settings.bookmarks, ...incoming]);
+                } catch (e) {
+                  window.alert(`Couldn't parse JSON: ${String(e)}`);
+                }
+              }}
+            >
+              Import bookmarks (paste JSON)
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
               disabled={
                 Object.keys(settings.folderViewMode).length === 0 &&
                 Object.keys(settings.folderSort).length === 0
