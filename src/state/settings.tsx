@@ -13,6 +13,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -388,10 +389,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Persist on every change to BOTH localStorage (hot cache for next
-  // mount) and disk via Tauri (durable across reinstalls / dotfile
-  // sync). The cost is one JSON.stringify per setting tweak; tiny.
+  // Persist on every VALUE change (not every reference change) to
+  // BOTH localStorage (hot cache for next mount) and disk via Tauri
+  // (durable across reinstalls / dotfile sync). The JSON-equality
+  // dedup is critical: the cross-window settings sync listener
+  // reloads from disk and calls setSettings with a fresh object ref
+  // even when values are identical. Without this dedup, the persist
+  // effect would re-fire → save → emit → reload → … infinite loop.
+  // Manifested in 0.2.137 as the view-mode oscillation in single-
+  // window mode (the disk-equality guard in App.tsx alone wasn't
+  // enough — by the time the listener compared, the source window
+  // had already re-armed its own persist effect via setSettings).
+  const lastSavedJsonRef = useRef<string>("");
   useEffect(() => {
+    const json = JSON.stringify(settings);
+    if (json === lastSavedJsonRef.current) return;
+    lastSavedJsonRef.current = json;
     saveSettings(settings);
     void saveSettingsToDisk(settings);
   }, [settings]);
