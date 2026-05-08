@@ -60,6 +60,12 @@ export default function App() {
         // VS Code expect this binding everywhere.
         e.preventDefault();
         navigate("/settings");
+      } else if (e.key === "\\") {
+        // Cmd/Ctrl+\ toggles two-pane (split) mode. FileZilla muscle
+        // memory: the second pane is for cross-protocol drag-drop
+        // transfers from local ↔ remote without juggling tabs.
+        e.preventDefault();
+        update("twoPaneMode", !settings.twoPaneMode);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -145,7 +151,47 @@ export default function App() {
         }}
       >
         <Routes>
-          <Route path="/" element={<BrowserTabs home={home} />} />
+          <Route
+            path="/"
+            element={
+              settings.twoPaneMode ? (
+                // Two-pane mode: split the file area into two
+                // independent BrowserTabs strips. Each pane has its
+                // own tab list (left → `savedTabs`, right →
+                // `savedTabsRight`) so they survive restarts
+                // independently. Drag-drop / global keyboard events
+                // route to whichever Browser instance picks them up
+                // first; future polish can disambiguate by cursor
+                // position relative to pane bounds.
+                <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
+                  <Box
+                    sx={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      minWidth: 0,
+                      borderRight: 1,
+                      borderColor: "divider",
+                    }}
+                  >
+                    <BrowserTabs home={home} pane="main" />
+                  </Box>
+                  <Box
+                    sx={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      minWidth: 0,
+                    }}
+                  >
+                    <BrowserTabs home={home} pane="right" />
+                  </Box>
+                </Box>
+              ) : (
+                <BrowserTabs home={home} />
+              )
+            }
+          />
           <Route path="/connections" element={<ConnectionsPage />} />
           <Route path="/transfers" element={<TransfersPage />} />
           <Route path="/settings" element={<SettingsPage />} />

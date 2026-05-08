@@ -61,6 +61,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
       { keys: "Cmd / Ctrl + Shift + ← / →", description: "Move active tab left / right" },
       { keys: "Middle-click folder", description: "Open folder in new tab" },
+      { keys: "Cmd / Ctrl + \\", description: "Toggle two-pane (split) mode" },
     ],
   },
   {

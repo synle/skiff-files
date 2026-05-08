@@ -157,6 +157,16 @@ export default function SettingsPage() {
             }
             label="New tabs open at the active tab's path (instead of home)"
           />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.twoPaneMode}
+                onChange={(e) => update("twoPaneMode", e.target.checked)}
+              />
+            }
+            label="Two-pane mode (split view, FileZilla-style — Cmd/Ctrl+\\ toggles)"
+          />
         </Section>
 
         <Divider />

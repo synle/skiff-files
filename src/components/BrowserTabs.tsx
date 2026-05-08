@@ -35,6 +35,12 @@ interface TabRow {
 interface Props {
   /** Used as the seed for new tabs. Empty until fsHomeDir resolves. */
   home: string;
+  /** Which pane this BrowserTabs instance backs. Single-pane mode
+   *  always uses `"main"`; two-pane mode renders a second instance
+   *  with `"right"` so each pane has its own tab list + active id
+   *  in Settings. Default `"main"` keeps the single-pane callsite
+   *  unchanged. */
+  pane?: "main" | "right";
 }
 
 /** Pull a friendly label out of an absolute path: the last segment, or
@@ -45,14 +51,24 @@ function labelFor(path: string): string {
   return segs[segs.length - 1] ?? path;
 }
 
-export default function BrowserTabs({ home }: Props) {
+export default function BrowserTabs({ home, pane = "main" }: Props) {
   // Seed tabs from persisted settings. Empty saved list → spawn the
   // default Home tab. Settings is also our write-back target so the
-  // tabs survive restart.
+  // tabs survive restart. Per-pane keys: the right pane uses the
+  // `*Right` field family so the two pane tab lists don't collide.
   const { settings, update } = useSettings();
+  const savedTabsKey = pane === "right" ? "savedTabsRight" : "savedTabs";
+  const savedActiveTabIdKey =
+    pane === "right" ? "savedActiveTabIdRight" : "savedActiveTabId";
+  const seedTabs =
+    pane === "right" ? settings.savedTabsRight : settings.savedTabs;
+  const seedActive =
+    pane === "right"
+      ? settings.savedActiveTabIdRight
+      : settings.savedActiveTabId;
   const [tabs, setTabs] = useState<TabRow[]>(() => {
-    if (settings.savedTabs.length > 0) {
-      return settings.savedTabs.map((t) => ({
+    if (seedTabs.length > 0) {
+      return seedTabs.map((t) => ({
         id: t.id,
         label: t.label || "Home",
         initialPath: t.initialPath,
@@ -78,9 +94,9 @@ export default function BrowserTabs({ home }: Props) {
   const [_closedStack, setClosedStack] = useState<TabRow[]>([]);
 
   const [activeId, setActiveId] = useState<string>(() => {
-    const saved = settings.savedActiveTabId;
-    if (saved && settings.savedTabs.some((t) => t.id === saved)) return saved;
-    return (settings.savedTabs[0]?.id ?? null) ?? "";
+    if (seedActive && seedTabs.some((t) => t.id === seedActive))
+      return seedActive;
+    return (seedTabs[0]?.id ?? null) ?? "";
   });
   // First-run default-tab case: activeId would be "" because there
   // were no saved tabs and the seed tabs[0].id is fresh. Fix that
@@ -107,17 +123,19 @@ export default function BrowserTabs({ home }: Props) {
 
   // Persist tabs + active id whenever either changes. We trim to
   // TABS_MAX = 20 so a stuck-open run doesn't bloat settings.json.
+  // Per-pane keys ensure the left + right tab strips don't trash
+  // each other's state when both are mounted.
   useEffect(() => {
     const slice = tabs.slice(0, 20);
     update(
-      "savedTabs",
+      savedTabsKey,
       slice.map((t) => ({
         id: t.id,
         label: t.label,
         initialPath: t.initialPath,
       })),
     );
-    update("savedActiveTabId", activeId || null);
+    update(savedActiveTabIdKey, activeId || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs, activeId]);
 

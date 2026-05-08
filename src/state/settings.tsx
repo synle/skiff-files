@@ -148,6 +148,18 @@ export interface Settings {
    *  Default true. Hidden = the host icon column collapses to the
    *  fallback HubIcon to keep visual balance. */
   sidebarShowStatusDots: boolean;
+  /** Two-pane mode (FileZilla-style): when true, the main area
+   *  splits in half horizontally with two independent BrowserTabs
+   *  strips. Each pane has its own tab list (`savedTabs` for the
+   *  left pane, `savedTabsRight` for the right). Toggle via Cmd/Ctrl+\.
+   *  Default false (single-pane). */
+  twoPaneMode: boolean;
+  /** Tabs persisted for the RIGHT pane in two-pane mode. Empty in
+   *  single-pane mode (BrowserTabs spawns a default Home on first
+   *  mount). Capped at TABS_MAX. */
+  savedTabsRight: SavedTab[];
+  /** Active tab id for the RIGHT pane. */
+  savedActiveTabIdRight: string | null;
   /** When true, Cmd/Ctrl+T (and the toolbar +) seeds the new tab at
    *  the active tab's current path instead of the home directory.
    *  Useful for power users who frequently spawn parallel tabs from
@@ -227,6 +239,9 @@ export const DEFAULTS: Settings = {
   sidebarAccordion: false,
   sidebarShowStatusDots: true,
   openNewTabAtCurrent: false,
+  twoPaneMode: false,
+  savedTabsRight: [],
+  savedActiveTabIdRight: null,
   savedTabs: [],
   savedActiveTabId: null,
 };
