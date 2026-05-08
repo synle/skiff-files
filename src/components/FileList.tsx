@@ -559,6 +559,10 @@ export default function FileList(props: Props) {
                     alignItems: "center",
                     cursor: e.isDir ? "pointer" : "default",
                     bgcolor: isSel ? "action.selected" : "transparent",
+                    // Hidden entries are rendered at half opacity when
+                    // visible (`showHidden` is on) so the user can tell
+                    // them apart from regular content at a glance.
+                    opacity: e.isHidden ? 0.55 : 1,
                     // Focus ring for keyboard users. Inset so the row
                     // doesn't shift when the focus moves.
                     boxShadow: isFocused
