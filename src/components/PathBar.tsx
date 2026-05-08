@@ -154,7 +154,21 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
           slotProps={{ htmlInput: { "aria-label": "Path" } }}
         />
       ) : (
-        <Breadcrumbs sx={{ flexGrow: 1, overflow: "hidden" }} maxItems={6}>
+        <Breadcrumbs
+          sx={{ flexGrow: 1, overflow: "hidden" }}
+          maxItems={6}
+          onContextMenu={(e) => {
+            // Right-click anywhere in the breadcrumb strip copies
+            // the full current path to the clipboard. Best-effort —
+            // silent fallback in tests / browsers without clipboard
+            // permission.
+            e.preventDefault();
+            if (typeof navigator !== "undefined" && navigator.clipboard) {
+              void navigator.clipboard.writeText(path);
+            }
+          }}
+          title="Right-click to copy full path"
+        >
           {segments.map((seg) => (
             <Link
               key={seg.path}

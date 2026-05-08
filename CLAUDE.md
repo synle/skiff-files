@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.74** — ✅ **Right-click PathBar copies full path**. Right-clicking anywhere in the breadcrumb strip writes the current path to the OS clipboard. Best-effort — silent fallback in test envs without clipboard. Tooltip advertises the affordance.
 - **0.2.73** — ✅ **Settings → Keyboard listing**. The shortcut catalog moved out of `ShortcutsModal.tsx` into `util/shortcuts.ts` (`SHORTCUT_GROUPS`) so both the cheatsheet modal AND the new Settings → Keyboard section can render the same data without drift. Read-only for now (rebinding is a future release); each row uses a monospace key column for visual scan-ability. Closes the spec's Settings → Keyboard "View, search, and edit shortcuts" listing requirement (edit + reset still pending).
 - **0.2.72** — ✅ **New tab opens at current path option**. New `Settings.openNewTabAtCurrent` (default false). When on, Cmd/Ctrl+T (and the toolbar +) seeds the new tab at the active tab's current path instead of home — matches the expectation of users who frequently spawn parallel tabs from a folder they're already viewing. Seeding precedence: explicit caller arg > setting > home.
 - **0.2.71** — ✅ **Cmd/Ctrl+, opens Settings**. Mac convention for Preferences (also matches VS Code on every OS). App-level keydown handler navigates to `/settings`. Cheatsheet updated.
