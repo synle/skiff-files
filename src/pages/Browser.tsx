@@ -16,6 +16,7 @@ import {
   fsDiskSpace,
   fsFind,
   fsCompressZip,
+  fsCopyRecursive,
   fsCreateEmptyFile,
   fsExtractZip,
   fsHomeDir,
@@ -43,6 +44,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
+import { uniqueDuplicateName } from "../util/duplicateName";
 import {
   clearFileClipboard,
   FILE_CLIPBOARD_EVENT,
@@ -1115,28 +1117,36 @@ export default function Browser({
             .catch((err) => setError(String(err)));
         }}
         onDuplicate={(e) => {
-          // Build a unique sibling name: `name (copy).ext` →
-          // `name (copy 2).ext` if the first one's taken. Routes
-          // through Skiffsync so folders deep-copy correctly.
-          const dot = e.isDir ? -1 : e.name.lastIndexOf(".");
-          const stem = dot > 0 ? e.name.slice(0, dot) : e.name;
-          const ext = dot > 0 ? e.name.slice(dot) : "";
+          // Timestamped duplicate: `<name>-copy-YYYY-MM-DD-HH-MM`.
+          // If the source already ends in a `-copy-<timestamp>`,
+          // strip it before re-appending so re-duplicates don't
+          // grow the name forever (see util/duplicateName).
+          // Routes through fs_copy_recursive (synchronous) so we
+          // can refresh once the copy is on disk — Skiffsync's
+          // start_local returns once the job is queued, not done,
+          // which races refresh.
           const existing = new Set(entries.map((x) => x.name));
-          let candidate = `${stem} (copy)${ext}`;
-          let n = 2;
-          while (existing.has(candidate)) {
-            candidate = `${stem} (copy ${n++})${ext}`;
-          }
+          const candidate = uniqueDuplicateName(e.name, existing, {
+            isDir: e.isDir,
+          });
           const sep = e.path.lastIndexOf("/");
           const parent = sep > 0 ? e.path.slice(0, sep) : "";
           const target = `${parent}/${candidate}`;
-          void startSync(e.path, target, {
-            maxSizeGb: 100,
-            conflictPolicy: "skip",
-          })
-            .then(() => {
-              if (path) void refresh(path);
+          if (e.path.startsWith("sftp://")) {
+            // Remote duplicate has to go through Skiffsync; the
+            // synchronous fs_copy_recursive is local-only. Refresh
+            // races the async sync but it's the best we can do
+            // until conn_copy_recursive lands.
+            void startSync(e.path, target, {
+              maxSizeGb: 100,
+              conflictPolicy: "skip",
             })
+              .then(() => path && void refresh(path))
+              .catch((err) => setError(String(err)));
+            return;
+          }
+          void fsCopyRecursive(e.path, target)
+            .then(() => path && void refresh(path))
             .catch((err) => setError(String(err)));
         }}
         comparePending={diffBase !== null}
