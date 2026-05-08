@@ -101,6 +101,11 @@ export interface ImageExif {
   focalLength: string | null;
 }
 
+/** Compute the SHA-256 hash of a local file. Streams the file in
+ *  chunks so large files don't load into memory; returns hex-encoded. */
+export const fsHashSha256 = (path: string): Promise<string> =>
+  invoke<string>("fs_hash_sha256", { path });
+
 /** Read EXIF off a local image. Returns an all-`null` struct when the
  *  file isn't EXIF-bearing rather than throwing. */
 export const fsImageExif = (path: string): Promise<ImageExif> =>

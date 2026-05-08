@@ -248,6 +248,31 @@ pub fn fs_open_in_terminal(path: String) -> FsResult<()> {
     Err(format!("open_in_terminal: unsupported platform for {path}"))
 }
 
+/// SHA-256 hash of a local file. Streams in 64 KB chunks so multi-GB
+/// files don't blow up RAM. Returns the hex-encoded digest. Used by
+/// the Properties dialog's "Compute SHA-256" button for integrity
+/// checks / bug-report metadata.
+#[tauri::command]
+pub fn fs_hash_sha256(path: String) -> FsResult<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let f = std::fs::File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
+    let mut reader = std::io::BufReader::new(f);
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| format!("read({path}): {e}"))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    let digest = hasher.finalize();
+    Ok(digest.iter().map(|b| format!("{b:02x}")).collect())
+}
+
 /// EXIF metadata read off a local image. Optional fields — every key
 /// is `null` when the image lacks the corresponding tag (or isn't a
 /// JPEG/TIFF where EXIF lives). Used by the PreviewPane to surface

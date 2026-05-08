@@ -21,7 +21,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useEffect, useState } from "react";
 import { dirSummary } from "../api/client";
-import type { DirSummary, Entry } from "../api/fs";
+import { fsHashSha256, type DirSummary, type Entry } from "../api/fs";
 import { formatBytes, formatMtime } from "../util/format";
 import IconForKind from "./IconForKind";
 
@@ -50,9 +50,16 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function PropertiesDialog({ entry, onClose }: Props) {
   const [summary, setSummary] = useState<DirSummary | null>(null);
+  /** SHA-256 hex digest. Lazily computed via the "Compute SHA-256"
+   *  button — non-trivial cost on large files, so we don't auto-fire
+   *  on every Properties open. Reset on entry change. */
+  const [sha256, setSha256] = useState<string | null>(null);
+  const [hashing, setHashing] = useState(false);
 
   useEffect(() => {
     setSummary(null);
+    setSha256(null);
+    setHashing(false);
     if (!entry?.isDir) return;
     let cancelled = false;
     void dirSummary(entry.path)
@@ -117,6 +124,27 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
           {entry.isSymlink && <Field label="Symlink" value="yes" />}
           {entry.isHidden && <Field label="Hidden" value="yes" />}
           <Field label="Path" value={entry.path} />
+          {sha256 && <Field label="SHA-256" value={<code>{sha256}</code>} />}
+          {!entry.isDir && !entry.path.startsWith("sftp://") && !sha256 && (
+            <Box sx={{ pt: 0.5 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={hashing}
+                onClick={() => {
+                  setHashing(true);
+                  void fsHashSha256(entry.path)
+                    .then((h) => setSha256(h))
+                    .catch(() => {
+                      /* swallow — UI just won't show the hash */
+                    })
+                    .finally(() => setHashing(false));
+                }}
+              >
+                {hashing ? "Hashing…" : "Compute SHA-256"}
+              </Button>
+            </Box>
+          )}
           <Box sx={{ pt: 1 }}>
             <Button
               size="small"
