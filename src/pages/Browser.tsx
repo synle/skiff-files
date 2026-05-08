@@ -12,6 +12,7 @@ import PreviewPane from "../components/PreviewPane";
 import {
   fsDiskSpace,
   fsFind,
+  fsCreateEmptyFile,
   fsHomeDir,
   fsOpenInTerminal,
   fsOpenWithDefault,
@@ -614,6 +615,37 @@ export default function Browser({
     }
   };
 
+  const handleNewFile = async () => {
+    if (!path) return;
+    if (path.startsWith("sftp://")) {
+      // Remote support would need an analogous conn_create_empty_file
+      // command on the SFTP backend; future work.
+      setError("Creating files on remote hosts isn't supported yet.");
+      return;
+    }
+    const existing = new Set(entries.map((e) => e.name));
+    let suggestion = "untitled.txt";
+    let n = 2;
+    while (existing.has(suggestion)) {
+      suggestion = `untitled ${n++}.txt`;
+    }
+    const name = window.prompt("Name for the new file:", suggestion);
+    if (name == null) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (existing.has(trimmed)) {
+      setError(`A file or folder named "${trimmed}" already exists.`);
+      return;
+    }
+    const target = `${path}/${trimmed}`;
+    try {
+      await fsCreateEmptyFile(target);
+      await refresh(path);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const handleNewFolder = async () => {
     if (!path) return;
     // Auto-name suggestion: "New Folder", "New Folder 2", … skipping
@@ -801,6 +833,7 @@ export default function Browser({
         isRefreshing={isRefreshing}
         onRefresh={() => path && void refresh(path)}
         onNewFolder={() => void handleNewFolder()}
+        onNewFile={() => void handleNewFile()}
         view={settings.folderViewMode[path] ?? settings.defaultView}
         onViewChange={(v) => {
           // Persist per-folder rather than globally — the user picked

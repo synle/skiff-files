@@ -248,6 +248,22 @@ pub fn fs_open_in_terminal(path: String) -> FsResult<()> {
     Err(format!("open_in_terminal: unsupported platform for {path}"))
 }
 
+/// Create an empty file. Errors if the path already exists. Used by
+/// the toolbar's "New file" button — same UX as "New folder".
+#[tauri::command]
+pub fn fs_create_empty_file(path: String) -> FsResult<()> {
+    let p = std::path::Path::new(&path);
+    if p.exists() {
+        return Err(format!("already exists: {path}"));
+    }
+    if let Some(parent) = p.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("mkdir parent: {e}"))?;
+    }
+    std::fs::File::create(&p).map_err(|e| format!("create({path}): {e}"))?;
+    Ok(())
+}
+
 /// Mounted volume entry — populated by `fs_mounts` to drive the
 /// Sidebar's Devices section. `removable` lets the UI show external
 /// drives differently from the system disk.

@@ -22,6 +22,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
+import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
@@ -54,6 +55,10 @@ interface Props {
   onHistoryJump?: (direction: "back" | "forward", steps: number) => void;
   onRefresh: () => void;
   onNewFolder: () => void;
+  /** Optional — when set, the toolbar shows a "New file" button next
+   *  to "New folder". Browser wires this to write an empty file
+   *  via the existing fs / conn abstractions. */
+  onNewFile?: () => void;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
   /** Whether the right-side preview pane is currently visible. */
@@ -84,6 +89,7 @@ export default function Toolbar(props: Props) {
     onUp,
     onRefresh,
     onNewFolder,
+    onNewFile,
     view,
     onViewChange,
     previewOpen,
@@ -223,6 +229,13 @@ export default function Toolbar(props: Props) {
           <CreateNewFolderIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+      {onNewFile && (
+        <Tooltip title="New file">
+          <IconButton size="small" onClick={onNewFile} aria-label="New file">
+            <NoteAddIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
 
       <Box sx={{ flexGrow: 1 }} />
 

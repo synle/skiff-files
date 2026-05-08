@@ -101,6 +101,11 @@ export interface ImageExif {
   focalLength: string | null;
 }
 
+/** Create an empty file at `path`. Errors if the path already exists.
+ *  Used by the toolbar's "New file" button. */
+export const fsCreateEmptyFile = (path: string): Promise<void> =>
+  invoke<void>("fs_create_empty_file", { path });
+
 /** Mirror of `crate::commands::MountedVolume`. Used by the Sidebar's
  *  Devices section to show the system disk + any plugged-in
  *  externals. */
