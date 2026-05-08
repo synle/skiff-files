@@ -391,6 +391,27 @@ export default function Browser({
         if (!path || parentPath(path) === path) return;
         e.preventDefault();
         goUp();
+      } else if (e.key === "[") {
+        // Browser muscle memory: Cmd+[ = back. Same effect as the
+        // toolbar's left arrow.
+        if (history.back.length <= 1) return;
+        e.preventDefault();
+        goBack();
+      } else if (e.key === "]") {
+        // Cmd+] = forward.
+        if (history.forward.length === 0) return;
+        e.preventDefault();
+        goForward();
+      } else if (e.key === "ArrowLeft" && !e.shiftKey) {
+        // Cmd+← also goes back (Finder convention; some users
+        // prefer arrows over brackets).
+        if (history.back.length <= 1) return;
+        e.preventDefault();
+        goBack();
+      } else if (e.key === "ArrowRight" && !e.shiftKey) {
+        if (history.forward.length === 0) return;
+        e.preventDefault();
+        goForward();
       }
     };
     window.addEventListener("keydown", onKey);
