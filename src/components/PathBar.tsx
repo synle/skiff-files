@@ -176,6 +176,10 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
               onClick={() => onNavigate(seg.path)}
               underline="hover"
               color="inherit"
+              // Hover surfaces the full path-up-to-here, useful when
+              // the breadcrumb truncates with `maxItems` and the user
+              // wants to know what a middle segment actually points at.
+              title={seg.path}
               sx={{ fontSize: "0.875rem" }}
             >
               {seg.label}
