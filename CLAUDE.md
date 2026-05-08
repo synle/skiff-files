@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.95** — ✅ **Drag onto bookmark triggers sync**. Bookmarks accept `application/x-skiff-paths` drops the same way Sidebar host items do (0.2.59). Dropping a multi-selection onto a bookmark prompts for confirmation, then fans out one `startSync` per dropped entry into `<bookmark.path>/<basename>`. Skips the destination-path prompt since the bookmark already names a target. Tooltip updated to advertise the affordance.
 - **0.2.94** — ✅ **Cmd/Ctrl+Shift+F = recursive find**. Plain Cmd/Ctrl+F focuses the search input as before; the Shift variant additionally flips the recursive-find toggle so the next keystroke kicks an `fs_find` walk. Toggling between filter and recursive doesn't get sticky — each shortcut writes the recursive bit explicitly. Cheatsheet grew a Search section.
 - **0.2.93** — ✅ **Bookmarks export / import via clipboard**. Settings → Advanced grew Export (writes the bookmarks array as pretty-printed JSON to the clipboard) and Import (parses pasted JSON, dedups by path, generates fresh UUIDs so cross-machine merges don't collide). Validates shape minimally (`label` + `path` strings); shows a plain alert on bad JSON. Useful for syncing a curated bookmark list across machines via dotfiles repo or a Slack paste.
 - **0.2.92** — ✅ **F1 opens cheatsheet (alias for `?`)**. Mirrors the canonical Windows / many-web-apps "help" binding so users don't have to know about Shift+/. Same input-focus guard as the `?` path.

@@ -319,7 +319,44 @@ export default function Sidebar({ home, onNavigate }: Props) {
                       e.preventDefault();
                       renameBookmark(b.id);
                     }}
-                    title="Right-click to rename"
+                    // Drop a Skiff selection here to sync into the
+                    // bookmark's path. Mirrors the host-drop flow but
+                    // skips the destination prompt since the bookmark
+                    // already names a path.
+                    onDragOver={(e) => {
+                      if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "copy";
+                      }
+                    }}
+                    onDrop={(e) => {
+                      const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+                      if (!raw) return;
+                      e.preventDefault();
+                      const paths = raw.split("\n").filter(Boolean);
+                      if (paths.length === 0) return;
+                      if (
+                        !window.confirm(
+                          `Sync ${paths.length} item${paths.length === 1 ? "" : "s"} into ${b.label}?`,
+                        )
+                      ) {
+                        return;
+                      }
+                      for (const p of paths) {
+                        const segs = p.split(/[\\/]/).filter(Boolean);
+                        const base = segs.at(-1) ?? p;
+                        const dest = b.path.endsWith("/")
+                          ? `${b.path}${base}`
+                          : `${b.path}/${base}`;
+                        void startSync(p, dest, {
+                          maxSizeGb: 100,
+                          conflictPolicy: "skip",
+                        }).catch(() => {
+                          /* errors surface in TransfersPage */
+                        });
+                      }
+                    }}
+                    title="Right-click to rename · drop here to sync"
                   >
                     <ListItemIcon sx={{ minWidth: 32 }}>
                       <BookmarkIcon fontSize="small" color="primary" />
