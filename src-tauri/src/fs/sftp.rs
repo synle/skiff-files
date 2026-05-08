@@ -47,19 +47,57 @@ fn default_port() -> u16 {
     22
 }
 
-/// Russh client handler that accepts any server key. **TODO Phase 2b**:
-/// thread a known-hosts policy through the registry so we can pin keys.
-struct AcceptAllHandler;
+/// Russh client handler. When `known_hosts_path` is `Some`, applies
+/// trust-on-first-use semantics — record the SHA-256 fingerprint of
+/// the server's public key on first connect, refuse on subsequent
+/// connects whose key doesn't match. When `None`, accepts any key
+/// (used by tests and explicit "accept all" mode).
+struct TofuHandler {
+    host: String,
+    port: u16,
+    known_hosts_path: Option<std::path::PathBuf>,
+    /// Side channel for surfacing a mismatch up to the caller. The
+    /// `Handler` trait can only return a bool; on mismatch we fill
+    /// this in so `connect()` can raise a meaningful error instead
+    /// of the generic russh "rejected" message.
+    mismatch: Arc<std::sync::Mutex<Option<String>>>,
+}
 
 #[async_trait::async_trait]
-impl Handler for AcceptAllHandler {
+impl Handler for TofuHandler {
     type Error = russh::Error;
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &russh::keys::key::PublicKey,
+        server_public_key: &russh::keys::key::PublicKey,
     ) -> Result<bool, Self::Error> {
-        Ok(true)
+        // No path = legacy accept-all mode (tests / explicit opt-out).
+        let Some(path) = self.known_hosts_path.clone() else {
+            return Ok(true);
+        };
+        let key_id = format!("{}:{}", self.host, self.port);
+        let presented = server_public_key.fingerprint();
+
+        // Best-effort load; a parse error treats it as if the file is
+        // empty so the user can recover by re-trusting the host.
+        let mut map = crate::fs::known_hosts::load(&path).unwrap_or_default();
+        match crate::fs::known_hosts::check(&map, &key_id, &presented) {
+            crate::fs::known_hosts::CheckOutcome::NewHost => {
+                map.insert(key_id, presented);
+                let _ = crate::fs::known_hosts::save(&path, &map);
+                Ok(true)
+            }
+            crate::fs::known_hosts::CheckOutcome::Match => Ok(true),
+            crate::fs::known_hosts::CheckOutcome::Mismatch {
+                stored,
+                presented,
+            } => {
+                *self.mismatch.lock().unwrap() = Some(format!(
+                    "host key mismatch for {key_id}: stored SHA256:{stored}, presented SHA256:{presented}. Remove the entry from known_hosts.json and reconnect if you actually trust this change."
+                ));
+                Ok(false)
+            }
+        }
     }
 }
 
@@ -72,26 +110,50 @@ pub struct SftpClient {
     /// Keeps the underlying SSH session alive for the lifetime of the
     /// SftpClient. Dropping this drops the channel; the field is otherwise
     /// unused at runtime.
-    _session: Handle<AcceptAllHandler>,
+    _session: Handle<TofuHandler>,
 }
 
 impl SftpClient {
     /// Open a new SFTP connection to `config.host:config.port` and
     /// authenticate. Errors flatten to strings on the way out — the
     /// frontend just shows them in a snackbar.
-    pub async fn connect(config: SftpConfig) -> FsResult<Self> {
+    ///
+    /// Tests pass `known_hosts_path = None` to bypass TOFU. Production
+    /// callers always pass `Some(app_data_dir.join("known_hosts.json"))`
+    /// so unrecognized host-key changes refuse the handshake.
+    pub async fn connect(
+        config: SftpConfig,
+        known_hosts_path: Option<std::path::PathBuf>,
+    ) -> FsResult<Self> {
         let ssh_config = Arc::new(russh::client::Config {
             inactivity_timeout: Some(Duration::from_secs(300)),
             ..russh::client::Config::default()
         });
 
+        let mismatch: Arc<std::sync::Mutex<Option<String>>> =
+            Arc::new(std::sync::Mutex::new(None));
+        let handler = TofuHandler {
+            host: config.host.clone(),
+            port: config.port,
+            known_hosts_path,
+            mismatch: Arc::clone(&mismatch),
+        };
+
         let mut session = russh::client::connect(
             ssh_config,
             (config.host.as_str(), config.port),
-            AcceptAllHandler,
+            handler,
         )
         .await
-        .map_err(|e| format!("ssh connect: {e}"))?;
+        .map_err(|e| {
+            // If the TOFU handler set a specific mismatch reason,
+            // surface it instead of the generic russh "rejected".
+            let reason = mismatch.lock().unwrap().take();
+            match reason {
+                Some(r) => r,
+                None => format!("ssh connect: {e}"),
+            }
+        })?;
 
         // Auth dispatch — caller validates exactly-one upstream.
         let authenticated: bool = if let Some(pw) = &config.password {

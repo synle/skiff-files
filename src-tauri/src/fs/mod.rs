@@ -3,6 +3,7 @@
 //! types so the frontend treats them interchangeably.
 
 pub mod icons;
+pub mod known_hosts;
 pub mod local;
 pub mod registry;
 pub mod sftp;

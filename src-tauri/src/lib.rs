@@ -11,8 +11,9 @@ pub mod fs;
 pub mod sync;
 
 use commands::{
-    conn_create_sftp, conn_dir_summary, conn_disconnect, conn_list, conn_list_dir, conn_mkdir,
-    conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, fs_canonicalize,
+    conn_create_sftp, conn_dir_summary, conn_disconnect, conn_known_hosts_list,
+    conn_known_hosts_remove, conn_list, conn_list_dir, conn_mkdir, conn_read_base64,
+    conn_read_text, conn_remove, conn_rename, conn_stat, fs_canonicalize,
     fs_copy_file, fs_dir_summary, fs_find, fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64,
     fs_disk_space, fs_image_exif, fs_open_in_terminal, fs_open_with_default, fs_read_text,
     fs_remove, fs_rename, fs_reveal_in_os,
@@ -76,6 +77,8 @@ pub fn run() {
             conn_mkdir,
             conn_rename,
             conn_remove,
+            conn_known_hosts_list,
+            conn_known_hosts_remove,
             // sync
             sync_start_local,
             sync_start_repo,

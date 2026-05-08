@@ -457,23 +457,68 @@ pub fn fs_find(path: String, query: String) -> FsResult<Vec<Entry>> {
 
 /// Open a new SFTP connection. Returns the registry id so the frontend
 /// can refer to it in subsequent commands. The label shown in the
-/// sidebar is `user@host:port`.
+/// sidebar is `user@host:port`. The known-hosts file lives next to
+/// settings.json so TOFU survives reinstalls + can be inspected via
+/// "Reveal app data folder".
 #[tauri::command]
 pub async fn conn_create_sftp(
     config: SftpConfig,
     registry: State<'_, Arc<Registry>>,
+    app: tauri::AppHandle,
 ) -> FsResult<String> {
     if config.password.is_none() && config.private_key_path.is_none() {
         return Err("password or privateKeyPath required".into());
     }
     let label = format!("{}@{}:{}", config.user, config.host, config.port);
-    let client = SftpClient::connect(config).await?;
+    let known_hosts_path = known_hosts_path(&app).ok();
+    let client = SftpClient::connect(config, known_hosts_path).await?;
     let id = registry.insert(
         ConnectionKind::Sftp,
         label,
         Connection::Sftp(Arc::new(client)),
     );
     Ok(id)
+}
+
+/// Resolve the known-hosts file path under `app_data_dir()`. Mirrors
+/// `settings_path` but for SFTP host-key pinning state.
+fn known_hosts_path(app: &tauri::AppHandle) -> FsResult<std::path::PathBuf> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app_data_dir: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir({}): {e}", dir.display()))?;
+    Ok(dir.join("known_hosts.json"))
+}
+
+/// List every `host:port` we have a stored fingerprint for. The
+/// frontend uses this to surface a Settings → SSH section so users
+/// can audit / forget hosts. Returns an empty list when the file
+/// doesn't exist yet.
+#[tauri::command]
+pub fn conn_known_hosts_list(
+    app: tauri::AppHandle,
+) -> FsResult<Vec<(String, String)>> {
+    let path = known_hosts_path(&app)?;
+    let map = crate::fs::known_hosts::load(&path)?;
+    Ok(map.into_iter().collect())
+}
+
+/// Forget a single `host:port` entry. The next connect to it will
+/// re-trust on first use. Idempotent — removing a missing key is
+/// not an error.
+#[tauri::command]
+pub fn conn_known_hosts_remove(
+    key_id: String,
+    app: tauri::AppHandle,
+) -> FsResult<()> {
+    let path = known_hosts_path(&app)?;
+    let mut map = crate::fs::known_hosts::load(&path).unwrap_or_default();
+    if map.remove(&key_id).is_some() {
+        crate::fs::known_hosts::save(&path, &map)?;
+    }
+    Ok(())
 }
 
 /// Drop a live connection. Idempotent — disconnecting an already-gone id

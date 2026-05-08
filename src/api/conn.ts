@@ -83,3 +83,17 @@ export const connRename = (
  *  trash; the frontend should confirm before invoking. */
 export const connRemove = (id: string, path: string): Promise<void> =>
   invoke<void>("conn_remove", { id, path });
+
+/** TOFU known-hosts entry: `[hostKeyId, sha256BaseFingerprint]` pairs.
+ *  hostKeyId is the canonical `<host>:<port>` form the engine uses
+ *  internally. */
+export type KnownHostEntry = [string, string];
+
+/** List every host the registry has a stored fingerprint for. */
+export const connKnownHostsList = (): Promise<KnownHostEntry[]> =>
+  invoke<KnownHostEntry[]>("conn_known_hosts_list");
+
+/** Forget a single `host:port` entry. The next connect to it will
+ *  re-trust on first use. Idempotent. */
+export const connKnownHostsRemove = (keyId: string): Promise<void> =>
+  invoke<void>("conn_known_hosts_remove", { keyId });

@@ -20,6 +20,8 @@ beforeEach(() => {
     if (cmd === "conn_list") return [];
     if (cmd === "conn_create_sftp") return "test-conn-id";
     if (cmd === "conn_disconnect") return null;
+    if (cmd === "conn_known_hosts_list") return [];
+    if (cmd === "conn_known_hosts_remove") return null;
     if (cmd === "settings_load") return null;
     return null;
   });
@@ -116,6 +118,7 @@ describe("ConnectionsPage", () => {
         ];
       }
       if (cmd === "conn_list") return [];
+      if (cmd === "conn_known_hosts_list") return [];
       return null;
     });
     r();

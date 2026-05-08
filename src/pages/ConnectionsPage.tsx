@@ -31,9 +31,12 @@ import { useEffect, useState } from "react";
 import {
   connCreateSftp,
   connDisconnect,
+  connKnownHostsList,
+  connKnownHostsRemove,
   connList,
   sshConfigHosts,
   type ConnectionInfo,
+  type KnownHostEntry,
   type SftpConfig,
   type SshConfigHost,
 } from "../api/conn";
@@ -96,6 +99,17 @@ export default function ConnectionsPage() {
    *  user shouldn't expect mid-session changes to surface without a
    *  refresh. */
   const [sshHosts, setSshHosts] = useState<SshConfigHost[]>([]);
+  /** TOFU-pinned host fingerprints. Refreshed alongside the live
+   *  connection list so deleting + reconnecting picks up changes. */
+  const [knownHosts, setKnownHosts] = useState<KnownHostEntry[]>([]);
+  const refreshKnownHosts = () => {
+    connKnownHostsList()
+      .then(setKnownHosts)
+      .catch(() => setKnownHosts([]));
+  };
+  useEffect(() => {
+    refreshKnownHosts();
+  }, []);
   useEffect(() => {
     sshConfigHosts()
       .then(setSshHosts)
@@ -537,6 +551,62 @@ export default function ConnectionsPage() {
                         ? "password auth"
                         : "private key auth"
                     }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Box>
+
+        <Divider />
+
+        <Box>
+          <Typography variant="h6" gutterBottom>
+            Known hosts (TOFU)
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Server fingerprints captured on first connect. Delete an
+            entry to re-trust the host on the next connection.
+          </Typography>
+          {knownHosts.length === 0 ? (
+            <Typography variant="body2" color="text.disabled">
+              No known hosts yet.
+            </Typography>
+          ) : (
+            <List dense>
+              {knownHosts.map(([keyId, fp]) => (
+                <ListItem
+                  key={keyId}
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      size="small"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Forget ${keyId}? The next connect will TOFU-trust whatever key the server presents.`,
+                          )
+                        ) {
+                          void connKnownHostsRemove(keyId).then(
+                            refreshKnownHosts,
+                          );
+                        }
+                      }}
+                      aria-label={`Forget ${keyId}`}
+                      title="Forget host"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  }
+                >
+                  <ListItemText
+                    primary={keyId}
+                    secondary={`SHA256:${fp}`}
+                    slotProps={{
+                      secondary: {
+                        sx: { fontFamily: "monospace", fontSize: "0.7rem" },
+                      },
+                    }}
                   />
                 </ListItem>
               ))}
