@@ -302,6 +302,24 @@ export default function FileList(props: Props) {
           setFocusedIdx(sorted.length - 1);
           break;
         }
+        case "PageDown": {
+          // Jump roughly one viewport. We don't know the exact pixel
+          // height of the visible window in this handler, so pick a
+          // sensible page size — 12 rows comfortable, 16 compact —
+          // matches what the user perceives as "one page".
+          e.preventDefault();
+          const page = density === "compact" ? 16 : 12;
+          setFocusedIdx((i) =>
+            Math.min(sorted.length - 1, Math.max(0, i) + page),
+          );
+          break;
+        }
+        case "PageUp": {
+          e.preventDefault();
+          const page = density === "compact" ? 16 : 12;
+          setFocusedIdx((i) => Math.max(0, (i < 0 ? 0 : i) - page));
+          break;
+        }
         case "Enter": {
           // Only fire when a row is focused. Skips when the focus is
           // on a checkbox / button (those would have tag === "input"

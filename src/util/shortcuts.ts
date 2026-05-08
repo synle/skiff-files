@@ -26,6 +26,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Space", description: "Toggle the focused row's selection" },
       { keys: "Backspace", description: "Go up one folder" },
       { keys: "Home / End", description: "Jump to first / last entry" },
+      { keys: "Page Up / Page Down", description: "Jump roughly one viewport" },
     ],
   },
   {
