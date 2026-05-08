@@ -139,16 +139,28 @@ export default function App() {
   // Multi-window settings sync. The Rust `settings_save` command
   // emits a `settings:changed` event after every write; every window
   // listens for it and re-loads from disk so views stay coherent
-  // (e.g. flipping the theme in window A applies to window B). We
-  // also re-load on window focus as a safety net for cases where the
-  // event was missed (background tab paused, etc.). The reload is a
-  // no-op when the on-disk JSON matches what's already in memory.
+  // (e.g. flipping the theme in window A applies to window B).
+  //
+  // CRITICAL: deep-equal compare before swapping state. Tauri
+  // broadcasts the event to every window INCLUDING the source. The
+  // source window's listener fires, reloads disk, and would call
+  // setSettings with a fresh object reference even though the values
+  // are identical. React sees the new ref → persist effect re-fires
+  // → save → emit → reload → loop. Manifested in 0.2.135 as the view
+  // mode flipping endlessly between gallery and column.
   useEffect(() => {
     let cancelled = false;
     let unlisten: (() => void) | null = null;
     const reload = async () => {
       const fromDisk = await loadSettingsFromDisk();
-      if (!cancelled && fromDisk) setSettings(fromDisk);
+      if (cancelled || !fromDisk) return;
+      setSettings((prev) => {
+        // JSON-roundtrip equality is safe — Settings is a plain
+        // serializable object. Skipping when equal keeps the persist
+        // effect from re-arming on a no-op reload.
+        if (JSON.stringify(prev) === JSON.stringify(fromDisk)) return prev;
+        return fromDisk;
+      });
     };
     void listen<unknown>("settings:changed", () => void reload())
       .then((u) => {
