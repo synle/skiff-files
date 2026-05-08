@@ -352,6 +352,11 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
             <Tab
               key={t.id}
               value={t.id}
+              // Native title tooltip on hover — shows the full path so
+              // users can disambiguate two tabs with the same basename
+              // (e.g. two `src` folders from different repos) without
+              // clicking through to read the breadcrumbs.
+              title={t.currentPath || t.initialPath || t.label}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setTabMenu({ anchor: e.currentTarget, tabId: t.id });
