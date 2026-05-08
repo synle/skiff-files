@@ -87,6 +87,10 @@ export default function App() {
               ? "small"
               : "small";
         update("fontSize", next);
+      } else if (e.shiftKey && e.key === ".") {
+        // Finder muscle memory: Cmd+Shift+. toggles dotfile visibility.
+        e.preventDefault();
+        update("showHidden", !settings.showHidden);
       }
     };
     window.addEventListener("keydown", onKey);
