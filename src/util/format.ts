@@ -30,6 +30,29 @@ export function formatMtime(unixSeconds: number | null | undefined): string {
 }
 
 /**
+ * Human-readable "N seconds/minutes/hours/days ago" form. Used as a
+ * tooltip on the mtime column so users can read recency at a glance
+ * without parsing a locale timestamp. Future-dated mtimes (clock skew)
+ * fall through to "in the future".
+ */
+export function formatMtimeRelative(
+  unixSeconds: number | null | undefined,
+): string {
+  if (unixSeconds == null) return "—";
+  const nowSec = Date.now() / 1000;
+  const diff = nowSec - unixSeconds;
+  if (!Number.isFinite(diff)) return "—";
+  if (diff < 0) return "in the future";
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 86400 * 365)
+    return `${Math.floor(diff / (86400 * 30))}mo ago`;
+  return `${Math.floor(diff / (86400 * 365))}y ago`;
+}
+
+/**
  * Split a filesystem path into ancestor segments suitable for a breadcrumb.
  * Works for POSIX (`/a/b/c`), Windows (`C:\\a\\b`), and remote
  * (`sftp://<id>/a/b`) inputs.

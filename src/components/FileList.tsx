@@ -11,7 +11,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
-import { formatBytes, formatMtime } from "../util/format";
+import { formatBytes, formatMtime, formatMtimeRelative } from "../util/format";
 import type { Density, ShowExtensions } from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "kind";
@@ -624,6 +624,7 @@ export default function FileList(props: Props) {
                     color="text.secondary"
                     sx={{ width: 180, px: 1 }}
                     noWrap
+                    title={formatMtimeRelative(e.mtime)}
                   >
                     {formatMtime(e.mtime)}
                   </Typography>
