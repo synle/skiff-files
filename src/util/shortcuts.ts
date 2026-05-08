@@ -74,6 +74,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + T", description: "New tab" },
       { keys: "Cmd / Ctrl + W", description: "Close active tab" },
       { keys: "Cmd / Ctrl + Shift + T", description: "Restore last closed tab" },
+      { keys: "Cmd / Ctrl + N", description: "Open new window" },
       { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
       { keys: "Cmd / Ctrl + Shift + [ / ]", description: "Switch to previous / next tab" },
       { keys: "Cmd / Ctrl + Shift + ← / →", description: "Move active tab left / right" },

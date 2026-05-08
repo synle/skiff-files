@@ -20,7 +20,7 @@ use commands::{
     fs_open_with_default, fs_read_text, fs_remove, fs_rename, fs_reveal_in_os,
     fs_trash_path,
     fs_stat, fs_trash, fs_trash_many, get_app_version, settings_app_data_dir, settings_load,
-    settings_save,
+    settings_save, window_open_new,
     ssh_config_hosts, sync_cancel, sync_cpstamp, sync_dedup,
     sync_list, sync_pause, sync_resolve_conflict, sync_resume, sync_start_cross, sync_start_local,
     sync_start_repo,
@@ -73,6 +73,7 @@ pub fn run() {
             settings_load,
             settings_save,
             settings_app_data_dir,
+            window_open_new,
             ssh_config_hosts,
             // connections
             conn_create_sftp,

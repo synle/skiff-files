@@ -48,6 +48,12 @@ export const getAppVersion = (): Promise<string> =>
 
 export const fsHomeDir = (): Promise<string> => invoke<string>("fs_home_dir");
 
+/** Spawn a new top-level Skiff Files window. Used by the Cmd/Ctrl+N
+ *  shortcut so the user can hold multiple windows open against the
+ *  same install. Resolves once the window has been created. */
+export const windowOpenNew = (): Promise<void> =>
+  invoke<void>("window_open_new");
+
 export const fsListDir = (
   path: string,
   options?: ListOptions,

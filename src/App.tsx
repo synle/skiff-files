@@ -11,7 +11,9 @@ import QuickJump from "./components/QuickJump";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
-import { fsHomeDir, fsStat } from "./api/fs";
+import { fsHomeDir, fsStat, windowOpenNew } from "./api/fs";
+import { listen } from "@tauri-apps/api/event";
+import { loadSettingsFromDisk } from "./state/settings";
 import { useSettings } from "./state/settings";
 import { pruneStaleBookmarks, pruneStalePaths } from "./util/pruneStale";
 
@@ -44,7 +46,7 @@ export default function App() {
   const [quickJumpOpen, setQuickJumpOpen] = useState(false);
   /** Active page. Replaces react-router's Routes-based switching. */
   const [page, setPage] = useState<Page>("browser");
-  const { settings, update } = useSettings();
+  const { settings, setSettings, update } = useSettings();
 
   // Cmd/Ctrl+K → toggle the quick-jump palette. Cmd/Ctrl+B → toggle
   // the sidebar (persisted in Settings so it survives restart).
@@ -56,7 +58,16 @@ export default function App() {
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
       const k = e.key.toLowerCase();
-      if (k === "k") {
+      if (k === "n" && !e.shiftKey) {
+        // Cmd/Ctrl+N opens a new top-level window. Multi-window
+        // support: each spawned window is a fresh React tree
+        // pointing at the same settings.json on disk; settings sync
+        // across windows via the `settings:changed` Tauri event.
+        e.preventDefault();
+        void windowOpenNew().catch(() => {
+          /* running outside Tauri / browser dev — silent fallback */
+        });
+      } else if (k === "k") {
         e.preventDefault();
         setQuickJumpOpen((o) => !o);
       } else if (k === "b") {
@@ -124,6 +135,37 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // Multi-window settings sync. The Rust `settings_save` command
+  // emits a `settings:changed` event after every write; every window
+  // listens for it and re-loads from disk so views stay coherent
+  // (e.g. flipping the theme in window A applies to window B). We
+  // also re-load on window focus as a safety net for cases where the
+  // event was missed (background tab paused, etc.). The reload is a
+  // no-op when the on-disk JSON matches what's already in memory.
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | null = null;
+    const reload = async () => {
+      const fromDisk = await loadSettingsFromDisk();
+      if (!cancelled && fromDisk) setSettings(fromDisk);
+    };
+    void listen<unknown>("settings:changed", () => void reload())
+      .then((u) => {
+        if (cancelled) u();
+        else unlisten = u;
+      })
+      .catch(() => {
+        /* tests / browser dev — no Tauri event bus */
+      });
+    const onFocus = () => void reload();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      unlisten?.();
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [setSettings]);
 
   // One-shot prune pass on mount: drop recent paths + bookmarks
   // whose target no longer exists. Local paths only — remote

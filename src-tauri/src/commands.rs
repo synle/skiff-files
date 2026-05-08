@@ -687,6 +687,9 @@ pub fn settings_app_data_dir(app: tauri::AppHandle) -> FsResult<String> {
 
 /// Persist the settings blob. We write atomically via a temp file +
 /// rename so a partial write doesn't corrupt user state on a crash.
+/// After a successful write, broadcasts a `settings:changed` event so
+/// other windows in a multi-window session can re-load from disk
+/// instead of holding a stale snapshot.
 #[tauri::command]
 pub fn settings_save(json: String, app: tauri::AppHandle) -> FsResult<()> {
     let final_path = settings_path(&app)?;
@@ -694,6 +697,26 @@ pub fn settings_save(json: String, app: tauri::AppHandle) -> FsResult<()> {
     std::fs::write(&tmp, &json).map_err(|e| format!("write({}): {e}", tmp.display()))?;
     std::fs::rename(&tmp, &final_path)
         .map_err(|e| format!("rename({} -> {}): {e}", tmp.display(), final_path.display()))?;
+    // Best-effort broadcast — failure here just means siblings won't
+    // refresh until they regain focus, which is fine.
+    let _ = app.emit("settings:changed", ());
+    Ok(())
+}
+
+/// Spawn a new top-level window. Used by the Cmd/Ctrl+N keyboard
+/// shortcut so the user can have multiple Skiff Files windows open
+/// against the same install. Each window gets a unique label so
+/// Tauri's window registry doesn't collide.
+#[tauri::command]
+pub fn window_open_new(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::WebviewUrl;
+    let label = format!("main-{}", Uuid::new_v4().simple());
+    tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title("Skiff Files")
+        .inner_size(1200.0, 760.0)
+        .min_inner_size(720.0, 480.0)
+        .build()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
