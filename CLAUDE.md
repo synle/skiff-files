@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.116** — ✅ **Right-click empty FileList area**. Right-clicking on whitespace (not on a row) pops a small menu with New folder / New file / Paste — Finder/Explorer parity. Paste item disables when nothing's on the file clipboard; otherwise shows the count ("Paste 3 items"). Routes through the same handlers the toolbar buttons / Cmd+V use.
 - **0.2.115** — ✅ **Toolbar "New file" button**. Companion to "New folder". New `fs_create_empty_file` Tauri command writes a 0-byte file (errors on collision). Toolbar grew an optional `onNewFile` prop next to `onNewFolder`. Browser handler suggests "untitled.txt" / "untitled 2.txt" etc., prompts for name (Enter accepts the suggestion). Skipped for remote (`sftp://`) paths until the SFTP backend grows an analogous command.
 - **0.2.114** — ✅ **Duplicate right-click action**. New "Duplicate" entry in the context menu (local files + folders only — remote routes through a different path that needs more thought). Builds a unique sibling name: `name (copy).ext` → `name (copy 2).ext` etc. on collision. Routes through Skiffsync so folders deep-copy correctly without a separate Rust command.
 - **0.2.113** — ✅ **Cmd+[ / Cmd+] / Cmd+← / Cmd+→ = back / forward**. Browser-style history navigation. Disabled at boundary (no back if there's no back-stack). Cheatsheet updated.

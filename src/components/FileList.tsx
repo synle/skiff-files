@@ -67,6 +67,10 @@ interface Props {
    *  Skiffsync targeting `targetFolder`. Without this prop, folder
    *  rows aren't drop targets. */
   onDropOntoFolder?: (paths: string[], targetFolder: Entry) => void;
+  /** Right-click on empty whitespace in the list (not on a row).
+   *  Browser uses this to show "New folder / New file / Paste" at
+   *  the cursor coordinates. */
+  onContextEmpty?: (x: number, y: number) => void;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -249,6 +253,7 @@ export default function FileList(props: Props) {
     groupFoldersFirst = true,
     highlightQuery = "",
     onDropOntoFolder,
+    onContextEmpty,
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
@@ -536,6 +541,18 @@ export default function FileList(props: Props) {
         ref={parentRef}
         role="grid"
         aria-rowcount={sorted.length}
+        onContextMenu={(evt) => {
+          // Only fire for whitespace clicks — row contextmenu has
+          // already stopped propagation via its own handler.
+          if (!onContextEmpty) return;
+          // The row handler calls preventDefault. If we got here,
+          // the click was on the scroll container itself, not a
+          // row's nested element.
+          const target = evt.target as HTMLElement;
+          if (target.closest('[data-testid="file-row"]')) return;
+          evt.preventDefault();
+          onContextEmpty(evt.clientX, evt.clientY);
+        }}
         sx={{ flex: 1, overflow: "auto", minHeight: 0 }}
       >
         {sorted.length === 0 ? (

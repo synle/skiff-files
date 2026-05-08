@@ -3,7 +3,10 @@
 // StatusBar, and the sidebar lives one level up in App so it persists across
 // route changes.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box } from "@mui/material";
+import { Box, ListItemIcon, ListItemText, Menu, MenuItem } from "@mui/material";
+import ContentPasteIcon from "@mui/icons-material/ContentPaste";
+import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
+import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import PathBar from "../components/PathBar";
 import Toolbar from "../components/Toolbar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
@@ -128,6 +131,9 @@ export default function Browser({
   /** Counter the PathBar watches — incrementing flips it into edit
    *  mode and selects the text. Driven by Cmd/Ctrl+L. */
   const [pathBarFocusRequest, setPathBarFocusRequest] = useState(0);
+  /** Empty-area context menu state — anchor coords. When non-null
+   *  the menu is open. */
+  const [emptyMenu, setEmptyMenu] = useState<{ x: number; y: number } | null>(null);
   /** First file picked for a "Compare with…" pair. When non-null and
    *  the user picks another file, both paths flow into DiffDialog. */
   const [diffBase, setDiffBase] = useState<string | null>(null);
@@ -904,6 +910,7 @@ export default function Browser({
           showExtensions={settings.showExtensions}
           groupFoldersFirst={settings.groupFoldersFirst}
           highlightQuery={search}
+          onContextEmpty={(x, y) => setEmptyMenu({ x, y })}
         />
         {effectivePreviewOpen && (
           <PreviewPane
@@ -931,6 +938,58 @@ export default function Browser({
         // user's signal to refine the query.
         findHitCap={!!findResults && findResults.length >= 1000}
       />}
+      <Menu
+        open={emptyMenu !== null}
+        onClose={() => setEmptyMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          emptyMenu ? { top: emptyMenu.y, left: emptyMenu.x } : undefined
+        }
+        slotProps={{ list: { dense: true } }}
+      >
+        <MenuItem
+          onClick={() => {
+            setEmptyMenu(null);
+            void handleNewFolder();
+          }}
+        >
+          <ListItemIcon>
+            <CreateNewFolderIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>New folder</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setEmptyMenu(null);
+            void handleNewFile();
+          }}
+        >
+          <ListItemIcon>
+            <NoteAddIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>New file</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={getFileClipboard() === null}
+          onClick={() => {
+            const cb = getFileClipboard();
+            setEmptyMenu(null);
+            if (cb) void handlePaste(cb);
+          }}
+        >
+          <ListItemIcon>
+            <ContentPasteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>
+            {(() => {
+              const cb = getFileClipboard();
+              return cb
+                ? `Paste ${cb.paths.length} item${cb.paths.length === 1 ? "" : "s"}`
+                : "Paste";
+            })()}
+          </ListItemText>
+        </MenuItem>
+      </Menu>
       <EntryContextMenu
         state={contextMenu}
         onClose={() => setContextMenu(null)}
