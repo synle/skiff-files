@@ -52,7 +52,7 @@ interface SftpDraft {
   host: string;
   port: number;
   user: string;
-  authMode: "password" | "privateKey";
+  authMode: "password" | "privateKey" | "agent";
   privateKeyPath?: string;
 }
 
@@ -84,9 +84,9 @@ export default function ConnectionsPage() {
   const [host, setHost] = useState("");
   const [port, setPort] = useState(22);
   const [user, setUser] = useState("");
-  const [authMode, setAuthMode] = useState<"password" | "privateKey">(
-    "password",
-  );
+  const [authMode, setAuthMode] = useState<
+    "password" | "privateKey" | "agent"
+  >("password");
   const [password, setPassword] = useState("");
   const [privateKeyPath, setPrivateKeyPath] = useState("");
   const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState("");
@@ -157,6 +157,7 @@ export default function ConnectionsPage() {
         authMode === "privateKey" && privateKeyPassphrase
           ? privateKeyPassphrase
           : undefined,
+      useAgent: authMode === "agent",
     };
     try {
       const id = await connCreateSftp(config);
@@ -188,6 +189,7 @@ export default function ConnectionsPage() {
         authMode === "privateKey" && privateKeyPassphrase
           ? privateKeyPassphrase
           : undefined,
+      useAgent: authMode === "agent",
     };
     try {
       await connCreateSftp(config);
@@ -358,15 +360,24 @@ export default function ConnectionsPage() {
               size="small"
               value={authMode}
               onChange={(e) =>
-                setAuthMode(e.target.value as "password" | "privateKey")
+                setAuthMode(
+                  e.target.value as "password" | "privateKey" | "agent",
+                )
               }
               sx={{ maxWidth: 240 }}
             >
               <MenuItem value="password">Password</MenuItem>
               <MenuItem value="privateKey">Private key</MenuItem>
+              <MenuItem value="agent">ssh-agent</MenuItem>
             </Select>
 
-            {authMode === "password" ? (
+            {authMode === "agent" ? (
+              <Typography variant="caption" color="text.secondary">
+                Reads identities from <code>$SSH_AUTH_SOCK</code>. Make sure
+                your agent is running and has loaded the key for this host
+                (<code>ssh-add -l</code> to verify).
+              </Typography>
+            ) : authMode === "password" ? (
               <TextField
                 label="Password"
                 size="small"
@@ -549,7 +560,9 @@ export default function ConnectionsPage() {
                     secondary={
                       d.authMode === "password"
                         ? "password auth"
-                        : "private key auth"
+                        : d.authMode === "agent"
+                          ? "ssh-agent auth"
+                          : "private key auth"
                     }
                   />
                 </ListItem>

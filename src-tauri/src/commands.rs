@@ -466,8 +466,11 @@ pub async fn conn_create_sftp(
     registry: State<'_, Arc<Registry>>,
     app: tauri::AppHandle,
 ) -> FsResult<String> {
-    if config.password.is_none() && config.private_key_path.is_none() {
-        return Err("password or privateKeyPath required".into());
+    if config.password.is_none()
+        && config.private_key_path.is_none()
+        && !config.use_agent
+    {
+        return Err("password, privateKeyPath, or useAgent required".into());
     }
     let label = format!("{}@{}:{}", config.user, config.host, config.port);
     let known_hosts_path = known_hosts_path(&app).ok();

@@ -41,6 +41,12 @@ pub struct SftpConfig {
     /// `private_key_passphrase`.
     pub private_key_path: Option<String>,
     pub private_key_passphrase: Option<String>,
+    /// When true, enumerate identities from `SSH_AUTH_SOCK` and try
+    /// each in turn — same flow as `ssh -A` from a shell. Higher
+    /// priority than password / private key when set, since users
+    /// who run an agent prefer it.
+    #[serde(default)]
+    pub use_agent: bool,
 }
 
 fn default_port() -> u16 {
@@ -114,6 +120,48 @@ pub struct SftpClient {
 }
 
 impl SftpClient {
+    /// Walk every identity in `SSH_AUTH_SOCK`, try each via the
+    /// russh `authenticate_future` flow with the agent as the
+    /// signer. Returns true on the first successful identity.
+    /// Failures (no SSH_AUTH_SOCK, agent socket missing, no
+    /// identities loaded) all coerce to false so the caller can
+    /// fall through to password / private-key auth.
+    async fn try_agent_auth(
+        session: &mut russh::client::Handle<TofuHandler>,
+        user: &str,
+    ) -> Result<bool, String> {
+        #[cfg(unix)]
+        {
+            use russh_keys::agent::client::AgentClient;
+            let mut agent = match AgentClient::connect_env().await {
+                Ok(a) => a,
+                Err(e) => return Err(format!("ssh-agent connect: {e}")),
+            };
+            let identities = agent
+                .request_identities()
+                .await
+                .map_err(|e| format!("ssh-agent identities: {e}"))?;
+            for key in identities {
+                let (returned, result) = session
+                    .authenticate_future(user, key, agent)
+                    .await;
+                agent = returned;
+                if result.unwrap_or(false) {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        #[cfg(not(unix))]
+        {
+            // Windows ssh-agent (named-pipe / Pageant) lives behind
+            // a different transport. Skip cleanly and let the
+            // configured password / private-key path handle it.
+            let _ = (session, user);
+            Ok(false)
+        }
+    }
+
     /// Open a new SFTP connection to `config.host:config.port` and
     /// authenticate. Errors flatten to strings on the way out — the
     /// frontend just shows them in a snackbar.
@@ -155,25 +203,39 @@ impl SftpClient {
             }
         })?;
 
-        // Auth dispatch — caller validates exactly-one upstream.
-        let authenticated: bool = if let Some(pw) = &config.password {
-            session
-                .authenticate_password(&config.user, pw)
-                .await
-                .map_err(|e| format!("ssh auth (password): {e}"))?
-        } else if let Some(key_path) = &config.private_key_path {
-            let key = russh_keys::load_secret_key(
-                key_path,
-                config.private_key_passphrase.as_deref(),
-            )
-            .map_err(|e| format!("load private key {key_path}: {e}"))?;
-            session
-                .authenticate_publickey(&config.user, Arc::new(key))
-                .await
-                .map_err(|e| format!("ssh auth (publickey): {e}"))?
-        } else {
-            return Err("no auth method provided (password or private key required)".into());
-        };
+        // Auth dispatch — caller validates at-least-one upstream. ssh-agent
+        // gets priority when enabled, mirroring `ssh -A` semantics; users
+        // who took the trouble to load identities into their agent expect
+        // those to be tried first. We fall back to password / private key
+        // if the agent has no usable identity.
+        let mut authenticated = false;
+        if config.use_agent {
+            authenticated =
+                Self::try_agent_auth(&mut session, &config.user).await.unwrap_or(false);
+        }
+        if !authenticated {
+            if let Some(pw) = &config.password {
+                authenticated = session
+                    .authenticate_password(&config.user, pw)
+                    .await
+                    .map_err(|e| format!("ssh auth (password): {e}"))?;
+            } else if let Some(key_path) = &config.private_key_path {
+                let key = russh_keys::load_secret_key(
+                    key_path,
+                    config.private_key_passphrase.as_deref(),
+                )
+                .map_err(|e| format!("load private key {key_path}: {e}"))?;
+                authenticated = session
+                    .authenticate_publickey(&config.user, Arc::new(key))
+                    .await
+                    .map_err(|e| format!("ssh auth (publickey): {e}"))?;
+            } else if !config.use_agent {
+                return Err(
+                    "no auth method provided (password, private key, or use_agent required)"
+                        .into(),
+                );
+            }
+        }
 
         if !authenticated {
             return Err("ssh auth: rejected by server".into());

@@ -27,8 +27,11 @@ export interface SshConfigHost {
 export const sshConfigHosts = (): Promise<SshConfigHost[]> =>
   invoke<SshConfigHost[]>("ssh_config_hosts");
 
-/** Mirror of `crate::fs::sftp::SftpConfig`. Auth is exactly one of
- *  `password` or `privateKeyPath` — the backend rejects empty/both. */
+/** Mirror of `crate::fs::sftp::SftpConfig`. At least one of
+ *  `password`, `privateKeyPath`, or `useAgent` must be set — the
+ *  backend rejects an empty auth payload. When `useAgent` is true,
+ *  the engine tries every identity in `$SSH_AUTH_SOCK` first and
+ *  falls back to the other methods only if the agent is empty. */
 export interface SftpConfig {
   host: string;
   port?: number;
@@ -36,6 +39,7 @@ export interface SftpConfig {
   password?: string;
   privateKeyPath?: string;
   privateKeyPassphrase?: string;
+  useAgent?: boolean;
 }
 
 export const connCreateSftp = (config: SftpConfig): Promise<string> =>
