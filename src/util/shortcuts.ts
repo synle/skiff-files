@@ -55,7 +55,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "View",
     items: [
-      { keys: "Cmd / Ctrl + B", description: "Toggle sidebar" },
+      { keys: "Cmd / Ctrl + \\ · Cmd / Ctrl + B", description: "Toggle sidebar" },
       { keys: "Cmd / Ctrl + I", description: "Toggle preview pane" },
       { keys: "Cmd / Ctrl + R · F5", description: "Refresh current folder" },
       { keys: "Cmd / Ctrl + L", description: "Edit path (focus path bar)" },
@@ -75,9 +75,10 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + W", description: "Close active tab" },
       { keys: "Cmd / Ctrl + Shift + T", description: "Restore last closed tab" },
       { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
+      { keys: "Cmd / Ctrl + Shift + [ / ]", description: "Switch to previous / next tab" },
       { keys: "Cmd / Ctrl + Shift + ← / →", description: "Move active tab left / right" },
       { keys: "Middle-click folder", description: "Open folder in new tab" },
-      { keys: "Cmd / Ctrl + \\", description: "Toggle two-pane (split) mode" },
+      { keys: "Cmd / Ctrl + Shift + \\", description: "Toggle two-pane (split) mode" },
     ],
   },
   {

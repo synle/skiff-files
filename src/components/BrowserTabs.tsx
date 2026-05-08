@@ -212,6 +212,18 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       } else if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
         moveActiveTab(e.key === "ArrowLeft" ? "left" : "right");
+      } else if (e.shiftKey && (e.key === "[" || e.key === "]")) {
+        // Cmd/Ctrl+Shift+[ / ] cycles between tabs (Chrome muscle
+        // memory). Wraps at the ends so repeated presses are circular.
+        // Distinct from plain Cmd+[/] which is back/forward inside a
+        // tab's history.
+        const idx = tabs.findIndex((t) => t.id === activeId);
+        if (idx >= 0 && tabs.length > 1) {
+          e.preventDefault();
+          const delta = e.key === "[" ? -1 : 1;
+          const next = (idx + delta + tabs.length) % tabs.length;
+          setActiveId(tabs[next].id);
+        }
       }
     };
     window.addEventListener("keydown", onKey);

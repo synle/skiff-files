@@ -68,12 +68,18 @@ export default function App() {
         // VS Code expect this binding everywhere.
         e.preventDefault();
         setPage("settings");
-      } else if (e.key === "\\") {
-        // Cmd/Ctrl+\ toggles two-pane (split) mode. FileZilla muscle
-        // memory: the second pane is for cross-protocol drag-drop
-        // transfers from local ↔ remote without juggling tabs.
+      } else if (e.key === "\\" && e.shiftKey) {
+        // Cmd/Ctrl+Shift+\ toggles two-pane (split) mode. FileZilla
+        // muscle memory: the second pane is for cross-protocol
+        // drag-drop transfers from local ↔ remote without juggling
+        // tabs. Plain Cmd+\ is reserved for the sidebar toggle below.
         e.preventDefault();
         update("twoPaneMode", !settings.twoPaneMode);
+      } else if (e.key === "\\") {
+        // Cmd/Ctrl+\ toggles the sidebar. Cmd+B also works (kept for
+        // VS Code muscle memory) — \\ is the user-preferred binding.
+        e.preventDefault();
+        update("sidebarVisible", !settings.sidebarVisible);
       } else if (e.key === "=" || e.key === "+") {
         // Browser muscle memory: Cmd/Ctrl+= bumps font size one step
         // up. Cycles small → medium → large → (cap). `=` and `+`
@@ -103,7 +109,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [settings.sidebarVisible, update]);
+  }, [settings.sidebarVisible, settings.twoPaneMode, settings.fontSize, settings.showHidden, update]);
 
   useEffect(() => {
     let cancelled = false;

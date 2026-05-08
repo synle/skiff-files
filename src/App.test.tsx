@@ -78,4 +78,25 @@ describe("App", () => {
       expect(screen.queryByText("Favorites")).not.toBeInTheDocument();
     });
   });
+
+  it("Cmd/Ctrl+\\ toggles the sidebar (user-preferred binding)", async () => {
+    render(frame("/"));
+    expect(screen.getByText("Favorites")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "\\", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.queryByText("Favorites")).not.toBeInTheDocument();
+    });
+    fireEvent.keyDown(window, { key: "\\", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Favorites")).toBeInTheDocument();
+    });
+  });
+
+  it("Cmd/Ctrl+Shift+\\ does not toggle the sidebar (reserved for split view)", () => {
+    render(frame("/"));
+    expect(screen.getByText("Favorites")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "\\", ctrlKey: true, shiftKey: true });
+    // Sidebar stays visible — Shift variant routes to twoPaneMode instead.
+    expect(screen.getByText("Favorites")).toBeInTheDocument();
+  });
 });
