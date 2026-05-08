@@ -670,6 +670,56 @@ pub fn fs_copy_file(from: String, to: String) -> FsResult<u64> {
     local::copy_file(Path::new(&from), Path::new(&to))
 }
 
+/// Recursively copy a file or folder. Used by the right-click
+/// "Duplicate" action — synchronous so the Browser can refresh
+/// once the copy is actually on disk (Skiffsync's start_local
+/// returns once the job is queued, not done, which makes the
+/// post-copy refresh race a stale listing).
+#[tauri::command]
+pub fn fs_copy_recursive(from: String, to: String) -> FsResult<()> {
+    use std::path::Path;
+    let from_path = Path::new(&from);
+    let to_path = Path::new(&to);
+    if to_path.exists() {
+        return Err(format!("destination already exists: {to}"));
+    }
+    let md = std::fs::metadata(from_path)
+        .map_err(|e| format!("stat({from}): {e}"))?;
+    if md.is_file() {
+        std::fs::copy(from_path, to_path)
+            .map_err(|e| format!("copy({from} -> {to}): {e}"))?;
+        return Ok(());
+    }
+    if md.is_dir() {
+        copy_dir_recursive(from_path, to_path)?;
+        return Ok(());
+    }
+    Err(format!("unsupported source kind for {from}"))
+}
+
+fn copy_dir_recursive(from: &std::path::Path, to: &std::path::Path) -> FsResult<()> {
+    std::fs::create_dir_all(to)
+        .map_err(|e| format!("mkdir({}): {e}", to.display()))?;
+    for entry in std::fs::read_dir(from).map_err(|e| format!("read_dir({}): {e}", from.display()))? {
+        let entry = entry.map_err(|e| format!("read_dir entry: {e}"))?;
+        let src = entry.path();
+        let dest = to.join(entry.file_name());
+        let ft = entry
+            .file_type()
+            .map_err(|e| format!("file_type({}): {e}", src.display()))?;
+        if ft.is_dir() {
+            copy_dir_recursive(&src, &dest)?;
+        } else if ft.is_file() {
+            std::fs::copy(&src, &dest)
+                .map_err(|e| format!("copy({} -> {}): {e}", src.display(), dest.display()))?;
+        }
+        // Symlinks are skipped — duplicating a symlink as the
+        // target's contents is rarely what the user wants on a
+        // duplicate.
+    }
+    Ok(())
+}
+
 /// Canonicalize a (possibly relative) path so the path bar can show the
 /// real absolute target after a user types `~/foo` or `../bar`. The `~`
 /// expansion is not done here — the frontend expands it before invoking.

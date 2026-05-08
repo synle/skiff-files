@@ -25,6 +25,11 @@ interface Props {
   /** Original full path. The dialog never sees the parent — it just
    *  passes (newName) back up so the caller can compute the dest. */
   originalPath: string;
+  /** Sibling names that already exist in the parent (excluding the
+   *  entry being renamed). Submit disables when the trimmed input
+   *  matches one of these — closes the corner case where users
+   *  blindly hit Enter on a duplicate. */
+  existingNames?: Set<string>;
   onClose: () => void;
   /** Resolves with the user-entered new name (no path components). */
   onRename: (newName: string) => Promise<void>;
@@ -43,6 +48,7 @@ export default function RenameDialog({
   open,
   originalName,
   originalPath,
+  existingNames,
   onClose,
   onRename,
 }: Props) {
@@ -60,14 +66,24 @@ export default function RenameDialog({
     }
   }, [open, originalName]);
 
+  const trimmed = name.trim();
+  const collides =
+    trimmed.length > 0 &&
+    trimmed !== originalName &&
+    !!existingNames?.has(trimmed);
+  const hasSeparator =
+    trimmed.includes("/") || trimmed.includes("\\");
+  const submitDisabled =
+    busy ||
+    trimmed.length === 0 ||
+    trimmed === originalName ||
+    collides ||
+    hasSeparator;
+
   const submit = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || trimmed === originalName) {
-      onClose();
-      return;
-    }
-    if (trimmed.includes("/") || trimmed.includes("\\")) {
-      setError("Name can't contain a path separator.");
+    if (submitDisabled) {
+      // No-op trim or unchanged name — close cleanly.
+      if (!trimmed || trimmed === originalName) onClose();
       return;
     }
     setBusy(true);
@@ -99,6 +115,14 @@ export default function RenameDialog({
             size="small"
             label="New name"
             value={name}
+            error={collides || hasSeparator || !!error}
+            helperText={
+              hasSeparator
+                ? "Name can't contain a path separator."
+                : collides
+                  ? `A file or folder named "${trimmed}" already exists here.`
+                  : (error ?? " ")
+            }
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void submit();
@@ -119,11 +143,6 @@ export default function RenameDialog({
               },
             }}
           />
-          {error && (
-            <Typography variant="caption" color="error">
-              {error}
-            </Typography>
-          )}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -133,7 +152,7 @@ export default function RenameDialog({
         <Button
           variant="contained"
           onClick={() => void submit()}
-          disabled={busy || !name.trim() || name === originalName}
+          disabled={submitDisabled}
         >
           Rename
         </Button>

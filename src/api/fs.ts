@@ -106,6 +106,13 @@ export interface ImageExif {
 export const fsCreateEmptyFile = (path: string): Promise<void> =>
   invoke<void>("fs_create_empty_file", { path });
 
+/** Synchronously copy `from` to `to` — files copy directly, folders
+ *  walk recursively. Errors if `to` already exists. Used by the
+ *  Duplicate right-click action so the Browser can refresh once the
+ *  copy is on disk (skipping the async-Skiffsync race). */
+export const fsCopyRecursive = (from: string, to: string): Promise<void> =>
+  invoke<void>("fs_copy_recursive", { from, to });
+
 /** Bundle one or more local paths into a zip archive at `destZip`.
  *  Folders walk recursively. Errors if `destZip` already exists. */
 export const fsCompressZip = (

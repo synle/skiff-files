@@ -58,7 +58,8 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <Box sx={{ p: 3, overflow: "auto", maxWidth: 720 }}>
+    <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
+      <Box sx={{ maxWidth: 720, mx: "auto" }}>
       <Typography variant="h4" gutterBottom>
         Settings
       </Typography>
@@ -711,6 +712,7 @@ export default function SettingsPage() {
           </Box>
         </Section>
       </Stack>
+      </Box>
     </Box>
   );
 }

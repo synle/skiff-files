@@ -38,6 +38,7 @@ import EntryContextMenu from "../components/EntryContextMenu";
 import PropertiesDialog from "../components/PropertiesDialog";
 import BulkRenameDialog from "../components/BulkRenameDialog";
 import DiffDialog from "../components/DiffDialog";
+import NewEntryDialog from "../components/NewEntryDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
@@ -131,6 +132,13 @@ export default function Browser({
    *  entries. Triggered by F2 with multi-select; single-select F2
    *  still opens the per-file RenameDialog. */
   const [bulkRenameTargets, setBulkRenameTargets] = useState<Entry[]>([]);
+  /** When non-null, the NewEntryDialog is open. `kind` picks between
+   *  the mkdir vs empty-file submit handler. `defaultName` is the
+   *  auto-suggested unique name (collision-aware). */
+  const [newEntryDialog, setNewEntryDialog] = useState<{
+    kind: "folder" | "file";
+    defaultName: string;
+  } | null>(null);
   /** Counter the PathBar watches — incrementing flips it into edit
    *  mode and selects the text. Driven by Cmd/Ctrl+L. */
   const [pathBarFocusRequest, setPathBarFocusRequest] = useState(0);
@@ -632,11 +640,11 @@ export default function Browser({
     }
   };
 
-  const handleNewFile = async () => {
+  /** Open the New File dialog. The dialog itself owns input + collision
+   *  validation; `handleCreateEntry` runs on submit. */
+  const handleNewFile = () => {
     if (!path) return;
     if (path.startsWith("sftp://")) {
-      // Remote support would need an analogous conn_create_empty_file
-      // command on the SFTP backend; future work.
       setError("Creating files on remote hosts isn't supported yet.");
       return;
     }
@@ -646,50 +654,34 @@ export default function Browser({
     while (existing.has(suggestion)) {
       suggestion = `untitled ${n++}.txt`;
     }
-    const name = window.prompt("Name for the new file:", suggestion);
-    if (name == null) return;
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (existing.has(trimmed)) {
-      setError(`A file or folder named "${trimmed}" already exists.`);
-      return;
-    }
-    const target = `${path}/${trimmed}`;
-    try {
-      await fsCreateEmptyFile(target);
-      await refresh(path);
-    } catch (e) {
-      setError(String(e));
-    }
+    setNewEntryDialog({ kind: "file", defaultName: suggestion });
   };
 
-  const handleNewFolder = async () => {
+  /** Open the New Folder dialog. */
+  const handleNewFolder = () => {
     if (!path) return;
-    // Auto-name suggestion: "New Folder", "New Folder 2", … skipping
-    // collisions. The prompt lets the user accept the suggestion (Enter)
-    // or rename in place — saves the rename round-trip vs. blindly
-    // creating "New Folder 7" and then re-clicking F2.
     const existing = new Set(entries.map((e) => e.name));
     let suggestion = "New Folder";
     let n = 2;
     while (existing.has(suggestion)) {
       suggestion = `New Folder ${n++}`;
     }
-    const name = window.prompt("Name for the new folder:", suggestion);
-    if (name == null) return; // user cancelled
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (existing.has(trimmed)) {
-      setError(`A file or folder named "${trimmed}" already exists.`);
-      return;
-    }
-    const target = `${path}/${trimmed}`;
-    try {
+    setNewEntryDialog({ kind: "folder", defaultName: suggestion });
+  };
+
+  /** NewEntryDialog's onSubmit callback. Dispatches mkdir or empty-file
+   *  create based on the open dialog's `kind`. The dialog itself
+   *  refuses collisions before reaching here, but the backend's
+   *  `already exists` errors still propagate as inline error text. */
+  const handleCreateEntry = async (name: string) => {
+    if (!path || !newEntryDialog) return;
+    const target = `${path}/${name}`;
+    if (newEntryDialog.kind === "folder") {
       await clientMkdir(target);
-      await refresh(path);
-    } catch (e) {
-      setError(String(e));
+    } else {
+      await fsCreateEmptyFile(target);
     }
+    await refresh(path);
   };
 
   const totals = useMemo(() => {
@@ -719,7 +711,11 @@ export default function Browser({
       ".localized",
       "._.DS_Store",
     ]);
-    let base = searchRecursive && findResults ? findResults : entries;
+    // Recursive find is only meaningful with a query — when the toggle
+    // is on but the input is empty, fall back to the local listing
+    // so the pane doesn't show "Empty folder" out of the blue.
+    let base =
+      searchRecursive && findResults && search ? findResults : entries;
     if (settings.hideSystemFiles) {
       base = base.filter((e) => !SYSTEM_NAMES.has(e.name));
     }
@@ -932,7 +928,9 @@ export default function Browser({
       </Box>
       {settings.showStatusBar && <StatusBar
         totalEntries={
-          searchRecursive && findResults ? findResults.length : entries.length
+          searchRecursive && findResults && search
+            ? findResults.length
+            : entries.length
         }
         folderCount={totals.folderCount}
         fileCount={totals.fileCount}
@@ -944,7 +942,7 @@ export default function Browser({
         onDismissError={() => setError(null)}
         diskFree={diskSpace?.free ?? null}
         diskTotal={diskSpace?.total ?? null}
-        findActive={searchRecursive && findResults != null}
+        findActive={searchRecursive && findResults != null && !!search}
         // The Rust-side cap is 1000 results; reaching it is the
         // user's signal to refine the query.
         findHitCap={!!findResults && findResults.length >= 1000}
@@ -1163,6 +1161,13 @@ export default function Browser({
         open={!!renameTarget}
         originalName={renameTarget?.name ?? ""}
         originalPath={renameTarget?.path ?? ""}
+        existingNames={
+          new Set(
+            entries
+              .filter((x) => x.path !== renameTarget?.path)
+              .map((x) => x.name),
+          )
+        }
         onClose={() => setRenameTarget(null)}
         onRename={async (newName) => {
           if (!renameTarget) return;
@@ -1176,6 +1181,16 @@ export default function Browser({
           await clientRename(renameTarget.path, dest);
           if (path) await refresh(path);
         }}
+      />
+      <NewEntryDialog
+        open={newEntryDialog !== null}
+        title={newEntryDialog?.kind === "file" ? "New file" : "New folder"}
+        parentPath={path}
+        defaultName={newEntryDialog?.defaultName ?? ""}
+        existingNames={new Set(entries.map((x) => x.name))}
+        submitLabel="Create"
+        onClose={() => setNewEntryDialog(null)}
+        onSubmit={handleCreateEntry}
       />
       {dragOver && (
         // Pointer-events: none so the OS drag operation isn't intercepted
