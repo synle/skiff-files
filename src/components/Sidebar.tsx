@@ -1,6 +1,7 @@
 // Left sidebar — Phase 1 only ships Favorites + a Settings link. Hosts and
 // Devices sections come online when the connection layer lands in Phase 2.
 import {
+  Badge,
   Box,
   CircularProgress,
   IconButton,
@@ -29,6 +30,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { Link as RouterLink } from "react-router";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
+import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
   SIDEBAR_WIDTH_MAX,
   SIDEBAR_WIDTH_MIN,
@@ -197,6 +199,69 @@ export default function Sidebar({ home, onNavigate }: Props) {
     return () => {
       cancelled = true;
       window.removeEventListener("skiff:connections-changed", onChange);
+    };
+  }, []);
+
+  /** Active in-flight sync job ids — drives the badge over the
+   *  Transfers nav link. We seed from `sync_list` then maintain
+   *  incrementally via the Tauri progress / done / error events. */
+  const [activeJobs, setActiveJobs] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    let cancelled = false;
+    void syncList()
+      .then((js) => {
+        if (cancelled) return;
+        const initial = new Set<string>(
+          js
+            .filter(
+              (j) =>
+                j.state === "planning" ||
+                j.state === "running" ||
+                j.state === "paused",
+            )
+            .map((j) => j.id),
+        );
+        setActiveJobs(initial);
+      })
+      .catch(() => {
+        /* outside Tauri / no engine — leave the badge unset */
+      });
+    const unlisteners: Array<() => void> = [];
+    void Promise.all([
+      onProgress((p) => {
+        setActiveJobs((prev) => {
+          if (prev.has(p.jobId)) return prev;
+          const next = new Set(prev);
+          next.add(p.jobId);
+          return next;
+        });
+      }),
+      onDone((s) => {
+        setActiveJobs((prev) => {
+          if (!prev.has(s.jobId)) return prev;
+          const next = new Set(prev);
+          next.delete(s.jobId);
+          return next;
+        });
+      }),
+      onError((e) => {
+        setActiveJobs((prev) => {
+          if (!prev.has(e.jobId)) return prev;
+          const next = new Set(prev);
+          next.delete(e.jobId);
+          return next;
+        });
+      }),
+    ]).then((fns) => {
+      if (cancelled) {
+        for (const fn of fns) fn();
+        return;
+      }
+      unlisteners.push(...fns);
+    });
+    return () => {
+      cancelled = true;
+      for (const fn of unlisteners) fn();
     };
   }, []);
 
@@ -531,7 +596,14 @@ export default function Sidebar({ home, onNavigate }: Props) {
         <ListItem disablePadding>
           <ListItemButton component={RouterLink} to="/transfers">
             <ListItemIcon sx={{ minWidth: 32 }}>
-              <SwapHorizIcon fontSize="small" />
+              <Badge
+                badgeContent={activeJobs.size}
+                color="primary"
+                invisible={activeJobs.size === 0}
+                overlap="circular"
+              >
+                <SwapHorizIcon fontSize="small" />
+              </Badge>
             </ListItemIcon>
             <ListItemText primary="Transfers" />
           </ListItemButton>
