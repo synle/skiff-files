@@ -39,6 +39,7 @@ import PropertiesDialog from "../components/PropertiesDialog";
 import BulkRenameDialog from "../components/BulkRenameDialog";
 import DiffDialog from "../components/DiffDialog";
 import NewEntryDialog from "../components/NewEntryDialog";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
@@ -138,6 +139,16 @@ export default function Browser({
   const [newEntryDialog, setNewEntryDialog] = useState<{
     kind: "folder" | "file";
     defaultName: string;
+  } | null>(null);
+  /** Generic yes/no confirm modal. Replaces every `window.confirm`
+   *  call (Tauri suppresses native dialogs). Closure captures the
+   *  follow-up; the dialog calls `onConfirm` and closes. */
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    destructive?: boolean;
+    onConfirm: () => void;
   } | null>(null);
   /** Counter the PathBar watches — incrementing flips it into edit
    *  mode and selects the text. Driven by Cmd/Ctrl+L. */
@@ -483,18 +494,24 @@ export default function Browser({
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
       if (selectedPaths.length === 0) return;
       const hasRemote = selectedPaths.some((p) => p.startsWith("sftp://"));
-      const verb = hasRemote
-        ? "Permanently delete" // remote: no server-side trash
-        : "Move to Trash";
-      const ok = window.confirm(
-        `${verb} ${selectedPaths.length} item${selectedPaths.length === 1 ? "" : "s"}?`,
-      );
-      if (!ok) return;
-      void removeOrTrashMany(selectedPaths)
-        .then(() => {
-          if (path) void refresh(path);
-        })
-        .catch((err) => setError(String(err)));
+      const verb = hasRemote ? "Permanently delete" : "Move to Trash";
+      const count = selectedPaths.length;
+      // Modal-based confirm — `window.confirm` is suppressed in the
+      // Tauri webview (see CLAUDE.md → Known footguns).
+      setConfirmDialog({
+        title: verb,
+        message: `${verb} ${count} item${count === 1 ? "" : "s"}?`,
+        confirmLabel: hasRemote ? "Delete" : "Move to Trash",
+        destructive: true,
+        onConfirm: () => {
+          setConfirmDialog(null);
+          void removeOrTrashMany(selectedPaths)
+            .then(() => {
+              if (path) void refresh(path);
+            })
+            .catch((err) => setError(String(err)));
+        },
+      });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1010,16 +1027,24 @@ export default function Browser({
         onOpen={(e) => navigate(e.path)}
         onRename={(e) => setRenameTarget(e)}
         onTrash={(e) => {
-          // Single-entry trash. Reuses the same confirm + remote
-          // wording as the multi-select Delete-key path.
+          // Single-entry trash. Modal-based confirm; window.confirm
+          // is suppressed in the Tauri webview.
           const isRemoteEntry = e.path.startsWith("sftp://");
           const verb = isRemoteEntry ? "Permanently delete" : "Move to Trash";
-          if (!window.confirm(`${verb} "${e.name}"?`)) return;
-          void removeOrTrashMany([e.path])
-            .then(() => {
-              if (path) void refresh(path);
-            })
-            .catch((err) => setError(String(err)));
+          setConfirmDialog({
+            title: verb,
+            message: `${verb} "${e.name}"?`,
+            confirmLabel: isRemoteEntry ? "Delete" : "Move to Trash",
+            destructive: true,
+            onConfirm: () => {
+              setConfirmDialog(null);
+              void removeOrTrashMany([e.path])
+                .then(() => {
+                  if (path) void refresh(path);
+                })
+                .catch((err) => setError(String(err)));
+            },
+          });
         }}
         onCopyPath={(e) => {
           // Best-effort — falls back silently in tests / browser
@@ -1191,6 +1216,15 @@ export default function Browser({
         submitLabel="Create"
         onClose={() => setNewEntryDialog(null)}
         onSubmit={handleCreateEntry}
+      />
+      <ConfirmDialog
+        open={confirmDialog !== null}
+        title={confirmDialog?.title ?? ""}
+        message={confirmDialog?.message ?? ""}
+        confirmLabel={confirmDialog?.confirmLabel}
+        destructive={confirmDialog?.destructive}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={() => confirmDialog?.onConfirm()}
       />
       {dragOver && (
         // Pointer-events: none so the OS drag operation isn't intercepted
