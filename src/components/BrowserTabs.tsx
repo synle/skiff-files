@@ -84,14 +84,9 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       },
     ];
   });
-  /** LRU stack of recently-closed tabs. Not persisted — restoring
-   *  closed tabs across restarts would conflict with the saved-tabs
-   *  flow. Capped at 10 so a hyperactive user doesn't grow memory
-   *  unbounded. We only ever read this through the functional setter
-   *  inside `restoreClosedTab`, so the state value is intentionally
-   *  unused at render time. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_closedStack, setClosedStack] = useState<TabRow[]>([]);
+  // Closed-tab stack is persisted in `Settings.recentlyClosedTabs`
+  // (across restarts; capped at 10). Local state isn't needed —
+  // `closeTab` writes to settings, `restoreClosedTab` reads + pops.
 
   const [activeId, setActiveId] = useState<string>(() => {
     if (seedActive && seedTabs.some((t) => t.id === seedActive))
@@ -261,10 +256,22 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       if (id === activeId && next.length > 0) {
         setActiveId(next[Math.max(0, idx - 1)].id);
       }
-      // Push onto the LRU stack so Cmd+Shift+T can restore.
+      // Push onto the persisted LRU stack so Cmd+Shift+T can restore
+      // even across restarts. Dedup by initialPath so closing + reopening
+      // the same path repeatedly doesn't bloat the list.
       if (closed && closed.currentPath) {
-        setClosedStack((stack) =>
-          [closed, ...stack.filter((t) => t.id !== closed.id)].slice(0, 10),
+        update(
+          "recentlyClosedTabs",
+          [
+            {
+              id: closed.id,
+              label: closed.label,
+              initialPath: closed.currentPath,
+            },
+            ...settings.recentlyClosedTabs.filter(
+              (t) => t.initialPath !== closed.currentPath,
+            ),
+          ].slice(0, 10),
         );
       }
       return next;
@@ -273,23 +280,21 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
 
   /** Pop the most recently closed tab back to life, focused. */
   const restoreClosedTab = () => {
-    setClosedStack((stack) => {
-      if (stack.length === 0) return stack;
-      const [restored, ...rest] = stack;
-      // Fresh id so a subsequent close + restore doesn't collide.
-      const id = crypto.randomUUID();
-      setTabs((prev) => [
-        ...prev,
-        {
-          id,
-          label: restored.label,
-          initialPath: restored.currentPath,
-          currentPath: restored.currentPath,
-        },
-      ]);
-      setActiveId(id);
-      return rest;
-    });
+    if (settings.recentlyClosedTabs.length === 0) return;
+    const [restored, ...rest] = settings.recentlyClosedTabs;
+    update("recentlyClosedTabs", rest);
+    // Fresh id so a subsequent close + restore doesn't collide.
+    const id = crypto.randomUUID();
+    setTabs((prev) => [
+      ...prev,
+      {
+        id,
+        label: restored.label,
+        initialPath: restored.initialPath,
+        currentPath: restored.initialPath,
+      },
+    ]);
+    setActiveId(id);
   };
 
   /** Updates a tab's label after the inner Browser navigates. Lifted

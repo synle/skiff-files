@@ -174,6 +174,10 @@ export interface Settings {
   savedTabsRight: SavedTab[];
   /** Active tab id for the RIGHT pane. */
   savedActiveTabIdRight: string | null;
+  /** LRU stack of recently-closed tabs across both panes. Persists
+   *  across restarts so Cmd/Ctrl+Shift+T after relaunch can resurrect
+   *  the last-closed tab. Capped at 10. */
+  recentlyClosedTabs: SavedTab[];
   /** When true, Cmd/Ctrl+T (and the toolbar +) seeds the new tab at
    *  the active tab's current path instead of the home directory.
    *  Useful for power users who frequently spawn parallel tabs from
@@ -258,6 +262,7 @@ export const DEFAULTS: Settings = {
   twoPaneMode: false,
   savedTabsRight: [],
   savedActiveTabIdRight: null,
+  recentlyClosedTabs: [],
   savedTabs: [],
   savedActiveTabId: null,
 };
