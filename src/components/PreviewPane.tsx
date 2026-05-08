@@ -67,12 +67,17 @@ function ImageBody({
   /** Rotation in degrees, applied via CSS transform. Resets to 0
    *  whenever the selection changes so the next image starts upright. */
   const [rotation, setRotation] = useState<number>(0);
+  /** Click-to-zoom toggle. Off = fit-to-pane (max 360 px tall);
+   *  on = native pixel size, scroll inside the pane to inspect.
+   *  Resets on selection change so each new image starts fitted. */
+  const [zoomed, setZoomed] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
     setSrc(null);
     setError(null);
     setRotation(0);
+    setZoomed(false);
     onDimensions(null);
     readBase64(entry.path)
       .then((b64) => {
@@ -105,28 +110,42 @@ function ImageBody({
   return (
     <Box>
       <Box
-        component="img"
-        src={src}
-        alt={entry.name}
-        onLoad={(e) => {
-          const img = e.currentTarget as HTMLImageElement;
-          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-            onDimensions({ w: img.naturalWidth, h: img.naturalHeight });
-          }
-        }}
-        sx={{
-          maxWidth: "100%",
-          maxHeight: 360,
-          borderRadius: 1,
-          display: "block",
-          transform: `rotate(${rotation}deg)`,
-          // Keep the rotated image inside the pane bounds — without
-          // `transform-origin: center` rotation pivots from top-left
-          // and the image walks off screen on quarter turns.
-          transformOrigin: "center",
-          transition: "transform 200ms",
-        }}
-      />
+        // When zoomed, wrap in a scrollable container so the user
+        // can pan inside the pane bounds without overflowing the
+        // properties block below.
+        sx={
+          zoomed
+            ? { maxHeight: 480, overflow: "auto", borderRadius: 1 }
+            : undefined
+        }
+      >
+        <Box
+          component="img"
+          src={src}
+          alt={entry.name}
+          onLoad={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+              onDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+            }
+          }}
+          onClick={() => setZoomed((z) => !z)}
+          title={zoomed ? "Click to fit" : "Click to zoom 100%"}
+          sx={{
+            maxWidth: zoomed ? "none" : "100%",
+            maxHeight: zoomed ? "none" : 360,
+            borderRadius: 1,
+            display: "block",
+            cursor: zoomed ? "zoom-out" : "zoom-in",
+            transform: `rotate(${rotation}deg)`,
+            // Keep the rotated image inside the pane bounds — without
+            // `transform-origin: center` rotation pivots from top-left
+            // and the image walks off screen on quarter turns.
+            transformOrigin: "center",
+            transition: "transform 200ms",
+          }}
+        />
+      </Box>
       <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
         <Tooltip title="Rotate left">
           <IconButton
