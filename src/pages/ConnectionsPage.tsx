@@ -278,7 +278,8 @@ export default function ConnectionsPage() {
   };
 
   return (
-    <Box sx={{ p: 3, overflow: "auto", maxWidth: 760 }}>
+    <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
+      <Box sx={{ maxWidth: 760, mx: "auto" }}>
       <Typography variant="h4" gutterBottom>
         Connections
       </Typography>
@@ -627,6 +628,7 @@ export default function ConnectionsPage() {
           )}
         </Box>
       </Stack>
+      </Box>
     </Box>
   );
 }

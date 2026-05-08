@@ -380,7 +380,8 @@ export default function TransfersPage() {
   );
 
   return (
-    <Box sx={{ p: 3, overflow: "auto", maxWidth: 880 }}>
+    <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
+      <Box sx={{ maxWidth: 880, mx: "auto" }}>
       <Typography variant="h4" gutterBottom>
         Transfers
       </Typography>
@@ -760,6 +761,7 @@ export default function TransfersPage() {
           )}
         </Box>
       </Stack>
+      </Box>
     </Box>
   );
 }
