@@ -79,4 +79,74 @@ describe("Sidebar", () => {
     fireEvent.click(within(favsList).getByText("Home"));
     expect(onNavigate).toHaveBeenCalled();
   });
+
+  // Regression for 0.2.131 — `Settings.hiddenFavorites` filters
+  // hardcoded favorites out of the sidebar so users can hide
+  // individual entries (Home / Desktop / Documents / Downloads /
+  // Trash) without nuking the whole section.
+  it("hides favorites listed in Settings.hiddenFavorites", () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({ hiddenFavorites: ["Desktop", "Downloads"] }),
+    );
+    r();
+    expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.queryByText("Desktop")).not.toBeInTheDocument();
+    expect(screen.queryByText("Downloads")).not.toBeInTheDocument();
+    expect(screen.getByText("Documents")).toBeInTheDocument();
+  });
+
+  // Regression for 0.2.130 — section header gets a hover-only ×
+  // icon that hides the entire section. Settings → Sidebar is the
+  // only way to bring it back.
+  it("section hide × button writes sidebarSectionsVisible[id]=false", () => {
+    r();
+    // The hide icon has aria-label "Hide Favorites section".
+    const hideBtn = screen.getByLabelText("Hide Favorites section");
+    fireEvent.click(hideBtn);
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
+    );
+    expect(stored.sidebarSectionsVisible.favorites).toBe(false);
+    // The Favorites label should also disappear from the DOM.
+    expect(screen.queryByText("Favorites")).not.toBeInTheDocument();
+  });
+
+  // Regression for 0.2.131 — bookmarks ship with inline ↑↓× icons
+  // PLUS a context menu that mirrors the actions. The menu's
+  // disabled state must agree with the inline buttons so users
+  // don't see "Move up" enabled at index 0.
+  it("right-click on the first bookmark shows Move up disabled", () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({
+        bookmarks: [
+          { id: "a", label: "A", path: "/a" },
+          { id: "b", label: "B", path: "/b" },
+        ],
+      }),
+    );
+    r();
+    fireEvent.contextMenu(screen.getByText("A"));
+    const moveUp = screen.getByText("Move up").closest("li");
+    expect(moveUp).toHaveAttribute("aria-disabled", "true");
+    const moveDown = screen.getByText("Move down").closest("li");
+    expect(moveDown).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("right-click on the last bookmark shows Move down disabled", () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({
+        bookmarks: [
+          { id: "a", label: "A", path: "/a" },
+          { id: "b", label: "B", path: "/b" },
+        ],
+      }),
+    );
+    r();
+    fireEvent.contextMenu(screen.getByText("B"));
+    const moveDown = screen.getByText("Move down").closest("li");
+    expect(moveDown).toHaveAttribute("aria-disabled", "true");
+  });
 });

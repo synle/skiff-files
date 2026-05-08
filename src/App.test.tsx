@@ -99,4 +99,51 @@ describe("App", () => {
     // Sidebar stays visible — Shift variant routes to twoPaneMode instead.
     expect(screen.getByText("Favorites")).toBeInTheDocument();
   });
+
+  // Regression for 0.2.129 — `e.key === "."` never matched on macOS US
+  // because Shift+. emits ">". Layout-independent matching is critical:
+  // accept ".", ">", and `e.code === "Period"` so the binding is stable
+  // across layouts.
+  it("Cmd/Ctrl+Shift+. fires when key is '.' (US-keyboard literal)", () => {
+    render(frame("/"));
+    fireEvent.keyDown(window, {
+      key: ".",
+      ctrlKey: true,
+      shiftKey: true,
+    });
+    // Side effect: showHidden flips. The provider persists to
+    // localStorage so we can assert against that without scraping the
+    // FileList — keeps the test layout-free.
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
+    );
+    expect(stored.showHidden).toBe(true);
+  });
+
+  it("Cmd/Ctrl+Shift+. fires when key is '>' (macOS-emitted Shift+.)", () => {
+    render(frame("/"));
+    fireEvent.keyDown(window, {
+      key: ">",
+      ctrlKey: true,
+      shiftKey: true,
+    });
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
+    );
+    expect(stored.showHidden).toBe(true);
+  });
+
+  it("Cmd/Ctrl+Shift+. fires when only e.code is 'Period' (layout-independent)", () => {
+    render(frame("/"));
+    fireEvent.keyDown(window, {
+      key: "Unidentified",
+      code: "Period",
+      ctrlKey: true,
+      shiftKey: true,
+    });
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
+    );
+    expect(stored.showHidden).toBe(true);
+  });
 });
