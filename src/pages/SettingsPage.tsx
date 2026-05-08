@@ -17,7 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import { appDataDir, useSettings } from "../state/settings";
-import { fsRevealInOs } from "../api/fs";
+import { fsOpenWithDefault, fsRevealInOs } from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
 
 /** Generic section wrapper so spacing stays consistent across groups. */
@@ -539,6 +539,24 @@ export default function SettingsPage() {
               }}
             >
               Reveal app data folder
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                // Until the Tauri updater is wired (needs signing
+                // keys), the in-app shortcut to "check for updates"
+                // is a hand-off to the GitHub Releases page. Routes
+                // through the existing `fs_open_with_default` Tauri
+                // command, which uses the `open` crate — works for
+                // URLs as well as files. URL is hard-coded, no
+                // injection risk.
+                void fsOpenWithDefault(
+                  "https://github.com/synle/skiff-files/releases",
+                );
+              }}
+            >
+              Check for updates
             </Button>
             <Button
               variant="outlined"
