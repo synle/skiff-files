@@ -20,8 +20,8 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useEffect, useState } from "react";
-import { dirSummary } from "../api/client";
-import { fsHashSha256, type DirSummary, type Entry } from "../api/fs";
+import { dirSummary, hashSha256 } from "../api/client";
+import { type DirSummary, type Entry } from "../api/fs";
 import { formatBytes, formatMtime } from "../util/format";
 import IconForKind from "./IconForKind";
 
@@ -125,7 +125,7 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
           {entry.isHidden && <Field label="Hidden" value="yes" />}
           <Field label="Path" value={entry.path} />
           {sha256 && <Field label="SHA-256" value={<code>{sha256}</code>} />}
-          {!entry.isDir && !entry.path.startsWith("sftp://") && !sha256 && (
+          {!entry.isDir && !sha256 && (
             <Box sx={{ pt: 0.5 }}>
               <Button
                 size="small"
@@ -133,7 +133,7 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
                 disabled={hashing}
                 onClick={() => {
                   setHashing(true);
-                  void fsHashSha256(entry.path)
+                  void hashSha256(entry.path)
                     .then((h) => setSha256(h))
                     .catch(() => {
                       /* swallow — UI just won't show the hash */

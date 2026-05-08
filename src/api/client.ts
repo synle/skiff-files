@@ -4,6 +4,7 @@
 // back into address-bar form so the next navigation routes through the
 // same backend without the caller having to remember.
 import {
+  fsHashSha256,
   fsListDir,
   fsMkdir,
   fsRename,
@@ -18,6 +19,7 @@ import {
 } from "./fs";
 import {
   connDirSummary,
+  connHashSha256,
   connListDir,
   connMkdir,
   connReadBase64,
@@ -80,6 +82,18 @@ export async function readBase64(path: string): Promise<string> {
     return connReadBase64(loc.backend.connectionId, loc.remotePath);
   }
   return fsReadBase64(path);
+}
+
+/** Backend-agnostic streaming SHA-256 hash. Routes to
+ *  `fs_hash_sha256` for local paths and `conn_hash_sha256` for
+ *  remotes — both stream chunked so multi-GB files don't blow up
+ *  memory. */
+export async function hashSha256(path: string): Promise<string> {
+  const loc = parseLocation(path);
+  if (loc.backend.kind === "sftp") {
+    return connHashSha256(loc.backend.connectionId, loc.remotePath);
+  }
+  return fsHashSha256(path);
 }
 
 /** Backend-agnostic recursive directory summary. */

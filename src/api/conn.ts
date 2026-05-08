@@ -97,6 +97,12 @@ export type KnownHostEntry = [string, string];
 export const connKnownHostsList = (): Promise<KnownHostEntry[]> =>
   invoke<KnownHostEntry[]>("conn_known_hosts_list");
 
+/** Streaming SHA-256 hash of a remote file. Mirrors `fsHashSha256`
+ *  but reads via the SFTP backend so the file's bytes never leave
+ *  the server's machine in plaintext. */
+export const connHashSha256 = (id: string, path: string): Promise<string> =>
+  invoke<string>("conn_hash_sha256", { id, path });
+
 /** Forget a single `host:port` entry. The next connect to it will
  *  re-trust on first use. Idempotent. */
 export const connKnownHostsRemove = (keyId: string): Promise<void> =>

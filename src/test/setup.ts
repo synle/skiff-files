@@ -44,6 +44,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "conn_remove") return null;
     if (cmd === "conn_known_hosts_list") return [];
     if (cmd === "conn_known_hosts_remove") return null;
+    if (cmd === "conn_hash_sha256") return "deadbeefremote";
     if (cmd === "sync_list") return [];
     if (cmd === "sync_start_local") return "test-job-id";
     if (cmd === "sync_start_repo") return "test-repo-job-id";

@@ -533,6 +533,19 @@ pub fn conn_known_hosts_list(
     Ok(map.into_iter().collect())
 }
 
+/// SHA-256 of a file living on a remote SFTP connection. Streams
+/// chunked from the russh `File` reader so large media doesn't blow
+/// up RAM. Mirrors `fs_hash_sha256` for local paths.
+#[tauri::command]
+pub async fn conn_hash_sha256(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<String> {
+    let client = registry.get_sftp(&id)?;
+    client.hash_sha256(&path).await
+}
+
 /// Forget a single `host:port` entry. The next connect to it will
 /// re-trust on first use. Idempotent — removing a missing key is
 /// not an error.

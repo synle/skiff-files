@@ -455,6 +455,29 @@ impl SftpClient {
             .map_err(|e| format!("open_for_read({path}): {e}"))
     }
 
+    /// Streaming SHA-256 of the remote file at `path`. Reads in 64 KB
+    /// chunks so large media doesn't load into RAM. Returns the hex
+    /// digest. Mirrors the local `fs_hash_sha256` command.
+    pub async fn hash_sha256(&self, path: &str) -> FsResult<String> {
+        use sha2::{Digest, Sha256};
+        use tokio::io::AsyncReadExt;
+        let mut file = self.open_read(path).await?;
+        let mut hasher = Sha256::new();
+        let mut buf = vec![0u8; 64 * 1024];
+        loop {
+            let n = file
+                .read(&mut buf)
+                .await
+                .map_err(|e| format!("read({path}): {e}"))?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+        }
+        let digest = hasher.finalize();
+        Ok(digest.iter().map(|b| format!("{b:02x}")).collect())
+    }
+
     /// Open a remote file for writing (create + truncate). Same
     /// outlives-the-lock argument as [`open_read`].
     pub async fn open_write(&self, path: &str) -> FsResult<russh_sftp::client::fs::File> {
