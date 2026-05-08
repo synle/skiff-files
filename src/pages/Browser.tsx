@@ -525,15 +525,25 @@ export default function Browser({
 
   const handleNewFolder = async () => {
     if (!path) return;
-    // Auto-name "New Folder", "New Folder 2", ... so we don't need a modal
-    // on the first cut. A rename-on-create flow lands with the context menu.
+    // Auto-name suggestion: "New Folder", "New Folder 2", … skipping
+    // collisions. The prompt lets the user accept the suggestion (Enter)
+    // or rename in place — saves the rename round-trip vs. blindly
+    // creating "New Folder 7" and then re-clicking F2.
     const existing = new Set(entries.map((e) => e.name));
-    let name = "New Folder";
+    let suggestion = "New Folder";
     let n = 2;
-    while (existing.has(name)) {
-      name = `New Folder ${n++}`;
+    while (existing.has(suggestion)) {
+      suggestion = `New Folder ${n++}`;
     }
-    const target = `${path}/${name}`;
+    const name = window.prompt("Name for the new folder:", suggestion);
+    if (name == null) return; // user cancelled
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (existing.has(trimmed)) {
+      setError(`A file or folder named "${trimmed}" already exists.`);
+      return;
+    }
+    const target = `${path}/${trimmed}`;
     try {
       await clientMkdir(target);
       await refresh(path);
