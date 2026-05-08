@@ -15,6 +15,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import ContentCopyTwoToneIcon from "@mui/icons-material/ContentCopyTwoTone";
 import LaunchIcon from "@mui/icons-material/Launch";
 import TabIcon from "@mui/icons-material/Tab";
 import TerminalIcon from "@mui/icons-material/Terminal";
@@ -45,6 +46,11 @@ interface Props {
   /** Open the directory in a new tab. Only shown for folders — files
    *  open into the preview pane / OS app and don't have a tab concept. */
   onOpenInNewTab: (entry: Entry) => void;
+  /** Duplicate the entry in the same folder, suffixing the name with
+   *  " (copy)". Folders deep-copy. Hidden for remote (`sftp://`)
+   *  entries because the engine flow is the same as Skiffsync —
+   *  routes through `startSync`. */
+  onDuplicate: (entry: Entry) => void;
   /** Start a diff against this file. The first call sets the "base"
    *  side; the second call (from another row's right-click) opens
    *  the DiffDialog. Hidden for directories. */
@@ -68,6 +74,7 @@ export default function EntryContextMenu({
   onOpenInTerminal,
   onOpenInNewTab,
   onCompareWith,
+  onDuplicate,
   comparePending = false,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
@@ -169,6 +176,19 @@ export default function EntryContextMenu({
         </ListItemIcon>
         <ListItemText>Copy path</ListItemText>
       </MenuItem>
+      {!isRemote && state && (
+        <MenuItem
+          onClick={() => {
+            onDuplicate(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <ContentCopyTwoToneIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Duplicate</ListItemText>
+        </MenuItem>
+      )}
       {state && !state.entry.isDir && (
         <MenuItem
           onClick={() => {

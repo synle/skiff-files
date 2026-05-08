@@ -937,6 +937,31 @@ export default function Browser({
             new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
           );
         }}
+        onDuplicate={(e) => {
+          // Build a unique sibling name: `name (copy).ext` →
+          // `name (copy 2).ext` if the first one's taken. Routes
+          // through Skiffsync so folders deep-copy correctly.
+          const dot = e.isDir ? -1 : e.name.lastIndexOf(".");
+          const stem = dot > 0 ? e.name.slice(0, dot) : e.name;
+          const ext = dot > 0 ? e.name.slice(dot) : "";
+          const existing = new Set(entries.map((x) => x.name));
+          let candidate = `${stem} (copy)${ext}`;
+          let n = 2;
+          while (existing.has(candidate)) {
+            candidate = `${stem} (copy ${n++})${ext}`;
+          }
+          const sep = e.path.lastIndexOf("/");
+          const parent = sep > 0 ? e.path.slice(0, sep) : "";
+          const target = `${parent}/${candidate}`;
+          void startSync(e.path, target, {
+            maxSizeGb: 100,
+            conflictPolicy: "skip",
+          })
+            .then(() => {
+              if (path) void refresh(path);
+            })
+            .catch((err) => setError(String(err)));
+        }}
         comparePending={diffBase !== null}
         onCompareWith={(e) => {
           // Two-phase: first call captures the base; second call

@@ -34,6 +34,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onOpenInTerminal: vi.fn(),
     onOpenInNewTab: vi.fn(),
     onCompareWith: vi.fn(),
+    onDuplicate: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>
