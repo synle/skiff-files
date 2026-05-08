@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import { appDataDir, useSettings } from "../state/settings";
 import { fsRevealInOs } from "../api/fs";
+import { SHORTCUT_GROUPS } from "../util/shortcuts";
 
 /** Generic section wrapper so spacing stays consistent across groups. */
 function Section({
@@ -440,6 +441,46 @@ export default function SettingsPage() {
             }
             label="Never show conflict prompt (auto-skip)"
           />
+        </Section>
+
+        <Divider />
+
+        <Section
+          title="Keyboard"
+          description="Read-only listing of every shortcut the app honors. Press ? anywhere to open this as an overlay. Rebinding lands in a future release."
+        >
+          <Stack spacing={2}>
+            {SHORTCUT_GROUPS.map((g) => (
+              <Box key={g.title}>
+                <Typography variant="overline" color="text.secondary">
+                  {g.title}
+                </Typography>
+                <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                  {g.items.map((it) => (
+                    <Box
+                      key={it.keys + it.description}
+                      sx={{ display: "flex", gap: 2 }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          width: 220,
+                          flexShrink: 0,
+                          fontFamily: "monospace",
+                          color: "text.primary",
+                        }}
+                      >
+                        {it.keys}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {it.description}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
         </Section>
 
         <Divider />

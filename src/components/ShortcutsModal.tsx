@@ -16,74 +16,11 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState } from "react";
+import { SHORTCUT_GROUPS } from "../util/shortcuts";
 
-interface Shortcut {
-  /** Plain-language label rendered on the left. */
-  keys: string;
-  /** What the shortcut does. */
-  description: string;
-}
-
-interface Group {
-  title: string;
-  items: Shortcut[];
-}
-
-/** The canonical list of bindings. Order matches frequency-of-use. */
-const GROUPS: Group[] = [
-  {
-    title: "Navigation",
-    items: [
-      { keys: "↑ / ↓", description: "Move focus up / down" },
-      { keys: "Enter", description: "Open the focused folder" },
-      { keys: "Space", description: "Toggle the focused row's selection" },
-      { keys: "Backspace", description: "Go up one folder" },
-      { keys: "Home / End", description: "Jump to first / last entry" },
-    ],
-  },
-  {
-    title: "Selection",
-    items: [
-      { keys: "Click", description: "Select one entry (replaces selection)" },
-      { keys: "Cmd / Ctrl + Click", description: "Toggle entry in selection" },
-      { keys: "Cmd / Ctrl + A", description: "Select all" },
-      { keys: "Cmd / Ctrl + C", description: "Copy selected paths to clipboard" },
-      { keys: "Esc", description: "Clear selection" },
-    ],
-  },
-  {
-    title: "View",
-    items: [
-      { keys: "Cmd / Ctrl + B", description: "Toggle sidebar" },
-      { keys: "Cmd / Ctrl + I", description: "Toggle preview pane" },
-      { keys: "Cmd / Ctrl + R · F5", description: "Refresh current folder" },
-      { keys: "Cmd / Ctrl + L", description: "Edit path (focus path bar)" },
-      { keys: "Cmd / Ctrl + K", description: "Quick-jump (bookmarks + recent)" },
-      { keys: "Cmd / Ctrl + ,", description: "Open Settings" },
-      { keys: "Cmd / Ctrl + Shift + N", description: "New folder" },
-      { keys: "Cmd / Ctrl + D", description: "Bookmark current folder" },
-      { keys: "F2", description: "Rename selected entry" },
-    ],
-  },
-  {
-    title: "Tabs",
-    items: [
-      { keys: "Cmd / Ctrl + T", description: "New tab" },
-      { keys: "Cmd / Ctrl + W", description: "Close active tab" },
-      { keys: "Cmd / Ctrl + Shift + T", description: "Restore last closed tab" },
-      { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
-      { keys: "Cmd / Ctrl + Shift + ← / →", description: "Move active tab left / right" },
-      { keys: "Middle-click folder", description: "Open folder in new tab" },
-    ],
-  },
-  {
-    title: "Help",
-    items: [
-      { keys: "?", description: "Show this cheatsheet" },
-      { keys: "Esc", description: "Close this cheatsheet" },
-    ],
-  },
-];
+// Shortcuts source-of-truth lives in `util/shortcuts.ts` so the
+// Settings → Keyboard listing renders the same data.
+const GROUPS = SHORTCUT_GROUPS;
 
 /** Listens for `?` (Shift+/) anywhere in the document and toggles the
  *  modal — but only when the active element isn't an input or
