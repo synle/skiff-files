@@ -33,6 +33,7 @@ function r(state: { entry: Entry; x: number; y: number } | null) {
     onRevealInOs: vi.fn(),
     onOpenInTerminal: vi.fn(),
     onOpenInNewTab: vi.fn(),
+    onCompareWith: vi.fn(),
   };
   render(
     <ThemeProvider theme={theme}>

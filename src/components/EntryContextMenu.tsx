@@ -14,6 +14,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import LaunchIcon from "@mui/icons-material/Launch";
 import TabIcon from "@mui/icons-material/Tab";
 import TerminalIcon from "@mui/icons-material/Terminal";
@@ -44,6 +45,13 @@ interface Props {
   /** Open the directory in a new tab. Only shown for folders — files
    *  open into the preview pane / OS app and don't have a tab concept. */
   onOpenInNewTab: (entry: Entry) => void;
+  /** Start a diff against this file. The first call sets the "base"
+   *  side; the second call (from another row's right-click) opens
+   *  the DiffDialog. Hidden for directories. */
+  onCompareWith: (entry: Entry) => void;
+  /** True when a base file is already pending. Drives the menu label
+   *  ("Compare with this file" instead of "Compare with…"). */
+  comparePending?: boolean;
 }
 
 export default function EntryContextMenu({
@@ -59,6 +67,8 @@ export default function EntryContextMenu({
   onRevealInOs,
   onOpenInTerminal,
   onOpenInNewTab,
+  onCompareWith,
+  comparePending = false,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
@@ -159,6 +169,21 @@ export default function EntryContextMenu({
         </ListItemIcon>
         <ListItemText>Copy path</ListItemText>
       </MenuItem>
+      {state && !state.entry.isDir && (
+        <MenuItem
+          onClick={() => {
+            onCompareWith(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <CompareArrowsIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>
+            {comparePending ? "Compare with this file" : "Compare with…"}
+          </ListItemText>
+        </MenuItem>
+      )}
       {state?.entry.isDir && (
         <MenuItem
           onClick={() => {

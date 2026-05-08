@@ -23,6 +23,8 @@
     "@tanstack/react-virtual": "^3.13.24",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "@types/diff": "^7.0.2",
+    "diff": "^9.0.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router": "^7.14.2"

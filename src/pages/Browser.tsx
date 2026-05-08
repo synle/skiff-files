@@ -31,6 +31,7 @@ import RenameDialog from "../components/RenameDialog";
 import EntryContextMenu from "../components/EntryContextMenu";
 import PropertiesDialog from "../components/PropertiesDialog";
 import BulkRenameDialog from "../components/BulkRenameDialog";
+import DiffDialog from "../components/DiffDialog";
 import { parentPath } from "../util/format";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
@@ -121,6 +122,10 @@ export default function Browser({
   /** Counter the PathBar watches — incrementing flips it into edit
    *  mode and selects the text. Driven by Cmd/Ctrl+L. */
   const [pathBarFocusRequest, setPathBarFocusRequest] = useState(0);
+  /** First file picked for a "Compare with…" pair. When non-null and
+   *  the user picks another file, both paths flow into DiffDialog. */
+  const [diffBase, setDiffBase] = useState<string | null>(null);
+  const [diffOther, setDiffOther] = useState<string | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
 
@@ -781,6 +786,19 @@ export default function Browser({
             new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
           );
         }}
+        comparePending={diffBase !== null}
+        onCompareWith={(e) => {
+          // Two-phase: first call captures the base; second call
+          // launches the diff. Same path twice = no-op (with a clean
+          // reset so the user can pick again).
+          if (diffBase === null) {
+            setDiffBase(e.path);
+          } else if (e.path === diffBase) {
+            setDiffBase(null);
+          } else {
+            setDiffOther(e.path);
+          }
+        }}
         onBookmark={(e) => {
           // Append a fresh bookmark with a UUID id; the basename
           // becomes the default label. Settings are persisted via
@@ -795,6 +813,14 @@ export default function Browser({
       <PropertiesDialog
         entry={propertiesTarget}
         onClose={() => setPropertiesTarget(null)}
+      />
+      <DiffDialog
+        left={diffBase}
+        right={diffOther}
+        onClose={() => {
+          setDiffBase(null);
+          setDiffOther(null);
+        }}
       />
       <BulkRenameDialog
         entries={bulkRenameTargets}
