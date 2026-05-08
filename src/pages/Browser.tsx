@@ -384,6 +384,13 @@ export default function Browser({
         if (!clipboard || clipboard.paths.length === 0) return;
         e.preventDefault();
         void handlePaste(clipboard);
+      } else if (e.key === "ArrowUp" && !e.shiftKey) {
+        // Finder convention: Cmd+↑ goes up one folder. Same as the
+        // toolbar Up button. Skipped on Shift+Up so it doesn't
+        // hijack range-select.
+        if (!path || parentPath(path) === path) return;
+        e.preventDefault();
+        goUp();
       }
     };
     window.addEventListener("keydown", onKey);
