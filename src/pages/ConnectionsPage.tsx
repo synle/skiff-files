@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import { useEffect, useState } from "react";
@@ -221,6 +222,22 @@ export default function ConnectionsPage() {
    *  without retyping host/user". The label gets a " (copy)" suffix
    *  (or " (copy 2)" / "… (copy 3)" if collisions exist) so the list
    *  stays readable. */
+  /** Rename a saved draft's display label. The label seeds from
+   *  `${user}@${host}:${port}` on save, but power users with multiple
+   *  accounts on the same host want to disambiguate ("prod box",
+   *  "stage box"). Pure presentation — host/user/port stay unchanged. */
+  const handleRenameDraft = (id: string) => {
+    const current = drafts.find((x) => x.id === id);
+    if (!current) return;
+    const next = window.prompt("Rename connection", current.label);
+    if (next == null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === current.label) return;
+    setDrafts((d) =>
+      d.map((x) => (x.id === id ? { ...x, label: trimmed } : x)),
+    );
+  };
+
   const handleDuplicateDraft = (id: string) => {
     setDrafts((d) => {
       const original = d.find((x) => x.id === id);
@@ -472,6 +489,18 @@ export default function ConnectionsPage() {
                   key={d.id}
                   secondaryAction={
                     <Stack direction="row" spacing={0.5}>
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenameDraft(d.id);
+                        }}
+                        aria-label={`Rename ${d.label}`}
+                        title="Rename label"
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
                       <IconButton
                         edge="end"
                         size="small"
