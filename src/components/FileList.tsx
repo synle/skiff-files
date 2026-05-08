@@ -4,7 +4,14 @@
 //
 // Sort and selection are owned here because they're list-local concerns; the
 // parent Browser owns navigation, refresh, and the underlying entries array.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Box, Typography, Checkbox } from "@mui/material";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
@@ -290,13 +297,23 @@ function FileGridView(props: FileGridViewProps) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
-  useEffect(() => {
+  // Use useLayoutEffect so the initial width measurement runs BEFORE
+  // the browser paints. With useEffect the first frame would render
+  // at containerWidth=0 → cols=1, and the user'd see a 1-column
+  // flash before ResizeObserver fired and corrected the layout.
+  // That manifested as visible flicker every time the user toggled
+  // into a non-list view mode.
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     setContainerWidth(el.clientWidth);
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+        const w = Math.round(entry.contentRect.width);
+        // Round to integer + only update when the column-affecting
+        // width actually changed. Sub-pixel drift from layout reflow
+        // would otherwise re-render every frame.
+        setContainerWidth((prev) => (prev === w ? prev : w));
       }
     });
     ro.observe(el);
@@ -305,9 +322,15 @@ function FileGridView(props: FileGridViewProps) {
 
   // Padding on the parent + gap between cells eats into available
   // width; keep a small buffer so the last column doesn't overflow.
+  // Default to a wide-enough fallback (1 column) until the layout
+  // effect runs — the real width arrives in the same paint frame
+  // thanks to useLayoutEffect, so this default never reaches the
+  // user as a visible state.
   const usableWidth = Math.max(0, containerWidth - 16);
   const cellSlot = cellWidth + 8; // cellWidth + gap
-  const cols = Math.max(1, Math.floor(usableWidth / cellSlot));
+  const cols = containerWidth === 0
+    ? 1
+    : Math.max(1, Math.floor(usableWidth / cellSlot));
   const rowCount = Math.ceil(sorted.length / cols);
 
   const rowVirtualizer = useVirtualizer({
