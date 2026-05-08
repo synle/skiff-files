@@ -12,6 +12,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
 import { formatBytes, formatMtime, formatMtimeRelative } from "../util/format";
+import { setFileClipboard } from "../util/fileClipboard";
 import type { Density, ShowExtensions } from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "kind";
@@ -349,11 +350,15 @@ export default function FileList(props: Props) {
           break;
         }
         case "c":
-        case "C": {
-          // Cmd/Ctrl+C copies selected paths (or the focused row's
-          // path when nothing is multi-selected) to the OS clipboard,
-          // newline-separated. Best-effort — falls back silently in
-          // environments without clipboard access (tests).
+        case "C":
+        case "x":
+        case "X": {
+          // Cmd/Ctrl+C → file clipboard (operation: copy). Cmd/Ctrl+X
+          // → file clipboard (operation: cut). The actual file move
+          // happens on Cmd/Ctrl+V in the destination folder. We also
+          // mirror the paths to the OS text clipboard so users can
+          // paste into a terminal — preserves the behavior shipped
+          // in 0.2.55.
           if (!cmd) return;
           const targets =
             selected.size > 0
@@ -363,6 +368,8 @@ export default function FileList(props: Props) {
                 : [];
           if (targets.length === 0) return;
           e.preventDefault();
+          const op = e.key.toLowerCase() === "x" ? "cut" : "copy";
+          setFileClipboard(targets, op);
           if (typeof navigator !== "undefined" && navigator.clipboard) {
             void navigator.clipboard.writeText(targets.join("\n"));
           }
