@@ -56,15 +56,17 @@ describe("App", () => {
     expect(screen.getByText("Devices")).toBeInTheDocument();
   });
 
-  it("renders the Settings page when navigated to /settings", () => {
-    render(frame("/settings"));
+  it("renders the Settings page when the Settings sidebar link is clicked", () => {
+    render(frame("/"));
+    fireEvent.click(screen.getByText("Settings"));
     expect(
       screen.getByRole("heading", { name: "Settings", level: 4 }),
     ).toBeInTheDocument();
   });
 
   it("Settings page has the theme selector", () => {
-    render(frame("/settings"));
+    render(frame("/"));
+    fireEvent.click(screen.getByText("Settings"));
     expect(screen.getByLabelText(/Theme$/)).toBeInTheDocument();
   });
 

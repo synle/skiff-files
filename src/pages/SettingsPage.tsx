@@ -45,6 +45,7 @@ function Section({
 }
 
 export default function SettingsPage() {
+  console.log("[SettingsPage] rendering");
   const { settings, update, reset } = useSettings();
   // Build version pulled from Cargo at compile time, surfaced via
   // `get_app_version` Tauri command. Tests / browser-mode dev see

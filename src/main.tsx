@@ -4,7 +4,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { CssBaseline, ThemeProvider } from "@mui/material";
-import { HashRouter } from "react-router";
 import App from "./App";
 import { SettingsProvider, useSettings } from "./state/settings";
 import {
@@ -35,16 +34,16 @@ function EffectiveThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Use HashRouter so deep links work under the `tauri://` protocol without
-// needing server-side route fallbacks (the file:// loader can't rewrite paths).
+// Top-level routing is state-based (see App.tsx Page type) rather than
+// react-router. We don't need URL deep linking inside a Tauri desktop
+// app and the HashRouter + StrictMode + nested Routes combo had a
+// rendering bug we couldn't track down.
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <SettingsProvider>
       <EffectiveThemeProvider>
         <CssBaseline />
-        <HashRouter>
-          <App />
-        </HashRouter>
+        <App />
       </EffectiveThemeProvider>
     </SettingsProvider>
   </React.StrictMode>,

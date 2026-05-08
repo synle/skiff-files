@@ -27,7 +27,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import { Link as RouterLink } from "react-router";
+import type { Page } from "../App";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
@@ -63,11 +63,16 @@ interface Props {
   /** Absolute home dir, resolved at app start. May be empty during the first
    *  paint — favorite buttons are disabled until it arrives. */
   home: string;
+  /** Active top-level page — drives the Settings/Transfers/Connections
+   *  buttons' selected styling. */
+  page: Page;
+  /** Switch the active page. App owns the state. */
+  onSwitchPage: (p: Page) => void;
   onNavigate: (path: string) => void;
 }
 
 /** Simple list of favorite shortcuts + Connections + a Settings link. */
-export default function Sidebar({ home, onNavigate }: Props) {
+export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props) {
   // POSIX-style join is fine here — Tauri normalizes the slashes for us when
   // we hand the path to canonicalize / list_dir.
   const join = (rel: string) => (rel ? `${home}/${rel}` : home);
@@ -488,7 +493,7 @@ export default function Sidebar({ home, onNavigate }: Props) {
         ) : connections.length === 0 ? (
           <List dense disablePadding>
             <ListItem disablePadding>
-              <ListItemButton component={RouterLink} to="/connections">
+              <ListItemButton onClick={() => onSwitchPage("connections")}>
                 <ListItemIcon sx={{ minWidth: 32 }}>
                   <HubIcon fontSize="small" />
                 </ListItemIcon>
@@ -565,7 +570,7 @@ export default function Sidebar({ home, onNavigate }: Props) {
               </ListItem>
             ))}
             <ListItem disablePadding>
-              <ListItemButton component={RouterLink} to="/connections">
+              <ListItemButton onClick={() => onSwitchPage("connections")}>
                 <ListItemIcon sx={{ minWidth: 32 }}>
                   <HubIcon fontSize="small" />
                 </ListItemIcon>
@@ -594,7 +599,7 @@ export default function Sidebar({ home, onNavigate }: Props) {
 
       <List dense disablePadding sx={{ borderTop: 1, borderColor: "divider" }}>
         <ListItem disablePadding>
-          <ListItemButton component={RouterLink} to="/transfers">
+          <ListItemButton onClick={() => onSwitchPage("transfers")} selected={page === "transfers"}>
             <ListItemIcon sx={{ minWidth: 32 }}>
               <Badge
                 badgeContent={activeJobs.size}
@@ -609,7 +614,10 @@ export default function Sidebar({ home, onNavigate }: Props) {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton component={RouterLink} to="/settings">
+          <ListItemButton
+            selected={page === "settings"}
+            onClick={() => onSwitchPage("settings")}
+          >
             <ListItemIcon sx={{ minWidth: 32 }}>
               <SettingsIcon fontSize="small" />
             </ListItemIcon>

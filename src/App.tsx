@@ -1,7 +1,6 @@
 // Root layout — sidebar on the left, route content on the right. Both are
 // inside the HashRouter (set up in main.tsx), so the sidebar can use the
 // navigation hooks directly.
-import { Routes, Route, Navigate, useNavigate } from "react-router";
 import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
@@ -28,6 +27,14 @@ export const NAVIGATE_EVENT = "skiff:navigate";
  *  Browser doesn't have to know about its tab strip parent. */
 export const OPEN_IN_TAB_EVENT = "skiff:open-in-new-tab";
 
+/** Top-level page identifier. The app used to use react-router for
+ *  this but the HashRouter + StrictMode + nested Routes combo had a
+ *  rendering bug we couldn't pin down — the URL would flip back to /
+ *  in a re-render loop after every navigate(). State-based switching
+ *  is more direct and we don't need URL deep links inside a Tauri
+ *  desktop app anyway. */
+export type Page = "browser" | "connections" | "transfers" | "settings";
+
 /**
  * Resolves the home directory once at the layout level so navigating between
  * Settings and Browser doesn't re-issue the Rust call on every route change.
@@ -35,7 +42,8 @@ export const OPEN_IN_TAB_EVENT = "skiff:open-in-new-tab";
 export default function App() {
   const [home, setHome] = useState("");
   const [quickJumpOpen, setQuickJumpOpen] = useState(false);
-  const navigate = useNavigate();
+  /** Active page. Replaces react-router's Routes-based switching. */
+  const [page, setPage] = useState<Page>("browser");
   const { settings, update } = useSettings();
 
   // Cmd/Ctrl+K → toggle the quick-jump palette. Cmd/Ctrl+B → toggle
@@ -59,7 +67,7 @@ export default function App() {
         // on Linux/Windows too via Ctrl+, since users coming from
         // VS Code expect this binding everywhere.
         e.preventDefault();
-        navigate("/settings");
+        setPage("settings");
       } else if (e.key === "\\") {
         // Cmd/Ctrl+\ toggles two-pane (split) mode. FileZilla muscle
         // memory: the second pane is for cross-protocol drag-drop
@@ -151,12 +159,14 @@ export default function App() {
       {settings.sidebarVisible && (
         <Sidebar
           home={home}
+          page={page}
+          onSwitchPage={setPage}
           onNavigate={(p) => {
-            // Switch to the Browser route first, then dispatch the
-            // path. Order matters: if we're on /settings the Browser
+            // Switch to the Browser page first, then dispatch the
+            // path. Order matters: if we're on Settings the Browser
             // isn't mounted yet, so dispatching first would no-op.
-            navigate("/");
-            // queueMicrotask so the route change commits before the
+            setPage("browser");
+            // queueMicrotask so the page change commits before the
             // listener fires.
             queueMicrotask(() =>
               window.dispatchEvent(
@@ -175,53 +185,48 @@ export default function App() {
           minWidth: 0,
         }}
       >
-        <Routes>
-          <Route
-            path="/"
-            element={
-              settings.twoPaneMode ? (
-                // Two-pane mode: split the file area into two
-                // independent BrowserTabs strips. Each pane has its
-                // own tab list (left → `savedTabs`, right →
-                // `savedTabsRight`) so they survive restarts
-                // independently. Drag-drop / global keyboard events
-                // route to whichever Browser instance picks them up
-                // first; future polish can disambiguate by cursor
-                // position relative to pane bounds.
-                <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-                  <Box
-                    sx={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      minWidth: 0,
-                      borderRight: 1,
-                      borderColor: "divider",
-                    }}
-                  >
-                    <BrowserTabs home={home} pane="main" />
-                  </Box>
-                  <Box
-                    sx={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      minWidth: 0,
-                    }}
-                  >
-                    <BrowserTabs home={home} pane="right" />
-                  </Box>
-                </Box>
-              ) : (
-                <BrowserTabs home={home} />
-              )
-            }
-          />
-          <Route path="/connections" element={<ConnectionsPage />} />
-          <Route path="/transfers" element={<TransfersPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        {/* State-based page switch. Replaces react-router's Routes
+            because that combo (HashRouter + StrictMode + nested
+            Routes with conditional element) was getting stuck in
+            a render loop that flipped the URL back to / on every
+            navigate(). Direct state is more reliable here — Tauri
+            doesn't expose URL deep linking anyway. */}
+        {page === "browser" ? (
+          settings.twoPaneMode ? (
+            <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  minWidth: 0,
+                  borderRight: 1,
+                  borderColor: "divider",
+                }}
+              >
+                <BrowserTabs home={home} pane="main" />
+              </Box>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  minWidth: 0,
+                }}
+              >
+                <BrowserTabs home={home} pane="right" />
+              </Box>
+            </Box>
+          ) : (
+            <BrowserTabs home={home} />
+          )
+        ) : page === "connections" ? (
+          <ConnectionsPage />
+        ) : page === "transfers" ? (
+          <TransfersPage />
+        ) : (
+          <SettingsPage />
+        )}
       </Box>
       {/* Mounted once at the app root so any route can pop the cheatsheet
           via `?` without re-listening per page. */}
@@ -237,7 +242,7 @@ export default function App() {
         onClose={() => setQuickJumpOpen(false)}
         home={home}
         onJump={(p) => {
-          navigate("/");
+          setPage("browser");
           queueMicrotask(() =>
             window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: p })),
           );
