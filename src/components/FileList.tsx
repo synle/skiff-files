@@ -13,7 +13,7 @@ import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
 import { formatBytes, formatMtime, formatMtimeRelative } from "../util/format";
 import { setFileClipboard } from "../util/fileClipboard";
-import type { Density, ShowExtensions } from "../state/settings";
+import type { Density, ShowExtensions, ViewMode } from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "kind";
 export type SortDir = "asc" | "desc";
@@ -76,6 +76,12 @@ interface Props {
    *  which row the menu is operating on (separate from selection /
    *  focus). When `null` no row is highlighted. */
   contextMenuPath?: string | null;
+  /** Visual layout. `list` is the virtualized list (default); other
+   *  modes render a non-virtualized grid of cards (tile = small
+   *  icons, gallery = larger icons / thumbs, column = wide rows).
+   *  Performance budget for non-list views: ~5k entries before
+   *  scroll feel degrades — large folders should stay on list. */
+  view?: ViewMode;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -260,6 +266,7 @@ export default function FileList(props: Props) {
     onDropOntoFolder,
     onContextEmpty,
     contextMenuPath = null,
+    view = "list",
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
@@ -491,6 +498,169 @@ export default function FileList(props: Props) {
     if (e.isDir) onOpenDir(e);
     else if (onOpenFile) onOpenFile(e);
   };
+
+  // Non-list views: render a non-virtualized CSS grid. Selection /
+  // double-click / right-click flows match the list view; the
+  // virtualizer + header row are skipped because they don't fit the
+  // grid layout. Keyboard nav (arrow keys, Home/End) still works
+  // through the same handler — moving the focused index updates the
+  // primary selection but doesn't scroll the grid (the user can
+  // tab/click to recenter).
+  if (view !== "list") {
+    const cellWidth = view === "tile" ? 96 : view === "gallery" ? 160 : 240;
+    const iconSize = view === "tile" ? 32 : view === "gallery" ? 64 : 28;
+    return (
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          bgcolor: "background.paper",
+        }}
+      >
+        <Box
+          ref={parentRef}
+          onContextMenu={(evt) => {
+            if (!onContextEmpty) return;
+            const target = evt.target as HTMLElement;
+            if (target.closest('[data-testid="file-grid-cell"]')) return;
+            evt.preventDefault();
+            onContextEmpty(evt.clientX, evt.clientY);
+          }}
+          sx={{
+            flex: 1,
+            overflow: "auto",
+            minHeight: 0,
+            p: 1,
+            display: sorted.length === 0 ? "block" : "grid",
+            gridTemplateColumns:
+              view === "column"
+                ? `repeat(auto-fill, minmax(${cellWidth}px, 1fr))`
+                : `repeat(auto-fill, minmax(${cellWidth}px, 1fr))`,
+            gap: 1,
+            alignContent: "start",
+          }}
+        >
+          {sorted.length === 0 ? (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ p: 2, textAlign: "center" }}
+            >
+              Empty folder
+            </Typography>
+          ) : (
+            sorted.map((e, idx) => {
+              const isSel = selected.has(e.path);
+              const isFocused = idx === focusedIdx;
+              return (
+                <Box
+                  key={e.path}
+                  data-testid="file-grid-cell"
+                  draggable
+                  onDragStart={(evt) => {
+                    const payload =
+                      selected.size > 0 && selected.has(e.path)
+                        ? Array.from(selected).join("\n")
+                        : e.path;
+                    evt.dataTransfer.setData(
+                      "application/x-skiff-paths",
+                      payload,
+                    );
+                    evt.dataTransfer.effectAllowed = "copy";
+                  }}
+                  onClick={(evt) => onRowClick(e, evt)}
+                  onMouseDown={(evt) => onRowMouseDown(e, evt)}
+                  onDoubleClick={() => onRowDouble(e)}
+                  onContextMenu={(evt) => {
+                    evt.preventDefault();
+                    onPrimarySelect?.(e);
+                    onContext?.(e, evt.clientX, evt.clientY);
+                  }}
+                  sx={{
+                    display: "flex",
+                    flexDirection: view === "column" ? "row" : "column",
+                    alignItems: "center",
+                    gap: view === "column" ? 1.5 : 0.5,
+                    p: 1,
+                    borderRadius: 1,
+                    cursor: e.isDir ? "pointer" : "default",
+                    bgcolor: isSel ? "action.selected" : "transparent",
+                    boxShadow:
+                      e.path === contextMenuPath
+                        ? (theme) =>
+                            `inset 0 0 0 1px ${theme.palette.text.secondary}`
+                        : isFocused
+                          ? (theme) =>
+                              `inset 0 0 0 2px ${theme.palette.primary.main}`
+                          : "none",
+                    opacity: e.isHidden ? 0.55 : 1,
+                    "&:hover": {
+                      bgcolor: isSel ? "action.selected" : "action.hover",
+                    },
+                    minHeight: view === "column" ? 48 : undefined,
+                    textAlign:
+                      view === "column" ? ("left" as const) : ("center" as const),
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: iconSize,
+                      height: iconSize,
+                      flexShrink: 0,
+                      "& svg": {
+                        fontSize: iconSize - 4,
+                      },
+                    }}
+                  >
+                    <IconForKind kind={e.kind} />
+                  </Box>
+                  <Box
+                    sx={{
+                      flex: view === "column" ? 1 : "none",
+                      minWidth: 0,
+                      width: view === "column" ? "auto" : "100%",
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      sx={{
+                        textAlign:
+                          view === "column" ? ("left" as const) : ("center" as const),
+                      }}
+                      title={e.name}
+                    >
+                      {renderHighlighted(
+                        displayName(e, showExtensions),
+                        highlightQuery,
+                      )}
+                      {e.isSymlink ? " ↪" : ""}
+                    </Typography>
+                    {view === "column" && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        noWrap
+                        sx={{ display: "block" }}
+                      >
+                        {e.isDir ? "Folder" : formatBytes(e.size)}
+                        {e.mtime ? ` · ${formatMtime(e.mtime)}` : ""}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              );
+            })
+          )}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box

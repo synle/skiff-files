@@ -938,6 +938,7 @@ export default function Browser({
           highlightQuery={search}
           onContextEmpty={(x, y) => setEmptyMenu({ x, y })}
           contextMenuPath={contextMenu?.entry.path ?? null}
+          view={settings.folderViewMode[path] ?? settings.defaultView}
         />
         {effectivePreviewOpen && (
           <PreviewPane
