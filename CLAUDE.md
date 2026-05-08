@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.121** — 🐛 **Fix: Sidebar accordion section headers didn't toggle on click**. Root cause: `SectionHeader` was defined inline inside the Sidebar function — every parent render created a fresh component class so React tore down the old subtree and remounted a new one. The click handler was always attached to a stale element. Lifted `SectionHeader` to module scope (typed props) and reduced the call site to `renderSectionHeader(id, label)`. Added `Sidebar.test.tsx` with 5 tests covering the regression: section toggle expand→collapse→expand, Settings/Transfers nav buttons hitting `onSwitchPage`, Favorite click bubbling to `onNavigate`. Documented the inline-component footgun in CLAUDE.md → "Known footguns".
 - **0.2.120** — 🐛 **Fix: New folder / New file silently failed** + collision check on rename. Root cause: Tauri's webview suppresses `window.prompt` and `window.confirm`, so the auto-naming flows silently no-op'd. New shared `NewEntryDialog` modal — autofocus, Enter submits, Esc cancels, refuses names that already exist in the parent (or contain path separators), inline error feedback. Browser's New folder / New file buttons + the empty-area context menu all use it. RenameDialog also gained `existingNames` so renaming to an existing sibling is refused inline before the rename round-trips. Find-in-subfolders empty-query bug fixed too: with the toggle on but search blank, the pane now falls back to the local listing instead of showing "Empty folder".
 - **0.2.119** — ✅ **Extract zip**. Companion to compress. New `fs_extract_zip(zip_path, dest_dir)` Tauri command. Path-traversal guard skips entries with absolute paths or `..` components silently. Right-click → "Extract here" appears for `.zip` files; the destination is a sibling folder named after the zip (sans extension), with collision-skipping. Closes the round-trip on archive workflows for MVP.
 - **0.2.118** — ✅ **Compress to zip**. New `zip` + `walkdir` Cargo deps. `fs_compress_zip(paths, dest_zip)` Tauri command walks each path (folders recursively) and writes a Deflated zip. Right-click → "Compress to zip" wires it: respects multi-selection (zips the whole selection), names the archive after the first basename, and collision-skips with `(2)` / `(3)` siblings.
@@ -204,6 +205,22 @@ Single source of truth: **`src-tauri/tauri.conf.json` → `version`**. `build.rs
 - Always add tests for new code: React components get `*.test.tsx` (Vitest + Testing Library), Rust modules get `#[cfg(test)] mod tests` blocks.
 - **Performance is a feature.** Never block the UI thread; never call `read_to_end` on user files; always virtualize lists; always cancel inflight scans on navigation.
 - Theme tokens live in `src/theme/{light,dark}.ts`; never hard-code colors in components.
+
+## Known footguns + patterns to avoid
+
+These are bugs that have bitten the app at least once. Add a check / regression test when you touch the related area.
+
+- **Don't use `window.alert` / `window.confirm` / `window.prompt` in Tauri.** The webview suppresses them in some configurations — code that gates on `if (!window.confirm(…)) return;` silently no-ops, so destructive actions like Move-to-Trash, "Reset all settings", and "New folder" / "New file" auto-naming flows appeared dead. Use a modal dialog (`ConfirmDialog`, `RenameDialog`, `NewEntryDialog`) instead. Pattern: lift `open` + `onConfirm` into the parent's state.
+
+- **Don't define React components inline inside the parent function.** A component declared inside another component's body is a fresh type on every render — React tears down the old subtree and remounts a new one each parent render. Click handlers and inputs on that subtree silently break. Always declare reusable components at module scope (or memoize with `useCallback` + a stable component ref). The Sidebar's `SectionHeader` regression (clicking the section header didn't toggle collapsed) was exactly this.
+
+- **HashRouter + StrictMode + nested conditional `<Routes>` had a render-loop bug.** Reproduced 2026-05: clicking a sidebar nav link flipped the URL to `/settings`, but a render later something flipped it back to `/` and the page never switched. Fixed by ditching react-router for top-level page switching and using a `Page` state in App. If you re-introduce react-router, write a test that asserts `useLocation().pathname` is stable for one tick after `navigate()` returns.
+
+- **Skiffsync's `start_local` / `start_cross` returns once the job is QUEUED, not once it's done.** Don't rely on `await startSync(...)` then immediately `refresh()` — the file isn't on disk yet. Use the synchronous `fs_copy_recursive` / `fs_copy_file` for one-shot duplicate flows, or wait for `sync:done` events.
+
+- **Find-in-subfolders gating:** when the recursive-find toggle is on but the search input is blank, `findResults` is `[]`. Don't substitute that for the listing — it'll show "Empty folder" out of the blue. Always require both the toggle AND a non-empty query before swapping in find results.
+
+- **Page container layout:** route pages (`SettingsPage`, `TransfersPage`, `ConnectionsPage`) sit inside a flex-column main area. They MUST set `flex: 1` (not `maxWidth`) on the outer Box or the page won't fill the available width. Use an inner `Box maxWidth=… mx="auto"` for content centering.
 
 ## CI / Release Workflows
 

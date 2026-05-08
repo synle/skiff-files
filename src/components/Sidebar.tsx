@@ -63,6 +63,59 @@ const FAVORITES: Favorite[] = [
   { label: "Downloads", rel: "Downloads", icon: <DownloadIcon fontSize="small" /> },
 ];
 
+/** Section header — clickable; flips the chevron and toggles
+ *  collapsed state. Defined outside Sidebar so React doesn't tear
+ *  down + remount it on every parent render (that broke the click
+ *  flow before — the user could click the header but state never
+ *  updated because the listener was attached to a stale element). */
+function SectionHeader({
+  id,
+  label,
+  collapsed,
+  onToggle,
+}: {
+  id: string;
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      aria-controls={`sidebar-section-${id}`}
+      sx={{
+        appearance: "none",
+        background: "transparent",
+        border: 0,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 0.5,
+        width: "100%",
+        textAlign: "left",
+        px: 2,
+        pt: 1.5,
+        color: "text.secondary",
+        fontSize: "0.6875rem",
+        fontWeight: 500,
+        letterSpacing: "0.08333em",
+        textTransform: "uppercase",
+        "&:hover": { color: "text.primary" },
+      }}
+    >
+      {collapsed ? (
+        <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
+      ) : (
+        <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
+      )}
+      {label}
+    </Box>
+  );
+}
+
 interface Props {
   /** Absolute home dir, resolved at app start. May be empty during the first
    *  paint — favorite buttons are disabled until it arrives. */
@@ -150,46 +203,18 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
   const isVisible = (id: string): boolean =>
     settings.sidebarSectionsVisible[id] !== false;
 
-  /** Section header — clickable; flips the chevron and toggles
-   *  collapsed state. Pure presentation; the children are rendered
-   *  by the caller and gated separately. */
-  const SectionHeader = ({ id, label }: { id: string; label: string }) => {
-    const collapsed = isCollapsed(id);
-    return (
-      <Box
-        component="button"
-        onClick={() => toggleSection(id)}
-        aria-expanded={!collapsed}
-        aria-controls={`sidebar-section-${id}`}
-        sx={{
-          appearance: "none",
-          background: "transparent",
-          border: 0,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 0.5,
-          width: "100%",
-          textAlign: "left",
-          px: 2,
-          pt: 1.5,
-          color: "text.secondary",
-          fontSize: "0.6875rem",
-          fontWeight: 500,
-          letterSpacing: "0.08333em",
-          textTransform: "uppercase",
-          "&:hover": { color: "text.primary" },
-        }}
-      >
-        {collapsed ? (
-          <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
-        ) : (
-          <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
-        )}
-        {label}
-      </Box>
-    );
-  };
+  /** Closure over toggleSection + isCollapsed for the SectionHeader
+   *  child component (defined outside this function so React doesn't
+   *  recreate the type on every parent render — that was breaking
+   *  the click handler in some renders). */
+  const renderSectionHeader = (id: string, label: string) => (
+    <SectionHeader
+      id={id}
+      label={label}
+      collapsed={isCollapsed(id)}
+      onToggle={() => toggleSection(id)}
+    />
+  );
 
   // Live connections, refreshed on mount + when other code dispatches the
   // 'skiff:connections-changed' event (Connections page does that on
@@ -336,7 +361,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       }}
     >
       <Box sx={{ flex: 1, overflow: "auto" }}>
-        {isVisible("favorites") && <SectionHeader id="favorites" label="Favorites" />}
+        {isVisible("favorites") && renderSectionHeader("favorites", "Favorites")}
         {isVisible("favorites") && !isCollapsed("favorites") && (
           <List dense disablePadding id="sidebar-section-favorites">
             {FAVORITES.map((f) => (
@@ -355,7 +380,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
 
         {isVisible("bookmarks") && settings.bookmarks.length > 0 && (
           <>
-            <SectionHeader id="bookmarks" label="Bookmarks" />
+            {renderSectionHeader("bookmarks", "Bookmarks")}
             {!isCollapsed("bookmarks") && (
             <List dense disablePadding id="sidebar-section-bookmarks">
               {settings.bookmarks.map((b, i) => (
@@ -469,7 +494,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
 
         {isVisible("recent") && settings.recentPaths.length > 0 && (
           <>
-            <SectionHeader id="recent" label="Recent" />
+            {renderSectionHeader("recent", "Recent")}
             {!isCollapsed("recent") && (
             <List dense disablePadding id="sidebar-section-recent">
               {settings.recentPaths.slice(0, 5).map((p) => {
@@ -505,7 +530,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
           </>
         )}
 
-        {isVisible("hosts") && <SectionHeader id="hosts" label="Hosts" />}
+        {isVisible("hosts") && renderSectionHeader("hosts", "Hosts")}
         {isVisible("hosts") && !isCollapsed("hosts") && (
         <Box id="sidebar-section-hosts">
         {connections == null ? (
@@ -607,7 +632,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         </Box>
         )}
 
-        {isVisible("devices") && <SectionHeader id="devices" label="Devices" />}
+        {isVisible("devices") && renderSectionHeader("devices", "Devices")}
         {isVisible("devices") && !isCollapsed("devices") && (
           mounts == null ? (
             <Box sx={{ px: 2, py: 0.5 }} id="sidebar-section-devices">
