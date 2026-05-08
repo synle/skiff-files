@@ -421,9 +421,29 @@ export default function FileList(props: Props) {
   };
 
   const onRowClick = (e: Entry, evt: React.MouseEvent) => {
+    const idx = sorted.findIndex((s) => s.path === e.path);
+    // Shift+click → range-select from the previously focused row to
+    // this one. Finder / Explorer / VS Code muscle memory. Falls
+    // back to single-select when there's no focused anchor yet.
+    if (evt.shiftKey && focusedIdx >= 0 && idx >= 0) {
+      const lo = Math.min(focusedIdx, idx);
+      const hi = Math.max(focusedIdx, idx);
+      const range = sorted.slice(lo, hi + 1).map((s) => s.path);
+      setSelected((prev) => {
+        // Merge: shift+click extends the existing selection rather
+        // than replacing — matches Finder. Cmd+Shift+click would
+        // extend strictly, but the simpler "union with range"
+        // semantics is rarely surprising.
+        const next = new Set(prev);
+        for (const p of range) next.add(p);
+        return next;
+      });
+      onPrimarySelect?.(e);
+      setFocusedIdx(idx);
+      return;
+    }
     toggleSel(e.path, evt.metaKey || evt.ctrlKey);
     onPrimarySelect?.(e);
-    const idx = sorted.findIndex((s) => s.path === e.path);
     if (idx >= 0) setFocusedIdx(idx);
   };
   /** Middle-click on a folder → open in a new tab (browser muscle

@@ -34,6 +34,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     items: [
       { keys: "Click", description: "Select one entry (replaces selection)" },
       { keys: "Cmd / Ctrl + Click", description: "Toggle entry in selection" },
+      { keys: "Shift + Click", description: "Range select from focused row" },
       { keys: "Cmd / Ctrl + A", description: "Select all" },
       { keys: "Cmd / Ctrl + C", description: "Copy selected paths to clipboard" },
       { keys: "Esc", description: "Clear selection" },
