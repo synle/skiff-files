@@ -66,6 +66,27 @@ export default function App() {
         // transfers from local ↔ remote without juggling tabs.
         e.preventDefault();
         update("twoPaneMode", !settings.twoPaneMode);
+      } else if (e.key === "=" || e.key === "+") {
+        // Browser muscle memory: Cmd/Ctrl+= bumps font size one step
+        // up. Cycles small → medium → large → (cap). `=` and `+`
+        // share the key on US keyboards; honor both.
+        e.preventDefault();
+        const next =
+          settings.fontSize === "small"
+            ? "medium"
+            : settings.fontSize === "medium"
+              ? "large"
+              : "large";
+        update("fontSize", next);
+      } else if (e.key === "-") {
+        e.preventDefault();
+        const next =
+          settings.fontSize === "large"
+            ? "medium"
+            : settings.fontSize === "medium"
+              ? "small"
+              : "small";
+        update("fontSize", next);
       }
     };
     window.addEventListener("keydown", onKey);
