@@ -62,6 +62,11 @@ interface Props {
    *  the bold-highlight visual when the user is filtering or
    *  recursive-finding. Empty / undefined disables highlighting. */
   highlightQuery?: string;
+  /** Called when one or more entries are dropped onto a FOLDER row
+   *  in this FileList. The Browser routes the dropped paths into a
+   *  Skiffsync targeting `targetFolder`. Without this prop, folder
+   *  rows aren't drop targets. */
+  onDropOntoFolder?: (paths: string[], targetFolder: Entry) => void;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -243,6 +248,7 @@ export default function FileList(props: Props) {
     isActive = true,
     groupFoldersFirst = true,
     highlightQuery = "",
+    onDropOntoFolder,
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
@@ -256,6 +262,10 @@ export default function FileList(props: Props) {
    *  + the scroll-into-view + the Enter/Backspace targets. -1 = no
    *  row focused (e.g. an empty folder). */
   const [focusedIdx, setFocusedIdx] = useState<number>(-1);
+  /** Index of the row currently being hovered with a drag payload.
+   *  Drives the inset primary border so the user sees where the drop
+   *  will land. */
+  const [dragOverIdx, setDragOverIdx] = useState<number>(-1);
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Reset selection + focus when the entries array identity changes —
@@ -570,6 +580,37 @@ export default function FileList(props: Props) {
                     );
                     evt.dataTransfer.effectAllowed = "copy";
                   }}
+                  onDragOver={(evt) => {
+                    if (
+                      e.isDir &&
+                      onDropOntoFolder &&
+                      evt.dataTransfer.types.includes(
+                        "application/x-skiff-paths",
+                      )
+                    ) {
+                      evt.preventDefault();
+                      evt.dataTransfer.dropEffect = "copy";
+                      if (dragOverIdx !== vi.index) setDragOverIdx(vi.index);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverIdx === vi.index) setDragOverIdx(-1);
+                  }}
+                  onDrop={(evt) => {
+                    if (!e.isDir || !onDropOntoFolder) return;
+                    const raw = evt.dataTransfer.getData(
+                      "application/x-skiff-paths",
+                    );
+                    if (!raw) return;
+                    evt.preventDefault();
+                    setDragOverIdx(-1);
+                    const paths = raw.split("\n").filter(Boolean);
+                    // Don't drop a folder onto itself — that would
+                    // try to nest the folder under itself which is
+                    // never what the user wants.
+                    const filtered = paths.filter((p) => p !== e.path);
+                    if (filtered.length > 0) onDropOntoFolder(filtered, e);
+                  }}
                   onClick={(evt) => onRowClick(e, evt)}
                   onMouseDown={(evt) => onRowMouseDown(e, evt)}
                   onDoubleClick={() => onRowDouble(e)}
@@ -596,11 +637,17 @@ export default function FileList(props: Props) {
                     // visible (`showHidden` is on) so the user can tell
                     // them apart from regular content at a glance.
                     opacity: e.isHidden ? 0.55 : 1,
-                    // Focus ring for keyboard users. Inset so the row
-                    // doesn't shift when the focus moves.
-                    boxShadow: isFocused
-                      ? (theme) => `inset 0 0 0 2px ${theme.palette.primary.main}`
-                      : "none",
+                    // Focus ring for keyboard users + drop-target
+                    // ring while a drag is hovering. Inset so the row
+                    // doesn't shift when either fires.
+                    boxShadow:
+                      vi.index === dragOverIdx
+                        ? (theme) =>
+                            `inset 0 0 0 2px ${theme.palette.success.main}`
+                        : isFocused
+                          ? (theme) =>
+                              `inset 0 0 0 2px ${theme.palette.primary.main}`
+                          : "none",
                     "&:hover": { bgcolor: isSel ? "action.selected" : "action.hover" },
                   }}
                 >

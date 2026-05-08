@@ -815,6 +815,21 @@ export default function Browser({
           sortDir={sortDir}
           onSortChange={handleSort}
           onOpenDir={(e) => navigate(e.path)}
+          onDropOntoFolder={(paths, target) => {
+            // Same Skiffsync flow as the sidebar host / bookmark
+            // drops — fire one job per dropped path nested under
+            // the target folder's basename. Honors the user's
+            // default conflict policy.
+            const dest = target.path;
+            for (const src of paths) {
+              const segs = src.split(/[\\/]/).filter(Boolean);
+              const base = segs.at(-1) ?? src;
+              void startSync(src, `${dest}/${base}`, {
+                maxSizeGb: 100,
+                conflictPolicy: settings.syncDefaultConflictPolicy,
+              }).catch((err) => setError(String(err)));
+            }
+          }}
           onOpenFile={(e) => {
             // Hand off to the OS default app. Skipped for remote
             // entries since the local OS can't open them without
