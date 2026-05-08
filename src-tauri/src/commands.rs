@@ -248,6 +248,85 @@ pub fn fs_open_in_terminal(path: String) -> FsResult<()> {
     Err(format!("open_in_terminal: unsupported platform for {path}"))
 }
 
+/// Mounted volume entry — populated by `fs_mounts` to drive the
+/// Sidebar's Devices section. `removable` lets the UI show external
+/// drives differently from the system disk.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MountedVolume {
+    /// User-visible name (e.g. "Macintosh HD", "USB-NTFS"). Inferred
+    /// from the basename of the mount point on macOS / Linux.
+    pub name: String,
+    /// Absolute path the user clicks to browse this volume.
+    pub mount_point: String,
+    /// Total bytes on the volume's filesystem. `0` if unavailable.
+    pub total: u64,
+    /// Bytes the current user can still write. `0` if unavailable.
+    pub free: u64,
+    /// True for USB / external drives. Drives the icon in the sidebar.
+    pub removable: bool,
+}
+
+/// Enumerate user-facing mounted volumes. Filters out pseudo-fs
+/// (/proc, /sys, /dev, snap loopbacks) and macOS firmlinks (/private/*)
+/// so the sidebar only shows mountpoints a user would actually want
+/// to navigate.
+#[tauri::command]
+pub fn fs_mounts() -> FsResult<Vec<MountedVolume>> {
+    use sysinfo::Disks;
+    let disks = Disks::new_with_refreshed_list();
+    let mut out = Vec::new();
+    for d in disks.list() {
+        let mount = d.mount_point().to_path_buf();
+        let mount_str = mount.to_string_lossy().to_string();
+
+        // Filter pseudo-filesystems + system-internal mounts.
+        if cfg!(target_os = "macos") {
+            // macOS exposes a lot of system mounts under /System,
+            // /private, /dev. Real volumes are at "/" or under
+            // "/Volumes/<Name>".
+            if mount_str != "/" && !mount_str.starts_with("/Volumes/") {
+                continue;
+            }
+        } else if cfg!(target_os = "linux") {
+            if mount_str.starts_with("/proc")
+                || mount_str.starts_with("/sys")
+                || mount_str.starts_with("/dev")
+                || mount_str.starts_with("/run")
+                || mount_str.starts_with("/snap")
+                || mount_str.starts_with("/var/lib/docker")
+            {
+                continue;
+            }
+        }
+
+        let name = if mount_str == "/" {
+            "Macintosh HD".to_string()
+        } else {
+            mount
+                .file_name()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| mount_str.clone())
+        };
+
+        out.push(MountedVolume {
+            name,
+            mount_point: mount_str,
+            total: d.total_space(),
+            free: d.available_space(),
+            removable: d.is_removable(),
+        });
+    }
+    // Sort: system disk first ("/"), then alphabetically.
+    out.sort_by(|a, b| match (a.mount_point.as_str(), b.mount_point.as_str()) {
+        ("/", _) => std::cmp::Ordering::Less,
+        (_, "/") => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+    Ok(out)
+}
+
 /// SHA-256 hash of a local file. Streams in 64 KB chunks so multi-GB
 /// files don't blow up RAM. Returns the hex-encoded digest. Used by
 /// the Properties dialog's "Compute SHA-256" button for integrity

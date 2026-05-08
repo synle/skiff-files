@@ -101,6 +101,22 @@ export interface ImageExif {
   focalLength: string | null;
 }
 
+/** Mirror of `crate::commands::MountedVolume`. Used by the Sidebar's
+ *  Devices section to show the system disk + any plugged-in
+ *  externals. */
+export interface MountedVolume {
+  name: string;
+  mountPoint: string;
+  total: number;
+  free: number;
+  removable: boolean;
+}
+
+/** List user-facing mounted volumes (system disk + any USB / external
+ *  drives). Pseudo-filesystems are filtered server-side. */
+export const fsMounts = (): Promise<MountedVolume[]> =>
+  invoke<MountedVolume[]>("fs_mounts");
+
 /** Compute the SHA-256 hash of a local file. Streams the file in
  *  chunks so large files don't load into memory; returns hex-encoded. */
 export const fsHashSha256 = (path: string): Promise<string> =>

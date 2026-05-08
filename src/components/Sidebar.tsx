@@ -20,6 +20,8 @@ import DownloadIcon from "@mui/icons-material/Download";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import HubIcon from "@mui/icons-material/Hub";
+import StorageIcon from "@mui/icons-material/Storage";
+import UsbIcon from "@mui/icons-material/Usb";
 import CircleIcon from "@mui/icons-material/Circle";
 import BookmarkIcon from "@mui/icons-material/Bookmark";
 import CloseIcon from "@mui/icons-material/Close";
@@ -30,6 +32,8 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import type { Page } from "../App";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
+import { fsMounts, type MountedVolume } from "../api/fs";
+import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
   SIDEBAR_WIDTH_MAX,
@@ -204,6 +208,24 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
     return () => {
       cancelled = true;
       window.removeEventListener("skiff:connections-changed", onChange);
+    };
+  }, []);
+
+  /** Mounted volumes for the Devices section. Refreshed on a 10s
+   *  interval since plug-events aren't surfaced through Tauri yet —
+   *  cheap query (sysinfo's `Disks::new_with_refreshed_list`). */
+  const [mounts, setMounts] = useState<MountedVolume[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () =>
+      fsMounts()
+        .then((m) => !cancelled && setMounts(m))
+        .catch(() => !cancelled && setMounts([]));
+    void refresh();
+    const handle = window.setInterval(refresh, 10_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(handle);
     };
   }, []);
 
@@ -587,13 +609,50 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
 
         {isVisible("devices") && <SectionHeader id="devices" label="Devices" />}
         {isVisible("devices") && !isCollapsed("devices") && (
-          <Typography
-            variant="caption"
-            sx={{ px: 2, color: "text.disabled", display: "block" }}
-            id="sidebar-section-devices"
-          >
-            (mounted volumes — Phase 5)
-          </Typography>
+          mounts == null ? (
+            <Box sx={{ px: 2, py: 0.5 }} id="sidebar-section-devices">
+              <CircularProgress size={14} />
+            </Box>
+          ) : mounts.length === 0 ? (
+            <Typography
+              variant="caption"
+              sx={{ px: 2, color: "text.disabled", display: "block" }}
+              id="sidebar-section-devices"
+            >
+              No mounted volumes
+            </Typography>
+          ) : (
+            <List dense disablePadding id="sidebar-section-devices">
+              {mounts.map((m) => (
+                <ListItem key={m.mountPoint} disablePadding>
+                  <ListItemButton
+                    onClick={() => onNavigate(m.mountPoint)}
+                    title={`${m.mountPoint}${m.total > 0 ? ` · ${formatBytes(m.free)} free of ${formatBytes(m.total)}` : ""}`}
+                  >
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      {m.removable ? (
+                        <UsbIcon fontSize="small" />
+                      ) : (
+                        <StorageIcon fontSize="small" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={m.name}
+                      secondary={
+                        m.total > 0
+                          ? `${formatBytes(m.free)} free`
+                          : undefined
+                      }
+                      slotProps={{
+                        primary: { variant: "body2", noWrap: true },
+                        secondary: { variant: "caption" },
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          )
         )}
       </Box>
 

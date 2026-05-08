@@ -68,6 +68,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "fs_open_with_default") return null;
     if (cmd === "fs_open_in_terminal") return null;
     if (cmd === "fs_hash_sha256") return "deadbeef";
+    if (cmd === "fs_mounts") return [];
     if (cmd === "fs_image_exif") {
       return {
         dateTaken: null,

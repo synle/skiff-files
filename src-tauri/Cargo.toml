@@ -33,6 +33,7 @@ russh-keys = "0.45"
 uuid = { version = "1", features = ["v4"] }
 kamadak-exif = "0.6"
 sha2 = "0.10"
+sysinfo = "0.32"
 
 [dev-dependencies]
 filetime = "0.2"
