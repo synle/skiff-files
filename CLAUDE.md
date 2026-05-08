@@ -58,6 +58,7 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.105** — ✅ **PreviewPane "Open with default app" button**. The header row in the preview pane gets a Launch icon next to the file name. Clicking dispatches the path through `fs_open_with_default` (the `open` crate). Hidden for folders + remote `sftp://` entries (latter would need a download-then-open flow, not currently implemented).
 - **0.2.104** — ✅ **Persisted closed-tab stack across restarts**. New `Settings.recentlyClosedTabs: SavedTab[]` (capped at 10) replaces the in-memory closedStack. `closeTab` pushes to the head + dedups by initialPath; `restoreClosedTab` pops the head. Cmd/Ctrl+Shift+T now resurrects tabs even after relaunch — useful when a session crash / accidental Cmd+Q drops a tab the user was relying on.
 - **0.2.103** — ✅ **Up button tooltip shows parent path**. Toolbar's Up arrow gets `upTarget?: string` prop. Browser passes the computed parent path so hovering reads "Up to /Users/syle/git" instead of just "Up".
 - **0.2.102** — ✅ **Streaming SHA-256 for remote files**. New `SftpClient::hash_sha256` reads the file via the existing russh-sftp `open_read` reader in 64 KB chunks, feeds each into `sha2::Sha256`. Tauri command `conn_hash_sha256(id, path)`. Frontend api/client.ts grew a backend-agnostic `hashSha256(path)` that dispatches to fs_ vs conn_ by URL scheme. PropertiesDialog now offers Compute SHA-256 for remote (sftp://) files too — file bytes never leave the server's machine in plaintext.

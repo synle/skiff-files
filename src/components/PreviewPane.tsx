@@ -7,12 +7,21 @@
 // Selection-driven: the parent passes the currently selected Entry. We
 // cancel any in-flight load if selection changes mid-fetch — important
 // because `fs_dir_summary` can take seconds on large trees.
-import { Box, Divider, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import {
+  Box,
+  Divider,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import LaunchIcon from "@mui/icons-material/Launch";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
 import { useEffect, useState } from "react";
 import {
   fsImageExif,
+  fsOpenWithDefault,
   type DirSummary,
   type Entry,
   type ImageExif,
@@ -547,11 +556,24 @@ export default function PreviewPane({ selected, width }: Props) {
             <IconForKind kind={selected.kind} fontSize="medium" />
             <Typography
               variant="subtitle2"
-              sx={{ wordBreak: "break-all" }}
+              sx={{ flex: 1, wordBreak: "break-all" }}
               title={selected.path}
             >
               {selected.name}
             </Typography>
+            {!selected.isDir && !selected.path.startsWith("sftp://") && (
+              <Tooltip title="Open with default app">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    void fsOpenWithDefault(selected.path);
+                  }}
+                  aria-label="Open with default app"
+                >
+                  <LaunchIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
 
           <Body entry={selected} onImageDimensions={setImageDimensions} />
