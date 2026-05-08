@@ -336,7 +336,18 @@ function FileGridView(props: FileGridViewProps) {
           evt.preventDefault();
           onContextEmpty(evt.clientX, evt.clientY);
         }}
-        sx={{ flex: 1, overflow: "auto", minHeight: 0, p: 1 }}
+        sx={{
+          flex: 1,
+          // Always reserve scrollbar space so a layout-induced
+          // overflow doesn't shrink usable width → re-fit → no
+          // overflow → scrollbar disappears → repeat. That feedback
+          // loop manifested as visible flicker in column view.
+          overflowY: "scroll",
+          overflowX: "hidden",
+          scrollbarGutter: "stable",
+          minHeight: 0,
+          p: 1,
+        }}
       >
         {sorted.length === 0 ? (
           <Typography
