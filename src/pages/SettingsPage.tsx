@@ -554,6 +554,25 @@ export default function SettingsPage() {
             <Button
               variant="outlined"
               size="small"
+              disabled={settings.bookmarks.length === 0}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Delete all ${settings.bookmarks.length} bookmark${settings.bookmarks.length === 1 ? "" : "s"}?`,
+                  )
+                ) {
+                  update("bookmarks", []);
+                }
+              }}
+            >
+              Clear bookmarks
+              {settings.bookmarks.length > 0
+                ? ` (${settings.bookmarks.length})`
+                : ""}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
               disabled={
                 Object.keys(settings.folderViewMode).length === 0 &&
                 Object.keys(settings.folderSort).length === 0
