@@ -29,6 +29,9 @@ interface Props {
    *  result count hit the engine's hard cap of 1000). */
   findActive?: boolean;
   findHitCap?: boolean;
+  /** When non-null, surfaces a hint about the file clipboard so users
+   *  can see what'll happen on Cmd+V. `op` matches `FileClipboardOperation`. */
+  clipboardHint?: { count: number; op: "copy" | "cut" } | null;
 }
 
 export default function StatusBar({
@@ -43,6 +46,7 @@ export default function StatusBar({
   diskTotal,
   findActive = false,
   findHitCap = false,
+  clipboardHint = null,
 }: Props) {
   // Errors take precedence — a directory listing error matters more than the
   // empty-selection summary it would otherwise render alongside.
@@ -105,6 +109,12 @@ export default function StatusBar({
       {diskFree != null && diskTotal != null && (
         <Typography variant="caption" color="text.secondary">
           · {formatBytes(diskFree)} free of {formatBytes(diskTotal)}
+        </Typography>
+      )}
+      {clipboardHint && clipboardHint.count > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          · {clipboardHint.count} item{clipboardHint.count === 1 ? "" : "s"}{" "}
+          ready to {clipboardHint.op === "cut" ? "move" : "paste"}
         </Typography>
       )}
     </Box>

@@ -41,6 +41,7 @@ import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
 import {
   clearFileClipboard,
+  FILE_CLIPBOARD_EVENT,
   getFileClipboard,
   type FileClipboardEntry,
 } from "../util/fileClipboard";
@@ -134,6 +135,14 @@ export default function Browser({
   /** Empty-area context menu state — anchor coords. When non-null
    *  the menu is open. */
   const [emptyMenu, setEmptyMenu] = useState<{ x: number; y: number } | null>(null);
+  /** Mirror of the file clipboard so the StatusBar can show the hint
+   *  reactively. Updated via the FILE_CLIPBOARD_EVENT window event. */
+  const [clipboardSnap, setClipboardSnap] = useState(getFileClipboard());
+  useEffect(() => {
+    const onChange = () => setClipboardSnap(getFileClipboard());
+    window.addEventListener(FILE_CLIPBOARD_EVENT, onChange);
+    return () => window.removeEventListener(FILE_CLIPBOARD_EVENT, onChange);
+  }, []);
   /** First file picked for a "Compare with…" pair. When non-null and
    *  the user picks another file, both paths flow into DiffDialog. */
   const [diffBase, setDiffBase] = useState<string | null>(null);
@@ -937,6 +946,11 @@ export default function Browser({
         // The Rust-side cap is 1000 results; reaching it is the
         // user's signal to refine the query.
         findHitCap={!!findResults && findResults.length >= 1000}
+        clipboardHint={
+          clipboardSnap
+            ? { count: clipboardSnap.paths.length, op: clipboardSnap.operation }
+            : null
+        }
       />}
       <Menu
         open={emptyMenu !== null}
