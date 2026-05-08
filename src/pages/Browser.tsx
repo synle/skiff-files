@@ -937,6 +937,7 @@ export default function Browser({
           groupFoldersFirst={settings.groupFoldersFirst}
           highlightQuery={search}
           onContextEmpty={(x, y) => setEmptyMenu({ x, y })}
+          contextMenuPath={contextMenu?.entry.path ?? null}
         />
         {effectivePreviewOpen && (
           <PreviewPane

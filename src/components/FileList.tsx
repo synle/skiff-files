@@ -71,6 +71,11 @@ interface Props {
    *  Browser uses this to show "New folder / New file / Paste" at
    *  the cursor coordinates. */
   onContextEmpty?: (x: number, y: number) => void;
+  /** Path of the row whose right-click context menu is currently
+   *  open. Drives a non-state cosmetic outline so the user can see
+   *  which row the menu is operating on (separate from selection /
+   *  focus). When `null` no row is highlighted. */
+  contextMenuPath?: string | null;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -254,6 +259,7 @@ export default function FileList(props: Props) {
     highlightQuery = "",
     onDropOntoFolder,
     onContextEmpty,
+    contextMenuPath = null,
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
@@ -661,10 +667,16 @@ export default function FileList(props: Props) {
                       vi.index === dragOverIdx
                         ? (theme) =>
                             `inset 0 0 0 2px ${theme.palette.success.main}`
-                        : isFocused
+                        : e.path === contextMenuPath
                           ? (theme) =>
-                              `inset 0 0 0 2px ${theme.palette.primary.main}`
-                          : "none",
+                              // Cosmetic dashed outline showing which row
+                              // the open context menu is acting on. Not
+                              // tied to selection / focus — purely a hint.
+                              `inset 0 0 0 1px ${theme.palette.text.secondary}`
+                          : isFocused
+                            ? (theme) =>
+                                `inset 0 0 0 2px ${theme.palette.primary.main}`
+                            : "none",
                     "&:hover": { bgcolor: isSel ? "action.selected" : "action.hover" },
                   }}
                 >

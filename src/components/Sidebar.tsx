@@ -73,51 +73,98 @@ const FAVORITES: Favorite[] = [
  *  collapsed state. Defined outside Sidebar so React doesn't tear
  *  down + remount it on every parent render (that broke the click
  *  flow before — the user could click the header but state never
- *  updated because the listener was attached to a stale element). */
+ *  updated because the listener was attached to a stale element).
+ *
+ *  Optional `onHide` adds a small × button at the right edge that
+ *  hides the entire section (so the user doesn't have to dig into
+ *  Settings → Sidebar to hide a section they don't use). The icon
+ *  is intentionally tiny + only appears on hover so it doesn't
+ *  invite accidental clicks. */
 function SectionHeader({
   id,
   label,
   collapsed,
   onToggle,
+  onHide,
 }: {
   id: string;
   label: string;
   collapsed: boolean;
   onToggle: () => void;
+  onHide?: () => void;
 }) {
   return (
     <Box
-      component="button"
-      type="button"
-      onClick={onToggle}
-      aria-expanded={!collapsed}
-      aria-controls={`sidebar-section-${id}`}
       sx={{
-        appearance: "none",
-        background: "transparent",
-        border: 0,
-        cursor: "pointer",
+        position: "relative",
         display: "flex",
         alignItems: "center",
-        gap: 0.5,
-        width: "100%",
-        textAlign: "left",
-        px: 2,
-        pt: 1.5,
-        color: "text.secondary",
-        fontSize: "0.6875rem",
-        fontWeight: 500,
-        letterSpacing: "0.08333em",
-        textTransform: "uppercase",
-        "&:hover": { color: "text.primary" },
+        // Reveal the hide button on hover only — full-time visibility
+        // is too easy to mis-click with the section header just above.
+        "&:hover .sidebar-section-hide": { opacity: 1 },
       }}
     >
-      {collapsed ? (
-        <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
-      ) : (
-        <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
+      <Box
+        component="button"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-controls={`sidebar-section-${id}`}
+        sx={{
+          appearance: "none",
+          background: "transparent",
+          border: 0,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 0.5,
+          flex: 1,
+          textAlign: "left",
+          px: 2,
+          pt: 1.5,
+          pb: 0.25,
+          color: "text.secondary",
+          fontSize: "0.6875rem",
+          fontWeight: 500,
+          letterSpacing: "0.08333em",
+          textTransform: "uppercase",
+          "&:hover": { color: "text.primary" },
+        }}
+      >
+        {collapsed ? (
+          <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
+        ) : (
+          <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
+        )}
+        {label}
+      </Box>
+      {onHide && (
+        <Tooltip title="Hide section (re-enable in Settings → Sidebar)">
+          <IconButton
+            className="sidebar-section-hide"
+            size="small"
+            onClick={(e) => {
+              // Stop the parent header click from also firing the
+              // collapse toggle.
+              e.stopPropagation();
+              onHide();
+            }}
+            sx={{
+              position: "absolute",
+              right: 4,
+              top: 8,
+              p: 0.25,
+              opacity: 0,
+              transition: "opacity 120ms",
+              color: "text.disabled",
+              "&:hover": { color: "text.primary" },
+            }}
+            aria-label={`Hide ${label} section`}
+          >
+            <CloseIcon sx={{ fontSize: 12 }} />
+          </IconButton>
+        </Tooltip>
       )}
-      {label}
     </Box>
   );
 }
@@ -209,6 +256,17 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
   const isVisible = (id: string): boolean =>
     settings.sidebarSectionsVisible[id] !== false;
 
+  /** Hide a section entirely. Persisted in
+   *  `Settings.sidebarSectionsVisible[id] = false`. Mirrors the
+   *  toggles on Settings → Sidebar so users have a one-click escape
+   *  hatch from the Sidebar itself. */
+  const hideSection = (id: string) => {
+    update("sidebarSectionsVisible", {
+      ...settings.sidebarSectionsVisible,
+      [id]: false,
+    });
+  };
+
   /** Closure over toggleSection + isCollapsed for the SectionHeader
    *  child component (defined outside this function so React doesn't
    *  recreate the type on every parent render — that was breaking
@@ -219,6 +277,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       label={label}
       collapsed={isCollapsed(id)}
       onToggle={() => toggleSection(id)}
+      onHide={() => hideSection(id)}
     />
   );
 
