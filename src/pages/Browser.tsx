@@ -390,6 +390,10 @@ export default function Browser({
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
       e.preventDefault();
+      // Cmd/Ctrl+Shift+F = recursive find. Cmd/Ctrl+F = in-pane filter.
+      // Both flip the recursive bit explicitly so toggling between the
+      // two modes doesn't get sticky.
+      setSearchRecursive(e.shiftKey);
       searchInputRef.current?.focus();
     };
     window.addEventListener("keydown", onKey);

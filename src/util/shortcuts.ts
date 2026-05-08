@@ -40,6 +40,14 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: "Search",
+    items: [
+      { keys: "Cmd / Ctrl + F", description: "Filter visible entries" },
+      { keys: "Cmd / Ctrl + Shift + F", description: "Recursive find" },
+      { keys: "Esc (in search)", description: "Clear search" },
+    ],
+  },
+  {
     title: "View",
     items: [
       { keys: "Cmd / Ctrl + B", description: "Toggle sidebar" },
