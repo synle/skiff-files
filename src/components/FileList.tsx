@@ -18,6 +18,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
+import GalleryThumb from "./GalleryThumb";
 import { formatBytes, formatMtime, formatMtimeRelative } from "../util/format";
 import { setFileClipboard } from "../util/fileClipboard";
 import type { Density, ShowExtensions, ViewMode } from "../state/settings";
@@ -471,15 +472,39 @@ function FileGridView(props: FileGridViewProps) {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            width: iconSize,
-                            height: iconSize,
                             flexShrink: 0,
                             cursor: "pointer",
-                            "& svg": { fontSize: iconSize - 4 },
                           }}
                           title="Click to open"
                         >
-                          <IconForKind kind={e.kind} />
+                          {/* Gallery view loads inline image thumbnails;
+                           *  tile + column views stick to the kind icon
+                           *  to keep listing perceived perf high (gallery
+                           *  is the only mode where a thumbnail wait is
+                           *  user-expected). Remote (sftp://) entries
+                           *  always use the icon since fs_read_base64 is
+                           *  local-only. */}
+                          {view === "gallery" ? (
+                            <GalleryThumb
+                              path={e.path}
+                              kind={e.kind}
+                              size={iconSize}
+                              remote={e.path.startsWith("sftp://")}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: iconSize,
+                                height: iconSize,
+                                "& svg": { fontSize: iconSize - 4 },
+                              }}
+                            >
+                              <IconForKind kind={e.kind} />
+                            </Box>
+                          )}
                         </Box>
                         <Box
                           sx={{
