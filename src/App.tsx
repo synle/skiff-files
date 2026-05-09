@@ -92,6 +92,9 @@ export default function App() {
         e.preventDefault();
         setCommandPaletteOpen((o) => !o);
       } else if (k === "b") {
+        // Cmd+B is the legacy sidebar binding (kept for VS Code muscle
+        // memory). The modern path goes through app.toggleSidebar
+        // below — Cmd+\ is the user-preferred default.
         e.preventDefault();
         update("sidebarVisible", !settings.sidebarVisible);
       } else if (
@@ -105,14 +108,24 @@ export default function App() {
         // VS Code expect this binding everywhere.
         e.preventDefault();
         setPage("settings");
-      } else if (e.key === "\\" && e.shiftKey) {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.toggleSplit", "cmd+shift+\\", settings.shortcutOverrides),
+        )
+      ) {
         // Cmd/Ctrl+Shift+\ toggles two-pane (split) mode. FileZilla
         // muscle memory: the second pane is for cross-protocol
         // drag-drop transfers from local ↔ remote without juggling
-        // tabs. Plain Cmd+\ is reserved for the sidebar toggle below.
+        // tabs.
         e.preventDefault();
         update("twoPaneMode", !settings.twoPaneMode);
-      } else if (e.key === "\\") {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.toggleSidebar", "cmd+\\", settings.shortcutOverrides),
+        )
+      ) {
         // Cmd/Ctrl+\ toggles the sidebar. Cmd+B also works (kept for
         // VS Code muscle memory) — \\ is the user-preferred binding.
         e.preventDefault();
@@ -146,10 +159,15 @@ export default function App() {
         if (e.shiftKey) return;
         e.preventDefault();
         update("fontSize", "medium");
-      } else if (e.shiftKey && (e.key === "." || e.key === ">" || e.code === "Period")) {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.toggleHidden", "cmd+shift+.", settings.shortcutOverrides),
+        )
+      ) {
         // Finder muscle memory: Cmd+Shift+. toggles dotfile visibility.
-        // On macOS Shift+. emits ">" (US layout) so we accept both keys
-        // plus the layout-independent `code === "Period"`.
+        // The `keyEventToCombo` helper normalizes via `code` so the
+        // Shift+. → ">" quirk on US layouts matches the binding.
         e.preventDefault();
         update("showHidden", !settings.showHidden);
       }

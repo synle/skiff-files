@@ -52,6 +52,7 @@ import {
   startSync,
 } from "../api/client";
 import { popTrashBatch, pushTrashBatch } from "../util/trashStack";
+import { activeCombo, matchesCombo } from "../util/keybindings";
 import RenameDialog from "../components/RenameDialog";
 import EntryContextMenu from "../components/EntryContextMenu";
 import PropertiesDialog from "../components/PropertiesDialog";
@@ -458,14 +459,20 @@ export default function Browser({
       cancelled = true;
       unlisten?.();
     };
-  }, [path, refresh, isActive]);
+  }, [path, refresh, isActive, settings.shortcutOverrides]);
 
   // F2 on the primary selection → open rename dialog. Skips when an
   // input is focused so typing F2 elsewhere doesn't hijack focus.
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "F2") return;
+      if (
+        !matchesCombo(
+          e,
+          activeCombo("browser.rename", "f2", settings.shortcutOverrides),
+        )
+      )
+        return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
@@ -482,7 +489,7 @@ export default function Browser({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isActive, primarySelected, selectedPaths, entries]);
+  }, [isActive, primarySelected, selectedPaths, entries, settings.shortcutOverrides]);
 
   // Cmd/Ctrl+R → refresh the current folder. F5 is also a refresh
   // alias (Windows Explorer muscle memory; takes no modifier).
@@ -649,7 +656,13 @@ export default function Browser({
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Delete") return;
+      if (
+        !matchesCombo(
+          e,
+          activeCombo("browser.trash", "delete", settings.shortcutOverrides),
+        )
+      )
+        return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
@@ -684,7 +697,7 @@ export default function Browser({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedPaths, path, refresh, isActive]);
+  }, [selectedPaths, path, refresh, isActive, settings.shortcutOverrides]);
 
   // Cmd/Ctrl+Shift+Backspace — permanently delete the selection
   // (skip trash). Destructive confirm dialog with stronger wording.
@@ -692,9 +705,17 @@ export default function Browser({
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (!e.shiftKey) return;
-      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      if (
+        !matchesCombo(
+          e,
+          activeCombo(
+            "browser.permanentDelete",
+            "cmd+shift+backspace",
+            settings.shortcutOverrides,
+          ),
+        )
+      )
+        return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
@@ -718,7 +739,7 @@ export default function Browser({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedPaths, path, refresh, isActive]);
+  }, [selectedPaths, path, refresh, isActive, settings.shortcutOverrides]);
 
   // Cmd/Ctrl+Z — restore the most recently trashed batch. Linux + Windows
   // use the OS trash API; macOS surfaces a friendly error since the
@@ -726,9 +747,13 @@ export default function Browser({
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (e.shiftKey) return; // Shift+Cmd+Z is the redo binding (future)
-      if (e.key !== "z" && e.key !== "Z") return;
+      if (
+        !matchesCombo(
+          e,
+          activeCombo("browser.undoTrash", "cmd+z", settings.shortcutOverrides),
+        )
+      )
+        return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
@@ -754,7 +779,7 @@ export default function Browser({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [path, refresh, isActive]);
+  }, [path, refresh, isActive, settings.shortcutOverrides]);
 
   /** Push a path onto history (the canonical way to navigate). */
   const navigate = useCallback((target: string) => {

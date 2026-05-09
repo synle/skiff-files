@@ -53,9 +53,24 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + C", description: "Copy files (paste with Cmd+V) — also writes paths to text clipboard" },
       { keys: "Cmd / Ctrl + X", description: "Cut files (paste with Cmd+V to move)" },
       { keys: "Cmd / Ctrl + V", description: "Paste files into current folder" },
-      { keys: "Delete", description: "Move selection to OS Trash" },
-      { keys: "Cmd / Ctrl + Z", description: "Undo last trash (Linux / Windows; macOS uses Finder's own Cmd+Z)" },
-      { keys: "Cmd / Ctrl + Shift + Backspace", description: "Permanently delete selection (skip Trash, no undo)" },
+      {
+        keys: "Delete",
+        description: "Move selection to OS Trash",
+        actionId: "browser.trash",
+        defaultCombo: "delete",
+      },
+      {
+        keys: "Cmd / Ctrl + Z",
+        description: "Undo last trash (Linux / Windows; macOS uses Finder's own Cmd+Z)",
+        actionId: "browser.undoTrash",
+        defaultCombo: "cmd+z",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + Backspace",
+        description: "Permanently delete selection (skip Trash, no undo)",
+        actionId: "browser.permanentDelete",
+        defaultCombo: "cmd+shift+backspace",
+      },
       { keys: "Esc", description: "Clear selection" },
     ],
   },
@@ -70,7 +85,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "View",
     items: [
-      { keys: "Cmd / Ctrl + \\ · Cmd / Ctrl + B", description: "Toggle sidebar" },
+      {
+        keys: "Cmd / Ctrl + \\ · Cmd / Ctrl + B",
+        description: "Toggle sidebar",
+        actionId: "app.toggleSidebar",
+        defaultCombo: "cmd+\\",
+      },
       { keys: "Cmd / Ctrl + I", description: "Toggle preview pane" },
       { keys: "Cmd / Ctrl + R · F5", description: "Refresh current folder" },
       { keys: "Cmd / Ctrl + L", description: "Edit path (focus path bar)" },
@@ -94,10 +114,20 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       },
       { keys: "Cmd / Ctrl + Shift + N", description: "New folder" },
       { keys: "Cmd / Ctrl + D", description: "Bookmark current folder" },
-      { keys: "F2", description: "Rename selected entry" },
+      {
+        keys: "F2",
+        description: "Rename selected entry",
+        actionId: "browser.rename",
+        defaultCombo: "f2",
+      },
       { keys: "Cmd / Ctrl + = / -", description: "Font size up / down (S / M / L cycle)" },
       { keys: "Cmd / Ctrl + 0", description: "Reset font size to medium" },
-      { keys: "Cmd / Ctrl + Shift + .", description: "Toggle hidden files (dotfiles)" },
+      {
+        keys: "Cmd / Ctrl + Shift + .",
+        description: "Toggle hidden files (dotfiles)",
+        actionId: "app.toggleHidden",
+        defaultCombo: "cmd+shift+.",
+      },
     ],
   },
   {
@@ -111,7 +141,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + Shift + [ / ]", description: "Switch to previous / next tab" },
       { keys: "Cmd / Ctrl + Shift + ← / →", description: "Move active tab left / right" },
       { keys: "Middle-click folder", description: "Open folder in new tab" },
-      { keys: "Cmd / Ctrl + Shift + \\", description: "Toggle two-pane (split) mode" },
+      {
+        keys: "Cmd / Ctrl + Shift + \\",
+        description: "Toggle two-pane (split) mode",
+        actionId: "app.toggleSplit",
+        defaultCombo: "cmd+shift+\\",
+      },
     ],
   },
   {
