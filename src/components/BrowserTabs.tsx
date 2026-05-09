@@ -420,6 +420,43 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
                 e.preventDefault();
                 setTabMenu({ anchor: e.currentTarget, tabId: t.id });
               }}
+              // Drag-to-reorder. Browser muscle memory: Chrome / Firefox
+              // / Edge / Safari all support dragging tabs in the strip.
+              // Uses a custom MIME so the OS drag-drop into the Browser
+              // pane (which expects `application/x-skiff-paths`) doesn't
+              // get confused.
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("application/x-skiff-tab", t.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (!e.dataTransfer.types.includes("application/x-skiff-tab")) {
+                  return;
+                }
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                const sourceId = e.dataTransfer.getData(
+                  "application/x-skiff-tab",
+                );
+                if (!sourceId || sourceId === t.id) return;
+                e.preventDefault();
+                setTabs((prev) => {
+                  const sourceIdx = prev.findIndex((x) => x.id === sourceId);
+                  const targetIdx = prev.findIndex((x) => x.id === t.id);
+                  if (sourceIdx < 0 || targetIdx < 0) return prev;
+                  const next = [...prev];
+                  const [moved] = next.splice(sourceIdx, 1);
+                  // Insert AT the target index — when dragging to the
+                  // right, the splice has already shifted everything
+                  // down by 1, so this lands the source where the
+                  // target was.
+                  next.splice(targetIdx, 0, moved);
+                  return next;
+                });
+              }}
               sx={{
                 minHeight: 36,
                 py: 0.5,
