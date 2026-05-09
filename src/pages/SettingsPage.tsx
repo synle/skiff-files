@@ -46,7 +46,7 @@ function Section({
 
 export default function SettingsPage() {
   console.log("[SettingsPage] rendering");
-  const { settings, update, reset } = useSettings();
+  const { settings, setSettings, update, reset } = useSettings();
   // Build version pulled from Cargo at compile time, surfaced via
   // `get_app_version` Tauri command. Tests / browser-mode dev see
   // the fallback string.
@@ -635,6 +635,70 @@ export default function SettingsPage() {
               }}
             >
               Export bookmarks (clipboard)
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                if (
+                  typeof navigator !== "undefined" &&
+                  navigator.clipboard
+                ) {
+                  // Whole settings round-trip: useful for cross-
+                  // machine sync via a dotfile repo or Slack paste.
+                  // We export the WHOLE settings object — the
+                  // bookmarks-only export above is kept for users
+                  // who only want to share that subset.
+                  void navigator.clipboard.writeText(
+                    JSON.stringify(settings, null, 2),
+                  );
+                }
+              }}
+            >
+              Export all settings (clipboard)
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                const raw = window.prompt(
+                  "Paste settings JSON. Replaces ALL current settings:",
+                );
+                if (!raw) return;
+                try {
+                  const parsed = JSON.parse(raw) as unknown;
+                  if (
+                    typeof parsed !== "object" ||
+                    parsed === null ||
+                    Array.isArray(parsed)
+                  ) {
+                    window.alert("Settings JSON must be an object.");
+                    return;
+                  }
+                  if (
+                    !window.confirm(
+                      "Replace ALL current settings with the pasted JSON? This drops your bookmarks, recent paths, saved tabs, theme, and every other persisted tweak.",
+                    )
+                  ) {
+                    return;
+                  }
+                  // Merge against the current settings so any keys
+                  // the JSON omits keep their current values rather
+                  // than reverting to DEFAULTS — friendlier when the
+                  // user only wanted to share a subset of fields.
+                  // Goes through setSettings (not update) so the
+                  // whole-object swap is one persist tick instead of
+                  // N piecemeal writes.
+                  setSettings({
+                    ...settings,
+                    ...(parsed as Partial<typeof settings>),
+                  });
+                } catch (e) {
+                  window.alert(`Couldn't parse JSON: ${String(e)}`);
+                }
+              }}
+            >
+              Import all settings (paste JSON)
             </Button>
             <Button
               variant="outlined"
