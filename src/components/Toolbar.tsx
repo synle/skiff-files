@@ -87,6 +87,15 @@ interface Props {
   /** Flip the current direction without changing the key — used by
    *  the standalone direction-toggle button next to the sort menu. */
   onSortDirToggle: () => void;
+  /** Recently-used search queries — surfaces in the search input's
+   *  HTML5 datalist so the user can recall a query without retyping.
+   *  Most-recent first. Empty array hides the dropdown. */
+  searchHistory?: string[];
+  /** Called when the user "commits" a search (Enter or blur with a
+   *  non-empty value). Browser uses this to push the query into
+   *  Settings.searchHistory. Optional — when omitted, history is
+   *  read-only. */
+  onSearchCommit?: (query: string) => void;
 }
 
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
@@ -119,6 +128,8 @@ export default function Toolbar(props: Props) {
     sortDir,
     onSortChange,
     onSortDirToggle,
+    searchHistory = [],
+    onSearchCommit,
   } = props;
 
   const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(
@@ -302,7 +313,15 @@ export default function Toolbar(props: Props) {
             // Esc clears + blurs so the user can resume keyboard nav.
             onSearchChange("");
             (e.target as HTMLInputElement).blur();
+          } else if (e.key === "Enter" && search.trim()) {
+            // Push the committed query into history. Esc / clear are
+            // intentionally NOT history events — only "I'm running
+            // this search" qualifies.
+            onSearchCommit?.(search.trim());
           }
+        }}
+        onBlur={() => {
+          if (search.trim()) onSearchCommit?.(search.trim());
         }}
         inputRef={searchInputRef}
         sx={{ width: 200 }}
@@ -326,9 +345,22 @@ export default function Toolbar(props: Props) {
               </InputAdornment>
             ) : null,
           },
-          htmlInput: { "aria-label": "Search current folder" },
+          htmlInput: {
+            "aria-label": "Search current folder",
+            // HTML5 datalist gives us a native suggestion dropdown for
+            // free — no extra Menu wiring needed. Browser-native
+            // appearance, OS-themed.
+            list: searchHistory.length > 0 ? "skiff-search-history" : undefined,
+          },
         }}
       />
+      {searchHistory.length > 0 && (
+        <datalist id="skiff-search-history">
+          {searchHistory.map((q) => (
+            <option key={q} value={q} />
+          ))}
+        </datalist>
+      )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 

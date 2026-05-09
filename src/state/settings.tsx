@@ -90,6 +90,10 @@ export interface Settings {
    *  the special token "trash" for the Trash favorite. Hidden items
    *  vanish from the Sidebar but stay re-enable-able from Settings. */
   hiddenFavorites: string[];
+  /** Last N unique search queries the user has run. Most-recent
+   *  first. Surfaces in the toolbar's search dropdown so users can
+   *  recall a query without retyping. Capped at SEARCH_HISTORY_MAX. */
+  searchHistory: string[];
   /** Per-folder view mode override. The Browser falls back to
    *  `defaultView` when there's no entry for the current path.
    *  Capped at FOLDER_VIEW_MAX (LRU-style: oldest entries dropped
@@ -230,6 +234,9 @@ export const PREVIEW_WIDTH_MAX = 720;
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
  *  day's navigation without making the sidebar scroll forever. */
 export const RECENT_PATHS_MAX = 10;
+/** Cap on persisted search queries. 10 is enough to recall this
+ *  morning's hunting and short enough to fit in a small dropdown. */
+export const SEARCH_HISTORY_MAX = 10;
 
 /** Max entries kept in `folderViewMode`. Settings.json grows by ~80
  *  bytes per entry; 200 caps the file at ~16 KB. */
@@ -249,6 +256,7 @@ export const DEFAULTS: Settings = {
   bookmarks: [],
   recentPaths: [],
   hiddenFavorites: [],
+  searchHistory: [],
   folderViewMode: {},
   defaultSortKey: "name",
   defaultSortDir: "asc",

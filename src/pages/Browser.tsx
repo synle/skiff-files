@@ -999,6 +999,21 @@ export default function Browser({
         onSortDirToggle={() =>
           setSortDir((d) => (d === "asc" ? "desc" : "asc"))
         }
+        searchHistory={settings.searchHistory}
+        onSearchCommit={(q) => {
+          // Push to head, dedup, cap at SEARCH_HISTORY_MAX (10). Most-
+          // recent first matches typical recall patterns.
+          const next = [
+            q,
+            ...settings.searchHistory.filter((x) => x !== q),
+          ].slice(0, 10);
+          if (
+            next.length !== settings.searchHistory.length ||
+            next[0] !== settings.searchHistory[0]
+          ) {
+            update("searchHistory", next);
+          }
+        }}
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
         <FileList
