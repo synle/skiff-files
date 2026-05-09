@@ -30,6 +30,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + ↓", description: "Open focused entry (folder enters; file opens)" },
       { keys: "Mouse back / forward (X1 / X2)", description: "Folder history back / forward" },
       { keys: "Home / End", description: "Jump to first / last entry" },
+      { keys: "Type letters", description: "Jump to next entry matching the typed prefix" },
       { keys: "Page Up / Page Down", description: "Jump roughly one viewport" },
     ],
   },

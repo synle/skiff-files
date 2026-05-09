@@ -591,6 +591,44 @@ export default function FileList(props: Props) {
    *  + the scroll-into-view + the Enter/Backspace targets. -1 = no
    *  row focused (e.g. an empty folder). */
   const [focusedIdx, setFocusedIdx] = useState<number>(-1);
+  /** Type-ahead navigation buffer + last keystroke timestamp. Refs
+   *  rather than state — we don't want the typing to trigger a
+   *  re-render on every keystroke. */
+  const typeAheadBuffer = useRef<string>("");
+  const typeAheadLastKey = useRef<number>(0);
+  /** Idle window after which the type-ahead buffer resets. 800ms
+   *  matches Finder's perceived behavior — slow enough to type a
+   *  3-letter prefix, fast enough that a fresh search starts clean. */
+  const TYPEAHEAD_RESET_MS = 800;
+  /** Advance focus to the next entry whose name starts with the
+   *  accumulated type-ahead buffer (case-insensitive). Cycling
+   *  behavior: pressing the same letter repeatedly walks past
+   *  successive matches. Falls through silently when nothing
+   *  matches. */
+  const typeAheadAdvance = (key: string) => {
+    const now = Date.now();
+    // Reset buffer when idle window elapsed since the last keystroke.
+    if (now - typeAheadLastKey.current > TYPEAHEAD_RESET_MS) {
+      typeAheadBuffer.current = "";
+    }
+    typeAheadLastKey.current = now;
+    typeAheadBuffer.current = (typeAheadBuffer.current + key).toLowerCase();
+    const buf = typeAheadBuffer.current;
+    // Search starts at focusedIdx + 1 so repeated keys cycle through
+    // matches. Wraps to the start so the user always finds the
+    // alphabetically-first match.
+    const start = Math.max(0, focusedIdx + (buf.length === 1 ? 1 : 0));
+    for (let i = 0; i < sorted.length; i++) {
+      const idx = (start + i) % sorted.length;
+      if (sorted[idx].name.toLowerCase().startsWith(buf)) {
+        setFocusedIdx(idx);
+        return;
+      }
+    }
+    // No match — ignore the keystroke. Buffer keeps growing so a
+    // mistyped letter at the end can be backspaced (we don't yet
+    // wire backspace; this is a future polish).
+  };
   /** Index of the row currently being hovered with a drag payload.
    *  Drives the inset primary border so the user sees where the drop
    *  will land. */
@@ -722,8 +760,27 @@ export default function FileList(props: Props) {
           toggleSel(sorted[focusedIdx].path, true);
           break;
         }
-        default:
-          return;
+        default: {
+          // Type-ahead navigation: typing a letter (without modifiers)
+          // jumps to the next entry whose name starts with the
+          // accumulated buffer. Standard Finder / Explorer / Files
+          // behavior. Buffer auto-resets after TYPEAHEAD_RESET_MS of
+          // no typing so a fresh "f" doesn't continue a stale match.
+          //
+          // Skipped when:
+          //   - Modifiers are held (preserves Cmd+1/2/9 etc.)
+          //   - The key is a multi-char or non-printable name (Tab,
+          //     ArrowLeft, F1, etc. — `length === 1` filters them out)
+          if (cmd || e.altKey) return;
+          if (e.key.length !== 1) return;
+          // Only printable characters. Excludes raw whitespace
+          // beyond Space (already handled above) and pure control.
+          const code = e.key.charCodeAt(0);
+          if (code < 0x20) return;
+          e.preventDefault();
+          typeAheadAdvance(e.key);
+          break;
+        }
       }
     };
     window.addEventListener("keydown", onKey);
