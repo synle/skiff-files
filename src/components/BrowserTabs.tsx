@@ -20,7 +20,7 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
-import { useEffect, useState, type SyntheticEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import Browser from "../pages/Browser";
 import { useSettings } from "../state/settings";
 import { OPEN_IN_TAB_EVENT } from "../App";
@@ -163,6 +163,12 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
     anchor: HTMLElement;
     tabId: string;
   } | null>(null);
+
+  /** Pending drag-hover timer. Set when a file drag enters a non-
+   *  active tab, cleared on drag-leave / drop / fire. Prevents
+   *  multiple timers stacking when the user lingers on the same
+   *  tab. */
+  const hoverTimerRef = useRef<number | null>(null);
 
   /** Close every tab whose id !== keepId. Keeps the kept tab as the
    *  active one even if it wasn't the active one before. Pinned tabs
@@ -424,20 +430,50 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
               // / Edge / Safari all support dragging tabs in the strip.
               // Uses a custom MIME so the OS drag-drop into the Browser
               // pane (which expects `application/x-skiff-paths`) doesn't
-              // get confused.
+              // get confused. A separate handler also activates the tab
+              // when the user hovers over it during a FILE drag — lets
+              // them drop a multi-selection into a different tab's
+              // folder without juggling the active-tab switch by hand.
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData("application/x-skiff-tab", t.id);
                 e.dataTransfer.effectAllowed = "move";
               }}
               onDragOver={(e) => {
-                if (!e.dataTransfer.types.includes("application/x-skiff-tab")) {
+                const types = e.dataTransfer.types;
+                if (types.includes("application/x-skiff-tab")) {
+                  // Tab-on-tab drag: prepare a reorder drop.
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
                   return;
                 }
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
+                if (types.includes("application/x-skiff-paths")) {
+                  // File drag hovering a non-active tab: arm a hover
+                  // timer that switches to it after 700ms. Browser
+                  // muscle memory ("hover-switch"). Already-active
+                  // tabs no-op the timer so we don't repeatedly
+                  // re-set the same active id.
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                  if (t.id !== activeId && hoverTimerRef.current === null) {
+                    hoverTimerRef.current = window.setTimeout(() => {
+                      setActiveId(t.id);
+                      hoverTimerRef.current = null;
+                    }, 700);
+                  }
+                }
+              }}
+              onDragLeave={() => {
+                if (hoverTimerRef.current !== null) {
+                  window.clearTimeout(hoverTimerRef.current);
+                  hoverTimerRef.current = null;
+                }
               }}
               onDrop={(e) => {
+                if (hoverTimerRef.current !== null) {
+                  window.clearTimeout(hoverTimerRef.current);
+                  hoverTimerRef.current = null;
+                }
                 const sourceId = e.dataTransfer.getData(
                   "application/x-skiff-tab",
                 );
