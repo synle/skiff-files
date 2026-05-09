@@ -114,7 +114,6 @@ export default function Browser({
   // group set isn't yet persisted (TODO: per-folder LRU like
   // folderViewMode).
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
-  const [kindFilter, setKindFilter] = useState<KindGroup[]>([]);
   /** When set, the archive-viewer dialog is open against this path. */
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
     null,
@@ -193,6 +192,34 @@ export default function Browser({
   const [diffOther, setDiffOther] = useState<string | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
+
+  // Per-folder kind filter — read from settings keyed by current path
+  // so the active chips persist across navigation. Setter writes back
+  // through an LRU-bounded map (matches folderViewMode / folderSort).
+  const kindFilter = useMemo<KindGroup[]>(() => {
+    if (!path) return [];
+    return (settings.folderKindFilter[path] ?? []) as KindGroup[];
+  }, [path, settings.folderKindFilter]);
+  const setKindFilter = useCallback(
+    (next: KindGroup[]) => {
+      if (!path) return;
+      const map = { ...settings.folderKindFilter };
+      if (next.length === 0) {
+        delete map[path];
+      } else {
+        map[path] = next;
+      }
+      const keys = Object.keys(map);
+      if (keys.length > 200) {
+        const trimmed: typeof map = {};
+        for (const k of keys.slice(keys.length - 200)) trimmed[k] = map[k];
+        update("folderKindFilter", trimmed);
+      } else {
+        update("folderKindFilter", map);
+      }
+    },
+    [path, settings.folderKindFilter, update],
+  );
 
   // Resolve home dir + start path on mount. We tolerate the initial call
   // failing (e.g. running outside Tauri during dev) by surfacing an empty

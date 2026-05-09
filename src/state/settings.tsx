@@ -106,6 +106,10 @@ export interface Settings {
   /** Per-folder sort override. Same LRU-bounded pattern as
    *  `folderViewMode`. */
   folderSort: Record<string, { key: SortKey; dir: SortDir }>;
+  /** Per-folder active kind-filter groups. Empty array = no filter
+   *  active. Same FOLDER_VIEW_MAX cap so settings.json stays bounded.
+   *  Values match the KindGroup enum from KindFilterBar. */
+  folderKindFilter: Record<string, string[]>;
   /** Default conflict policy for new sync jobs. The Transfers form
    *  reads this on mount; saved-job templates always carry their
    *  own policy and ignore this. */
@@ -279,6 +283,7 @@ export const DEFAULTS: Settings = {
   defaultSortKey: "name",
   defaultSortDir: "asc",
   folderSort: {},
+  folderKindFilter: {},
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
