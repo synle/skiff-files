@@ -301,9 +301,17 @@ function FileGridView(props: FileGridViewProps) {
     onColsChange,
   } = props;
 
-  const cellWidth = view === "tile" ? 96 : view === "gallery" ? 160 : 240;
-  const cellHeight = view === "tile" ? 88 : view === "gallery" ? 140 : 56;
-  const iconSize = view === "tile" ? 32 : view === "gallery" ? 64 : 28;
+  // Per-view sizing tuned to make the four grid modes visibly
+  // distinct even when the folder has no image thumbnails:
+  //   tile   = compact 80 px cell, small icon — "many at a glance"
+  //   gallery = roomy 160 px cell, large icon, card affordance
+  //             (rounded bg + shadow) so each entry reads as a
+  //             "tile in a frame" even without a thumbnail
+  //   column = wide 240 px cell, icon + name + bold size/mtime line
+  //             so it's obviously a metadata-forward layout
+  const cellWidth = view === "tile" ? 80 : view === "gallery" ? 160 : 240;
+  const cellHeight = view === "tile" ? 88 : view === "gallery" ? 150 : 56;
+  const iconSize = view === "tile" ? 32 : view === "gallery" ? 72 : 28;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -457,17 +465,43 @@ function FileGridView(props: FileGridViewProps) {
                           gap: view === "column" ? 1.5 : 0.5,
                           p: 1,
                           height: cellHeight,
-                          borderRadius: 1,
+                          borderRadius: view === "gallery" ? 2 : 1,
                           cursor: e.isDir ? "pointer" : "default",
-                          bgcolor: isSel ? "action.selected" : "transparent",
-                          boxShadow:
-                            e.path === contextMenuPath
-                              ? (theme) =>
-                                  `inset 0 0 0 1px ${theme.palette.text.secondary}`
-                              : isFocused
-                                ? (theme) =>
-                                    `inset 0 0 0 2px ${theme.palette.primary.main}`
-                                : "none",
+                          // Gallery view: card affordance — translucent
+                          // background + soft shadow so each cell reads
+                          // as a "framed tile" even when the entry is a
+                          // folder (no image thumbnail). Distinguishes
+                          // gallery from tile when neither has an image.
+                          ...(view === "gallery"
+                            ? {
+                                bgcolor: isSel
+                                  ? "action.selected"
+                                  : "background.default",
+                                boxShadow: isSel
+                                  ? "none"
+                                  : (theme: import("@mui/material/styles").Theme) =>
+                                      `0 1px 2px ${theme.palette.action.disabled}`,
+                                border: 1,
+                                borderColor: "divider",
+                              }
+                            : {
+                                bgcolor: isSel
+                                  ? "action.selected"
+                                  : "transparent",
+                              }),
+                          // Focus / context-menu inset outline takes
+                          // priority over the gallery card shadow.
+                          ...(e.path === contextMenuPath
+                            ? {
+                                boxShadow: (theme) =>
+                                  `inset 0 0 0 1px ${theme.palette.text.secondary}`,
+                              }
+                            : isFocused
+                              ? {
+                                  boxShadow: (theme) =>
+                                    `inset 0 0 0 2px ${theme.palette.primary.main}`,
+                                }
+                              : {}),
                           opacity: e.isHidden ? 0.55 : 1,
                           "&:hover": {
                             bgcolor: isSel ? "action.selected" : "action.hover",
@@ -547,14 +581,25 @@ function FileGridView(props: FileGridViewProps) {
                             {e.isSymlink ? " ↪" : ""}
                           </Typography>
                           {view === "column" && (
+                            // Column view: bump the metadata line to
+                            // body2 + medium weight so the layout reads
+                            // clearly as "metadata-forward" — distinct
+                            // from tile (metadata absent) and gallery
+                            // (visual-forward).
                             <Typography
-                              variant="caption"
+                              variant="body2"
                               color="text.secondary"
                               noWrap
-                              sx={{ display: "block" }}
+                              sx={{
+                                display: "block",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                mt: 0.25,
+                              }}
                             >
                               {e.isDir ? "Folder" : formatBytes(e.size)}
                               {e.mtime ? ` · ${formatMtime(e.mtime)}` : ""}
+                              {!e.isDir && e.kind ? ` · ${e.kind}` : ""}
                             </Typography>
                           )}
                         </Box>
