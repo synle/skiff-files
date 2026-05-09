@@ -32,6 +32,11 @@ interface Props {
   /** When non-null, surfaces a hint about the file clipboard so users
    *  can see what'll happen on Cmd+V. `op` matches `FileClipboardOperation`. */
   clipboardHint?: { count: number; op: "copy" | "cut" } | null;
+  /** Name of the single-selected entry. When provided + selectedEntries
+   *  === 1, surfaces in the status bar so the user has a textual
+   *  confirmation of what's selected (especially useful when the row
+   *  highlight scrolls out of view). */
+  selectedName?: string | null;
 }
 
 export default function StatusBar({
@@ -47,6 +52,7 @@ export default function StatusBar({
   findActive = false,
   findHitCap = false,
   clipboardHint = null,
+  selectedName = null,
 }: Props) {
   // Errors take precedence — a directory listing error matters more than the
   // empty-selection summary it would otherwise render alongside.
@@ -96,7 +102,9 @@ export default function StatusBar({
     >
       <Typography variant="caption" color="text.secondary">
         {selectedEntries > 0
-          ? `${selectedEntries} of ${totalEntries} selected · ${formatBytes(selectedSize)}`
+          ? selectedEntries === 1 && selectedName
+            ? `${selectedName} · ${formatBytes(selectedSize)}`
+            : `${selectedEntries} of ${totalEntries} selected · ${formatBytes(selectedSize)}`
           : findActive
             ? `${totalEntries}${findHitCap ? "+" : ""} match${totalEntries === 1 ? "" : "es"}`
             : folderCount != null &&

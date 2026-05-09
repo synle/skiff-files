@@ -1096,6 +1096,11 @@ export default function Browser({
             ? { count: clipboardSnap.paths.length, op: clipboardSnap.operation }
             : null
         }
+        selectedName={
+          selectionStats.count === 1 && primarySelected
+            ? primarySelected.name
+            : null
+        }
       />}
       <Menu
         open={emptyMenu !== null}
