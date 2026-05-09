@@ -418,6 +418,96 @@ function FileGridView(props: FileGridViewProps) {
     return { left, top, right: left + cellWidth, bottom: top + cellHeight };
   };
 
+  // Window-level mousemove + mouseup handlers — installed only while
+  // a drag is active. CRITICAL: mouseup MUST be on `window`, not the
+  // container, because the user can release the mouse anywhere on
+  // screen and we still need to commit + clear the rectangle. The
+  // previous container-only handler left phantom rectangles when the
+  // user dragged past the toolbar / sidebar / app edge.
+  useEffect(() => {
+    if (!dragRect) return;
+    const onMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      // Clamp to the container's bounding rect so the rectangle
+      // doesn't extend visually into the toolbar / sidebar.
+      const el = containerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const clampedX = Math.max(r.left, Math.min(r.right, e.clientX));
+      const clampedY = Math.max(r.top, Math.min(r.bottom, e.clientY));
+      const localX = clampedX - r.left + el.scrollLeft;
+      const localY = clampedY - r.top + el.scrollTop;
+      const left = Math.min(dragRef.current.startX, localX);
+      const top = Math.min(dragRef.current.startY, localY);
+      const width = Math.abs(localX - dragRef.current.startX);
+      const height = Math.abs(localY - dragRef.current.startY);
+      setDragRect({ left, top, width, height });
+    };
+    const onUp = (e: MouseEvent) => {
+      if (!dragRef.current) {
+        setDragRect(null);
+        return;
+      }
+      const el = containerRef.current;
+      const r = el?.getBoundingClientRect();
+      const clampedX = r
+        ? Math.max(r.left, Math.min(r.right, e.clientX))
+        : e.clientX;
+      const clampedY = r
+        ? Math.max(r.top, Math.min(r.bottom, e.clientY))
+        : e.clientY;
+      const localX = el && r ? clampedX - r.left + el.scrollLeft : 0;
+      const localY = el && r ? clampedY - r.top + el.scrollTop : 0;
+      const left = Math.min(dragRef.current.startX, localX);
+      const top = Math.min(dragRef.current.startY, localY);
+      const right = Math.max(dragRef.current.startX, localX);
+      const bottom = Math.max(dragRef.current.startY, localY);
+      // Sub-4px drag = click. Clears selection on plain click; no-op
+      // when modifier held (preserves existing selection).
+      const isClick = right - left < 4 && bottom - top < 4;
+      if (isClick) {
+        if (!dragRef.current.additive) {
+          onRubberBand?.(new Set(), false);
+        }
+      } else {
+        const hit = new Set<string>();
+        for (let i = 0; i < sorted.length; i++) {
+          const b = cellBox(i);
+          if (
+            b.right >= left &&
+            b.left <= right &&
+            b.bottom >= top &&
+            b.top <= bottom
+          ) {
+            hit.add(sorted[i].path);
+          }
+        }
+        onRubberBand?.(hit, dragRef.current.additive);
+      }
+      dragRef.current = null;
+      setDragRect(null);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    // Defensive: clear if the user Esc-cancels the drag (e.g. via
+    // Cmd+Tab away mid-drag). Some platforms fire window blur in
+    // those cases; also handle dragend for completeness.
+    const onCancel = () => {
+      dragRef.current = null;
+      setDragRect(null);
+    };
+    window.addEventListener("blur", onCancel);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("blur", onCancel);
+    };
+    // dragRect is the trigger; the rest of the closure values are
+    // referenced via refs / cell-box math, all reading the latest
+    // values at event-time without needing dep tracking.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragRect != null]);
+
   return (
     <Box
       sx={{
@@ -439,11 +529,28 @@ function FileGridView(props: FileGridViewProps) {
         }}
         onMouseDown={(evt) => {
           // Rubber-band only starts on left button + clicks on the
-          // container's whitespace (NOT on a cell). Cell clicks go
+          // container's whitespace (NOT on a cell, NOT on an input
+          // / button / link inside the cell area). Cell clicks go
           // through the normal selection path.
           if (evt.button !== 0) return;
           const target = evt.target as HTMLElement;
           if (target.closest('[data-testid="file-grid-cell"]')) return;
+          // The mousedown's clientY must be INSIDE the container's
+          // bounding rect — defends against synthetic events bubbling
+          // from elsewhere (toolbars / inputs / sidebar) that could
+          // otherwise start a phantom drag whose mouseup we'd never
+          // see if the user releases over a sibling element.
+          const el = containerRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          if (
+            evt.clientX < r.left ||
+            evt.clientX > r.right ||
+            evt.clientY < r.top ||
+            evt.clientY > r.bottom
+          ) {
+            return;
+          }
           const { x, y } = localCoords(evt.clientX, evt.clientY);
           dragRef.current = {
             startX: x,
@@ -451,49 +558,9 @@ function FileGridView(props: FileGridViewProps) {
             additive: evt.metaKey || evt.ctrlKey || evt.shiftKey,
           };
           setDragRect({ left: x, top: y, width: 0, height: 0 });
-        }}
-        onMouseMove={(evt) => {
-          if (!dragRef.current) return;
-          const { x, y } = localCoords(evt.clientX, evt.clientY);
-          const left = Math.min(dragRef.current.startX, x);
-          const top = Math.min(dragRef.current.startY, y);
-          const width = Math.abs(x - dragRef.current.startX);
-          const height = Math.abs(y - dragRef.current.startY);
-          setDragRect({ left, top, width, height });
-        }}
-        onMouseUp={(evt) => {
-          if (!dragRef.current) return;
-          const { x, y } = localCoords(evt.clientX, evt.clientY);
-          const left = Math.min(dragRef.current.startX, x);
-          const top = Math.min(dragRef.current.startY, y);
-          const right = Math.max(dragRef.current.startX, x);
-          const bottom = Math.max(dragRef.current.startY, y);
-          // Tiny drags (< 4px in either dimension) are clicks; treat
-          // as "clear selection" rather than a select-nothing rubber-
-          // band. Matches Finder's "click on empty space" behavior.
-          const isClick = right - left < 4 && bottom - top < 4;
-          if (isClick) {
-            if (!dragRef.current.additive) {
-              onRubberBand?.(new Set(), false);
-            }
-          } else {
-            // Hit-test every cell against the drag rect.
-            const hit = new Set<string>();
-            for (let i = 0; i < sorted.length; i++) {
-              const b = cellBox(i);
-              if (
-                b.right >= left &&
-                b.left <= right &&
-                b.bottom >= top &&
-                b.top <= bottom
-              ) {
-                hit.add(sorted[i].path);
-              }
-            }
-            onRubberBand?.(hit, dragRef.current.additive);
-          }
-          dragRef.current = null;
-          setDragRect(null);
+          // preventDefault stops native text-selection from kicking
+          // in alongside the rubber-band rectangle.
+          evt.preventDefault();
         }}
         sx={{
           flex: 1,
