@@ -634,6 +634,59 @@ pub fn fs_trash_many(paths: Vec<String>) -> FsResult<()> {
     trash::delete_all(&paths).map_err(|e| format!("trash_many: {e}"))
 }
 
+/// Restore the most recently trashed batch matching the given original
+/// paths. Cmd/Ctrl+Z in the Browser routes here. Linux + Windows use
+/// the `trash::os_limited::restore_all` API. macOS isn't supported by
+/// the `trash` crate's restore surface — we surface an actionable
+/// error so the frontend can toast "Use Finder's Cmd+Z to undo" and
+/// the user knows the limitation isn't a bug.
+#[tauri::command]
+pub fn fs_trash_restore(_paths: Vec<String>) -> FsResult<u32> {
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    {
+        use std::collections::HashMap;
+        // Index trashed items by their original full path. Multiple
+        // versions of the same path may exist (delete-then-restore-
+        // then-delete cycles); we keep the most recent (max time_deleted).
+        let items = trash::os_limited::list().map_err(|e| format!("trash list: {e}"))?;
+        let mut newest: HashMap<String, trash::TrashItem> = HashMap::new();
+        for it in items {
+            let key = std::path::Path::new(&it.original_parent)
+                .join(&it.name)
+                .to_string_lossy()
+                .into_owned();
+            match newest.get(&key) {
+                Some(existing) if existing.time_deleted >= it.time_deleted => {}
+                _ => {
+                    newest.insert(key, it);
+                }
+            }
+        }
+        let to_restore: Vec<trash::TrashItem> = _paths
+            .iter()
+            .filter_map(|p| newest.remove(p))
+            .collect();
+        let count = to_restore.len() as u32;
+        if count == 0 {
+            return Err("no matching trash entries found to restore".to_string());
+        }
+        trash::os_limited::restore_all(to_restore)
+            .map_err(|e| format!("restore_all: {e}"))?;
+        return Ok(count);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return Err(
+            "macOS doesn't support programmatic trash restore. Open Trash and use Finder's Cmd+Z."
+                .to_string(),
+        );
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        return Err("trash restore not supported on this platform".to_string());
+    }
+}
+
 // ---------- Settings persistence (Phase 0.1.4) ----------
 //
 // We keep Settings as opaque JSON on the Rust side — the schema is owned

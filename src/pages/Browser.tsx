@@ -34,8 +34,10 @@ import {
   mkdir as clientMkdir,
   rename as clientRename,
   removeOrTrashMany,
+  fsTrashRestore,
   startSync,
 } from "../api/client";
+import { popTrashBatch, pushTrashBatch } from "../util/trashStack";
 import RenameDialog from "../components/RenameDialog";
 import EntryContextMenu from "../components/EntryContextMenu";
 import PropertiesDialog from "../components/PropertiesDialog";
@@ -607,6 +609,10 @@ export default function Browser({
         destructive: true,
         onConfirm: () => {
           setConfirmDialog(null);
+          // Stash the batch so Cmd/Ctrl+Z can undo it. Only locals
+          // are pushed (sftp:// remotes are filtered inside the
+          // helper since they don't go to OS trash).
+          pushTrashBatch(selectedPaths);
           void removeOrTrashMany(selectedPaths)
             .then(() => {
               if (path) void refresh(path);
@@ -618,6 +624,42 @@ export default function Browser({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedPaths, path, refresh, isActive]);
+
+  // Cmd/Ctrl+Z — restore the most recently trashed batch. Linux + Windows
+  // use the OS trash API; macOS surfaces a friendly error since the
+  // `trash` crate doesn't expose programmatic restore there.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.shiftKey) return; // Shift+Cmd+Z is the redo binding (future)
+      if (e.key !== "z" && e.key !== "Z") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      const batch = popTrashBatch();
+      if (!batch) return; // nothing to undo — silent no-op
+      e.preventDefault();
+      void fsTrashRestore(batch.paths)
+        .then((count) => {
+          if (path) void refresh(path);
+          if (count < batch.paths.length) {
+            setError(
+              `Restored ${count} of ${batch.paths.length} entries — some couldn't be located in the OS trash.`,
+            );
+          }
+        })
+        .catch((err) => {
+          // Push the batch back so a follow-up Cmd+Z (e.g. after the
+          // user fixes the underlying issue or moves to a different
+          // OS) can retry.
+          pushTrashBatch(batch.paths);
+          setError(String(err));
+        });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [path, refresh, isActive]);
 
   /** Push a path onto history (the canonical way to navigate). */
   const navigate = useCallback((target: string) => {
@@ -1201,6 +1243,7 @@ export default function Browser({
             destructive: true,
             onConfirm: () => {
               setConfirmDialog(null);
+              pushTrashBatch(targets);
               void removeOrTrashMany(targets)
                 .then(() => {
                   if (path) void refresh(path);

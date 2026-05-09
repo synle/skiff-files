@@ -53,6 +53,7 @@ import {
   useSettings,
 } from "../state/settings";
 import { startSync } from "../api/client";
+import { pushTrashBatch } from "../util/trashStack";
 
 /** MIME type the FileList row uses to carry dragged paths. Newline-
  *  joined for multi-select drops. Sidebar host items handle this MIME
@@ -588,6 +589,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     ) {
                       return;
                     }
+                    pushTrashBatch(paths);
                     void fsTrashMany(paths).catch(() => {
                       /* failure surfaces via the next list_dir refresh */
                     });

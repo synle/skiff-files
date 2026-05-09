@@ -179,3 +179,13 @@ export async function removeOrTrashMany(paths: string[]): Promise<void> {
   if (local.length) await fsTrashMany(local);
   for (const r of remote) await connRemove(r.id, r.remotePath);
 }
+
+/** Restore the most recently trashed entries matching the given paths
+ *  via the OS trash API. Linux + Windows use the `trash` crate's
+ *  os_limited::restore_all; macOS surfaces an actionable error since
+ *  the crate doesn't expose programmatic restore on that platform.
+ *  Returns the number of entries actually restored. */
+export async function fsTrashRestore(paths: string[]): Promise<number> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<number>("fs_trash_restore", { paths });
+}
