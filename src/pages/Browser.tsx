@@ -999,6 +999,8 @@ export default function Browser({
         onSortDirToggle={() =>
           setSortDir((d) => (d === "asc" ? "desc" : "asc"))
         }
+        showHidden={settings.showHidden}
+        onShowHiddenToggle={() => update("showHidden", !settings.showHidden)}
         searchHistory={settings.searchHistory}
         onSearchCommit={(q) => {
           // Push to head, dedup, cap at SEARCH_HISTORY_MAX (10). Most-

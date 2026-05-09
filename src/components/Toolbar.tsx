@@ -96,6 +96,11 @@ interface Props {
    *  Settings.searchHistory. Optional — when omitted, history is
    *  read-only. */
   onSearchCommit?: (query: string) => void;
+  /** Show-hidden-files toggle — mirrors the Cmd+Shift+. shortcut as
+   *  a discoverable click affordance. Optional so existing callers
+   *  don't have to wire it. */
+  showHidden?: boolean;
+  onShowHiddenToggle?: () => void;
 }
 
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
@@ -130,6 +135,8 @@ export default function Toolbar(props: Props) {
     onSortDirToggle,
     searchHistory = [],
     onSearchCommit,
+    showHidden,
+    onShowHiddenToggle,
   } = props;
 
   const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(
@@ -378,6 +385,39 @@ export default function Toolbar(props: Props) {
           )}
         </IconButton>
       </Tooltip>
+
+      {/* Show-hidden-files toggle. Mirrors the Cmd+Shift+. shortcut
+       *  but as a discoverable affordance — power users who didn't
+       *  know about the keyboard binding still find it. */}
+      {onShowHiddenToggle && (
+        <Tooltip
+          title={
+            showHidden ? "Hide dotfiles (Cmd+Shift+.)" : "Show dotfiles (Cmd+Shift+.)"
+          }
+        >
+          <ToggleButton
+            size="small"
+            value="showHidden"
+            selected={!!showHidden}
+            onChange={onShowHiddenToggle}
+            aria-label="Toggle hidden files"
+            aria-pressed={!!showHidden}
+            sx={{ p: 0.5 }}
+          >
+            {/* `.*` glyph reads as "dotfiles" at a glance */}
+            <Box
+              component="span"
+              sx={{
+                fontFamily: "monospace",
+                fontSize: 13,
+                lineHeight: 1,
+              }}
+            >
+              .*
+            </Box>
+          </ToggleButton>
+        </Tooltip>
+      )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
