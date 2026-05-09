@@ -203,6 +203,12 @@ export default function Toolbar(props: Props) {
         py: 0.5,
         borderBottom: 1,
         borderColor: "divider",
+        // Wrap to a second row on narrow windows instead of squeezing
+        // controls into invisible widths. The TextField search input
+        // already absorbs flex growth so wrapping happens at the
+        // toggles + view picker which is the right place to break.
+        flexWrap: "wrap",
+        rowGap: 0.5,
       }}
     >
       <Tooltip title="Back (right-click for history)">
