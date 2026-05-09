@@ -485,24 +485,36 @@ export default function PreviewPane({ selected, width }: Props) {
   // the FileList, so dragging left widens it. Same MouseMove-on-document
   // pattern the Sidebar uses (0.2.28) so a fast drag past the handle's
   // own bounds doesn't drop the pointer.
+  //
+  // Drag-then-commit: mousemove updates a LOCAL `dragWidth` only;
+  // the persisted settings.previewWidth is committed once on mouseup.
+  // Without this, calling update() per mousemove fires the persist
+  // effect 60 times a second and races with the cross-window
+  // settings:changed listener — same class of bug fixed for the
+  // sidebar resize in 0.2.167.
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const effectiveWidth = dragWidth ?? width;
   const startDrag = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
     const startW = width;
+    let lastNext = startW;
     const onMove = (ev: MouseEvent) => {
       // dx grows as the mouse moves right; we want the pane to widen
       // when the mouse moves *left* (since the handle is on the left
       // edge), so subtract.
       const dx = ev.clientX - startX;
-      const next = Math.max(
+      lastNext = Math.max(
         PREVIEW_WIDTH_MIN,
         Math.min(PREVIEW_WIDTH_MAX, startW - dx),
       );
-      update("previewWidth", next);
+      setDragWidth(lastNext);
     };
     const onUp = () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      update("previewWidth", lastNext);
+      setDragWidth(null);
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -514,7 +526,7 @@ export default function PreviewPane({ selected, width }: Props) {
       aria-label="Preview pane"
       sx={{
         position: "relative",
-        width,
+        width: effectiveWidth,
         flexShrink: 0,
         borderLeft: 1,
         borderColor: "divider",
