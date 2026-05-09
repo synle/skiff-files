@@ -44,6 +44,73 @@ function Section({
   );
 }
 
+/** Keyboard shortcut catalog with a search box. The catalog is short
+ *  enough to render fully, but power users want to find a binding by
+ *  the action name (e.g. "duplicate", "rename") without scanning the
+ *  entire list. Filter is case-insensitive and matches both the keys
+ *  column and the description. Empty groups (no matches) collapse. */
+function KeyboardShortcutList() {
+  const [filter, setFilter] = useState("");
+  const q = filter.trim().toLowerCase();
+  const groups = q
+    ? SHORTCUT_GROUPS.map((g) => ({
+        ...g,
+        items: g.items.filter(
+          (it) =>
+            it.keys.toLowerCase().includes(q) ||
+            it.description.toLowerCase().includes(q),
+        ),
+      })).filter((g) => g.items.length > 0)
+    : SHORTCUT_GROUPS;
+  return (
+    <Stack spacing={2}>
+      <TextField
+        size="small"
+        placeholder="Search shortcuts (e.g. tab, rename, font)…"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        sx={{ maxWidth: 480 }}
+      />
+      {groups.length === 0 ? (
+        <Typography variant="caption" color="text.secondary">
+          No shortcuts match "{filter}".
+        </Typography>
+      ) : (
+        groups.map((g) => (
+          <Box key={g.title}>
+            <Typography variant="overline" color="text.secondary">
+              {g.title}
+            </Typography>
+            <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+              {g.items.map((it) => (
+                <Box
+                  key={it.keys + it.description}
+                  sx={{ display: "flex", gap: 2 }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      width: 220,
+                      flexShrink: 0,
+                      fontFamily: "monospace",
+                      color: "text.primary",
+                    }}
+                  >
+                    {it.keys}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {it.description}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+        ))
+      )}
+    </Stack>
+  );
+}
+
 export default function SettingsPage() {
   console.log("[SettingsPage] rendering");
   const { settings, setSettings, update, reset } = useSettings();
@@ -500,38 +567,7 @@ export default function SettingsPage() {
           title="Keyboard"
           description="Read-only listing of every shortcut the app honors. Press ? anywhere to open this as an overlay. Rebinding lands in a future release."
         >
-          <Stack spacing={2}>
-            {SHORTCUT_GROUPS.map((g) => (
-              <Box key={g.title}>
-                <Typography variant="overline" color="text.secondary">
-                  {g.title}
-                </Typography>
-                <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                  {g.items.map((it) => (
-                    <Box
-                      key={it.keys + it.description}
-                      sx={{ display: "flex", gap: 2 }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          width: 220,
-                          flexShrink: 0,
-                          fontFamily: "monospace",
-                          color: "text.primary",
-                        }}
-                      >
-                        {it.keys}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {it.description}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            ))}
-          </Stack>
+          <KeyboardShortcutList />
         </Section>
 
         <Divider />
