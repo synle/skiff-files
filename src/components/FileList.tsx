@@ -433,7 +433,41 @@ function FileGridView(props: FileGridViewProps) {
   // user dragged past the toolbar / sidebar / app edge.
   useEffect(() => {
     if (!dragRect) return;
+    // Auto-scroll: while the rubber-band is active and the cursor
+    // sits near the container's top or bottom edge, scroll the
+    // container so the user can extend the selection past the
+    // viewport. Driven by an rAF loop that reads the latest cursor
+    // position from a ref. Without this, dragging "downward" stops
+    // selecting once the cursor hits the visible bottom — surprising
+    // for users coming from Finder.
+    let lastClientY = 0;
+    let rafId = 0;
+    const SCROLL_EDGE_PX = 30;
+    const SCROLL_SPEED_PX = 12;
+    const tick = () => {
+      const el = containerRef.current;
+      if (el && dragRef.current) {
+        const r = el.getBoundingClientRect();
+        if (lastClientY > r.bottom - SCROLL_EDGE_PX) {
+          // Faster the closer to the edge.
+          const t = Math.min(
+            1,
+            (lastClientY - (r.bottom - SCROLL_EDGE_PX)) / SCROLL_EDGE_PX,
+          );
+          el.scrollTop += SCROLL_SPEED_PX * t;
+        } else if (lastClientY < r.top + SCROLL_EDGE_PX) {
+          const t = Math.min(
+            1,
+            (r.top + SCROLL_EDGE_PX - lastClientY) / SCROLL_EDGE_PX,
+          );
+          el.scrollTop -= SCROLL_SPEED_PX * t;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
     const onMove = (e: MouseEvent) => {
+      lastClientY = e.clientY;
       if (!dragRef.current) return;
       // Clamp to the container's bounding rect so the rectangle
       // doesn't extend visually into the toolbar / sidebar.
@@ -518,6 +552,7 @@ function FileGridView(props: FileGridViewProps) {
     };
     window.addEventListener("blur", onCancel);
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       window.removeEventListener("blur", onCancel);
@@ -963,33 +998,52 @@ export default function FileList(props: Props) {
       // = 1 for ↑↓ and ←→ are no-ops there. Cmd+← / Cmd+→ stay
       // reserved for back/forward (Browser-level handler).
       const stepDown = view !== "list" ? Math.max(1, gridCols) : 1;
+      /** Move focus by `delta` and, if Shift was held, extend the
+       *  multi-selection from the previously-focused row to the new
+       *  one. Standard Finder / Explorer keyboard range-select. */
+      const moveFocus = (delta: number, shiftKey: boolean) => {
+        setFocusedIdx((prev) => {
+          const start = prev < 0 ? 0 : prev;
+          const next = Math.max(
+            0,
+            Math.min(sorted.length - 1, start + delta),
+          );
+          if (shiftKey && next !== prev) {
+            const lo = Math.min(start, next);
+            const hi = Math.max(start, next);
+            const range = sorted.slice(lo, hi + 1).map((s) => s.path);
+            setSelected((s) => {
+              const out = new Set(s);
+              for (const p of range) out.add(p);
+              return out;
+            });
+          }
+          return next;
+        });
+      };
       switch (e.key) {
         case "ArrowDown": {
           e.preventDefault();
-          setFocusedIdx((i) =>
-            Math.min(sorted.length - 1, Math.max(0, i) + stepDown),
-          );
+          moveFocus(stepDown, e.shiftKey);
           break;
         }
         case "ArrowUp": {
           e.preventDefault();
-          setFocusedIdx((i) => Math.max(0, (i < 0 ? 0 : i) - stepDown));
+          moveFocus(-stepDown, e.shiftKey);
           break;
         }
         case "ArrowRight": {
           if (view === "list") return;
           if (cmd) return; // Browser owns Cmd+→ for forward nav.
           e.preventDefault();
-          setFocusedIdx((i) =>
-            Math.min(sorted.length - 1, Math.max(0, i) + 1),
-          );
+          moveFocus(1, e.shiftKey);
           break;
         }
         case "ArrowLeft": {
           if (view === "list") return;
           if (cmd) return; // Browser owns Cmd+← for back nav.
           e.preventDefault();
-          setFocusedIdx((i) => Math.max(0, (i < 0 ? 0 : i) - 1));
+          moveFocus(-1, e.shiftKey);
           break;
         }
         case "Home": {

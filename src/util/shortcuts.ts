@@ -21,7 +21,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Navigation",
     items: [
-      { keys: "↑ / ↓", description: "Move focus up / down" },
+      { keys: "↑ / ↓", description: "Move focus up / down (in grid views: previous / next row of cells)" },
+      { keys: "Shift + ↑ / ↓ / ← / →", description: "Extend selection toward the new focused row" },
       { keys: "Enter", description: "Open the focused folder" },
       { keys: "Space", description: "Toggle the focused row's selection" },
       { keys: "Backspace · Cmd / Ctrl + ↑", description: "Go up one folder" },
