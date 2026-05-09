@@ -125,6 +125,28 @@ export default function EntryContextMenu({
           <ListItemText>Open in new tab</ListItemText>
         </MenuItem>
       )}
+      {!isRemote && state?.entry.isDir && (
+        <MenuItem
+          onClick={() => {
+            // Spawn a fresh top-level window seeded at this folder.
+            // Routes through window_open_at, which encodes the path
+            // into the URL fragment so the new BrowserTabs picks it
+            // up at boot. Hidden for remotes since the new window
+            // would also need the SFTP connection registry, and
+            // we don't yet round-trip connection state to a freshly
+            // spawned window.
+            void import("../api/fs").then(({ windowOpenAt }) =>
+              windowOpenAt(state!.entry.path).catch(() => {}),
+            );
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <LaunchIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Open in new window</ListItemText>
+        </MenuItem>
+      )}
       {!isRemote && state && !state.entry.isDir && (
         <MenuItem
           onClick={() => {

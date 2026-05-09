@@ -38,6 +38,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 walkdir = "2"
 notify = "7"
 rayon = "1"
+urlencoding = "2"
 
 [dev-dependencies]
 filetime = "0.2"

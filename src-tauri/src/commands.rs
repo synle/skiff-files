@@ -720,6 +720,29 @@ pub fn window_open_new(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Spawn a new window pre-seeded at `path`. The path is encoded in
+/// the URL fragment (`index.html#path=<urlEncoded>`) so the
+/// frontend's bootstrap can pick it up before any tab state hydrates
+/// from settings. Right-click "Open in new window" routes through
+/// this so users can split work across windows without re-typing
+/// the path in the new window's path bar.
+#[tauri::command]
+pub fn window_open_at(path: String, app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::WebviewUrl;
+    let label = format!("main-{}", Uuid::new_v4().simple());
+    // URL-encode the path so slashes / spaces / Unicode survive the
+    // fragment round-trip. The frontend decodeURIComponent's it.
+    let encoded = urlencoding::encode(&path).into_owned();
+    let url = format!("index.html#path={encoded}");
+    tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+        .title("Skiff Files")
+        .inner_size(1200.0, 760.0)
+        .min_inner_size(720.0, 480.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Live-reload state for the active tab. The watcher is initialized
 /// lazily on first use so apps that never browse the local fs (rare,
 /// but possible — e.g. an SFTP-only session) don't pay the cost.

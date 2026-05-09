@@ -60,6 +60,12 @@ export const fsHomeDir = (): Promise<string> => invoke<string>("fs_home_dir");
 export const windowOpenNew = (): Promise<void> =>
   invoke<void>("window_open_new");
 
+/** Spawn a new window pre-seeded at `path`. The Rust side encodes
+ *  the path into the URL fragment (`#path=<urlEncoded>`) so the
+ *  fresh window's BrowserTabs can pick it up at boot. */
+export const windowOpenAt = (path: string): Promise<void> =>
+  invoke<void>("window_open_at", { path });
+
 /** Re-target the local fs watcher at `path`. The Rust side emits
  *  debounced `fs:changed` events when anything inside changes, so the
  *  Browser can auto-refresh without polling. Call on every navigation

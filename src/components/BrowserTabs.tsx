@@ -74,6 +74,35 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       ? settings.savedActiveTabIdRight
       : settings.savedActiveTabId;
   const [tabs, setTabs] = useState<TabRow[]>(() => {
+    // Boot-time URL hash override: when the window was spawned via
+    // window_open_at(path), the Rust side encoded the path into the
+    // URL fragment (#path=<urlEncoded>). Honor it once at first
+    // mount — overrides saved tabs so the user lands at the
+    // requested path even if they had a saved set. Only the main
+    // pane reads the hash; the right pane in two-pane mode keeps
+    // its persisted state.
+    if (pane === "main" && typeof window !== "undefined") {
+      const hash = window.location.hash;
+      const m = /[#&]path=([^&]+)/.exec(hash);
+      if (m) {
+        try {
+          const initialPath = decodeURIComponent(m[1]);
+          // Strip the fragment so a refresh / reopen doesn't keep
+          // re-seeding from the stale hash.
+          window.history.replaceState(null, "", window.location.pathname);
+          return [
+            {
+              id: crypto.randomUUID(),
+              label: "",
+              initialPath,
+              currentPath: initialPath,
+            },
+          ];
+        } catch {
+          /* malformed hash — fall through to the saved-tabs path */
+        }
+      }
+    }
     if (seedTabs.length > 0) {
       return seedTabs.map((t) => ({
         id: t.id,
