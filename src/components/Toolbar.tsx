@@ -30,6 +30,7 @@ import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import SortIcon from "@mui/icons-material/Sort";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import type { ViewMode } from "../state/settings";
 import type { SortDir, SortKey } from "./FileList";
 
@@ -152,6 +153,20 @@ export default function Toolbar(props: Props) {
   const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(
     null,
   );
+  const [overflowAnchor, setOverflowAnchor] = useState<HTMLElement | null>(
+    null,
+  );
+
+  /** Breakpoint at which we collapse the trailing controls into a ⋮
+   *  menu. Below `md` (900px), the toolbar's preview / kind filter /
+   *  hidden-files / sort controls render only inside the overflow
+   *  menu. Above, they render inline as before.  */
+  const overflowOnlyBelowMd = {
+    display: { xs: "none", md: "inline-flex" },
+  } as const;
+  const inlineOnlyAboveMd = {
+    display: { xs: "inline-flex", md: "none" },
+  } as const;
 
   /** Display label for the active sort. Surfaces in the dropdown's
    *  tooltip so the current state is glanceable. */
@@ -387,87 +402,92 @@ export default function Toolbar(props: Props) {
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-      <Tooltip title={previewOpen ? "Hide preview" : "Show preview"}>
-        <IconButton
-          size="small"
-          onClick={onTogglePreview}
-          aria-label={previewOpen ? "Hide preview" : "Show preview"}
-          aria-pressed={previewOpen}
-        >
-          {previewOpen ? (
-            <VisibilityIcon fontSize="small" />
-          ) : (
-            <VisibilityOffIcon fontSize="small" />
-          )}
-        </IconButton>
-      </Tooltip>
+      <Box sx={overflowOnlyBelowMd}>
+        <Tooltip title={previewOpen ? "Hide preview" : "Show preview"}>
+          <IconButton
+            size="small"
+            onClick={onTogglePreview}
+            aria-label={previewOpen ? "Hide preview" : "Show preview"}
+            aria-pressed={previewOpen}
+          >
+            {previewOpen ? (
+              <VisibilityIcon fontSize="small" />
+            ) : (
+              <VisibilityOffIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
+      </Box>
 
       {/* Kind-filter chip row toggle. Badge shows count of active
        *  filter groups when the row is collapsed so the user notices
        *  a filter is active even with the chips hidden. */}
       {onKindFilterToggle && (
-        <Tooltip
-          title={
-            kindFilterActiveCount > 0
-              ? `Filter (${kindFilterActiveCount} active)`
-              : "Filter by kind"
-          }
-        >
-          <ToggleButton
-            size="small"
-            value="kindFilter"
-            selected={!!kindFilterOpen || kindFilterActiveCount > 0}
-            onChange={onKindFilterToggle}
-            aria-label="Toggle kind filter row"
-            aria-pressed={!!kindFilterOpen}
-            sx={{ p: 0.5 }}
+        <Box sx={overflowOnlyBelowMd}>
+          <Tooltip
+            title={
+              kindFilterActiveCount > 0
+                ? `Filter (${kindFilterActiveCount} active)`
+                : "Filter by kind"
+            }
           >
-            <Box
-              component="span"
-              sx={{
-                fontFamily: "monospace",
-                fontSize: 11,
-                lineHeight: 1,
-                fontWeight: 600,
-              }}
+            <ToggleButton
+              size="small"
+              value="kindFilter"
+              selected={!!kindFilterOpen || kindFilterActiveCount > 0}
+              onChange={onKindFilterToggle}
+              aria-label="Toggle kind filter row"
+              aria-pressed={!!kindFilterOpen}
+              sx={{ p: 0.5 }}
             >
-              {kindFilterActiveCount > 0 ? `▤ ${kindFilterActiveCount}` : "▤"}
-            </Box>
-          </ToggleButton>
-        </Tooltip>
+              <Box
+                component="span"
+                sx={{
+                  fontFamily: "monospace",
+                  fontSize: 11,
+                  lineHeight: 1,
+                  fontWeight: 600,
+                }}
+              >
+                {kindFilterActiveCount > 0 ? `▤ ${kindFilterActiveCount}` : "▤"}
+              </Box>
+            </ToggleButton>
+          </Tooltip>
+        </Box>
       )}
 
       {/* Show-hidden-files toggle. Mirrors the Cmd+Shift+. shortcut
        *  but as a discoverable affordance — power users who didn't
        *  know about the keyboard binding still find it. */}
       {onShowHiddenToggle && (
-        <Tooltip
-          title={
-            showHidden ? "Hide dotfiles (Cmd+Shift+.)" : "Show dotfiles (Cmd+Shift+.)"
-          }
-        >
-          <ToggleButton
-            size="small"
-            value="showHidden"
-            selected={!!showHidden}
-            onChange={onShowHiddenToggle}
-            aria-label="Toggle hidden files"
-            aria-pressed={!!showHidden}
-            sx={{ p: 0.5 }}
+        <Box sx={overflowOnlyBelowMd}>
+          <Tooltip
+            title={
+              showHidden ? "Hide dotfiles (Cmd+Shift+.)" : "Show dotfiles (Cmd+Shift+.)"
+            }
           >
-            {/* `.*` glyph reads as "dotfiles" at a glance */}
-            <Box
-              component="span"
-              sx={{
-                fontFamily: "monospace",
-                fontSize: 13,
-                lineHeight: 1,
-              }}
+            <ToggleButton
+              size="small"
+              value="showHidden"
+              selected={!!showHidden}
+              onChange={onShowHiddenToggle}
+              aria-label="Toggle hidden files"
+              aria-pressed={!!showHidden}
+              sx={{ p: 0.5 }}
             >
-              .*
-            </Box>
-          </ToggleButton>
-        </Tooltip>
+              <Box
+                component="span"
+                sx={{
+                  fontFamily: "monospace",
+                  fontSize: 13,
+                  lineHeight: 1,
+                }}
+              >
+                .*
+              </Box>
+            </ToggleButton>
+          </Tooltip>
+        </Box>
       )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
@@ -476,17 +496,95 @@ export default function Toolbar(props: Props) {
        *  grid views (tile / gallery / column), which have no column
        *  headers to click. List view keeps the column-header path so
        *  this is a redundant-but-discoverable alternative there. */}
-      <Tooltip
-        title={`Sort by ${sortLabel(sortKey)} (${sortDir === "asc" ? "↑" : "↓"})`}
-      >
-        <IconButton
-          size="small"
-          onClick={(e) => setSortMenuAnchor(e.currentTarget)}
-          aria-label="Sort"
+      <Box sx={overflowOnlyBelowMd}>
+        <Tooltip
+          title={`Sort by ${sortLabel(sortKey)} (${sortDir === "asc" ? "↑" : "↓"})`}
         >
-          <SortIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
+          <IconButton
+            size="small"
+            onClick={(e) => setSortMenuAnchor(e.currentTarget)}
+            aria-label="Sort"
+          >
+            <SortIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      {/* Overflow menu — only renders below `md`, surfaces the same
+       *  controls that hide above the breakpoint. */}
+      <Box sx={inlineOnlyAboveMd}>
+        <Tooltip title="More toolbar options">
+          <IconButton
+            size="small"
+            onClick={(e) => setOverflowAnchor(e.currentTarget)}
+            aria-label="More toolbar options"
+          >
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Menu
+          open={overflowAnchor != null}
+          anchorEl={overflowAnchor}
+          onClose={() => setOverflowAnchor(null)}
+          slotProps={{ list: { dense: true } }}
+        >
+          <MenuItem
+            onClick={() => {
+              onTogglePreview();
+              setOverflowAnchor(null);
+            }}
+          >
+            {previewOpen ? "Hide preview pane" : "Show preview pane"}
+          </MenuItem>
+          {onKindFilterToggle && (
+            <MenuItem
+              onClick={() => {
+                onKindFilterToggle();
+                setOverflowAnchor(null);
+              }}
+            >
+              {kindFilterOpen ? "Hide filter row" : "Show filter row"}
+              {kindFilterActiveCount > 0
+                ? ` (${kindFilterActiveCount} active)`
+                : ""}
+            </MenuItem>
+          )}
+          {onShowHiddenToggle && (
+            <MenuItem
+              onClick={() => {
+                onShowHiddenToggle();
+                setOverflowAnchor(null);
+              }}
+            >
+              {showHidden ? "Hide dotfiles" : "Show dotfiles"}
+            </MenuItem>
+          )}
+          <Divider />
+          {(["name", "size", "mtime", "ctime", "kind"] as const).map((k) => {
+            const active = k === sortKey;
+            return (
+              <MenuItem
+                key={k}
+                selected={active}
+                onClick={() => {
+                  onSortChange(k);
+                  setOverflowAnchor(null);
+                }}
+              >
+                Sort by {sortLabel(k)}
+                {active ? (sortDir === "asc" ? "  ↑" : "  ↓") : ""}
+              </MenuItem>
+            );
+          })}
+          <MenuItem
+            onClick={() => {
+              onSortDirToggle();
+              setOverflowAnchor(null);
+            }}
+          >
+            Reverse sort direction
+          </MenuItem>
+        </Menu>
+      </Box>
       <Menu
         open={sortMenuAnchor != null}
         anchorEl={sortMenuAnchor}
