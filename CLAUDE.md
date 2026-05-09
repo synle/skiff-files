@@ -58,6 +58,8 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.172** — 🐛 **Preview pane text opts back into selection**. The 0.2.167 global user-select:none baseline left the preview text uncopyable — regression. Added className="skiff-selectable" to the TextBody render so the CSS override restores auto behavior on that subtree.
+- **0.2.171** — ✅ **Keyboard shortcuts in the row context menu**. Open / Open in new tab / Rename… / Move to Trash now show their key right-aligned in monospace (Enter / Mid-click / F2 / Del). Discoverability win — users learn bindings without the cheatsheet.
 - **0.2.170** — ✅ **Drag folder to Bookmarks section → add as bookmark**. Complementary to the 0.2.95 "drop on bookmark row = sync into bookmark" gesture: drop on the section header / list whitespace = add as new bookmark. Doesn't collide because the row handler preventDefaults before the section-level handler sees it. Deduped by path; label = basename.
 - **0.2.169** — ✅ **Search box on Settings → Keyboard catalog**. Shortcut list got a search field — filters keys + description (case-insensitive). Empty groups collapse so the list stays clean.
 - **0.2.168** — 🐛 **Preview pane resize "snap back" — same race fix as 0.2.167 sidebar**. Drag-then-commit: local dragWidth during drag, single `update()` on mouseup. Pattern documented under "Known footguns".
