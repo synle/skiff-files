@@ -3,7 +3,15 @@
 // StatusBar, and the sidebar lives one level up in App so it persists across
 // route changes.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, ListItemIcon, ListItemText, Menu, MenuItem } from "@mui/material";
+import {
+  Box,
+  CircularProgress,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Snackbar,
+} from "@mui/material";
 import ContentPasteIcon from "@mui/icons-material/ContentPaste";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import NoteAddIcon from "@mui/icons-material/NoteAdd";
@@ -118,6 +126,11 @@ export default function Browser({
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
     null,
   );
+  /** Transient toast surfaced while a non-Skiffsync operation (delete /
+   *  paste / extract / compress) is in flight. The Operations drawer
+   *  already covers Skiffsync; this picks up the synchronous flows
+   *  that don't emit sync:* events. */
+  const [opToast, setOpToast] = useState<string | null>(null);
   /** Per-session toggle of the preview pane, seeded from the persisted
    *  policy. The toolbar eye icon flips this; closing-then-reopening
    *  doesn't change Settings. */
@@ -653,15 +666,19 @@ export default function Browser({
         destructive: true,
         onConfirm: () => {
           setConfirmDialog(null);
-          // Stash the batch so Cmd/Ctrl+Z can undo it. Only locals
-          // are pushed (sftp:// remotes are filtered inside the
-          // helper since they don't go to OS trash).
           pushTrashBatch(selectedPaths);
+          setOpToast(
+            `${verb}: ${count} item${count === 1 ? "" : "s"}…`,
+          );
           void removeOrTrashMany(selectedPaths)
             .then(() => {
               if (path) void refresh(path);
+              setOpToast(null);
             })
-            .catch((err) => setError(String(err)));
+            .catch((err) => {
+              setError(String(err));
+              setOpToast(null);
+            });
         },
       });
     };
@@ -1423,11 +1440,16 @@ export default function Browser({
             candidate = `${baseName} (${n++})`;
           }
           const dest = `${parent}/${candidate}`;
+          setOpToast(`Extracting ${e.name}…`);
           void fsExtractZip(e.path, dest)
             .then(() => {
               if (path) void refresh(path);
+              setOpToast(null);
             })
-            .catch((err) => setError(String(err)));
+            .catch((err) => {
+              setError(String(err));
+              setOpToast(null);
+            });
         }}
         onCompressZip={(e) => {
           // If the user right-clicked while multi-selecting, zip
@@ -1450,11 +1472,20 @@ export default function Browser({
             candidate = `${baseName} (${n++}).zip`;
           }
           const dest = `${parent}/${candidate}`;
+          setOpToast(
+            sources.length === 1
+              ? `Compressing ${e.name}…`
+              : `Compressing ${sources.length} items…`,
+          );
           void fsCompressZip(sources, dest)
             .then(() => {
               if (path) void refresh(path);
+              setOpToast(null);
             })
-            .catch((err) => setError(String(err)));
+            .catch((err) => {
+              setError(String(err));
+              setOpToast(null);
+            });
         }}
         onDuplicate={(e) => {
           // Timestamped duplicate: `<name>-copy-YYYY-MM-DD-HH-MM`.
@@ -1532,6 +1563,16 @@ export default function Browser({
         onExtracted={() => {
           if (path) void refresh(path);
         }}
+      />
+      <Snackbar
+        open={!!opToast}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        message={
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={14} sx={{ color: "inherit" }} />
+            <span>{opToast}</span>
+          </Box>
+        }
       />
       <BulkRenameDialog
         entries={bulkRenameTargets}
