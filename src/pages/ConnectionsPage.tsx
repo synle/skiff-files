@@ -40,8 +40,57 @@ import {
   type SftpConfig,
   type SshConfigHost,
 } from "../api/conn";
+import { fsOpenWithDefault } from "../api/fs";
 
 const STORAGE_KEY = "skiff-files.connections.sftp.v1";
+const SMB_STORAGE_KEY = "skiff-files.connections.smb.v1";
+
+/** SMB / Samba share draft. Routed through the OS-native mount handler
+ *  (Finder on macOS, Explorer on Windows, GVFS on Linux) via
+ *  `fs_open_with_default("smb://server/share")`. The OS handles auth
+ *  prompts + mounting; once mounted the user browses the share via
+ *  the local fs (e.g. /Volumes/share on macOS). A first-class Rust SMB
+ *  client lives behind a Phase 3 commit; this MVP gets users productive
+ *  on existing Samba shares without waiting on that work. */
+interface SmbDraft {
+  id: string;
+  label: string;
+  /** Hostname or IP (no scheme — that's added on connect). */
+  server: string;
+  /** Share name. Empty = browse server's share list. */
+  share: string;
+  /** Optional username for the URL (smb://user@server/share). The OS
+   *  prompts for password — we never store SMB credentials in
+   *  settings.json. */
+  user?: string;
+}
+
+function loadSmbDrafts(): SmbDraft[] {
+  try {
+    const raw = localStorage.getItem(SMB_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as SmbDraft[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSmbDrafts(drafts: SmbDraft[]): void {
+  try {
+    localStorage.setItem(SMB_STORAGE_KEY, JSON.stringify(drafts));
+  } catch {
+    /* private mode — silently drop */
+  }
+}
+
+/** Build the SMB URL the OS-native handler accepts. macOS / Linux
+ *  use forward slashes; Windows accepts the same scheme via Edge's
+ *  webview but typically wants UNC `\\server\share` — `start
+ *  smb://...` works on Windows too in practice. */
+function smbUrl(d: { server: string; share: string; user?: string }): string {
+  const userPart = d.user ? `${encodeURIComponent(d.user)}@` : "";
+  const sharePart = d.share ? `/${encodeURIComponent(d.share)}` : "";
+  return `smb://${userPart}${d.server}${sharePart}`;
+}
 
 /** Saved (not necessarily live) draft. Kept on the client so users don't
  *  re-type host/user every time. We never persist passwords or key
@@ -75,9 +124,16 @@ function saveDrafts(drafts: SftpDraft[]): void {
 
 export default function ConnectionsPage() {
   const [drafts, setDrafts] = useState<SftpDraft[]>(() => loadDrafts());
+  const [smbDrafts, setSmbDrafts] = useState<SmbDraft[]>(() => loadSmbDrafts());
   const [live, setLive] = useState<ConnectionInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Which protocol the new-connection form is targeting. The
+   *  dropdown sits at the top of the form so the user can flip
+   *  between SFTP (full programmatic control via russh) and SMB
+   *  (OS-native mount handler). FTP slot reserved for Phase 3 —
+   *  hidden until that lands. */
+  const [protocol, setProtocol] = useState<"sftp" | "smb">("sftp");
 
   // Form state — kept local so Add Connection doesn't dirty the rest of
   // the app's state.
@@ -91,9 +147,50 @@ export default function ConnectionsPage() {
   const [privateKeyPath, setPrivateKeyPath] = useState("");
   const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState("");
 
+  // SMB form state.
+  const [smbServer, setSmbServer] = useState("");
+  const [smbShare, setSmbShare] = useState("");
+  const [smbUser, setSmbUser] = useState("");
+
   useEffect(() => {
     saveDrafts(drafts);
   }, [drafts]);
+
+  useEffect(() => {
+    saveSmbDrafts(smbDrafts);
+  }, [smbDrafts]);
+
+  /** Hand the SMB URL to the OS native handler. macOS Finder and
+   *  Windows Explorer both register smb:// as a system handler — they
+   *  prompt for credentials, mount the share (e.g. /Volumes/<share>
+   *  on macOS), and open it in their own file manager. Skiff Files
+   *  picks up the mount automatically via the Devices section's
+   *  fs_mounts polling. Linux relies on GVFS / KIO support. */
+  const handleMountSmb = async (
+    d: { server: string; share: string; user?: string },
+    label: string,
+  ) => {
+    setError(null);
+    setBusy(true);
+    try {
+      await fsOpenWithDefault(smbUrl(d));
+      // Save / refresh the draft for next time.
+      setSmbDrafts((prev) => [
+        ...prev.filter((x) => x.label !== label),
+        {
+          id: crypto.randomUUID(),
+          label,
+          server: d.server,
+          share: d.share,
+          user: d.user,
+        },
+      ]);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   /** Imported entries from `~/.ssh/config`. Loaded once on mount; the
    *  user shouldn't expect mid-session changes to surface without a
@@ -292,9 +389,90 @@ export default function ConnectionsPage() {
 
       <Stack spacing={4}>
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            New SFTP connection
-          </Typography>
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{ alignItems: "center", mb: 2 }}
+          >
+            <Typography variant="h6">New connection</Typography>
+            {/* Protocol dropdown — sits at the top of the form so the
+             *  user picks the transport before filling anything in.
+             *  Switching also resets the form so credentials don't
+             *  bleed across protocols (the SMB form has different
+             *  fields). */}
+            <Select
+              size="small"
+              value={protocol}
+              onChange={(e) => {
+                setProtocol(e.target.value as "sftp" | "smb");
+                setError(null);
+                setTestResult(null);
+              }}
+              sx={{ minWidth: 200 }}
+              aria-label="Protocol"
+            >
+              <MenuItem value="sftp">SFTP / SSH</MenuItem>
+              <MenuItem value="smb">SMB / Samba</MenuItem>
+            </Select>
+          </Stack>
+          {protocol === "smb" ? (
+            <Stack spacing={2}>
+              <Typography variant="caption" color="text.secondary">
+                Mounts a Samba / SMB share via the OS native handler
+                (Finder on macOS, Explorer on Windows, GVFS on Linux).
+                The system prompts for credentials and the share
+                appears under the Devices section once mounted.
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="Server"
+                  size="small"
+                  value={smbServer}
+                  onChange={(e) => setSmbServer(e.target.value)}
+                  placeholder="nas.local or 192.168.1.10"
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Share"
+                  size="small"
+                  value={smbShare}
+                  onChange={(e) => setSmbShare(e.target.value)}
+                  placeholder="(empty = pick from list)"
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="User (optional)"
+                  size="small"
+                  value={smbUser}
+                  onChange={(e) => setSmbUser(e.target.value)}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+              {smbServer && (
+                <Typography variant="caption" color="text.secondary">
+                  Will open: <code>{smbUrl({ server: smbServer, share: smbShare, user: smbUser || undefined })}</code>
+                </Typography>
+              )}
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="contained"
+                  disabled={busy || !smbServer.trim()}
+                  onClick={() =>
+                    void handleMountSmb(
+                      {
+                        server: smbServer.trim(),
+                        share: smbShare.trim(),
+                        user: smbUser.trim() || undefined,
+                      },
+                      `${smbUser ? `${smbUser}@` : ""}${smbServer}${smbShare ? `/${smbShare}` : ""}`,
+                    )
+                  }
+                >
+                  Mount in OS
+                </Button>
+              </Stack>
+            </Stack>
+          ) : (
           <Stack spacing={2}>
             {sshHosts.length > 0 && (
               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -431,7 +609,67 @@ export default function ConnectionsPage() {
               </Alert>
             )}
           </Stack>
+          )}
         </Paper>
+
+        {/* Saved SMB shares — quick-mount list mirroring the SFTP
+         *  drafts UX. We don't persist credentials; the OS prompt
+         *  handles auth on each mount. */}
+        {smbDrafts.length > 0 && (
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Saved SMB shares
+            </Typography>
+            <List dense>
+              {smbDrafts.map((d) => (
+                <ListItem
+                  key={d.id}
+                  secondaryAction={
+                    <Stack direction="row" spacing={0.5}>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          void handleMountSmb(
+                            {
+                              server: d.server,
+                              share: d.share,
+                              user: d.user,
+                            },
+                            d.label,
+                          )
+                        }
+                        aria-label={`Mount ${d.label}`}
+                        disabled={busy}
+                      >
+                        <LinkIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          setSmbDrafts((prev) =>
+                            prev.filter((x) => x.id !== d.id),
+                          )
+                        }
+                        aria-label={`Delete ${d.label}`}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  }
+                >
+                  <ListItemText
+                    primary={d.label}
+                    secondary={smbUrl({
+                      server: d.server,
+                      share: d.share,
+                      user: d.user,
+                    })}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
+        )}
 
         <Box>
           <Stack
