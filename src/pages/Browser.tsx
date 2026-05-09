@@ -35,6 +35,7 @@ import {
   rename as clientRename,
   removeOrTrashMany,
   fsTrashRestore,
+  permanentlyDeleteMany,
   startSync,
 } from "../api/client";
 import { popTrashBatch, pushTrashBatch } from "../util/trashStack";
@@ -614,6 +615,40 @@ export default function Browser({
           // helper since they don't go to OS trash).
           pushTrashBatch(selectedPaths);
           void removeOrTrashMany(selectedPaths)
+            .then(() => {
+              if (path) void refresh(path);
+            })
+            .catch((err) => setError(String(err)));
+        },
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedPaths, path, refresh, isActive]);
+
+  // Cmd/Ctrl+Shift+Backspace — permanently delete the selection
+  // (skip trash). Destructive confirm dialog with stronger wording.
+  // No undo — that's the point.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (!e.shiftKey) return;
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      if (selectedPaths.length === 0) return;
+      e.preventDefault();
+      const count = selectedPaths.length;
+      setConfirmDialog({
+        title: "Permanently delete",
+        message: `Permanently delete ${count} item${count === 1 ? "" : "s"}? This cannot be undone.`,
+        confirmLabel: "Delete forever",
+        destructive: true,
+        onConfirm: () => {
+          setConfirmDialog(null);
+          void permanentlyDeleteMany(selectedPaths)
             .then(() => {
               if (path) void refresh(path);
             })

@@ -180,6 +180,22 @@ export async function removeOrTrashMany(paths: string[]): Promise<void> {
   for (const r of remote) await connRemove(r.id, r.remotePath);
 }
 
+/** Permanently delete a multi-path selection. Bypasses OS trash. Local
+ *  paths use `fs_remove` (recursive); remote paths route through
+ *  `conn_remove`. The caller should confirm with destructive wording
+ *  before invoking — there's no recovery path here. */
+export async function permanentlyDeleteMany(paths: string[]): Promise<void> {
+  for (const p of paths) {
+    const loc = parseLocation(p);
+    if (loc.backend.kind === "sftp") {
+      await connRemove(loc.backend.connectionId, loc.remotePath);
+    } else {
+      const { fsRemove } = await import("./fs");
+      await fsRemove(p);
+    }
+  }
+}
+
 /** Restore the most recently trashed entries matching the given paths
  *  via the OS trash API. Linux + Windows use the `trash` crate's
  *  os_limited::restore_all; macOS surfaces an actionable error since
