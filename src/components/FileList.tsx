@@ -275,6 +275,12 @@ interface FileGridViewProps {
   onContext?: (entry: Entry, x: number, y: number) => void;
   onPrimarySelect?: (entry: Entry | null) => void;
   onContextEmpty?: (x: number, y: number) => void;
+  /** Called whenever the computed columns-per-row changes. The
+   *  FileList parent uses this to drive 2D arrow-key navigation
+   *  in grid views (↑↓ jumps by cols, ←→ is ±1). Decoupled this
+   *  way so FileGridView stays the single owner of the layout
+   *  measurement (ResizeObserver). */
+  onColsChange?: (cols: number) => void;
 }
 
 function FileGridView(props: FileGridViewProps) {
@@ -292,6 +298,7 @@ function FileGridView(props: FileGridViewProps) {
     onContext,
     onPrimarySelect,
     onContextEmpty,
+    onColsChange,
   } = props;
 
   const cellWidth = view === "tile" ? 96 : view === "gallery" ? 160 : 240;
@@ -335,6 +342,13 @@ function FileGridView(props: FileGridViewProps) {
     ? 1
     : Math.max(1, Math.floor(usableWidth / cellSlot));
   const rowCount = Math.ceil(sorted.length / cols);
+
+  // Notify parent when cols changes so FileList's keyboard handler
+  // can drive 2D arrow-key navigation. useEffect (not in render) so
+  // we don't fire setState-inside-render on the parent.
+  useEffect(() => {
+    onColsChange?.(cols);
+  }, [cols, onColsChange]);
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -596,6 +610,11 @@ export default function FileList(props: Props) {
    *  re-render on every keystroke. */
   const typeAheadBuffer = useRef<string>("");
   const typeAheadLastKey = useRef<number>(0);
+  /** Columns-per-row reported by FileGridView (for grid views). 1
+   *  in list view since arrows there are inherently 1D. The grid
+   *  pushes updates via onColsChange whenever ResizeObserver
+   *  retriggers. Drives the 2D arrow-key nav below. */
+  const [gridCols, setGridCols] = useState<number>(1);
   /** Idle window after which the type-ahead buffer resets. 800ms
    *  matches Finder's perceived behavior — slow enough to type a
    *  3-letter prefix, fast enough that a fresh search starts clean. */
@@ -664,13 +683,36 @@ export default function FileList(props: Props) {
       if (sorted.length === 0) return;
 
       const cmd = e.metaKey || e.ctrlKey;
+      // Grid views (tile / gallery / column) navigate in 2D: ↑↓
+      // jumps by `cols` rows, ←→ is ±1. List view is 1D so step
+      // = 1 for ↑↓ and ←→ are no-ops there. Cmd+← / Cmd+→ stay
+      // reserved for back/forward (Browser-level handler).
+      const stepDown = view !== "list" ? Math.max(1, gridCols) : 1;
       switch (e.key) {
         case "ArrowDown": {
           e.preventDefault();
-          setFocusedIdx((i) => Math.min(sorted.length - 1, Math.max(0, i) + 1));
+          setFocusedIdx((i) =>
+            Math.min(sorted.length - 1, Math.max(0, i) + stepDown),
+          );
           break;
         }
         case "ArrowUp": {
+          e.preventDefault();
+          setFocusedIdx((i) => Math.max(0, (i < 0 ? 0 : i) - stepDown));
+          break;
+        }
+        case "ArrowRight": {
+          if (view === "list") return;
+          if (cmd) return; // Browser owns Cmd+→ for forward nav.
+          e.preventDefault();
+          setFocusedIdx((i) =>
+            Math.min(sorted.length - 1, Math.max(0, i) + 1),
+          );
+          break;
+        }
+        case "ArrowLeft": {
+          if (view === "list") return;
+          if (cmd) return; // Browser owns Cmd+← for back nav.
           e.preventDefault();
           setFocusedIdx((i) => Math.max(0, (i < 0 ? 0 : i) - 1));
           break;
@@ -688,10 +730,12 @@ export default function FileList(props: Props) {
         case "PageDown": {
           // Jump roughly one viewport. We don't know the exact pixel
           // height of the visible window in this handler, so pick a
-          // sensible page size — 12 rows comfortable, 16 compact —
-          // matches what the user perceives as "one page".
+          // sensible page size — 12 rows comfortable, 16 compact for
+          // list view; for grid views multiply by cols so the user
+          // jumps ROWS-of-cells rather than cells.
           e.preventDefault();
-          const page = density === "compact" ? 16 : 12;
+          const rowsPerPage = density === "compact" ? 16 : 12;
+          const page = view === "list" ? rowsPerPage : rowsPerPage * stepDown;
           setFocusedIdx((i) =>
             Math.min(sorted.length - 1, Math.max(0, i) + page),
           );
@@ -699,7 +743,8 @@ export default function FileList(props: Props) {
         }
         case "PageUp": {
           e.preventDefault();
-          const page = density === "compact" ? 16 : 12;
+          const rowsPerPage = density === "compact" ? 16 : 12;
+          const page = view === "list" ? rowsPerPage : rowsPerPage * stepDown;
           setFocusedIdx((i) => Math.max(0, (i < 0 ? 0 : i) - page));
           break;
         }
@@ -789,7 +834,7 @@ export default function FileList(props: Props) {
     // parent in practice; the dep list intentionally captures only
     // the values we read inside the handler that change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, sorted, focusedIdx, selected, onOpenDir]);
+  }, [isActive, sorted, focusedIdx, selected, onOpenDir, view, gridCols, density]);
 
   // When the focused row moves, update the primary selection + scroll
   // it into view. We don't toggle the multi-selection set here — that
@@ -887,6 +932,7 @@ export default function FileList(props: Props) {
         onContext={onContext}
         onPrimarySelect={onPrimarySelect}
         onContextEmpty={onContextEmpty}
+        onColsChange={setGridCols}
       />
     );
   }
