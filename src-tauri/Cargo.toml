@@ -35,6 +35,8 @@ kamadak-exif = "0.6"
 sha2 = "0.10"
 sysinfo = "0.32"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = "1"
 walkdir = "2"
 notify = "7"
 rayon = "1"

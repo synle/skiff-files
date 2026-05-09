@@ -321,33 +321,85 @@ pub struct ArchiveEntry {
     pub is_dir: bool,
 }
 
-/// List the contents of a zip archive without extracting. Powers the
-/// archive viewer dialog. Streams the central directory only — no
-/// per-entry decompression — so a multi-GB archive opens quickly.
+/// Detect archive format from path extension. Returns one of
+/// "zip" / "tar" / "tar.gz" / "" (unrecognized).
+fn archive_format(path: &str) -> &'static str {
+    let lower = path.to_lowercase();
+    if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
+        "tar.gz"
+    } else if lower.ends_with(".tar") {
+        "tar"
+    } else if lower.ends_with(".zip") {
+        "zip"
+    } else {
+        ""
+    }
+}
+
+/// List the contents of an archive (zip / tar / tar.gz). Powers the
+/// archive viewer dialog. Zip reads the central directory only so
+/// multi-GB archives open instantly; tar walks the whole stream
+/// since the format doesn't carry an index.
 #[tauri::command]
 pub fn fs_archive_list(path: String) -> FsResult<Vec<ArchiveEntry>> {
     use std::fs::File;
-    let file = File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
-    let mut archive =
-        zip::ZipArchive::new(file).map_err(|e| format!("read zip({path}): {e}"))?;
-    let mut out = Vec::with_capacity(archive.len());
-    for i in 0..archive.len() {
-        let entry = archive
-            .by_index(i)
-            .map_err(|e| format!("zip entry {i}: {e}"))?;
-        out.push(ArchiveEntry {
-            name: entry.name().to_string(),
-            size: entry.size(),
-            is_dir: entry.is_dir(),
-        });
+    match archive_format(&path) {
+        "zip" => {
+            let file = File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
+            let mut archive =
+                zip::ZipArchive::new(file).map_err(|e| format!("read zip({path}): {e}"))?;
+            let mut out = Vec::with_capacity(archive.len());
+            for i in 0..archive.len() {
+                let entry = archive
+                    .by_index(i)
+                    .map_err(|e| format!("zip entry {i}: {e}"))?;
+                out.push(ArchiveEntry {
+                    name: entry.name().to_string(),
+                    size: entry.size(),
+                    is_dir: entry.is_dir(),
+                });
+            }
+            Ok(out)
+        }
+        "tar" => {
+            let file = File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
+            list_tar(Box::new(file))
+        }
+        "tar.gz" => {
+            let file = File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
+            list_tar(Box::new(flate2::read::GzDecoder::new(file)))
+        }
+        _ => Err(format!("unsupported archive format: {path}")),
+    }
+}
+
+/// Walk a tar stream and collect entry metadata. Shared by both
+/// plain `.tar` and gzipped `.tar.gz`. The stream is read end-to-end
+/// since tar doesn't carry a central directory.
+fn list_tar(reader: Box<dyn std::io::Read>) -> FsResult<Vec<ArchiveEntry>> {
+    let mut archive = tar::Archive::new(reader);
+    let mut out = Vec::new();
+    let entries = archive
+        .entries()
+        .map_err(|e| format!("read tar: {e}"))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("tar entry: {e}"))?;
+        let header = entry.header();
+        let path_bytes = entry
+            .path_bytes();
+        let name = String::from_utf8_lossy(&path_bytes).into_owned();
+        let size = header.size().unwrap_or(0);
+        let is_dir = header.entry_type().is_dir();
+        out.push(ArchiveEntry { name, size, is_dir });
     }
     Ok(out)
 }
 
-/// Extract a single entry from a zip archive to `dest_path` on disk.
-/// Errors if dest_path already exists (the caller should make sure
-/// the destination is unique). Path-traversal guard same as
-/// `fs_extract_zip`.
+/// Extract a single entry from an archive (zip / tar / tar.gz) to
+/// `dest_path`. Errors if dest_path already exists. Path-traversal
+/// guard rejects absolute paths and `..` components. Tar variants
+/// walk the stream until they find the named entry — slower than
+/// zip's by_name lookup but matches the format's read pattern.
 #[tauri::command]
 pub fn fs_archive_extract_one(
     zip_path: String,
@@ -370,29 +422,87 @@ pub fn fs_archive_extract_one(
     {
         return Err("entry name traverses parent directories".to_string());
     }
-    let file = File::open(&zip_path).map_err(|e| format!("open({zip_path}): {e}"))?;
-    let mut archive =
-        zip::ZipArchive::new(file).map_err(|e| format!("read zip({zip_path}): {e}"))?;
-    let mut entry = archive
-        .by_name(&entry_name)
-        .map_err(|e| format!("entry({entry_name}): {e}"))?;
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir parent: {e}"))?;
     }
-    let mut out = File::create(&dest_path)
-        .map_err(|e| format!("create({dest_path}): {e}"))?;
-    let mut buf = vec![0u8; 64 * 1024];
-    loop {
-        let n = entry
-            .read(&mut buf)
-            .map_err(|e| format!("read zip entry: {e}"))?;
-        if n == 0 {
-            break;
+    match archive_format(&zip_path) {
+        "zip" => {
+            let file =
+                File::open(&zip_path).map_err(|e| format!("open({zip_path}): {e}"))?;
+            let mut archive = zip::ZipArchive::new(file)
+                .map_err(|e| format!("read zip({zip_path}): {e}"))?;
+            let mut entry = archive
+                .by_name(&entry_name)
+                .map_err(|e| format!("entry({entry_name}): {e}"))?;
+            let mut out = File::create(&dest_path)
+                .map_err(|e| format!("create({dest_path}): {e}"))?;
+            let mut buf = vec![0u8; 64 * 1024];
+            loop {
+                let n = entry
+                    .read(&mut buf)
+                    .map_err(|e| format!("read zip entry: {e}"))?;
+                if n == 0 {
+                    break;
+                }
+                out.write_all(&buf[..n])
+                    .map_err(|e| format!("write({dest_path}): {e}"))?;
+            }
+            Ok(())
         }
-        out.write_all(&buf[..n])
-            .map_err(|e| format!("write({dest_path}): {e}"))?;
+        "tar" => {
+            let file =
+                File::open(&zip_path).map_err(|e| format!("open({zip_path}): {e}"))?;
+            extract_one_tar(Box::new(file), &entry_name, &dest_path)
+        }
+        "tar.gz" => {
+            let file =
+                File::open(&zip_path).map_err(|e| format!("open({zip_path}): {e}"))?;
+            extract_one_tar(
+                Box::new(flate2::read::GzDecoder::new(file)),
+                &entry_name,
+                &dest_path,
+            )
+        }
+        _ => Err(format!("unsupported archive format: {zip_path}")),
     }
-    Ok(())
+}
+
+/// Walk a tar stream looking for a named entry, copying its contents
+/// to `dest_path`. Returns OK once written; errors if the entry isn't
+/// found.
+fn extract_one_tar(
+    reader: Box<dyn std::io::Read>,
+    entry_name: &str,
+    dest_path: &str,
+) -> FsResult<()> {
+    use std::fs::File;
+    use std::io::Write;
+    let mut archive = tar::Archive::new(reader);
+    let entries = archive.entries().map_err(|e| format!("read tar: {e}"))?;
+    for entry in entries {
+        let mut entry = entry.map_err(|e| format!("tar entry: {e}"))?;
+        let path_bytes = entry.path_bytes();
+        let name = String::from_utf8_lossy(&path_bytes);
+        if name != entry_name {
+            continue;
+        }
+        let mut out = File::create(dest_path)
+            .map_err(|e| format!("create({dest_path}): {e}"))?;
+        let mut buf = vec![0u8; 64 * 1024];
+        use std::io::Read;
+        loop {
+            let n = entry
+                .read(&mut buf)
+                .map_err(|e| format!("read tar entry: {e}"))?;
+            if n == 0 {
+                break;
+            }
+            out.write_all(&buf[..n])
+                .map_err(|e| format!("write({dest_path}): {e}"))?;
+        }
+        return Ok(());
+    }
+    Err(format!("entry not found in tar: {entry_name}"))
 }
 
 /// Bundle one or more local paths into a zip archive at `dest_zip`.

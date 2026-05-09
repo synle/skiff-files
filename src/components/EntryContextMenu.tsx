@@ -334,7 +334,15 @@ export default function EntryContextMenu({
       {!isRemote &&
         state &&
         onViewArchive &&
-        state.entry.name.toLowerCase().endsWith(".zip") && (
+        (() => {
+          const lower = state.entry.name.toLowerCase();
+          return (
+            lower.endsWith(".zip") ||
+            lower.endsWith(".tar") ||
+            lower.endsWith(".tar.gz") ||
+            lower.endsWith(".tgz")
+          );
+        })() && (
           <MenuItem
             onClick={() => {
               onViewArchive(state.entry);
