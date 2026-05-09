@@ -281,6 +281,11 @@ interface FileGridViewProps {
    *  way so FileGridView stays the single owner of the layout
    *  measurement (ResizeObserver). */
   onColsChange?: (cols: number) => void;
+  /** Apply the rubber-band selection result. `paths` are the cells
+   *  currently overlapping the drag rectangle. `additive` is true
+   *  when the user held Cmd / Shift during the drag — those modes
+   *  add to the existing selection instead of replacing it. */
+  onRubberBand?: (paths: Set<string>, additive: boolean) => void;
 }
 
 function FileGridView(props: FileGridViewProps) {
@@ -299,6 +304,7 @@ function FileGridView(props: FileGridViewProps) {
     onPrimarySelect,
     onContextEmpty,
     onColsChange,
+    onRubberBand,
   } = props;
 
   // Per-view sizing tuned to make the four grid modes visibly
@@ -365,6 +371,53 @@ function FileGridView(props: FileGridViewProps) {
     overscan: 4,
   });
 
+  // Rubber-band (drag rectangle) selection. State lives in a ref +
+  // mirror state — refs for the hot mousemove path (avoid 60fps
+  // setState), state for the rectangle render. Coords are in the
+  // SCROLL container's coordinate system so they stay valid as the
+  // user drags past the edge and the container scrolls.
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    additive: boolean;
+  } | null>(null);
+  const [dragRect, setDragRect] = useState<
+    | {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+      }
+    | null
+  >(null);
+
+  /** Convert a viewport-relative event into the container's
+   *  local coordinate system (accounting for scroll position). */
+  const localCoords = (clientX: number, clientY: number) => {
+    const el = containerRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    return {
+      x: clientX - r.left + el.scrollLeft,
+      y: clientY - r.top + el.scrollTop,
+    };
+  };
+
+  /** Bounding box for cell at index `idx` in the rendered grid.
+   *  Same math the render path uses (cellSlot × col, cellHeight × row,
+   *  +/- p1=8px padding) so hit-testing matches what the user sees. */
+  const cellBox = (idx: number) => {
+    const row = Math.floor(idx / cols);
+    const col = idx % cols;
+    // Outer container has p=1 (8px). The grid row inside is laid out
+    // with `gridTemplateColumns: repeat(cols, 1fr)` + `gap: 1` (8px).
+    // We approximate the cell width as cellSlot - gap, anchoring at
+    // p1 + col * cellSlot.
+    const left = 8 + col * cellSlot;
+    const top = 8 + row * (cellHeight + 8);
+    return { left, top, right: left + cellWidth, bottom: top + cellHeight };
+  };
+
   return (
     <Box
       sx={{
@@ -384,6 +437,64 @@ function FileGridView(props: FileGridViewProps) {
           evt.preventDefault();
           onContextEmpty(evt.clientX, evt.clientY);
         }}
+        onMouseDown={(evt) => {
+          // Rubber-band only starts on left button + clicks on the
+          // container's whitespace (NOT on a cell). Cell clicks go
+          // through the normal selection path.
+          if (evt.button !== 0) return;
+          const target = evt.target as HTMLElement;
+          if (target.closest('[data-testid="file-grid-cell"]')) return;
+          const { x, y } = localCoords(evt.clientX, evt.clientY);
+          dragRef.current = {
+            startX: x,
+            startY: y,
+            additive: evt.metaKey || evt.ctrlKey || evt.shiftKey,
+          };
+          setDragRect({ left: x, top: y, width: 0, height: 0 });
+        }}
+        onMouseMove={(evt) => {
+          if (!dragRef.current) return;
+          const { x, y } = localCoords(evt.clientX, evt.clientY);
+          const left = Math.min(dragRef.current.startX, x);
+          const top = Math.min(dragRef.current.startY, y);
+          const width = Math.abs(x - dragRef.current.startX);
+          const height = Math.abs(y - dragRef.current.startY);
+          setDragRect({ left, top, width, height });
+        }}
+        onMouseUp={(evt) => {
+          if (!dragRef.current) return;
+          const { x, y } = localCoords(evt.clientX, evt.clientY);
+          const left = Math.min(dragRef.current.startX, x);
+          const top = Math.min(dragRef.current.startY, y);
+          const right = Math.max(dragRef.current.startX, x);
+          const bottom = Math.max(dragRef.current.startY, y);
+          // Tiny drags (< 4px in either dimension) are clicks; treat
+          // as "clear selection" rather than a select-nothing rubber-
+          // band. Matches Finder's "click on empty space" behavior.
+          const isClick = right - left < 4 && bottom - top < 4;
+          if (isClick) {
+            if (!dragRef.current.additive) {
+              onRubberBand?.(new Set(), false);
+            }
+          } else {
+            // Hit-test every cell against the drag rect.
+            const hit = new Set<string>();
+            for (let i = 0; i < sorted.length; i++) {
+              const b = cellBox(i);
+              if (
+                b.right >= left &&
+                b.left <= right &&
+                b.bottom >= top &&
+                b.top <= bottom
+              ) {
+                hit.add(sorted[i].path);
+              }
+            }
+            onRubberBand?.(hit, dragRef.current.additive);
+          }
+          dragRef.current = null;
+          setDragRect(null);
+        }}
         sx={{
           flex: 1,
           // Always reserve scrollbar space so a layout-induced
@@ -395,6 +506,10 @@ function FileGridView(props: FileGridViewProps) {
           scrollbarGutter: "stable",
           minHeight: 0,
           p: 1,
+          position: "relative",
+          // Disable text selection during drag so the rubber band
+          // doesn't double-up with browser text-select.
+          userSelect: dragRect ? "none" : undefined,
         }}
       >
         {sorted.length === 0 ? (
@@ -413,6 +528,30 @@ function FileGridView(props: FileGridViewProps) {
               width: "100%",
             }}
           >
+            {/* Rubber-band selection rectangle. Lives inside the
+             *  scroll-tracking inner Box so it scrolls with the grid
+             *  contents — coords are already in container-local
+             *  space. Subtract the outer p1=8px padding because the
+             *  inner virtual-grid Box doesn't have it. */}
+            {dragRect && (dragRect.width > 1 || dragRect.height > 1) && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: dragRect.left - 8,
+                  top: dragRect.top - 8,
+                  width: dragRect.width,
+                  height: dragRect.height,
+                  bgcolor: (theme) =>
+                    `${theme.palette.primary.main}1f` /* 12% alpha */,
+                  border: 1,
+                  borderColor: "primary.main",
+                  borderStyle: "solid",
+                  pointerEvents: "none",
+                  zIndex: 2,
+                  borderRadius: 0.5,
+                }}
+              />
+            )}
             {rowVirtualizer.getVirtualItems().map((vi) => {
               const startIdx = vi.index * cols;
               const endIdx = Math.min(startIdx + cols, sorted.length);
@@ -978,6 +1117,19 @@ export default function FileList(props: Props) {
         onPrimarySelect={onPrimarySelect}
         onContextEmpty={onContextEmpty}
         onColsChange={setGridCols}
+        onRubberBand={(paths, additive) => {
+          setSelected((prev) => {
+            // additive (Cmd/Shift held during drag) merges with the
+            // existing selection. Plain drag replaces it. An empty
+            // result with !additive clears (the "click on empty
+            // space" behavior the rubber-band path emulates for
+            // sub-4px drags).
+            if (!additive) return new Set(paths);
+            const next = new Set(prev);
+            for (const p of paths) next.add(p);
+            return next;
+          });
+        }}
       />
     );
   }
