@@ -186,6 +186,64 @@ export default function EntryContextMenu({
         </ListItemIcon>
         <ListItemText>Copy path</ListItemText>
       </MenuItem>
+      {/* Power-user copy variants. These bypass the onCopyPath
+       *  callback because they're pure string transforms — no need
+       *  to round-trip through Browser. Best-effort: silently no-op
+       *  when navigator.clipboard isn't available. */}
+      <MenuItem
+        onClick={() => {
+          if (state && navigator?.clipboard) {
+            void navigator.clipboard.writeText(state.entry.name);
+          }
+          onClose();
+        }}
+      >
+        <ListItemIcon>
+          <ContentCopyIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Copy filename</ListItemText>
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          if (state && navigator?.clipboard) {
+            // Strip the basename to get the parent directory. Works
+            // for both forward and backward slashes.
+            const path = state.entry.path;
+            const lastSep = Math.max(
+              path.lastIndexOf("/"),
+              path.lastIndexOf("\\"),
+            );
+            const parent = lastSep > 0 ? path.slice(0, lastSep) : path;
+            void navigator.clipboard.writeText(parent);
+          }
+          onClose();
+        }}
+      >
+        <ListItemIcon>
+          <ContentCopyIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Copy parent path</ListItemText>
+      </MenuItem>
+      {!isRemote && (
+        <MenuItem
+          onClick={() => {
+            if (state && navigator?.clipboard) {
+              // file:// URI for the entry. Encode each path segment
+              // (preserves Unicode + spaces) but keep the slashes.
+              const segs = state.entry.path.split("/").map((s) =>
+                s ? encodeURIComponent(s) : s,
+              );
+              void navigator.clipboard.writeText(`file://${segs.join("/")}`);
+            }
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Copy as file:// URI</ListItemText>
+        </MenuItem>
+      )}
       {!isRemote && state && (
         <MenuItem
           onClick={() => {
