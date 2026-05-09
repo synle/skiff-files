@@ -24,6 +24,8 @@ import {
   fsOpenWithDefault,
   fsRevealInOs,
   fsStat,
+  fsWatchClear,
+  fsWatchSet,
   type DiskSpace,
   type Entry,
 } from "../api/fs";
@@ -241,6 +243,60 @@ export default function Browser({
       cancelled = true;
     };
   }, [path]);
+
+  // Re-target the local fs watcher whenever the active path changes.
+  // The Rust side emits debounced fs:changed events; the next effect
+  // listens + debounce-refreshes. Skipped for remote paths since
+  // local fs notifications can't see them. Only the active tab
+  // claims the (single, shared) watcher so background tabs don't
+  // reset the watch target every time a sibling navigates.
+  useEffect(() => {
+    if (!isActive) return;
+    if (!path || path.startsWith("sftp://")) {
+      void fsWatchClear().catch(() => {});
+      return;
+    }
+    void fsWatchSet(path).catch(() => {
+      /* watcher init is best-effort — failure leaves the user with
+         manual refresh, which still works. */
+    });
+  }, [isActive, path]);
+
+  // Subscribe to fs:changed events from the Rust watcher and refresh
+  // the visible listing when our path is the one that changed. The
+  // Rust side already debounces at 150ms; we add a second 250ms layer
+  // here so a burst (e.g. unzipping into the open folder) coalesces
+  // into ONE refresh instead of N.
+  useEffect(() => {
+    if (!isActive) return;
+    if (!path || path.startsWith("sftp://")) return;
+    let cancelled = false;
+    let unlisten: (() => void) | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    void import("@tauri-apps/api/event").then(({ listen }) =>
+      listen<string>("fs:changed", (event) => {
+        // Filter: only react when the changed path is the one we're
+        // showing. Watcher emits the path that triggered (notify
+        // surfaces the file path, not the parent dir).
+        const changed = event.payload ?? "";
+        const norm = path.replace(/\/+$/, "");
+        if (changed && !changed.startsWith(norm)) return;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => void refresh(path), 250);
+      }).then((u) => {
+        if (cancelled) u();
+        else unlisten = u;
+      }),
+    );
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      unlisten?.();
+    };
+    // refresh is stable enough; capturing path keeps the closure
+    // pointing at the active folder.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, path]);
 
   // Bubble path changes up to the tab strip so the tab label tracks
   // the active path.

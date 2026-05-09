@@ -54,6 +54,19 @@ export const fsHomeDir = (): Promise<string> => invoke<string>("fs_home_dir");
 export const windowOpenNew = (): Promise<void> =>
   invoke<void>("window_open_new");
 
+/** Re-target the local fs watcher at `path`. The Rust side emits
+ *  debounced `fs:changed` events when anything inside changes, so the
+ *  Browser can auto-refresh without polling. Call on every navigation
+ *  (Browser does this in a useEffect tied to `path`). Errors silently
+ *  — a watcher failure shouldn't block navigation. */
+export const fsWatchSet = (path: string): Promise<void> =>
+  invoke<void>("fs_watch_set", { path });
+
+/** Stop the watcher. Called when navigating to a remote (`sftp://…`)
+ *  path where local fs notifications don't apply. */
+export const fsWatchClear = (): Promise<void> =>
+  invoke<void>("fs_watch_clear");
+
 export const fsListDir = (
   path: string,
   options?: ListOptions,

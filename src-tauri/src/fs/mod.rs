@@ -9,3 +9,4 @@ pub mod registry;
 pub mod sftp;
 pub mod ssh_config;
 pub mod types;
+pub mod watch;

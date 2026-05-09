@@ -21,6 +21,7 @@ use commands::{
     fs_trash_path,
     fs_stat, fs_trash, fs_trash_many, get_app_version, settings_app_data_dir, settings_load,
     settings_save, window_open_new,
+    fs_watch_clear, fs_watch_set, FsWatchState,
     ssh_config_hosts, sync_cancel, sync_cpstamp, sync_dedup,
     sync_list, sync_pause, sync_resolve_conflict, sync_resume, sync_start_cross, sync_start_local,
     sync_start_repo,
@@ -41,6 +42,7 @@ pub fn run() {
         .manage(Arc::new(Registry::new()))
         .manage(Arc::new(JobRegistry::new()))
         .manage(Arc::new(ResolverHub::new()))
+        .manage(Arc::new(FsWatchState::new(None)))
         .invoke_handler(tauri::generate_handler![
             // local
             get_app_version,
@@ -74,6 +76,8 @@ pub fn run() {
             settings_save,
             settings_app_data_dir,
             window_open_new,
+            fs_watch_set,
+            fs_watch_clear,
             ssh_config_hosts,
             // connections
             conn_create_sftp,

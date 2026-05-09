@@ -720,6 +720,49 @@ pub fn window_open_new(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Live-reload state for the active tab. The watcher is initialized
+/// lazily on first use so apps that never browse the local fs (rare,
+/// but possible — e.g. an SFTP-only session) don't pay the cost.
+pub type FsWatchState = std::sync::Mutex<Option<crate::fs::watch::WatchHandle>>;
+
+/// Switch the file watcher to `path`. The frontend calls this on every
+/// navigation; the watcher then emits `fs:changed` Tauri events when
+/// anything changes in that folder so the Browser can auto-refresh.
+/// Skipped for remote paths (sftp://, smb://, …) where local fs
+/// notifications don't apply — the frontend filters before calling.
+#[tauri::command]
+pub fn fs_watch_set(
+    path: String,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, std::sync::Arc<FsWatchState>>,
+) -> Result<(), String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    if guard.is_none() {
+        *guard = Some(
+            crate::fs::watch::WatchHandle::new(app)
+                .map_err(|e| format!("watch init: {e}"))?,
+        );
+    }
+    let handle = guard.as_mut().expect("watch handle just initialized");
+    handle
+        .set(std::path::Path::new(&path))
+        .map_err(|e| format!("watch set({path}): {e}"))
+}
+
+/// Stop watching. The Browser calls this when navigating to a remote
+/// path so we don't keep a stale local watcher running. Cheap if no
+/// watcher was ever initialized.
+#[tauri::command]
+pub fn fs_watch_clear(
+    state: tauri::State<'_, std::sync::Arc<FsWatchState>>,
+) -> Result<(), String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    if let Some(h) = guard.as_mut() {
+        h.clear();
+    }
+    Ok(())
+}
+
 /// Copy a single file. Returns bytes written.
 #[tauri::command]
 pub fn fs_copy_file(from: String, to: String) -> FsResult<u64> {
