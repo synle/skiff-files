@@ -610,7 +610,44 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         )}
 
         {isVisible("bookmarks") && settings.bookmarks.length > 0 && (
-          <>
+          <Box
+            // Drop target for "drag folder into Bookmarks → add new
+            // bookmark". Bubbles up from below: a drop on a bookmark
+            // row preventDefaults via its own handler (existing
+            // sync-into-bookmark flow), so this fires only when the
+            // drop landed on the section header / list whitespace.
+            // Falls through to the inner row handlers when those
+            // accept the drop first.
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "copy";
+              }
+            }}
+            onDrop={(e) => {
+              const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+              if (!raw) return;
+              e.preventDefault();
+              // Each path becomes a new bookmark, deduped by path.
+              const incoming = raw
+                .split("\n")
+                .filter(Boolean)
+                .filter(
+                  (p) =>
+                    !settings.bookmarks.some((b) => b.path === p),
+                )
+                .map((p) => {
+                  const segs = p.split(/[\\/]/).filter(Boolean);
+                  return {
+                    id: crypto.randomUUID(),
+                    label: segs.at(-1) ?? p,
+                    path: p,
+                  };
+                });
+              if (incoming.length === 0) return;
+              update("bookmarks", [...settings.bookmarks, ...incoming]);
+            }}
+          >
             {renderSectionHeader("bookmarks", "Bookmarks")}
             {!isCollapsed("bookmarks") && (
             <List dense disablePadding id="sidebar-section-bookmarks">
@@ -795,7 +832,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               ))}
             </List>
             )}
-          </>
+          </Box>
         )}
 
         {isVisible("recent") && settings.recentPaths.length > 0 && (
