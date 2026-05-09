@@ -41,6 +41,7 @@ import { connList, type ConnectionInfo } from "../api/conn";
 import {
   fsMounts,
   fsOpenWithDefault,
+  fsTrashMany,
   fsTrashPath,
   type MountedVolume,
 } from "../api/fs";
@@ -545,6 +546,42 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                         },
                       ],
                     });
+                  }}
+                  // Drop target for "drag rows here to delete" — Finder
+                  // muscle memory. Accepts the path-drag MIME the
+                  // FileList rows emit. Local paths only; sftp:// is
+                  // skipped silently (those go through right-click
+                  // "Move to Trash" which uses conn_remove instead).
+                  onDragOver={(e) => {
+                    if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "copy";
+                    }
+                  }}
+                  onDrop={(e) => {
+                    const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+                    if (!raw) return;
+                    e.preventDefault();
+                    const paths = raw
+                      .split("\n")
+                      .filter((p) => p && !p.startsWith("sftp://"));
+                    if (paths.length === 0) return;
+                    if (
+                      !window.confirm(
+                        `Move ${paths.length} item${paths.length === 1 ? "" : "s"} to Trash?`,
+                      )
+                    ) {
+                      return;
+                    }
+                    void fsTrashMany(paths).catch(() => {
+                      /* failure surfaces via the next list_dir refresh */
+                    });
+                    // Nudge any open Browser to refresh — not strictly
+                    // necessary (the watcher will catch it within
+                    // ~150ms) but feels snappier.
+                    window.dispatchEvent(
+                      new CustomEvent("skiff:trash-completed"),
+                    );
                   }}
                 >
                   <ListItemIcon sx={{ minWidth: 32 }}>
