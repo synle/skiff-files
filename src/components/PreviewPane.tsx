@@ -332,6 +332,11 @@ function TextBody({ entry }: { entry: Entry }) {
   return (
     <Box
       component="pre"
+      // .skiff-selectable opts back into native text-selection,
+      // overriding the global user-select:none baseline. Without
+      // this the preview text would render but the user couldn't
+      // copy from it — a regression of the 0.2.167 baseline.
+      className="skiff-selectable"
       sx={{
         m: 0,
         p: 1,
