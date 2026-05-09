@@ -5,6 +5,7 @@
 import {
   Box,
   Button,
+  Dialog,
   Divider,
   FormControl,
   FormControlLabel,
@@ -20,6 +21,11 @@ import { useEffect, useState } from "react";
 import { appDataDir, useSettings } from "../state/settings";
 import { fsOpenWithDefault, fsRevealInOs, getAppVersion } from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
+import {
+  activeCombo,
+  formatCombo,
+  keyEventToCombo,
+} from "../util/keybindings";
 
 /** Generic section wrapper so spacing stays consistent across groups. */
 function Section({
@@ -50,7 +56,9 @@ function Section({
  *  entire list. Filter is case-insensitive and matches both the keys
  *  column and the description. Empty groups (no matches) collapse. */
 function KeyboardShortcutList() {
+  const { settings, update } = useSettings();
   const [filter, setFilter] = useState("");
+  const [recordingFor, setRecordingFor] = useState<string | null>(null);
   const q = filter.trim().toLowerCase();
   const groups = q
     ? SHORTCUT_GROUPS.map((g) => ({
@@ -62,6 +70,22 @@ function KeyboardShortcutList() {
         ),
       })).filter((g) => g.items.length > 0)
     : SHORTCUT_GROUPS;
+
+  const updateOverride = (actionId: string, combo: string | null) => {
+    const next = { ...settings.shortcutOverrides };
+    if (combo === undefined) {
+      delete next[actionId];
+    } else {
+      next[actionId] = combo;
+    }
+    update("shortcutOverrides", next);
+  };
+  const resetOverride = (actionId: string) => {
+    const next = { ...settings.shortcutOverrides };
+    delete next[actionId];
+    update("shortcutOverrides", next);
+  };
+
   return (
     <Stack spacing={2}>
       <TextField
@@ -71,6 +95,11 @@ function KeyboardShortcutList() {
         onChange={(e) => setFilter(e.target.value)}
         sx={{ maxWidth: 480 }}
       />
+      <Typography variant="caption" color="text.secondary">
+        Shortcuts marked with an Edit button are rebindable. The rest are
+        documentation-only — their handlers will migrate to the rebindable
+        framework in future releases.
+      </Typography>
       {groups.length === 0 ? (
         <Typography variant="caption" color="text.secondary">
           No shortcuts match "{filter}".
@@ -82,32 +111,166 @@ function KeyboardShortcutList() {
               {g.title}
             </Typography>
             <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-              {g.items.map((it) => (
-                <Box
-                  key={it.keys + it.description}
-                  sx={{ display: "flex", gap: 2 }}
-                >
-                  <Typography
-                    variant="caption"
+              {g.items.map((it) => {
+                const rebindable = !!it.actionId && !!it.defaultCombo;
+                const live = rebindable
+                  ? activeCombo(
+                      it.actionId!,
+                      it.defaultCombo!,
+                      settings.shortcutOverrides,
+                    )
+                  : null;
+                const isOverridden =
+                  rebindable &&
+                  Object.prototype.hasOwnProperty.call(
+                    settings.shortcutOverrides,
+                    it.actionId!,
+                  );
+                return (
+                  <Box
+                    key={it.keys + it.description}
                     sx={{
-                      width: 220,
-                      flexShrink: 0,
-                      fontFamily: "monospace",
-                      color: "text.primary",
+                      display: "flex",
+                      gap: 2,
+                      alignItems: "center",
                     }}
                   >
-                    {it.keys}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {it.description}
-                  </Typography>
-                </Box>
-              ))}
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        width: 220,
+                        flexShrink: 0,
+                        fontFamily: "monospace",
+                        color: "text.primary",
+                      }}
+                    >
+                      {rebindable
+                        ? live === null
+                          ? "(disabled)"
+                          : formatCombo(live)
+                        : it.keys}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ flex: 1 }}
+                    >
+                      {it.description}
+                    </Typography>
+                    {rebindable && (
+                      <Box sx={{ display: "flex", gap: 0.5 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setRecordingFor(it.actionId!)}
+                        >
+                          {recordingFor === it.actionId ? "Recording…" : "Edit"}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() =>
+                            updateOverride(it.actionId!, null)
+                          }
+                          disabled={live === null}
+                        >
+                          Disable
+                        </Button>
+                        {isOverridden && (
+                          <Button
+                            size="small"
+                            variant="text"
+                            onClick={() => resetOverride(it.actionId!)}
+                          >
+                            Reset
+                          </Button>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })}
             </Stack>
           </Box>
         ))
       )}
+      <KeyRecorderDialog
+        open={recordingFor != null}
+        onClose={() => setRecordingFor(null)}
+        onCommit={(combo) => {
+          if (recordingFor) updateOverride(recordingFor, combo);
+          setRecordingFor(null);
+        }}
+      />
     </Stack>
+  );
+}
+
+/** Modal that captures the next non-modifier keypress and reports
+ *  the canonical combo back. Esc cancels without committing. */
+function KeyRecorderDialog({
+  open,
+  onClose,
+  onCommit,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCommit: (combo: string) => void;
+}) {
+  const [captured, setCaptured] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      setCaptured(null);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      const combo = keyEventToCombo(e);
+      if (!combo) return;
+      e.preventDefault();
+      setCaptured(combo);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, onClose]);
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <Box sx={{ p: 3, textAlign: "center" }}>
+        <Typography variant="subtitle1" sx={{ mb: 1 }}>
+          Press a key combination
+        </Typography>
+        <Typography
+          variant="h6"
+          sx={{
+            fontFamily: "monospace",
+            color: captured ? "text.primary" : "text.disabled",
+            minHeight: 32,
+          }}
+        >
+          {captured ? formatCombo(captured) : "—"}
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 1 }}
+        >
+          Esc cancels. Press the same combo again to confirm.
+        </Typography>
+        <Box sx={{ mt: 2, display: "flex", justifyContent: "center", gap: 1 }}>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!captured}
+            onClick={() => captured && onCommit(captured)}
+          >
+            Save
+          </Button>
+        </Box>
+      </Box>
+    </Dialog>
   );
 }
 

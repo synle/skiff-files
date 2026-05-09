@@ -9,6 +9,14 @@ export interface Shortcut {
   keys: string;
   /** What the shortcut does. */
   description: string;
+  /** Stable action id. Present only for shortcuts that have been
+   *  migrated to the `Settings.shortcutOverrides` lookup — those
+   *  are user-rebindable from Settings → Keyboard. The rest are
+   *  documentation-only for now. */
+  actionId?: string;
+  /** Default combo string for rebindable shortcuts (used when no
+   *  override is set). Lowercase + `+`-joined per `keybindings.ts`. */
+  defaultCombo?: string;
 }
 
 export interface ShortcutGroup {
@@ -66,9 +74,24 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + I", description: "Toggle preview pane" },
       { keys: "Cmd / Ctrl + R · F5", description: "Refresh current folder" },
       { keys: "Cmd / Ctrl + L", description: "Edit path (focus path bar)" },
-      { keys: "Cmd / Ctrl + K", description: "Quick-jump (bookmarks + recent)" },
-      { keys: "Cmd / Ctrl + Shift + P", description: "Command palette (every action, searchable)" },
-      { keys: "Cmd / Ctrl + ,", description: "Open Settings" },
+      {
+        keys: "Cmd / Ctrl + K",
+        description: "Quick-jump (bookmarks + recent)",
+        actionId: "app.quickJump",
+        defaultCombo: "cmd+k",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + P",
+        description: "Command palette (every action, searchable)",
+        actionId: "app.commandPalette",
+        defaultCombo: "cmd+shift+p",
+      },
+      {
+        keys: "Cmd / Ctrl + ,",
+        description: "Open Settings",
+        actionId: "app.openSettings",
+        defaultCombo: "cmd+,",
+      },
       { keys: "Cmd / Ctrl + Shift + N", description: "New folder" },
       { keys: "Cmd / Ctrl + D", description: "Bookmark current folder" },
       { keys: "F2", description: "Rename selected entry" },

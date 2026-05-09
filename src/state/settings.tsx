@@ -212,6 +212,14 @@ export interface Settings {
   useCustomTheme: boolean;
   customLightPalette: CustomPalette;
   customDarkPalette: CustomPalette;
+  /** Per-action keyboard binding overrides. Key = action id from
+   *  the shortcut catalog. Value = combo string ("ctrl+shift+p")
+   *  or `null` to mean the user has disabled the binding entirely.
+   *  Missing key = use the default combo. Only a starter set of
+   *  actions are wired today (palette / quick-jump / settings);
+   *  the rest of the catalog is read-only until their handlers
+   *  migrate to the same `matchesCombo` lookup. */
+  shortcutOverrides: Record<string, string | null>;
 }
 
 /** User-editable palette slots. Maps directly onto MUI's `palette`
@@ -323,6 +331,7 @@ export const DEFAULTS: Settings = {
     textPrimary: "",
     textSecondary: "",
   },
+  shortcutOverrides: {},
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

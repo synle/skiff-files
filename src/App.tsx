@@ -18,6 +18,7 @@ import { listen } from "@tauri-apps/api/event";
 import { loadSettingsFromDisk } from "./state/settings";
 import { useSettings } from "./state/settings";
 import { pruneStaleBookmarks, pruneStalePaths } from "./util/pruneStale";
+import { activeCombo, matchesCombo } from "./util/keybindings";
 
 /** A custom DOM event the Sidebar emits to ask the Browser to navigate. We
  *  use a window event rather than lifting state because it stays
@@ -70,19 +71,35 @@ export default function App() {
         void windowOpenNew().catch(() => {
           /* running outside Tauri / browser dev — silent fallback */
         });
-      } else if (k === "k") {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.quickJump", "cmd+k", settings.shortcutOverrides),
+        )
+      ) {
         e.preventDefault();
         setQuickJumpOpen((o) => !o);
-      } else if (k === "p" && e.shiftKey) {
-        // Cmd/Ctrl+Shift+P opens the command palette. VS Code muscle
-        // memory. Distinct from Cmd+K (paths) and Cmd+P (no binding —
-        // intentionally left free since browsers consume it for print).
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "app.commandPalette",
+            "cmd+shift+p",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
         e.preventDefault();
         setCommandPaletteOpen((o) => !o);
       } else if (k === "b") {
         e.preventDefault();
         update("sidebarVisible", !settings.sidebarVisible);
-      } else if (e.key === "," ) {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.openSettings", "cmd+,", settings.shortcutOverrides),
+        )
+      ) {
         // Mac convention: Cmd+, opens app preferences. We honor it
         // on Linux/Windows too via Ctrl+, since users coming from
         // VS Code expect this binding everywhere.
@@ -139,7 +156,14 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [settings.sidebarVisible, settings.twoPaneMode, settings.fontSize, settings.showHidden, update]);
+  }, [
+    settings.sidebarVisible,
+    settings.twoPaneMode,
+    settings.fontSize,
+    settings.showHidden,
+    settings.shortcutOverrides,
+    update,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
