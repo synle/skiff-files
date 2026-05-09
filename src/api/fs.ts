@@ -27,6 +27,12 @@ export interface Entry {
   kind: FileKind;
   size: number;
   mtime: number | null;
+  /** Unix seconds for file creation / birth time. `null` on platforms
+   *  / filesystems that don't expose it (Linux ext4 in some configs,
+   *  SFTP — the protocol doesn't carry creation time). UI hides the
+   *  Created column for entries with a null value. Optional for
+   *  backwards compatibility with test fixtures predating ctime. */
+  ctime?: number | null;
   isDir: boolean;
   isSymlink: boolean;
   isHidden: boolean;

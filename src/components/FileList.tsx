@@ -23,7 +23,7 @@ import { formatBytes, formatMtime, formatMtimeRelative } from "../util/format";
 import { setFileClipboard } from "../util/fileClipboard";
 import type { Density, ShowExtensions, ViewMode } from "../state/settings";
 
-export type SortKey = "name" | "size" | "mtime" | "kind";
+export type SortKey = "name" | "size" | "mtime" | "ctime" | "kind";
 export type SortDir = "asc" | "desc";
 
 interface Props {
@@ -107,6 +107,8 @@ function sortEntries(
         return (a.size - b.size) * mul;
       case "mtime":
         return ((a.mtime ?? 0) - (b.mtime ?? 0)) * mul;
+      case "ctime":
+        return ((a.ctime ?? 0) - (b.ctime ?? 0)) * mul;
       case "kind":
         return a.kind.localeCompare(b.kind) * mul || a.name.localeCompare(b.name);
       case "name":

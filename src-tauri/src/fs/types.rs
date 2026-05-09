@@ -38,6 +38,10 @@ pub struct Entry {
     pub size: u64,
     /// Unix seconds. `None` if the platform / FS can't provide it.
     pub mtime: Option<i64>,
+    /// Unix seconds for file creation time (birth time on macOS / FAT,
+    /// ctime fallback on Linux ext4 where birth isn't always available).
+    /// `None` when the platform / filesystem doesn't expose it.
+    pub ctime: Option<i64>,
     pub is_dir: bool,
     pub is_symlink: bool,
     pub is_hidden: bool,

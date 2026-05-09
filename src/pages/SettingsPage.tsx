@@ -224,6 +224,7 @@ export default function SettingsPage() {
                 <MenuItem value="name">Name</MenuItem>
                 <MenuItem value="size">Size</MenuItem>
                 <MenuItem value="mtime">Modified</MenuItem>
+                <MenuItem value="ctime">Created</MenuItem>
                 <MenuItem value="kind">Kind</MenuItem>
               </Select>
             </FormControl>

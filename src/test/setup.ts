@@ -20,6 +20,7 @@ vi.mock("@tauri-apps/api/core", () => ({
         kind: "folder",
         size: 0,
         mtime: null,
+        ctime: null,
         isDir: true,
         isSymlink: false,
         isHidden: false,

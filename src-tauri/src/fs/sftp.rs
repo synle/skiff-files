@@ -281,6 +281,9 @@ impl SftpClient {
             kind,
             size: if is_dir { 0 } else { attrs.size.unwrap_or(0) },
             mtime: attrs.mtime.map(|t| t as i64),
+            // SFTP attributes don't carry creation time; the protocol
+            // only exposes mtime + atime. Always None for remote rows.
+            ctime: None,
             is_dir,
             is_symlink,
             is_hidden,
