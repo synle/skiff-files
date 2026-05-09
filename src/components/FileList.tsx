@@ -1248,13 +1248,35 @@ export default function FileList(props: Props) {
   const [dragOverIdx, setDragOverIdx] = useState<number>(-1);
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // Reset selection + focus when the entries array identity changes —
-  // typically after a navigation. Sticking to a stale path in the
-  // previous folder would surface a wrong size in the StatusBar.
+  // Path-change detector. Lets us distinguish navigation (reset
+  // selection — stale paths from a previous folder are nonsense) from
+  // a refresh-in-place (preserve the user's selection wherever the
+  // entries still exist in the new listing — fixes a fs-watcher
+  // refresh from blowing away an active multi-select). The initial
+  // sentinel `null` is distinct from any real path so the first
+  // mount counts as a path change, mirroring the previous reset
+  // behavior.
+  const lastPathRef = useRef<string | null | undefined>(null);
   useEffect(() => {
-    setSelected(new Set());
-    setFocusedIdx(entries.length > 0 ? 0 : -1);
-  }, [entries]);
+    const pathChanged = lastPathRef.current !== path;
+    lastPathRef.current = path;
+    if (pathChanged) {
+      setSelected(new Set());
+      setFocusedIdx(entries.length > 0 ? 0 : -1);
+      return;
+    }
+    // Refresh in place — keep selection rows that still exist.
+    setSelected((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set<string>();
+      const stillThere = new Set(entries.map((e) => e.path));
+      for (const p of prev) if (stillThere.has(p)) next.add(p);
+      // Reference-stable when nothing was dropped — avoids a no-op
+      // re-render that'd cascade through the selection effect chain.
+      return next.size === prev.size ? prev : next;
+    });
+    if (entries.length === 0) setFocusedIdx(-1);
+  }, [entries, path]);
 
   // Per-folder scroll memory for the list view. Mirrors the same
   // logic FileGridView uses — save on scroll (rAF-debounced), restore

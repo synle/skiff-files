@@ -18,7 +18,7 @@ import {
 import LaunchIcon from "@mui/icons-material/Launch";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   fsImageExif,
   fsOpenWithDefault,
@@ -80,6 +80,19 @@ function ImageBody({
    *  on = native pixel size, scroll inside the pane to inspect.
    *  Resets on selection change so each new image starts fitted. */
   const [zoomed, setZoomed] = useState<boolean>(false);
+  /** Drag-to-pan when zoomed. The scrollable wrapper holds the ref;
+   *  pointer-down captures the starting cursor + scroll offset, then
+   *  pointermove updates scrollTop / scrollLeft by the delta until
+   *  pointerup. Suppresses the click-to-fit toggle when the drag
+   *  actually moved (>4px) so panning doesn't accidentally exit zoom. */
+  const panContainerRef = useRef<HTMLDivElement | null>(null);
+  const panStateRef = useRef<{
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+    moved: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +132,7 @@ function ImageBody({
   return (
     <Box>
       <Box
+        ref={panContainerRef}
         // When zoomed, wrap in a scrollable container so the user
         // can pan inside the pane bounds without overflowing the
         // properties block below.
@@ -132,26 +146,73 @@ function ImageBody({
           component="img"
           src={src}
           alt={entry.name}
+          draggable={false}
           onLoad={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             if (img.naturalWidth > 0 && img.naturalHeight > 0) {
               onDimensions({ w: img.naturalWidth, h: img.naturalHeight });
             }
           }}
-          onClick={() => setZoomed((z) => !z)}
-          title={zoomed ? "Click to fit" : "Click to zoom 100%"}
+          onPointerDown={(e) => {
+            if (!zoomed) return;
+            const cont = panContainerRef.current;
+            if (!cont) return;
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            panStateRef.current = {
+              startX: e.clientX,
+              startY: e.clientY,
+              scrollLeft: cont.scrollLeft,
+              scrollTop: cont.scrollTop,
+              moved: false,
+            };
+          }}
+          onPointerMove={(e) => {
+            const s = panStateRef.current;
+            const cont = panContainerRef.current;
+            if (!s || !cont) return;
+            const dx = e.clientX - s.startX;
+            const dy = e.clientY - s.startY;
+            if (!s.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+              s.moved = true;
+            }
+            cont.scrollLeft = s.scrollLeft - dx;
+            cont.scrollTop = s.scrollTop - dy;
+          }}
+          onPointerUp={(e) => {
+            const s = panStateRef.current;
+            panStateRef.current = null;
+            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+            // Suppress the click-to-fit toggle when the user dragged.
+            if (s?.moved) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+          onClick={(e) => {
+            // Pointerup already cleaned up panState; if it dragged
+            // (moved=true), we wouldn't reach here because preventDefault
+            // suppressed click. But pointerup fires before click in
+            // some browsers without click suppression — guard again.
+            if (panStateRef.current === null) {
+              setZoomed((z) => !z);
+            }
+            e.preventDefault();
+          }}
+          title={zoomed ? "Click to fit · drag to pan" : "Click to zoom 100%"}
           sx={{
             maxWidth: zoomed ? "none" : "100%",
             maxHeight: zoomed ? "none" : 360,
             borderRadius: 1,
             display: "block",
-            cursor: zoomed ? "zoom-out" : "zoom-in",
+            cursor: zoomed ? "grab" : "zoom-in",
+            "&:active": { cursor: zoomed ? "grabbing" : "zoom-in" },
             transform: `rotate(${rotation}deg)`,
             // Keep the rotated image inside the pane bounds — without
             // `transform-origin: center` rotation pivots from top-left
             // and the image walks off screen on quarter turns.
             transformOrigin: "center",
             transition: "transform 200ms",
+            userSelect: "none",
           }}
         />
       </Box>

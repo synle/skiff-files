@@ -356,6 +356,35 @@ function buildCommandActions(deps: {
   update: ReturnType<typeof useSettings>["update"];
 }): CommandAction[] {
   const { page, setPage, settings, update } = deps;
+  /** Common helper: switch to Browser then dispatch a navigate event so
+   *  the Browser actually goes there. Used by every "Go to <path>"
+   *  action surfaced from bookmarks / recent. */
+  const goTo = (target: string) => {
+    setPage("browser");
+    queueMicrotask(() =>
+      window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: target })),
+    );
+  };
+  // Bookmark + recent path actions. Each becomes a row in the
+  // palette so users can fuzzy-search across their full path graph.
+  const bookmarkActions: CommandAction[] = settings.bookmarks.map((b) => ({
+    id: `bookmark.${b.id}`,
+    label: `Go to ${b.label}`,
+    hint: b.path,
+    keywords: `bookmark ${b.path}`,
+    run: () => goTo(b.path),
+  }));
+  const recentActions: CommandAction[] = settings.recentPaths
+    // Drop the current path (Browser auto-pushes it) since "go to
+    // current" is a no-op that pollutes the suggestions list.
+    .slice(0, 10)
+    .map((p) => ({
+      id: `recent.${p}`,
+      label: `Recent: ${p}`,
+      hint: undefined,
+      keywords: `recent ${p}`,
+      run: () => goTo(p),
+    }));
   return [
     // Pages
     {
@@ -484,5 +513,10 @@ function buildCommandActions(deps: {
       hint: settings.density === "compact" ? "Current" : undefined,
       run: () => update("density", "compact"),
     },
+    // User-curated paths land at the bottom — they're noisier than
+    // the static actions, but the palette's fuzzy search lets users
+    // type a snippet of the path and skip past everything else.
+    ...bookmarkActions,
+    ...recentActions,
   ];
 }
