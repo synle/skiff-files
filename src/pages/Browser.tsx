@@ -9,6 +9,7 @@ import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import PathBar from "../components/PathBar";
 import Toolbar from "../components/Toolbar";
+import BulkActionBar from "../components/BulkActionBar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
@@ -54,6 +55,7 @@ import {
   clearFileClipboard,
   FILE_CLIPBOARD_EVENT,
   getFileClipboard,
+  setFileClipboard,
   type FileClipboardEntry,
 } from "../util/fileClipboard";
 import { NAVIGATE_EVENT, OPEN_IN_TAB_EVENT } from "../App";
@@ -1093,6 +1095,50 @@ export default function Browser({
             update("searchHistory", next);
           }
         }}
+      />
+      <BulkActionBar
+        count={selectedPaths.length}
+        onCopy={() => setFileClipboard(selectedPaths, "copy")}
+        onCut={() => setFileClipboard(selectedPaths, "cut")}
+        onDelete={() => {
+          if (selectedPaths.length === 0) return;
+          const hasRemote = selectedPaths.some((p) => p.startsWith("sftp://"));
+          const verb = hasRemote ? "Permanently delete" : "Move to Trash";
+          const count = selectedPaths.length;
+          setConfirmDialog({
+            title: verb,
+            message: `${verb} ${count} item${count === 1 ? "" : "s"}?`,
+            confirmLabel: hasRemote ? "Delete" : "Move to Trash",
+            destructive: true,
+            onConfirm: () => {
+              setConfirmDialog(null);
+              pushTrashBatch(selectedPaths);
+              void removeOrTrashMany(selectedPaths)
+                .then(() => {
+                  if (path) void refresh(path);
+                })
+                .catch((err) => setError(String(err)));
+            },
+          });
+        }}
+        onCompress={() => {
+          if (selectedPaths.length === 0 || !path) return;
+          const existing = new Set(entries.map((x) => x.name));
+          let candidate = `archive.zip`;
+          let n = 2;
+          while (existing.has(candidate)) candidate = `archive (${n++}).zip`;
+          const dest = `${path}/${candidate}`;
+          void fsCompressZip(selectedPaths, dest)
+            .then(() => {
+              if (path) void refresh(path);
+            })
+            .catch((err) => setError(String(err)));
+        }}
+        onBulkRename={() => {
+          const set = new Set(selectedPaths);
+          setBulkRenameTargets(entries.filter((x) => set.has(x.path)));
+        }}
+        onClear={() => setSelectedPaths([])}
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
         <FileList
