@@ -172,20 +172,20 @@ describe("TransfersPage", () => {
     fireEvent.click(screen.getByText("Start"));
     await waitFor(() => {
       expect(
-        screen.getByLabelText("Pause job test-job-id"),
+        screen.getByRole("button", { name: "Pause" }),
       ).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByLabelText("Pause job test-job-id"));
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     await waitFor(() => {
       expect(mocked).toHaveBeenCalledWith("sync_pause", { id: "test-job-id" });
     });
     // After pause the row should now expose a Resume button.
     await waitFor(() => {
       expect(
-        screen.getByLabelText("Resume job test-job-id"),
+        screen.getByRole("button", { name: "Resume" }),
       ).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByLabelText("Resume job test-job-id"));
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
     await waitFor(() => {
       expect(mocked).toHaveBeenCalledWith("sync_resume", {
         id: "test-job-id",

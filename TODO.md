@@ -361,7 +361,7 @@ These are tracked here so they don't get lost, but the user has asked that they 
   - Settings → Connections gets per-cloud "Add" buttons; each pops a provider-specific config form (OAuth flow opens system browser → loopback redirect → token exchange).
 
 
-- [ ] **Unified progress dialogs for all in-progress operations** *(top priority backlog)* — every long-running operation (delete-to-trash, copy, cut/paste, sync jobs) should surface the **same** progress widget so the UX is deterministic. Spec:
+- [x] **Unified progress dialogs for all in-progress operations** *(top priority backlog — first slice in 0.2.175)* — every long-running operation (delete-to-trash, copy, cut/paste, sync jobs) should surface the **same** progress widget so the UX is deterministic. The `ProgressWidget` component + rolling-window ETA tracker shipped in 0.2.175 and is wired into TransfersPage. Snackbar-anchored variant for delete + paste flows + global "operations queue" drawer remain. Spec:
   - **Determinate progress bar** wherever total bytes are known up-front (sync — `bytesDone / bytesTotal`); fall back to indeterminate during the pre-scan.
   - **Files counter** — "N of M files" alongside the bar, regardless of whether the byte count is known. This is the "always-something-deterministic" anchor: even when total bytes are unknown, the user sees how many files are left.
   - **ETA** computed from a rolling 5-second bytes-per-second window. Display as both **time remaining** ("~2 min 14 s") **and absolute completion time** ("done at 3:47 PM"). Switch to "Calculating…" for the first 5 seconds while the rolling window primes.

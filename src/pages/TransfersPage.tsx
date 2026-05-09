@@ -10,7 +10,6 @@ import {
   FormControlLabel,
   IconButton,
   InputLabel,
-  LinearProgress,
   List,
   ListItem,
   ListItemText,
@@ -22,12 +21,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import StopIcon from "@mui/icons-material/Stop";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import PauseIcon from "@mui/icons-material/Pause";
 import SaveIcon from "@mui/icons-material/Save";
 import { useEffect, useRef, useState } from "react";
+import ProgressWidget from "../components/ProgressWidget";
+import { computeEta, pushSample, type EtaSample } from "../util/etaTracker";
 import {
   onDone,
   onError,
@@ -146,6 +145,11 @@ export default function TransfersPage() {
   }, [savedJobs]);
 
   const mounted = useRef(true);
+  // Per-job rolling sample buffers for the ETA tracker. Lives outside
+  // the React state because we don't need to re-render on each push;
+  // we read it during the render pass to compute ETA from the latest
+  // progress event.
+  const samplesRef = useRef<Record<string, EtaSample[]>>({});
 
   // Subscribe to the three Tauri events on mount; unsubscribe on
   // unmount. Initial JobInfo list comes from one syncList() call so
@@ -170,6 +174,10 @@ export default function TransfersPage() {
     })();
     void (async () => {
       unsubP = await onProgress((p) => {
+        // Push a sample for the rolling-window ETA tracker.
+        const buf = samplesRef.current[p.jobId] ?? [];
+        pushSample(buf, Date.now(), p.bytesDone);
+        samplesRef.current[p.jobId] = buf;
         setJobs((prev) => {
           const slot = prev[p.jobId] ?? {
             info: {
@@ -668,96 +676,50 @@ export default function TransfersPage() {
               No jobs yet.
             </Typography>
           ) : (
-            <List dense>
+            <Stack spacing={1}>
               {jobList.map((j) => {
                 const p = j.progress;
-                const pct = p && p.bytesTotal > 0
-                  ? Math.round((p.bytesDone / p.bytesTotal) * 100)
-                  : null;
                 const running =
                   j.info.state === "running" || j.info.state === "planning";
                 const paused = j.info.state === "paused";
                 const inFlight = running || paused;
+                const buf = samplesRef.current[j.info.id] ?? [];
+                const eta = computeEta(buf, p?.bytesTotal);
                 return (
-                  <ListItem
+                  <Paper
                     key={j.info.id}
-                    secondaryAction={
-                      inFlight ? (
-                        <Stack direction="row">
-                          {paused ? (
-                            <IconButton
-                              edge="end"
-                              onClick={() => void handleResume(j.info.id)}
-                              aria-label={`Resume job ${j.info.id}`}
-                            >
-                              <PlayArrowIcon />
-                            </IconButton>
-                          ) : (
-                            <IconButton
-                              edge="end"
-                              onClick={() => void handlePause(j.info.id)}
-                              aria-label={`Pause job ${j.info.id}`}
-                            >
-                              <PauseIcon />
-                            </IconButton>
-                          )}
-                          <IconButton
-                            edge="end"
-                            onClick={() => void handleCancel(j.info.id)}
-                            aria-label={`Cancel job ${j.info.id}`}
-                          >
-                            <StopIcon />
-                          </IconButton>
-                        </Stack>
-                      ) : null
-                    }
-                    alignItems="flex-start"
+                    variant="outlined"
+                    sx={{ p: 1.5 }}
                   >
-                    <ListItemText
-                      primary={`${j.info.src} → ${j.info.dest}`}
-                      secondary={
-                        <Stack
-                          component="span"
-                          spacing={0.5}
-                          sx={{ mt: 0.5, display: "block" }}
-                        >
-                          <Typography
-                            component="span"
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            {j.info.state}
-                            {p
-                              ? ` · ${p.filesDone}/${p.filesTotal} files · ${formatBytes(p.bytesDone)} of ${formatBytes(p.bytesTotal)}`
-                              : ""}
-                            {j.summary
-                              ? ` · ${j.summary.copied} copied, ${j.summary.skipped} skipped, ${j.summary.conflicts} conflicts, ${j.summary.errors} errors`
-                              : ""}
-                          </Typography>
-                          {pct != null && (
-                            <LinearProgress
-                              variant="determinate"
-                              value={pct}
-                              sx={{ width: 360, maxWidth: "100%" }}
-                            />
-                          )}
-                          {j.error && (
-                            <Typography
-                              component="span"
-                              variant="caption"
-                              color="error"
-                            >
-                              {j.error}
-                            </Typography>
-                          )}
-                        </Stack>
-                      }
-                      slotProps={{ primary: { variant: "body2" } }}
+                    <ProgressWidget
+                      label={`${j.info.src} → ${j.info.dest} · ${j.info.state}`}
+                      filesDone={p?.filesDone ?? 0}
+                      filesTotal={p?.filesTotal ?? 0}
+                      bytesDone={p?.bytesDone}
+                      bytesTotal={p?.bytesTotal}
+                      currentItem={p?.last?.dest}
+                      etaSeconds={eta.etaSeconds}
+                      bytesPerSec={eta.bytesPerSec}
+                      paused={paused}
+                      onPause={inFlight && !paused ? () => void handlePause(j.info.id) : undefined}
+                      onResume={paused ? () => void handleResume(j.info.id) : undefined}
+                      onCancel={inFlight ? () => void handleCancel(j.info.id) : undefined}
+                      error={j.error ?? null}
                     />
-                  </ListItem>
+                    {j.summary && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", mt: 0.5 }}
+                      >
+                        {j.summary.copied} copied, {j.summary.skipped} skipped,{" "}
+                        {j.summary.conflicts} conflicts, {j.summary.errors} errors
+                      </Typography>
+                    )}
+                  </Paper>
                 );
               })}
-            </List>
+            </Stack>
           )}
         </Box>
       </Stack>
