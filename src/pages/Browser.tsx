@@ -411,14 +411,14 @@ export default function Browser({
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
       if (!primarySelected) return;
-      e.preventDefault();
-      // Multi-selection → bulk dialog; single → per-file dialog.
+      // Multi-select: open the bulk rename dialog.
+      // Single-select: FileList handles inline (don't preventDefault
+      // so its keyboard handler picks up the same F2 event).
       if (selectedPaths.length > 1) {
+        e.preventDefault();
         const set = new Set(selectedPaths);
         const selectedEntries = entries.filter((en) => set.has(en.path));
         setBulkRenameTargets(selectedEntries);
-      } else {
-        setRenameTarget(primarySelected);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1063,6 +1063,25 @@ export default function Browser({
           contextMenuPath={contextMenu?.entry.path ?? null}
           view={settings.folderViewMode[path] ?? settings.defaultView}
           path={path}
+          onRename={async (entry, newName) => {
+            // Build the new full path under the same parent dir.
+            const sep = entry.path.includes("\\") && !entry.path.includes("/")
+              ? "\\"
+              : "/";
+            const idx = Math.max(
+              entry.path.lastIndexOf("/"),
+              entry.path.lastIndexOf("\\"),
+            );
+            const parent = idx >= 0 ? entry.path.slice(0, idx) : entry.path;
+            const newPath = `${parent}${sep}${newName}`;
+            try {
+              await clientRename(entry.path, newPath);
+              await refresh(path);
+            } catch (err) {
+              setError(String(err));
+              throw err;
+            }
+          }}
         />
         {effectivePreviewOpen && (
           <PreviewPane

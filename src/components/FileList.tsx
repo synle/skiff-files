@@ -95,6 +95,12 @@ interface Props {
    *  FileList restores the previous scrollTop. Optional — when
    *  omitted, scroll memory is disabled. */
   path?: string;
+  /** Inline rename callback. Called with the entry being renamed
+   *  and the new name (basename only — the parent dir is unchanged).
+   *  Resolves on success / rejects on failure (collision, permission,
+   *  cross-FS, etc.). When omitted, F2 falls through to whatever the
+   *  parent's keyboard handler does. */
+  onRename?: (entry: Entry, newName: string) => Promise<void>;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -202,6 +208,80 @@ function renderHighlighted(name: string, query: string): React.ReactNode {
   );
 }
 
+/** Inline rename editor. Shown in place of the file name when F2 is
+ *  pressed. Auto-focuses, selects the stem (everything before the
+ *  last "." for files; whole name for folders / dotfiles) so the
+ *  user can immediately type a replacement. Enter / blur commits;
+ *  Esc cancels. */
+function RenameInput({
+  entry,
+  draft,
+  onDraftChange,
+  onCommit,
+  onCancel,
+}: {
+  entry: Entry;
+  draft: string;
+  onDraftChange: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  // useRef so we can imperatively select the stem AFTER mount.
+  // setSelectionRange in a useLayoutEffect fires before paint so the
+  // user never sees the full-name selection flash.
+  const ref = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    // Stem = up to the last "." for non-folders that have an
+    // extension (e.g. "report.pdf" → select "report"). Folders +
+    // dotfiles (e.g. ".env") get the whole name selected so the
+    // user can replace cleanly.
+    if (!entry.isDir) {
+      const lastDot = entry.name.lastIndexOf(".");
+      if (lastDot > 0) {
+        el.setSelectionRange(0, lastDot);
+        return;
+      }
+    }
+    el.select();
+  }, []);
+  return (
+    <input
+      ref={ref}
+      value={draft}
+      onChange={(e) => onDraftChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onCommit();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+      // Blur commits — Finder behavior. Esc beats blur because it
+      // sets renamingPath = null first, which unmounts this input.
+      onBlur={onCommit}
+      onClick={(e) => e.stopPropagation()}
+      // Inherit theme typography so the input looks like the
+      // Typography it replaces. Reset OS textfield styling.
+      style={{
+        font: "inherit",
+        color: "inherit",
+        background: "rgba(127, 127, 127, 0.15)",
+        border: "1px solid rgba(127, 127, 127, 0.4)",
+        borderRadius: 4,
+        padding: "1px 4px",
+        outline: "none",
+        width: "100%",
+        boxSizing: "border-box",
+      }}
+    />
+  );
+}
+
 /** Header cell with click-to-sort + indicator arrow.
  *  Active column is rendered in `text.primary` with a 14 px MUI arrow
  *  icon; inactive columns reveal a faint arrow on hover so the column
@@ -282,6 +362,14 @@ interface FileGridViewProps {
   contextMenuPath: string | null;
   /** Forwarded from FileList for per-folder scroll memory. */
   path?: string;
+  /** Inline rename state forwarded from FileList. When `path` matches
+   *  the cell's entry.path, the cell renders a RenameInput instead
+   *  of the static label. */
+  renamingPath?: string | null;
+  renameDraft?: string;
+  onRenameDraftChange?: (v: string) => void;
+  onCommitRename?: () => void;
+  onCancelRename?: () => void;
   /** Paths currently being dragged. Their cells render at half opacity
    *  so the user can see what's in flight. Cleared on dragend. */
   draggingPaths: Set<string>;
@@ -330,6 +418,11 @@ function FileGridView(props: FileGridViewProps) {
     draggingPaths,
     onDraggingChange,
     path,
+    renamingPath = null,
+    renameDraft = "",
+    onRenameDraftChange,
+    onCommitRename,
+    onCancelRename,
   } = props;
 
   // Per-view sizing tuned to make the four grid modes visibly
@@ -913,23 +1006,33 @@ function FileGridView(props: FileGridViewProps) {
                             width: view === "column" ? "auto" : "100%",
                           }}
                         >
-                          <Typography
-                            variant="body2"
-                            noWrap
-                            sx={{
-                              textAlign:
-                                view === "column"
-                                  ? ("left" as const)
-                                  : ("center" as const),
-                            }}
-                            title={e.name}
-                          >
-                            {renderHighlighted(
-                              displayName(e, showExtensions),
-                              highlightQuery,
-                            )}
-                            {e.isSymlink ? " ↪" : ""}
-                          </Typography>
+                          {renamingPath === e.path && onCommitRename && onCancelRename && onRenameDraftChange ? (
+                            <RenameInput
+                              entry={e}
+                              draft={renameDraft}
+                              onDraftChange={onRenameDraftChange}
+                              onCommit={onCommitRename}
+                              onCancel={onCancelRename}
+                            />
+                          ) : (
+                            <Typography
+                              variant="body2"
+                              noWrap
+                              sx={{
+                                textAlign:
+                                  view === "column"
+                                    ? ("left" as const)
+                                    : ("center" as const),
+                              }}
+                              title={e.name}
+                            >
+                              {renderHighlighted(
+                                displayName(e, showExtensions),
+                                highlightQuery,
+                              )}
+                              {e.isSymlink ? " ↪" : ""}
+                            </Typography>
+                          )}
                           {view === "column" && (
                             // Column view: bump the metadata line to
                             // body2 + medium weight so the layout reads
@@ -988,7 +1091,49 @@ export default function FileList(props: Props) {
     contextMenuPath = null,
     view = "list",
     path,
+    onRename,
   } = props;
+
+  /** Inline rename state. `renamingPath` is the entry currently being
+   *  edited; `renameDraft` is the in-progress name. F2 starts the
+   *  edit; Enter / blur commits; Esc cancels.  */
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState<string>("");
+
+  const startInlineRename = (e: Entry) => {
+    setRenamingPath(e.path);
+    setRenameDraft(e.name);
+  };
+  const commitInlineRename = () => {
+    if (!renamingPath || !onRename) {
+      setRenamingPath(null);
+      return;
+    }
+    const targetEntry = entries.find((x) => x.path === renamingPath);
+    if (!targetEntry) {
+      setRenamingPath(null);
+      return;
+    }
+    const trimmed = renameDraft.trim();
+    if (!trimmed || trimmed === targetEntry.name) {
+      setRenamingPath(null);
+      return;
+    }
+    // Refuse path separators in the new name — that would be a move,
+    // not a rename, and surprises users.
+    if (trimmed.includes("/") || trimmed.includes("\\")) {
+      setRenamingPath(null);
+      return;
+    }
+    void onRename(targetEntry, trimmed)
+      .catch(() => {
+        /* parent surfaces the error via setError */
+      })
+      .finally(() => setRenamingPath(null));
+  };
+  const cancelInlineRename = () => {
+    setRenamingPath(null);
+  };
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
   const sorted = useMemo(
@@ -1215,6 +1360,17 @@ export default function FileList(props: Props) {
           if (row.isDir) onOpenDir(row);
           break;
         }
+        case "F2": {
+          // Inline rename — replaces the dialog flow when onRename
+          // is wired. Single-select only; multi-select rename uses
+          // the bulk dialog (Browser handles that).
+          if (focusedIdx < 0 || focusedIdx >= sorted.length) return;
+          if (!onRename) return; // fall through to parent
+          if (selected.size > 1) return; // bulk path stays in Browser
+          e.preventDefault();
+          startInlineRename(sorted[focusedIdx]);
+          break;
+        }
         case "Escape": {
           if (selected.size === 0) return;
           e.preventDefault();
@@ -1393,6 +1549,11 @@ export default function FileList(props: Props) {
         onColsChange={setGridCols}
         draggingPaths={draggingPaths}
         onDraggingChange={setDraggingPaths}
+        renamingPath={renamingPath}
+        renameDraft={renameDraft}
+        onRenameDraftChange={setRenameDraft}
+        onCommitRename={commitInlineRename}
+        onCancelRename={cancelInlineRename}
         onRubberBand={(paths, additive) => {
           setSelected((prev) => {
             // additive (Cmd/Shift held during drag) merges with the
@@ -1660,18 +1821,30 @@ export default function FileList(props: Props) {
                     >
                       <IconForKind kind={e.kind} />
                     </Box>
-                    <Typography
-                      variant="body2"
-                      noWrap
-                      sx={{ flex: 1 }}
-                      title={e.name}
-                    >
-                      {renderHighlighted(
-                        displayName(e, showExtensions),
-                        highlightQuery,
-                      )}
-                      {e.isSymlink ? " ↪" : ""}
-                    </Typography>
+                    {renamingPath === e.path ? (
+                      <Box sx={{ flex: 1 }}>
+                        <RenameInput
+                          entry={e}
+                          draft={renameDraft}
+                          onDraftChange={setRenameDraft}
+                          onCommit={commitInlineRename}
+                          onCancel={cancelInlineRename}
+                        />
+                      </Box>
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{ flex: 1 }}
+                        title={e.name}
+                      >
+                        {renderHighlighted(
+                          displayName(e, showExtensions),
+                          highlightQuery,
+                        )}
+                        {e.isSymlink ? " ↪" : ""}
+                      </Typography>
+                    )}
                   </Box>
                   <Typography
                     variant="body2"
