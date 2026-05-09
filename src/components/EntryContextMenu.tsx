@@ -7,6 +7,7 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Typography,
 } from "@mui/material";
 import OpenIcon from "@mui/icons-material/FolderOpen";
 import EditIcon from "@mui/icons-material/Edit";
@@ -89,6 +90,24 @@ export default function EntryContextMenu({
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
+  /** Right-aligned shortcut hint for a menu item. Renders inside
+   *  the MenuItem next to the ListItemText so the user sees
+   *  "Rename… · F2". Tiny + monospace so it reads as a key, not a
+   *  label. */
+  const shortcut = (label: string) => (
+    <Typography
+      variant="caption"
+      sx={{
+        ml: 2,
+        color: "text.disabled",
+        fontFamily: "monospace",
+        fontSize: "0.7rem",
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </Typography>
+  );
   return (
     <Menu
       open={open}
@@ -110,6 +129,7 @@ export default function EntryContextMenu({
             <OpenIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Open</ListItemText>
+          {shortcut("Enter")}
         </MenuItem>
       )}
       {state?.entry.isDir && (
@@ -123,6 +143,7 @@ export default function EntryContextMenu({
             <TabIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Open in new tab</ListItemText>
+          {shortcut("Mid-click")}
         </MenuItem>
       )}
       {!isRemote && state?.entry.isDir && (
@@ -196,6 +217,7 @@ export default function EntryContextMenu({
           <EditIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Rename…</ListItemText>
+        {shortcut("F2")}
       </MenuItem>
       <MenuItem
         onClick={() => {
@@ -355,6 +377,7 @@ export default function EntryContextMenu({
           <DeleteIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Move to Trash</ListItemText>
+        {shortcut("Del")}
       </MenuItem>
     </Menu>
   );
