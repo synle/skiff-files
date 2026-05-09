@@ -856,6 +856,11 @@ function FileGridView(props: FileGridViewProps) {
                               ? ("left" as const)
                               : ("center" as const),
                           overflow: "hidden",
+                          // Disable native text selection on cells so
+                          // dragging / clicking doesn't accidentally
+                          // highlight the label text. Files are rows,
+                          // not paragraphs.
+                          userSelect: "none",
                         }}
                       >
                         <Box
@@ -1600,6 +1605,10 @@ export default function FileList(props: Props) {
                                 `inset 0 0 0 2px ${theme.palette.primary.main}`
                             : "none",
                     "&:hover": { bgcolor: isSel ? "action.selected" : "action.hover" },
+                    // Disable native text selection on rows so the
+                    // file name doesn't get highlighted while clicking
+                    // / dragging. Files are list items, not paragraphs.
+                    userSelect: "none",
                   }}
                 >
                   <Box
