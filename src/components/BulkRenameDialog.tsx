@@ -44,6 +44,11 @@ export default function BulkRenameDialog({
   const [prefix, setPrefix] = useState("");
   const [suffix, setSuffix] = useState("");
   const [regex, setRegex] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState(false);
+  /** Per-row override that wins over the find/replace result.
+   *  Keyed by the original entry name so a name change clears its
+   *  override automatically (the row simply disappears). */
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
     null,
@@ -59,6 +64,8 @@ export default function BulkRenameDialog({
       setPrefix("");
       setSuffix("");
       setRegex(false);
+      setInlineEdit(false);
+      setOverrides({});
       setBusy(false);
       setProgress(null);
       setError(null);
@@ -77,7 +84,23 @@ export default function BulkRenameDialog({
     [entries, find, replace, regex, prefix, suffix],
   );
 
-  const changed = results.filter((r) => r.changed);
+  /** Apply the per-row override on top of the find/replace result.
+   *  An override is any non-empty string that differs from oldName;
+   *  empty / equal strings clear the override semantics so the row
+   *  shows as unchanged. */
+  const effective = useMemo(
+    () =>
+      results.map((r) => {
+        const override = overrides[r.oldName];
+        if (override != null && override !== "" && override !== r.oldName) {
+          return { ...r, newName: override, changed: true };
+        }
+        return r;
+      }),
+    [results, overrides],
+  );
+
+  const changed = effective.filter((r) => r.changed);
   const regexErr = results.find((r) => r.error)?.error ?? null;
 
   /** Detect renames that would collide with each other (two src names
@@ -185,9 +208,19 @@ export default function BulkRenameDialog({
             </Typography>
           )}
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={inlineEdit}
+                onChange={(e) => setInlineEdit(e.target.checked)}
+              />
+            }
+            label="Inline edit (tweak individual results before applying)"
+          />
+
           <Box
             sx={{
-              maxHeight: 200,
+              maxHeight: 240,
               overflow: "auto",
               border: 1,
               borderColor: "divider",
@@ -195,9 +228,59 @@ export default function BulkRenameDialog({
               p: 1,
             }}
           >
-            {find === "" ? (
+            {inlineEdit ? (
+              <Stack spacing={0.5}>
+                {effective.map((r) => (
+                  <Box
+                    key={r.oldName}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "row",
+                      gap: 1,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontFamily: "monospace",
+                        flexBasis: "40%",
+                        flexShrink: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        color: r.changed ? "text.secondary" : "text.disabled",
+                      }}
+                      title={r.oldName}
+                    >
+                      {r.oldName}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ flexShrink: 0, color: "text.secondary" }}
+                    >
+                      →
+                    </Typography>
+                    <TextField
+                      size="small"
+                      value={r.newName}
+                      onChange={(e) =>
+                        setOverrides((m) => ({
+                          ...m,
+                          [r.oldName]: e.target.value,
+                        }))
+                      }
+                      sx={{
+                        flex: 1,
+                        "& input": { fontFamily: "monospace", fontSize: 12 },
+                      }}
+                    />
+                  </Box>
+                ))}
+              </Stack>
+            ) : find === "" && Object.keys(overrides).length === 0 ? (
               <Typography variant="caption" color="text.secondary">
-                Enter a Find pattern to preview the renames.
+                Enter a Find pattern (or flip Inline edit on) to preview the renames.
               </Typography>
             ) : changed.length === 0 ? (
               <Typography variant="caption" color="text.secondary">
