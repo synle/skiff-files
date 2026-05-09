@@ -101,6 +101,13 @@ interface Props {
    *  don't have to wire it. */
   showHidden?: boolean;
   onShowHiddenToggle?: () => void;
+  /** Whether the kind-filter chip row is currently shown. */
+  kindFilterOpen?: boolean;
+  /** Toggle handler for the kind-filter chip row. */
+  onKindFilterToggle?: () => void;
+  /** Number of active kind-filter groups (used to badge the toolbar
+   *  button when the row is collapsed). */
+  kindFilterActiveCount?: number;
 }
 
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
@@ -137,6 +144,9 @@ export default function Toolbar(props: Props) {
     onSearchCommit,
     showHidden,
     onShowHiddenToggle,
+    kindFilterOpen,
+    onKindFilterToggle,
+    kindFilterActiveCount = 0,
   } = props;
 
   const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(
@@ -385,6 +395,41 @@ export default function Toolbar(props: Props) {
           )}
         </IconButton>
       </Tooltip>
+
+      {/* Kind-filter chip row toggle. Badge shows count of active
+       *  filter groups when the row is collapsed so the user notices
+       *  a filter is active even with the chips hidden. */}
+      {onKindFilterToggle && (
+        <Tooltip
+          title={
+            kindFilterActiveCount > 0
+              ? `Filter (${kindFilterActiveCount} active)`
+              : "Filter by kind"
+          }
+        >
+          <ToggleButton
+            size="small"
+            value="kindFilter"
+            selected={!!kindFilterOpen || kindFilterActiveCount > 0}
+            onChange={onKindFilterToggle}
+            aria-label="Toggle kind filter row"
+            aria-pressed={!!kindFilterOpen}
+            sx={{ p: 0.5 }}
+          >
+            <Box
+              component="span"
+              sx={{
+                fontFamily: "monospace",
+                fontSize: 11,
+                lineHeight: 1,
+                fontWeight: 600,
+              }}
+            >
+              {kindFilterActiveCount > 0 ? `▤ ${kindFilterActiveCount}` : "▤"}
+            </Box>
+          </ToggleButton>
+        </Tooltip>
+      )}
 
       {/* Show-hidden-files toggle. Mirrors the Cmd+Shift+. shortcut
        *  but as a discoverable affordance — power users who didn't

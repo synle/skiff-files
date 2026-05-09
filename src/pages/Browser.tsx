@@ -10,6 +10,10 @@ import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import PathBar from "../components/PathBar";
 import Toolbar from "../components/Toolbar";
 import BulkActionBar from "../components/BulkActionBar";
+import KindFilterBar, {
+  entryMatchesFilter,
+  type KindGroup,
+} from "../components/KindFilterBar";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
@@ -105,6 +109,11 @@ export default function Browser({
   /** Multi-select set, reported by FileList. We compute aggregate stats
    *  here so the StatusBar can render N of M selected · total size. */
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  // Kind-filter chips. Visibility is per-tab session state; the active
+  // group set isn't yet persisted (TODO: per-folder LRU like
+  // folderViewMode).
+  const [kindFilterOpen, setKindFilterOpen] = useState(false);
+  const [kindFilter, setKindFilter] = useState<KindGroup[]>([]);
   /** Per-session toggle of the preview pane, seeded from the persisted
    *  policy. The toolbar eye icon flips this; closing-then-reopening
    *  doesn't change Settings. */
@@ -917,10 +926,13 @@ export default function Browser({
     if (settings.hideSystemFiles) {
       base = base.filter((e) => !SYSTEM_NAMES.has(e.name));
     }
+    if (kindFilter.length > 0) {
+      base = base.filter((e) => entryMatchesFilter(e.kind, kindFilter));
+    }
     if (!search) return base;
     const q = search.toLowerCase();
     return base.filter((e) => e.name.toLowerCase().includes(q));
-  }, [entries, search, searchRecursive, findResults, settings.hideSystemFiles]);
+  }, [entries, search, searchRecursive, findResults, settings.hideSystemFiles, kindFilter]);
 
   // Reset the query on every navigation — the new folder almost certainly
   // doesn't have files matching the previous folder's search.
@@ -1080,6 +1092,9 @@ export default function Browser({
         }
         showHidden={settings.showHidden}
         onShowHiddenToggle={() => update("showHidden", !settings.showHidden)}
+        kindFilterOpen={kindFilterOpen}
+        onKindFilterToggle={() => setKindFilterOpen((o) => !o)}
+        kindFilterActiveCount={kindFilter.length}
         searchHistory={settings.searchHistory}
         onSearchCommit={(q) => {
           // Push to head, dedup, cap at SEARCH_HISTORY_MAX (10). Most-
@@ -1096,6 +1111,13 @@ export default function Browser({
           }
         }}
       />
+      {kindFilterOpen && (
+        <KindFilterBar
+          active={kindFilter}
+          onChange={setKindFilter}
+          onClose={() => setKindFilterOpen(false)}
+        />
+      )}
       <BulkActionBar
         count={selectedPaths.length}
         onCopy={() => setFileClipboard(selectedPaths, "copy")}
