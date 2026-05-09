@@ -8,6 +8,7 @@ import ShortcutsModal from "./components/ShortcutsModal";
 import ConflictModal from "./components/ConflictModal";
 import BrowserTabs from "./components/BrowserTabs";
 import QuickJump from "./components/QuickJump";
+import CommandPalette, { type CommandAction } from "./components/CommandPalette";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -44,6 +45,7 @@ export type Page = "browser" | "connections" | "transfers" | "settings";
 export default function App() {
   const [home, setHome] = useState("");
   const [quickJumpOpen, setQuickJumpOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   /** Active page. Replaces react-router's Routes-based switching. */
   const [page, setPage] = useState<Page>("browser");
   const { settings, setSettings, update } = useSettings();
@@ -70,6 +72,12 @@ export default function App() {
       } else if (k === "k") {
         e.preventDefault();
         setQuickJumpOpen((o) => !o);
+      } else if (k === "p" && e.shiftKey) {
+        // Cmd/Ctrl+Shift+P opens the command palette. VS Code muscle
+        // memory. Distinct from Cmd+K (paths) and Cmd+P (no binding —
+        // intentionally left free since browsers consume it for print).
+        e.preventDefault();
+        setCommandPaletteOpen((o) => !o);
       } else if (k === "b") {
         e.preventDefault();
         update("sidebarVisible", !settings.sidebarVisible);
@@ -318,6 +326,158 @@ export default function App() {
           );
         }}
       />
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        actions={buildCommandActions({
+          page,
+          setPage,
+          settings,
+          update,
+        })}
+      />
     </Box>
   );
+}
+
+/** Build the catalog of actions surfaced by Cmd/Ctrl+Shift+P. Each
+ *  action either flips a setting, switches the page, or fires a
+ *  one-shot UI event. We rebuild on every render so the hint strings
+ *  reflect live state ("Theme: dark" vs "Theme: light"). */
+function buildCommandActions(deps: {
+  page: Page;
+  setPage: (p: Page) => void;
+  settings: ReturnType<typeof useSettings>["settings"];
+  update: ReturnType<typeof useSettings>["update"];
+}): CommandAction[] {
+  const { page, setPage, settings, update } = deps;
+  return [
+    // Pages
+    {
+      id: "page.browser",
+      label: "Go to Browser",
+      hint: page === "browser" ? "Current page" : undefined,
+      keywords: "files folder navigate",
+      run: () => setPage("browser"),
+    },
+    {
+      id: "page.connections",
+      label: "Go to Connections",
+      keywords: "sftp ssh remote",
+      run: () => setPage("connections"),
+    },
+    {
+      id: "page.transfers",
+      label: "Go to Transfers",
+      keywords: "sync skiffsync jobs progress",
+      run: () => setPage("transfers"),
+    },
+    {
+      id: "page.settings",
+      label: "Open Settings",
+      keywords: "preferences config",
+      run: () => setPage("settings"),
+    },
+    // Theme
+    {
+      id: "theme.light",
+      label: "Theme: Light",
+      hint: settings.themeMode === "light" ? "Current" : undefined,
+      keywords: "appearance",
+      run: () => update("themeMode", "light"),
+    },
+    {
+      id: "theme.dark",
+      label: "Theme: Dark",
+      hint: settings.themeMode === "dark" ? "Current" : undefined,
+      keywords: "appearance",
+      run: () => update("themeMode", "dark"),
+    },
+    {
+      id: "theme.system",
+      label: "Theme: System",
+      hint: settings.themeMode === "system" ? "Current" : undefined,
+      keywords: "appearance auto",
+      run: () => update("themeMode", "system"),
+    },
+    // Font size
+    {
+      id: "font.small",
+      label: "Font size: Small",
+      hint: settings.fontSize === "small" ? "Current" : undefined,
+      run: () => update("fontSize", "small"),
+    },
+    {
+      id: "font.medium",
+      label: "Font size: Medium (reset)",
+      hint: settings.fontSize === "medium" ? "Current" : "Cmd+0",
+      run: () => update("fontSize", "medium"),
+    },
+    {
+      id: "font.large",
+      label: "Font size: Large",
+      hint: settings.fontSize === "large" ? "Current" : undefined,
+      run: () => update("fontSize", "large"),
+    },
+    // Visibility toggles
+    {
+      id: "toggle.hidden",
+      label: settings.showHidden
+        ? "Hide hidden files (dotfiles)"
+        : "Show hidden files (dotfiles)",
+      hint: "Cmd+Shift+.",
+      run: () => update("showHidden", !settings.showHidden),
+    },
+    {
+      id: "toggle.sidebar",
+      label: settings.sidebarVisible ? "Hide sidebar" : "Show sidebar",
+      hint: "Cmd+\\",
+      run: () => update("sidebarVisible", !settings.sidebarVisible),
+    },
+    {
+      id: "toggle.statusbar",
+      label: settings.showStatusBar ? "Hide status bar" : "Show status bar",
+      run: () => update("showStatusBar", !settings.showStatusBar),
+    },
+    {
+      id: "toggle.twoPane",
+      label: settings.twoPaneMode ? "Disable two-pane mode" : "Enable two-pane mode",
+      hint: "Cmd+Shift+\\",
+      run: () => update("twoPaneMode", !settings.twoPaneMode),
+    },
+    // View modes
+    {
+      id: "view.list",
+      label: "View: List",
+      run: () => update("defaultView", "list"),
+    },
+    {
+      id: "view.tile",
+      label: "View: Tile",
+      run: () => update("defaultView", "tile"),
+    },
+    {
+      id: "view.gallery",
+      label: "View: Gallery",
+      run: () => update("defaultView", "gallery"),
+    },
+    {
+      id: "view.column",
+      label: "View: Column",
+      run: () => update("defaultView", "column"),
+    },
+    // Density
+    {
+      id: "density.comfortable",
+      label: "Density: Comfortable",
+      hint: settings.density === "comfortable" ? "Current" : undefined,
+      run: () => update("density", "comfortable"),
+    },
+    {
+      id: "density.compact",
+      label: "Density: Compact",
+      hint: settings.density === "compact" ? "Current" : undefined,
+      run: () => update("density", "compact"),
+    },
+  ];
 }

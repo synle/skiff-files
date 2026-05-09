@@ -67,6 +67,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + R · F5", description: "Refresh current folder" },
       { keys: "Cmd / Ctrl + L", description: "Edit path (focus path bar)" },
       { keys: "Cmd / Ctrl + K", description: "Quick-jump (bookmarks + recent)" },
+      { keys: "Cmd / Ctrl + Shift + P", description: "Command palette (every action, searchable)" },
       { keys: "Cmd / Ctrl + ,", description: "Open Settings" },
       { keys: "Cmd / Ctrl + Shift + N", description: "New folder" },
       { keys: "Cmd / Ctrl + D", description: "Bookmark current folder" },
