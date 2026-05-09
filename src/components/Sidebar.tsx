@@ -41,10 +41,12 @@ import { connList, type ConnectionInfo } from "../api/conn";
 import {
   fsMounts,
   fsOpenWithDefault,
+  fsRevealInOs,
   fsTrashMany,
   fsTrashPath,
   type MountedVolume,
 } from "../api/fs";
+import LaunchIcon from "@mui/icons-material/Launch";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
@@ -751,6 +753,19 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                         section: "bookmarks",
                         itemId: b.id,
                         actions: [
+                          ...(b.path.startsWith("sftp://")
+                            ? []
+                            : [
+                                {
+                                  key: "reveal",
+                                  icon: <LaunchIcon fontSize="small" />,
+                                  label: "Show in Finder/Explorer",
+                                  dividerAfter: true,
+                                  onClick: () => {
+                                    void fsRevealInOs(b.path).catch(() => {});
+                                  },
+                                },
+                              ]),
                           {
                             key: "rename",
                             icon: <EditIcon fontSize="small" />,
@@ -864,6 +879,19 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                           section: "recent",
                           itemId: p,
                           actions: [
+                            ...(p.startsWith("sftp://")
+                              ? []
+                              : [
+                                  {
+                                    key: "reveal",
+                                    icon: <LaunchIcon fontSize="small" />,
+                                    label: "Show in Finder/Explorer",
+                                    dividerAfter: true,
+                                    onClick: () => {
+                                      void fsRevealInOs(p).catch(() => {});
+                                    },
+                                  },
+                                ]),
                             {
                               key: "bookmark",
                               icon: <BookmarkIcon fontSize="small" />,
