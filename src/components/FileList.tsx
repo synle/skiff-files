@@ -380,6 +380,13 @@ function FileGridView(props: FileGridViewProps) {
     startX: number;
     startY: number;
     additive: boolean;
+    /** Snapshot of the selection at drag-start. Used to compute the
+     *  live preview each mousemove: plain drag REPLACES with the
+     *  current hit set; additive (Cmd/Shift) drag UNIONS the snapshot
+     *  with the current hit set. Without the snapshot an additive
+     *  drag would re-merge growing rectangles into an ever-larger
+     *  selection that never shrinks. */
+    baseSelection: Set<string>;
   } | null>(null);
   const [dragRect, setDragRect] = useState<
     | {
@@ -439,15 +446,46 @@ function FileGridView(props: FileGridViewProps) {
       const localY = clampedY - r.top + el.scrollTop;
       const left = Math.min(dragRef.current.startX, localX);
       const top = Math.min(dragRef.current.startY, localY);
+      const right = Math.max(dragRef.current.startX, localX);
+      const bottom = Math.max(dragRef.current.startY, localY);
       const width = Math.abs(localX - dragRef.current.startX);
       const height = Math.abs(localY - dragRef.current.startY);
       setDragRect({ left, top, width, height });
+      // Live-preview the selection: every cell whose bounding box
+      // overlaps the current rect joins the hit set. Plain drag
+      // REPLACES (selection = hit). Additive drag UNIONS the
+      // baseSelection snapshot with the hit set so the user can
+      // see live which cells are landing in the selection.
+      if (width < 4 && height < 4) return; // sub-4px = treat as click; don't commit yet
+      const hit = new Set<string>();
+      for (let i = 0; i < sorted.length; i++) {
+        const b = cellBox(i);
+        if (
+          b.right >= left &&
+          b.left <= right &&
+          b.bottom >= top &&
+          b.top <= bottom
+        ) {
+          hit.add(sorted[i].path);
+        }
+      }
+      if (dragRef.current.additive) {
+        const merged = new Set(dragRef.current.baseSelection);
+        for (const p of hit) merged.add(p);
+        onRubberBand?.(merged, false /* replace, not additive */);
+      } else {
+        onRubberBand?.(hit, false);
+      }
     };
     const onUp = (e: MouseEvent) => {
       if (!dragRef.current) {
         setDragRect(null);
         return;
       }
+      // Selection has been live-committed on every mousemove already
+      // — onUp just tears down the rectangle + handles the "click on
+      // empty space" case (sub-4px drag = click; clears selection on
+      // plain click, preserves on modifier).
       const el = containerRef.current;
       const r = el?.getBoundingClientRect();
       const clampedX = r
@@ -458,31 +496,13 @@ function FileGridView(props: FileGridViewProps) {
         : e.clientY;
       const localX = el && r ? clampedX - r.left + el.scrollLeft : 0;
       const localY = el && r ? clampedY - r.top + el.scrollTop : 0;
-      const left = Math.min(dragRef.current.startX, localX);
-      const top = Math.min(dragRef.current.startY, localY);
       const right = Math.max(dragRef.current.startX, localX);
+      const left = Math.min(dragRef.current.startX, localX);
       const bottom = Math.max(dragRef.current.startY, localY);
-      // Sub-4px drag = click. Clears selection on plain click; no-op
-      // when modifier held (preserves existing selection).
+      const top = Math.min(dragRef.current.startY, localY);
       const isClick = right - left < 4 && bottom - top < 4;
-      if (isClick) {
-        if (!dragRef.current.additive) {
-          onRubberBand?.(new Set(), false);
-        }
-      } else {
-        const hit = new Set<string>();
-        for (let i = 0; i < sorted.length; i++) {
-          const b = cellBox(i);
-          if (
-            b.right >= left &&
-            b.left <= right &&
-            b.bottom >= top &&
-            b.top <= bottom
-          ) {
-            hit.add(sorted[i].path);
-          }
-        }
-        onRubberBand?.(hit, dragRef.current.additive);
+      if (isClick && !dragRef.current.additive) {
+        onRubberBand?.(new Set(), false);
       }
       dragRef.current = null;
       setDragRect(null);
@@ -556,6 +576,10 @@ function FileGridView(props: FileGridViewProps) {
             startX: x,
             startY: y,
             additive: evt.metaKey || evt.ctrlKey || evt.shiftKey,
+            // Snapshot the existing selection so additive drags can
+            // union against it on every move (without the snapshot
+            // we'd re-merge against a growing selection).
+            baseSelection: new Set(selected),
           };
           setDragRect({ left: x, top: y, width: 0, height: 0 });
           // preventDefault stops native text-selection from kicking
