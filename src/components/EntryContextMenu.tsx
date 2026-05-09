@@ -340,7 +340,8 @@ export default function EntryContextMenu({
             lower.endsWith(".zip") ||
             lower.endsWith(".tar") ||
             lower.endsWith(".tar.gz") ||
-            lower.endsWith(".tgz")
+            lower.endsWith(".tgz") ||
+            lower.endsWith(".7z")
           );
         })() && (
           <MenuItem

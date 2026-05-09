@@ -37,6 +37,7 @@ sysinfo = "0.32"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 tar = "0.4"
 flate2 = "1"
+sevenz-rust = "0.6"
 walkdir = "2"
 notify = "7"
 rayon = "1"

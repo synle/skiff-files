@@ -322,7 +322,7 @@ pub struct ArchiveEntry {
 }
 
 /// Detect archive format from path extension. Returns one of
-/// "zip" / "tar" / "tar.gz" / "" (unrecognized).
+/// "zip" / "tar" / "tar.gz" / "7z" / "" (unrecognized).
 fn archive_format(path: &str) -> &'static str {
     let lower = path.to_lowercase();
     if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
@@ -331,6 +331,8 @@ fn archive_format(path: &str) -> &'static str {
         "tar"
     } else if lower.ends_with(".zip") {
         "zip"
+    } else if lower.ends_with(".7z") {
+        "7z"
     } else {
         ""
     }
@@ -368,6 +370,28 @@ pub fn fs_archive_list(path: String) -> FsResult<Vec<ArchiveEntry>> {
         "tar.gz" => {
             let file = File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
             list_tar(Box::new(flate2::read::GzDecoder::new(file)))
+        }
+        "7z" => {
+            let file = File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
+            let len = file
+                .metadata()
+                .map_err(|e| format!("metadata({path}): {e}"))?
+                .len();
+            let reader = sevenz_rust::SevenZReader::new(
+                file,
+                len,
+                sevenz_rust::Password::empty(),
+            )
+            .map_err(|e| format!("read 7z({path}): {e}"))?;
+            let mut out = Vec::with_capacity(reader.archive().files.len());
+            for entry in &reader.archive().files {
+                out.push(ArchiveEntry {
+                    name: entry.name().to_string(),
+                    size: entry.size(),
+                    is_dir: entry.is_directory(),
+                });
+            }
+            Ok(out)
         }
         _ => Err(format!("unsupported archive format: {path}")),
     }
@@ -462,6 +486,65 @@ pub fn fs_archive_extract_one(
                 &entry_name,
                 &dest_path,
             )
+        }
+        "7z" => {
+            // sevenz-rust gives us a callback API. We walk every entry
+            // until ours matches, copy bytes to dest, then return false
+            // on subsequent entries to short-circuit the rest of the
+            // archive walk.
+            use std::io::Write;
+            let file =
+                File::open(&zip_path).map_err(|e| format!("open({zip_path}): {e}"))?;
+            let mut found = false;
+            let mut io_err: Option<String> = None;
+            let dest_clone = dest_path.clone();
+            sevenz_rust::decompress_with_extract_fn(
+                file,
+                "/",
+                |entry, reader, _path| {
+                    if found {
+                        return Ok(false);
+                    }
+                    if entry.name() != entry_name {
+                        return Ok(true);
+                    }
+                    found = true;
+                    let mut out = match File::create(&dest_clone) {
+                        Ok(f) => f,
+                        Err(e) => {
+                            io_err = Some(format!("create({dest_clone}): {e}"));
+                            return Ok(false);
+                        }
+                    };
+                    let mut buf = vec![0u8; 64 * 1024];
+                    use std::io::Read;
+                    loop {
+                        let n = match reader.read(&mut buf) {
+                            Ok(n) => n,
+                            Err(e) => {
+                                io_err = Some(format!("read 7z entry: {e}"));
+                                return Ok(false);
+                            }
+                        };
+                        if n == 0 {
+                            break;
+                        }
+                        if let Err(e) = out.write_all(&buf[..n]) {
+                            io_err = Some(format!("write({dest_clone}): {e}"));
+                            return Ok(false);
+                        }
+                    }
+                    Ok(false)
+                },
+            )
+            .map_err(|e| format!("read 7z({zip_path}): {e}"))?;
+            if let Some(e) = io_err {
+                return Err(e);
+            }
+            if !found {
+                return Err(format!("entry not found in 7z: {entry_name}"));
+            }
+            Ok(())
         }
         _ => Err(format!("unsupported archive format: {zip_path}")),
     }
