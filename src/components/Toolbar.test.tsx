@@ -26,6 +26,10 @@ function r(overrides?: Partial<Parameters<typeof Toolbar>[0]>) {
     backHistory: [],
     forwardHistory: [],
     onHistoryJump: vi.fn(),
+    sortKey: "name" as const,
+    sortDir: "asc" as const,
+    onSortChange: vi.fn(),
+    onSortDirToggle: vi.fn(),
     ...overrides,
   };
   render(

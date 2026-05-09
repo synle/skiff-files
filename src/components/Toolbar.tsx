@@ -29,7 +29,9 @@ import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import SortIcon from "@mui/icons-material/Sort";
 import type { ViewMode } from "../state/settings";
+import type { SortDir, SortKey } from "./FileList";
 
 interface Props {
   canGoBack: boolean;
@@ -75,6 +77,16 @@ interface Props {
   /** Ref for Cmd/Ctrl+F focus. The Browser owns the keybind so the
    *  toolbar doesn't need to know about route-level shortcuts. */
   searchInputRef?: Ref<HTMLInputElement>;
+  /** Active sort key — drives the dropdown's selected state. */
+  sortKey: SortKey;
+  /** Active sort direction. Toggling the same key in the dropdown
+   *  flips the direction; picking a new key resets to asc. */
+  sortDir: SortDir;
+  /** Apply a new sort. Browser persists per-folder + global default. */
+  onSortChange: (key: SortKey) => void;
+  /** Flip the current direction without changing the key — used by
+   *  the standalone direction-toggle button next to the sort menu. */
+  onSortDirToggle: () => void;
 }
 
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
@@ -103,7 +115,28 @@ export default function Toolbar(props: Props) {
     forwardHistory = [],
     onHistoryJump,
     isRefreshing = false,
+    sortKey,
+    sortDir,
+    onSortChange,
+    onSortDirToggle,
   } = props;
+
+  const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(
+    null,
+  );
+
+  /** Display label for the active sort. Surfaces in the dropdown's
+   *  tooltip so the current state is glanceable. */
+  const sortLabel = (k: SortKey): string =>
+    k === "name"
+      ? "Name"
+      : k === "size"
+        ? "Size"
+        : k === "mtime"
+          ? "Modified"
+          : k === "ctime"
+            ? "Created"
+            : "Kind";
 
   // Anchor for the history dropdowns. We share one state slot for both
   // arrows since only one menu is ever open at a time.
@@ -313,6 +346,56 @@ export default function Toolbar(props: Props) {
           )}
         </IconButton>
       </Tooltip>
+
+      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+      {/* Sort dropdown — primary affordance for changing sort in the
+       *  grid views (tile / gallery / column), which have no column
+       *  headers to click. List view keeps the column-header path so
+       *  this is a redundant-but-discoverable alternative there. */}
+      <Tooltip
+        title={`Sort by ${sortLabel(sortKey)} (${sortDir === "asc" ? "↑" : "↓"})`}
+      >
+        <IconButton
+          size="small"
+          onClick={(e) => setSortMenuAnchor(e.currentTarget)}
+          aria-label="Sort"
+        >
+          <SortIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Menu
+        open={sortMenuAnchor != null}
+        anchorEl={sortMenuAnchor}
+        onClose={() => setSortMenuAnchor(null)}
+        slotProps={{ list: { dense: true } }}
+      >
+        {(["name", "size", "mtime", "ctime", "kind"] as const).map((k) => {
+          const active = k === sortKey;
+          return (
+            <MenuItem
+              key={k}
+              selected={active}
+              onClick={() => {
+                onSortChange(k);
+                setSortMenuAnchor(null);
+              }}
+            >
+              {sortLabel(k)}
+              {active ? (sortDir === "asc" ? "  ↑" : "  ↓") : ""}
+            </MenuItem>
+          );
+        })}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            onSortDirToggle();
+            setSortMenuAnchor(null);
+          }}
+        >
+          Reverse direction (currently {sortDir === "asc" ? "asc" : "desc"})
+        </MenuItem>
+      </Menu>
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 

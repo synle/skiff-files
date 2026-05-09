@@ -993,6 +993,12 @@ export default function Browser({
         searchRecursive={searchRecursive}
         onSearchRecursiveChange={setSearchRecursive}
         searchInputRef={searchInputRef}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSortChange={handleSort}
+        onSortDirToggle={() =>
+          setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+        }
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
         <FileList
