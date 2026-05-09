@@ -413,7 +413,15 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           scrollButtons="auto"
           sx={{ flex: 1, minHeight: 36 }}
         >
-          {tabs.map((t) => (
+          {tabs.map((t) => {
+            // Remote tabs (sftp:// + future smb:// / gdrive:// / s3://)
+            // get a primary-tinted underline so users can tell remote
+            // from local at a glance without reading the breadcrumb.
+            // Local tabs render unchanged.
+            const isRemote = (t.currentPath || t.initialPath).startsWith(
+              "sftp://",
+            );
+            return (
             <Tab
               key={t.id}
               value={t.id}
@@ -501,6 +509,17 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
                 // as Chrome's "fav-icon-only" pinned tabs. Saves
                 // horizontal real estate when many tabs are pinned.
                 ...(t.pinned ? { minWidth: 56, px: 1 } : {}),
+                // Remote tabs get a left border in primary tint so
+                // they read as visually distinct from local tabs at
+                // a glance. Width is small (3px) so it doesn't move
+                // the label.
+                ...(isRemote
+                  ? {
+                      borderLeft: 3,
+                      borderColor: "primary.main",
+                      pl: 1.5,
+                    }
+                  : {}),
               }}
               label={
                 <Box
@@ -543,7 +562,8 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
                 </Box>
               }
             />
-          ))}
+            );
+          })}
         </Tabs>
         <Tooltip title="New tab (Cmd/Ctrl+T)">
           <IconButton
