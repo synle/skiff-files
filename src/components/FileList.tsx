@@ -463,6 +463,10 @@ function FileGridView(props: FileGridViewProps) {
                         }}
                       >
                         <Box
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            onRowDouble(e);
+                          }}
                           sx={{
                             display: "flex",
                             alignItems: "center",
@@ -470,8 +474,10 @@ function FileGridView(props: FileGridViewProps) {
                             width: iconSize,
                             height: iconSize,
                             flexShrink: 0,
+                            cursor: "pointer",
                             "& svg": { fontSize: iconSize - 4 },
                           }}
+                          title="Click to open"
                         >
                           <IconForKind kind={e.kind} />
                         </Box>
@@ -1020,7 +1026,24 @@ export default function FileList(props: Props) {
                       px: 1,
                     }}
                   >
-                    <IconForKind kind={e.kind} />
+                    <Box
+                      onClick={(evt) => {
+                        // Single-click on the icon opens the entry —
+                        // saves a double-click for folder traversal.
+                        // stopPropagation so the row's onClick (which
+                        // toggles selection) doesn't also fire.
+                        evt.stopPropagation();
+                        onRowDouble(e);
+                      }}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        cursor: "pointer",
+                      }}
+                      title="Click to open"
+                    >
+                      <IconForKind kind={e.kind} />
+                    </Box>
                     <Typography
                       variant="body2"
                       noWrap

@@ -451,14 +451,58 @@ export default function Browser({
         if (history.forward.length === 0) return;
         e.preventDefault();
         goForward();
+      } else if (e.key === "ArrowDown" && !e.shiftKey) {
+        // Finder convention: Cmd+↓ opens the focused entry — folders
+        // navigate in, files open with the OS default app. Falls back
+        // to a no-op when nothing is focused so it doesn't fight the
+        // FileList's plain ArrowDown nav.
+        if (!primarySelected) return;
+        e.preventDefault();
+        if (primarySelected.isDir) {
+          navigate(primarySelected.path);
+        } else if (!primarySelected.path.startsWith("sftp://")) {
+          void fsOpenWithDefault(primarySelected.path).catch((err) =>
+            setError(String(err)),
+          );
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // handleNewFolder + refresh are stable enough; we list path so the
     // refresh handler reads the current value via closure capture.
+    // primarySelected drives the Cmd+↓ open-entry binding.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, path]);
+  }, [isActive, path, primarySelected]);
+
+  // Mouse thumb buttons (X1 = back, X2 = forward) — common on full-size
+  // mice and some trackball setups. The browser-style affordance the
+  // user expects from any history-having app. Only the active tab
+  // responds so background tabs don't yank under the cursor.
+  useEffect(() => {
+    if (!isActive) return;
+    const onMouseDown = (e: MouseEvent) => {
+      // button 3 = back (X1), button 4 = forward (X2). preventDefault
+      // suppresses the browser's own back/forward gesture that the
+      // webview would otherwise inherit.
+      if (e.button === 3 && history.back.length > 1) {
+        e.preventDefault();
+        goBack();
+      } else if (e.button === 4 && history.forward.length > 0) {
+        e.preventDefault();
+        goForward();
+      }
+    };
+    window.addEventListener("mousedown", onMouseDown);
+    // `auxclick` covers webviews that don't surface button 3/4 via
+    // mousedown on every platform — belt + suspenders.
+    window.addEventListener("auxclick", onMouseDown as EventListener);
+    return () => {
+      window.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("auxclick", onMouseDown as EventListener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, history.back.length, history.forward.length]);
 
   // Cmd/Ctrl + F → focus the toolbar search input. Doesn't fire if the
   // user is already in an input (so it doesn't hijack the path bar).
