@@ -112,6 +112,14 @@ export default function App() {
               ? "small"
               : "small";
         update("fontSize", next);
+      } else if (e.key === "0") {
+        // Browser muscle memory: Cmd/Ctrl+0 resets zoom. Here it
+        // resets font size to medium. Skipped when Shift is held so
+        // users with non-US layouts who type ")" via Shift+0 don't
+        // accidentally trigger.
+        if (e.shiftKey) return;
+        e.preventDefault();
+        update("fontSize", "medium");
       } else if (e.shiftKey && (e.key === "." || e.key === ">" || e.code === "Period")) {
         // Finder muscle memory: Cmd+Shift+. toggles dotfile visibility.
         // On macOS Shift+. emits ">" (US layout) so we accept both keys

@@ -90,6 +90,11 @@ interface Props {
    *  Performance budget for non-list views: ~5k entries before
    *  scroll feel degrades — large folders should stay on list. */
   view?: ViewMode;
+  /** Path of the folder these entries represent. Drives per-folder
+   *  scroll-position memory: when the user navigates away and back,
+   *  FileList restores the previous scrollTop. Optional — when
+   *  omitted, scroll memory is disabled. */
+  path?: string;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -127,6 +132,14 @@ function sortEntries(
   groups.files.sort(cmp);
   return [...groups.dirs, ...groups.files];
 }
+
+/** Module-level cache of scroll positions per folder path. Keeps
+ *  navigation feel like a real file manager — leave a folder mid-
+ *  scroll, come back, the scroll is where you left it. Cleared
+ *  implicitly on app reload (intentional: avoids stale offsets
+ *  bound to removed folders). Bounded loosely; entries naturally
+ *  fall out of working memory as the user navigates. */
+const scrollMemory = new Map<string, number>();
 
 /** Kinds whose icon is recognizable enough that the extension isn't
  *  load-bearing for "what is this". Used by the `whenAmbiguous` extension
@@ -267,6 +280,8 @@ interface FileGridViewProps {
   selected: Set<string>;
   focusedIdx: number;
   contextMenuPath: string | null;
+  /** Forwarded from FileList for per-folder scroll memory. */
+  path?: string;
   /** Paths currently being dragged. Their cells render at half opacity
    *  so the user can see what's in flight. Cleared on dragend. */
   draggingPaths: Set<string>;
@@ -314,6 +329,7 @@ function FileGridView(props: FileGridViewProps) {
     onRubberBand,
     draggingPaths,
     onDraggingChange,
+    path,
   } = props;
 
   // Per-view sizing tuned to make the four grid modes visibly
@@ -372,6 +388,51 @@ function FileGridView(props: FileGridViewProps) {
   useEffect(() => {
     onColsChange?.(cols);
   }, [cols, onColsChange]);
+
+  // Per-folder scroll memory. Save the container's scrollTop on
+  // every scroll (debounced via rAF). On entries / path change,
+  // restore the saved offset for the new path. Also save once on
+  // unmount so the position survives a tab switch / view switch.
+  useEffect(() => {
+    if (!path) return;
+    const el = containerRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        scrollMemory.set(path, el.scrollTop);
+      });
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      // Defensive: capture final position on unmount (the rAF may
+      // not have fired before this cleanup runs).
+      scrollMemory.set(path, el.scrollTop);
+    };
+  }, [path]);
+
+  // Restore scroll position when entries / path change. Wait one
+  // tick so the virtualizer renders rows before we set scrollTop —
+  // setting it pre-render gets clamped to 0 by the empty container
+  // height.
+  useEffect(() => {
+    if (!path) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const saved = scrollMemory.get(path) ?? 0;
+    if (saved === 0) return;
+    // requestAnimationFrame so the row layout flushes first.
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = saved;
+    });
+    return () => cancelAnimationFrame(raf);
+    // sorted is the entries-changed signal; cols change also matters
+    // since the virtualizer's row count depends on it.
+  }, [path, sorted, cols]);
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -921,6 +982,7 @@ export default function FileList(props: Props) {
     onContextEmpty,
     contextMenuPath = null,
     view = "list",
+    path,
   } = props;
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
@@ -995,6 +1057,43 @@ export default function FileList(props: Props) {
     setSelected(new Set());
     setFocusedIdx(entries.length > 0 ? 0 : -1);
   }, [entries]);
+
+  // Per-folder scroll memory for the list view. Mirrors the same
+  // logic FileGridView uses — save on scroll (rAF-debounced), restore
+  // after entries change. The grid view has its own copy because the
+  // scroll container lives there; list view's scroll container is
+  // parentRef here.
+  useEffect(() => {
+    if (!path || view !== "list") return;
+    const el = parentRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        scrollMemory.set(path, el.scrollTop);
+      });
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      scrollMemory.set(path, el.scrollTop);
+    };
+  }, [path, view]);
+
+  useEffect(() => {
+    if (!path || view !== "list") return;
+    const el = parentRef.current;
+    if (!el) return;
+    const saved = scrollMemory.get(path) ?? 0;
+    if (saved === 0) return;
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = saved;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [path, sorted, view]);
 
   // Notify the parent on every selection change. Memoized via an effect
   // rather than calling inside the click handler so we don't fire twice
@@ -1279,6 +1378,7 @@ export default function FileList(props: Props) {
         contextMenuPath={contextMenuPath}
         showExtensions={showExtensions}
         highlightQuery={highlightQuery}
+        path={path}
         onRowClick={onRowClick}
         onRowMouseDown={onRowMouseDown}
         onRowDouble={onRowDouble}

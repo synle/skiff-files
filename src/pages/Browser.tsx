@@ -1062,6 +1062,7 @@ export default function Browser({
           onContextEmpty={(x, y) => setEmptyMenu({ x, y })}
           contextMenuPath={contextMenu?.entry.path ?? null}
           view={settings.folderViewMode[path] ?? settings.defaultView}
+          path={path}
         />
         {effectivePreviewOpen && (
           <PreviewPane

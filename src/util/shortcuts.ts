@@ -69,6 +69,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + D", description: "Bookmark current folder" },
       { keys: "F2", description: "Rename selected entry" },
       { keys: "Cmd / Ctrl + = / -", description: "Font size up / down (S / M / L cycle)" },
+      { keys: "Cmd / Ctrl + 0", description: "Reset font size to medium" },
       { keys: "Cmd / Ctrl + Shift + .", description: "Toggle hidden files (dotfiles)" },
     ],
   },
