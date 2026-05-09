@@ -267,6 +267,13 @@ interface FileGridViewProps {
   selected: Set<string>;
   focusedIdx: number;
   contextMenuPath: string | null;
+  /** Paths currently being dragged. Their cells render at half opacity
+   *  so the user can see what's in flight. Cleared on dragend. */
+  draggingPaths: Set<string>;
+  /** Mark paths as dragging when a drag starts (or [] to clear on
+   *  end). FileList owns the state so the list-view code path uses
+   *  the same Set + visual treatment. */
+  onDraggingChange: (paths: Set<string>) => void;
   showExtensions: ShowExtensions;
   highlightQuery: string;
   onRowClick: (e: Entry, evt: React.MouseEvent) => void;
@@ -305,6 +312,8 @@ function FileGridView(props: FileGridViewProps) {
     onContextEmpty,
     onColsChange,
     onRubberBand,
+    draggingPaths,
+    onDraggingChange,
   } = props;
 
   // Per-view sizing tuned to make the four grid modes visibly
@@ -705,16 +714,18 @@ function FileGridView(props: FileGridViewProps) {
                         data-testid="file-grid-cell"
                         draggable
                         onDragStart={(evt) => {
-                          const payload =
+                          const paths =
                             selected.size > 0 && selected.has(e.path)
-                              ? Array.from(selected).join("\n")
-                              : e.path;
+                              ? Array.from(selected)
+                              : [e.path];
                           evt.dataTransfer.setData(
                             "application/x-skiff-paths",
-                            payload,
+                            paths.join("\n"),
                           );
                           evt.dataTransfer.effectAllowed = "copy";
+                          onDraggingChange(new Set(paths));
                         }}
+                        onDragEnd={() => onDraggingChange(new Set())}
                         onClick={(evt) => onRowClick(e, evt)}
                         onMouseDown={(evt) => onRowMouseDown(e, evt)}
                         onDoubleClick={() => onRowDouble(e)}
@@ -767,7 +778,15 @@ function FileGridView(props: FileGridViewProps) {
                                     `inset 0 0 0 2px ${theme.palette.primary.main}`,
                                 }
                               : {}),
-                          opacity: e.isHidden ? 0.55 : 1,
+                          // Drag-source dim: cells in flight render at
+                          // 0.4 opacity so the user can see what's
+                          // being moved. Hidden-entry dim (0.55) is
+                          // separate; the lower of the two wins.
+                          opacity: draggingPaths.has(e.path)
+                            ? 0.4
+                            : e.isHidden
+                              ? 0.55
+                              : 1,
                           "&:hover": {
                             bgcolor: isSel ? "action.selected" : "action.hover",
                           },
@@ -915,6 +934,11 @@ export default function FileList(props: Props) {
    *  + the scroll-into-view + the Enter/Backspace targets. -1 = no
    *  row focused (e.g. an empty folder). */
   const [focusedIdx, setFocusedIdx] = useState<number>(-1);
+  /** Paths currently being dragged (the source rows). Set during
+   *  onDragStart, cleared on dragend / drop. Drives a "ghost"
+   *  opacity on the source rows so the user can see what's in
+   *  flight — standard file manager behavior. */
+  const [draggingPaths, setDraggingPaths] = useState<Set<string>>(new Set());
   /** Type-ahead navigation buffer + last keystroke timestamp. Refs
    *  rather than state — we don't want the typing to trigger a
    *  re-render on every keystroke. */
@@ -1262,6 +1286,8 @@ export default function FileList(props: Props) {
         onPrimarySelect={onPrimarySelect}
         onContextEmpty={onContextEmpty}
         onColsChange={setGridCols}
+        draggingPaths={draggingPaths}
+        onDraggingChange={setDraggingPaths}
         onRubberBand={(paths, additive) => {
           setSelected((prev) => {
             // additive (Cmd/Shift held during drag) merges with the
@@ -1380,16 +1406,18 @@ export default function FileList(props: Props) {
                     // multi-selection (or just this row when nothing
                     // is multi-selected). Sidebar host items consume
                     // this to start a Skiffsync.
-                    const payload =
+                    const paths =
                       selected.size > 0 && selected.has(e.path)
-                        ? Array.from(selected).join("\n")
-                        : e.path;
+                        ? Array.from(selected)
+                        : [e.path];
                     evt.dataTransfer.setData(
                       "application/x-skiff-paths",
-                      payload,
+                      paths.join("\n"),
                     );
                     evt.dataTransfer.effectAllowed = "copy";
+                    setDraggingPaths(new Set(paths));
                   }}
+                  onDragEnd={() => setDraggingPaths(new Set())}
                   onDragOver={(evt) => {
                     if (
                       e.isDir &&
@@ -1446,7 +1474,14 @@ export default function FileList(props: Props) {
                     // Hidden entries are rendered at half opacity when
                     // visible (`showHidden` is on) so the user can tell
                     // them apart from regular content at a glance.
-                    opacity: e.isHidden ? 0.55 : 1,
+                    // Drag-source dim wins over hidden-entry dim — 0.4
+                    // is enough darker that "in flight" reads at a
+                    // glance distinct from "hidden but visible".
+                    opacity: draggingPaths.has(e.path)
+                      ? 0.4
+                      : e.isHidden
+                        ? 0.55
+                        : 1,
                     // Focus ring for keyboard users + drop-target
                     // ring while a drag is hovering. Inset so the row
                     // doesn't shift when either fires.
