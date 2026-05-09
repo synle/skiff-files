@@ -159,7 +159,21 @@ export function themeForFull(
       MuiCssBaseline: {
         styleOverrides: {
           html: { fontSize: `${fontSizePx(fontSize)}px` },
-          body: { fontSize: `${fontSizePx(fontSize)}px` },
+          body: {
+            fontSize: `${fontSizePx(fontSize)}px`,
+            // Desktop-app convention: labels (sidebar, tabs, path-
+            // bar, file rows, status bar, menu items) shouldn't be
+            // text-selectable — clicking / dragging them drops a
+            // caret which always feels wrong. Inputs + textareas +
+            // content-editable + the preview pane (.skiff-selectable)
+            // opt back in.
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          },
+          "input, textarea, [contenteditable=true], .skiff-selectable, .skiff-selectable *": {
+            userSelect: "auto",
+            WebkitUserSelect: "auto",
+          },
         },
       },
     },

@@ -442,21 +442,36 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
    *  the listeners. We use document-level mousemove rather than the
    *  handle's own so a fast drag past the edge doesn't drop the
    *  pointer outside our listener. */
+  /** Live drag width. While the user is dragging the resize handle,
+   *  width updates land here for the visual; the persisted setting
+   *  only commits on mouseup. Decoupling the two keeps the persist
+   *  effect (and the cross-window settings:changed broadcast) from
+   *  firing 60 times a second during a drag — which used to race
+   *  with the listener's reloadFromDisk and leave the sidebar
+   *  "snapping back" after a resize. */
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const effectiveWidth = dragWidth ?? settings.sidebarWidth;
+
   const startDrag = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
     const startW = settings.sidebarWidth;
+    let lastNext = startW;
     const onMove = (ev: MouseEvent) => {
       const dx = ev.clientX - startX;
-      const next = Math.max(
+      lastNext = Math.max(
         SIDEBAR_WIDTH_MIN,
         Math.min(SIDEBAR_WIDTH_MAX, startW + dx),
       );
-      update("sidebarWidth", next);
+      setDragWidth(lastNext);
     };
     const onUp = () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      // Commit ONCE at the end of the drag — single persist tick,
+      // single settings:changed emit, no race with the listener.
+      update("sidebarWidth", lastNext);
+      setDragWidth(null);
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -467,7 +482,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       component="nav"
       aria-label="Sidebar"
       sx={{
-        width: settings.sidebarWidth,
+        width: effectiveWidth,
         flexShrink: 0,
         borderRight: 1,
         borderColor: "divider",
