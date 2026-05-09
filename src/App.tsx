@@ -9,6 +9,7 @@ import ConflictModal from "./components/ConflictModal";
 import BrowserTabs from "./components/BrowserTabs";
 import QuickJump from "./components/QuickJump";
 import CommandPalette, { type CommandAction } from "./components/CommandPalette";
+import OperationsDrawer from "./components/OperationsDrawer";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -336,6 +337,10 @@ export default function App() {
           update,
         })}
       />
+      {/* Floating bottom-right drawer that surfaces every in-flight
+          sync from any page, so closing the Transfers tab doesn't
+          hide an active operation. */}
+      <OperationsDrawer />
     </Box>
   );
 }
