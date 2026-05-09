@@ -5,6 +5,7 @@
 // Sort and selection are owned here because they're list-local concerns; the
 // parent Browser owns navigation, refresh, and the underlying entries array.
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -21,6 +22,10 @@ import IconForKind from "./IconForKind";
 import GalleryThumb from "./GalleryThumb";
 import { formatBytes, formatMtime, formatMtimeRelative } from "../util/format";
 import { setFileClipboard } from "../util/fileClipboard";
+import {
+  fetchFolderSize,
+  getCachedFolderSize,
+} from "../util/folderSizeCache";
 import type { Density, ShowExtensions, ViewMode } from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "ctime" | "kind";
@@ -1100,6 +1105,49 @@ export default function FileList(props: Props) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState<string>("");
 
+  /** Folder-size hover state. Hovering a folder row for ≥ 800 ms kicks
+   *  a `dirSummary` walk; the result fills in the size column. Cached
+   *  via `folderSizeCache` so a second hover is instant. */
+  const [folderSizes, setFolderSizes] = useState<Record<string, number>>({});
+  const folderHoverTimer = useRef<number | null>(null);
+  const armFolderHover = useCallback((path: string, isDir: boolean) => {
+    if (!isDir) return;
+    if (folderHoverTimer.current != null) {
+      clearTimeout(folderHoverTimer.current);
+    }
+    const cached = getCachedFolderSize(path);
+    if (cached) {
+      setFolderSizes((m) => ({ ...m, [path]: cached.totalSize }));
+      return;
+    }
+    folderHoverTimer.current = window.setTimeout(() => {
+      void fetchFolderSize(path)
+        .then((s) => {
+          setFolderSizes((m) => ({ ...m, [path]: s.totalSize }));
+        })
+        .catch(() => {
+          /* permissions / disconnected sftp / etc. — silently skip */
+        });
+    }, 800);
+  }, []);
+  const cancelFolderHover = useCallback(() => {
+    if (folderHoverTimer.current != null) {
+      clearTimeout(folderHoverTimer.current);
+      folderHoverTimer.current = null;
+    }
+  }, []);
+  // Cancel any in-flight hover timer when the folder changes / list
+  // unmounts so a freshly-arrived listing isn't haunted by a fetch
+  // queued for a previous path.
+  useEffect(() => {
+    setFolderSizes({});
+    return () => {
+      if (folderHoverTimer.current != null) {
+        clearTimeout(folderHoverTimer.current);
+      }
+    };
+  }, [path]);
+
   const startInlineRename = (e: Entry) => {
     setRenamingPath(e.path);
     setRenameDraft(e.name);
@@ -1717,6 +1765,8 @@ export default function FileList(props: Props) {
                   }}
                   onClick={(evt) => onRowClick(e, evt)}
                   onMouseDown={(evt) => onRowMouseDown(e, evt)}
+                  onMouseEnter={() => armFolderHover(e.path, e.isDir)}
+                  onMouseLeave={cancelFolderHover}
                   onDoubleClick={() => onRowDouble(e)}
                   onContextMenu={(evt) => {
                     evt.preventDefault();
@@ -1850,8 +1900,17 @@ export default function FileList(props: Props) {
                     variant="body2"
                     color="text.secondary"
                     sx={{ width: 96, px: 1 }}
+                    title={
+                      e.isDir && folderSizes[e.path] != null
+                        ? `Recursive size: ${formatBytes(folderSizes[e.path])}`
+                        : undefined
+                    }
                   >
-                    {e.isDir ? "—" : formatBytes(e.size)}
+                    {e.isDir
+                      ? folderSizes[e.path] != null
+                        ? formatBytes(folderSizes[e.path])
+                        : "—"
+                      : formatBytes(e.size)}
                   </Typography>
                   <Typography
                     variant="body2"
