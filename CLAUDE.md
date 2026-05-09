@@ -58,6 +58,8 @@ Two layers, talking via `invoke()`:
 
 ## Phase 0.2.x — cross-protocol Skiffsync
 
+- **0.2.170** — ✅ **Drag folder to Bookmarks section → add as bookmark**. Complementary to the 0.2.95 "drop on bookmark row = sync into bookmark" gesture: drop on the section header / list whitespace = add as new bookmark. Doesn't collide because the row handler preventDefaults before the section-level handler sees it. Deduped by path; label = basename.
+- **0.2.169** — ✅ **Search box on Settings → Keyboard catalog**. Shortcut list got a search field — filters keys + description (case-insensitive). Empty groups collapse so the list stays clean.
 - **0.2.168** — 🐛 **Preview pane resize "snap back" — same race fix as 0.2.167 sidebar**. Drag-then-commit: local dragWidth during drag, single `update()` on mouseup. Pattern documented under "Known footguns".
 - **0.2.167** — 🐛 **Sidebar resize snapped back mid-drag + global user-select:none**. (1) Drag handler called `update("sidebarWidth", next)` per mousemove → at 60 fps the persist + settings:changed + reloadFromDisk cycle raced and a stale read would land mid-drag overwriting the live width. Lifted to local `dragWidth`; mouseup commits once via update(). (2) Per-component user-select:none (0.2.166) didn't catch text-selection above the file pane (sidebar / tabs / path-bar / status bar). Lifted to a global `body { user-select: none }` rule via the theme's MuiCssBaseline override; `input, textarea, [contenteditable], .skiff-selectable` opt back in.
 - **0.2.166** — ✅ **File rows + grid cells stop being text-selectable**. Added user-select: none to both the list-view row sx and the grid-view cell sx so single-click no longer drops a caret in the label.
