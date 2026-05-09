@@ -49,6 +49,7 @@ import EntryContextMenu from "../components/EntryContextMenu";
 import PropertiesDialog from "../components/PropertiesDialog";
 import BulkRenameDialog from "../components/BulkRenameDialog";
 import DiffDialog from "../components/DiffDialog";
+import ArchiveViewerDialog from "../components/ArchiveViewerDialog";
 import NewEntryDialog from "../components/NewEntryDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { parentPath } from "../util/format";
@@ -114,6 +115,10 @@ export default function Browser({
   // folderViewMode).
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
   const [kindFilter, setKindFilter] = useState<KindGroup[]>([]);
+  /** When set, the archive-viewer dialog is open against this path. */
+  const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
+    null,
+  );
   /** Per-session toggle of the preview pane, seeded from the persisted
    *  policy. The toolbar eye icon flips this; closing-then-reopening
    *  doesn't change Settings. */
@@ -1377,6 +1382,7 @@ export default function Browser({
             new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
           );
         }}
+        onViewArchive={(e) => setArchiveViewerPath(e.path)}
         onExtractZip={(e) => {
           // Pick a sibling folder named after the zip (sans
           // extension), with collision-aware fallback.
@@ -1490,6 +1496,14 @@ export default function Browser({
         onClose={() => {
           setDiffBase(null);
           setDiffOther(null);
+        }}
+      />
+      <ArchiveViewerDialog
+        open={!!archiveViewerPath}
+        archivePath={archiveViewerPath}
+        onClose={() => setArchiveViewerPath(null)}
+        onExtracted={() => {
+          if (path) void refresh(path);
         }}
       />
       <BulkRenameDialog

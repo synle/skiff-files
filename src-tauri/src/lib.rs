@@ -13,7 +13,8 @@ pub mod sync;
 use commands::{
     conn_create_sftp, conn_dir_summary, conn_disconnect, conn_hash_sha256,
     conn_known_hosts_list, conn_known_hosts_remove, conn_list, conn_list_dir, conn_mkdir,
-    conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, fs_canonicalize,
+    conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, fs_archive_extract_one,
+    fs_archive_list, fs_canonicalize,
     fs_copy_file, fs_dir_summary, fs_find, fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64,
     fs_compress_zip, fs_copy_recursive, fs_create_empty_file, fs_disk_space,
     fs_extract_zip, fs_hash_sha256, fs_image_exif, fs_mounts, fs_open_in_terminal,
@@ -71,6 +72,8 @@ pub fn run() {
             fs_create_empty_file,
             fs_compress_zip,
             fs_extract_zip,
+            fs_archive_list,
+            fs_archive_extract_one,
             fs_copy_recursive,
             fs_disk_space,
             settings_load,

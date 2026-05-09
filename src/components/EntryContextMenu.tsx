@@ -60,6 +60,9 @@ interface Props {
   /** Extract a zip into a sibling folder. Only shown when the entry's
    *  basename ends in `.zip`. */
   onExtractZip: (entry: Entry) => void;
+  /** Open the in-app archive viewer for the entry. Only shown for
+   *  `.zip` files. */
+  onViewArchive?: (entry: Entry) => void;
   /** Start a diff against this file. The first call sets the "base"
    *  side; the second call (from another row's right-click) opens
    *  the DiffDialog. Hidden for directories. */
@@ -86,6 +89,7 @@ export default function EntryContextMenu({
   onDuplicate,
   onCompressZip,
   onExtractZip,
+  onViewArchive,
   comparePending = false,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
@@ -327,6 +331,22 @@ export default function EntryContextMenu({
           <ListItemText>Extract here</ListItemText>
         </MenuItem>
       )}
+      {!isRemote &&
+        state &&
+        onViewArchive &&
+        state.entry.name.toLowerCase().endsWith(".zip") && (
+          <MenuItem
+            onClick={() => {
+              onViewArchive(state.entry);
+              onClose();
+            }}
+          >
+            <ListItemIcon>
+              <ArchiveIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>View contents</ListItemText>
+          </MenuItem>
+        )}
       {state && !state.entry.isDir && (
         <MenuItem
           onClick={() => {

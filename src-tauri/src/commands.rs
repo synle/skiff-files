@@ -311,6 +311,90 @@ pub fn fs_extract_zip(
     Ok(())
 }
 
+/// Entry inside a zip archive. Used by the in-app archive viewer
+/// (right-click → "View contents"). `size` is uncompressed bytes.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveEntry {
+    pub name: String,
+    pub size: u64,
+    pub is_dir: bool,
+}
+
+/// List the contents of a zip archive without extracting. Powers the
+/// archive viewer dialog. Streams the central directory only — no
+/// per-entry decompression — so a multi-GB archive opens quickly.
+#[tauri::command]
+pub fn fs_archive_list(path: String) -> FsResult<Vec<ArchiveEntry>> {
+    use std::fs::File;
+    let file = File::open(&path).map_err(|e| format!("open({path}): {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("read zip({path}): {e}"))?;
+    let mut out = Vec::with_capacity(archive.len());
+    for i in 0..archive.len() {
+        let entry = archive
+            .by_index(i)
+            .map_err(|e| format!("zip entry {i}: {e}"))?;
+        out.push(ArchiveEntry {
+            name: entry.name().to_string(),
+            size: entry.size(),
+            is_dir: entry.is_dir(),
+        });
+    }
+    Ok(out)
+}
+
+/// Extract a single entry from a zip archive to `dest_path` on disk.
+/// Errors if dest_path already exists (the caller should make sure
+/// the destination is unique). Path-traversal guard same as
+/// `fs_extract_zip`.
+#[tauri::command]
+pub fn fs_archive_extract_one(
+    zip_path: String,
+    entry_name: String,
+    dest_path: String,
+) -> FsResult<()> {
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use std::path::{Path, PathBuf};
+
+    let dest = Path::new(&dest_path);
+    if dest.exists() {
+        return Err(format!("destination exists: {dest_path}"));
+    }
+    let rel = PathBuf::from(&entry_name);
+    if rel.is_absolute()
+        || rel
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err("entry name traverses parent directories".to_string());
+    }
+    let file = File::open(&zip_path).map_err(|e| format!("open({zip_path}): {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("read zip({zip_path}): {e}"))?;
+    let mut entry = archive
+        .by_name(&entry_name)
+        .map_err(|e| format!("entry({entry_name}): {e}"))?;
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir parent: {e}"))?;
+    }
+    let mut out = File::create(&dest_path)
+        .map_err(|e| format!("create({dest_path}): {e}"))?;
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        let n = entry
+            .read(&mut buf)
+            .map_err(|e| format!("read zip entry: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        out.write_all(&buf[..n])
+            .map_err(|e| format!("write({dest_path}): {e}"))?;
+    }
+    Ok(())
+}
+
 /// Bundle one or more local paths into a zip archive at `dest_zip`.
 /// Folders are walked recursively. Errors if `dest_zip` already exists
 /// (caller should pick a unique destination). Used by the right-click
