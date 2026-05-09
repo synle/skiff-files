@@ -26,6 +26,7 @@ import {
   fetchFolderSize,
   getCachedFolderSize,
 } from "../util/folderSizeCache";
+import { startNativeDrag } from "../api/drag";
 import type { Density, ShowExtensions, ViewMode } from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "ctime" | "kind";
@@ -883,6 +884,12 @@ function FileGridView(props: FileGridViewProps) {
                           );
                           evt.dataTransfer.effectAllowed = "copy";
                           onDraggingChange(new Set(paths));
+                          const localPaths = paths.filter(
+                            (p) => !p.startsWith("sftp://"),
+                          );
+                          if (localPaths.length > 0) {
+                            void startNativeDrag(localPaths).catch(() => {});
+                          }
                         }}
                         onDragEnd={() => onDraggingChange(new Set())}
                         onClick={(evt) => onRowClick(e, evt)}
@@ -1752,6 +1759,17 @@ export default function FileList(props: Props) {
                     );
                     evt.dataTransfer.effectAllowed = "copy";
                     setDraggingPaths(new Set(paths));
+                    // Also kick the OS-native drag so dropping into
+                    // Finder / Explorer / Desktop works. Local paths
+                    // only — sftp:// URLs aren't real OS file paths.
+                    const localPaths = paths.filter(
+                      (p) => !p.startsWith("sftp://"),
+                    );
+                    if (localPaths.length > 0) {
+                      void startNativeDrag(localPaths).catch(() => {
+                        /* plugin not available — in-app drag still works */
+                      });
+                    }
                   }}
                   onDragEnd={() => setDraggingPaths(new Set())}
                   onDragOver={(evt) => {
