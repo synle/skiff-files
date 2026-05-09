@@ -18,6 +18,8 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
+import PushPinIcon from "@mui/icons-material/PushPin";
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import Browser from "../pages/Browser";
 import { useSettings } from "../state/settings";
@@ -30,6 +32,11 @@ interface TabRow {
   /** Most recent path the inner Browser navigated to. Drives the
    *  optional full-path window title. */
   currentPath: string;
+  /** Pinned tabs render at the front of the strip (smaller width,
+   *  no close × button) and survive Close-others / Close-to-right.
+   *  Mirrors browser muscle memory — Chrome / Safari / VS Code all
+   *  use this same affordance for "tabs I want to keep around". */
+  pinned?: boolean;
 }
 
 interface Props {
@@ -73,6 +80,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         label: t.label || "Home",
         initialPath: t.initialPath,
         currentPath: t.initialPath,
+        pinned: t.pinned,
       }));
     }
     return [
@@ -128,6 +136,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         id: t.id,
         label: t.label,
         initialPath: t.initialPath,
+        pinned: t.pinned,
       })),
     );
     update(savedActiveTabIdKey, activeId || null);
@@ -156,10 +165,40 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
   } | null>(null);
 
   /** Close every tab whose id !== keepId. Keeps the kept tab as the
-   *  active one even if it wasn't the active one before. */
+   *  active one even if it wasn't the active one before. Pinned tabs
+   *  survive — they're explicit "I want this one around" markers. */
   const closeOtherTabs = (keepId: string) => {
-    setTabs((prev) => prev.filter((t) => t.id === keepId));
+    setTabs((prev) => prev.filter((t) => t.id === keepId || t.pinned));
     setActiveId(keepId);
+  };
+
+  /** Toggle pinned state. Pinned tabs migrate to the front of the
+   *  strip on pin (so they cluster) and stay where they are on
+   *  unpin (the user can drag them back later if they want). */
+  const togglePin = (id: string) => {
+    setTabs((prev) => {
+      const target = prev.find((t) => t.id === id);
+      if (!target) return prev;
+      const nextPinned = !target.pinned;
+      const others = prev.filter((t) => t.id !== id);
+      if (nextPinned) {
+        // Insert AFTER the last existing pinned tab so multiple
+        // pinned tabs cluster in pin order.
+        const lastPinIdx = others.reduce(
+          (acc, t, i) => (t.pinned ? i : acc),
+          -1,
+        );
+        const insertAt = lastPinIdx + 1;
+        return [
+          ...others.slice(0, insertAt),
+          { ...target, pinned: true },
+          ...others.slice(insertAt),
+        ];
+      }
+      // Unpin in place — keep the user's mental model of where
+      // the tab was sitting.
+      return prev.map((t) => (t.id === id ? { ...t, pinned: false } : t));
+    });
   };
 
   /** Reorder the active tab left or right by one position. No-op at
@@ -264,6 +303,9 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       if (prev.length <= 1) return prev;
       const idx = prev.findIndex((t) => t.id === id);
       const closed = prev[idx];
+      // Pinned tabs ignore Cmd+W / × clicks — the user has to
+      // explicitly Unpin first. Browser muscle memory.
+      if (closed?.pinned) return prev;
       const next = prev.filter((t) => t.id !== id);
       if (id === activeId && next.length > 0) {
         setActiveId(next[Math.max(0, idx - 1)].id);
@@ -378,7 +420,15 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
                 e.preventDefault();
                 setTabMenu({ anchor: e.currentTarget, tabId: t.id });
               }}
-              sx={{ minHeight: 36, py: 0.5, textTransform: "none" }}
+              sx={{
+                minHeight: 36,
+                py: 0.5,
+                textTransform: "none",
+                // Pinned tabs render slimmer + icon-only — same idea
+                // as Chrome's "fav-icon-only" pinned tabs. Saves
+                // horizontal real estate when many tabs are pinned.
+                ...(t.pinned ? { minWidth: 56, px: 1 } : {}),
+              }}
               label={
                 <Box
                   sx={{
@@ -387,8 +437,20 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
                     gap: 0.5,
                   }}
                 >
-                  {t.label}
-                  {tabs.length > 1 && (
+                  {t.pinned && (
+                    <PushPinIcon
+                      sx={{
+                        fontSize: 12,
+                        color: "primary.main",
+                        transform: "rotate(45deg)",
+                      }}
+                    />
+                  )}
+                  {/* Hide the label on pinned tabs to keep them slim,
+                   *  similar to Chrome. The full path stays accessible
+                   *  via the title tooltip + right-click menu. */}
+                  {!t.pinned && t.label}
+                  {tabs.length > 1 && !t.pinned && (
                     <CloseIcon
                       fontSize="inherit"
                       onClick={(e) => {
@@ -430,7 +492,40 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         onClose={() => setTabMenu(null)}
         slotProps={{ list: { dense: true } }}
       >
+        {tabMenu &&
+          (() => {
+            const target = tabs.find((t) => t.id === tabMenu.tabId);
+            const pinned = !!target?.pinned;
+            return (
+              <MenuItem
+                onClick={() => {
+                  togglePin(tabMenu.tabId);
+                  setTabMenu(null);
+                }}
+              >
+                {pinned ? (
+                  <>
+                    <PushPinOutlinedIcon
+                      fontSize="small"
+                      sx={{ mr: 1 }}
+                    />
+                    Unpin
+                  </>
+                ) : (
+                  <>
+                    <PushPinIcon fontSize="small" sx={{ mr: 1 }} />
+                    Pin
+                  </>
+                )}
+              </MenuItem>
+            );
+          })()}
         <MenuItem
+          disabled={
+            tabMenu
+              ? !!tabs.find((t) => t.id === tabMenu.tabId)?.pinned
+              : false
+          }
           onClick={() => {
             if (tabMenu) closeTab(tabMenu.tabId);
             setTabMenu(null);
@@ -450,13 +545,19 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         <MenuItem
           disabled={tabs.length <= 1}
           onClick={() => {
-            // Close every tab that's strictly to the right of the
+            // Close every NON-PINNED tab strictly to the right of the
             // right-clicked one — convention from VS Code / Chrome.
+            // Pinned tabs survive regardless of position.
             if (!tabMenu) return;
             const idx = tabs.findIndex((t) => t.id === tabMenu.tabId);
             if (idx >= 0) {
-              setTabs((prev) => prev.slice(0, idx + 1));
-              if (!tabs.slice(0, idx + 1).some((t) => t.id === activeId)) {
+              setTabs((prev) =>
+                prev.filter((t, i) => i <= idx || t.pinned),
+              );
+              const surviving = tabs.filter(
+                (t, i) => i <= idx || t.pinned,
+              );
+              if (!surviving.some((t) => t.id === activeId)) {
                 setActiveId(tabMenu.tabId);
               }
             }

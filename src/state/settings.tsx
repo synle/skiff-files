@@ -205,6 +205,11 @@ export interface SavedTab {
   id: string;
   label: string;
   initialPath: string;
+  /** Pinned tabs survive bulk-close actions and render at the
+   *  front of the strip with a smaller width. Optional — undefined
+   *  is equivalent to false so existing settings.json files round-
+   *  trip without migration. */
+  pinned?: boolean;
 }
 
 /** Max tabs we restore. 20 is well past anyone's reasonable usage
