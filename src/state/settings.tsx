@@ -201,6 +201,24 @@ export interface Settings {
   /** Active tab id at last save. The matching savedTabs entry is
    *  selected on launch; if it's missing the first tab wins. */
   savedActiveTabId: string | null;
+  /** Opt-in custom palette overrides. When `useCustomTheme` is true,
+   *  the theme builder reads `customLightPalette` / `customDarkPalette`
+   *  instead of the built-in palettes. Each field is a hex string;
+   *  unset (empty) keeps the built-in default for that slot.  */
+  useCustomTheme: boolean;
+  customLightPalette: CustomPalette;
+  customDarkPalette: CustomPalette;
+}
+
+/** User-editable palette slots. Maps directly onto MUI's `palette`
+ *  options; theme builder spreads them in when `useCustomTheme` is
+ *  true. Empty string = inherit the built-in default for that slot. */
+export interface CustomPalette {
+  primaryMain: string;
+  backgroundDefault: string;
+  backgroundPaper: string;
+  textPrimary: string;
+  textSecondary: string;
 }
 
 /** Persisted tab descriptor — id is stable across restarts so the
@@ -285,6 +303,21 @@ export const DEFAULTS: Settings = {
   recentlyClosedTabs: [],
   savedTabs: [],
   savedActiveTabId: null,
+  useCustomTheme: false,
+  customLightPalette: {
+    primaryMain: "",
+    backgroundDefault: "",
+    backgroundPaper: "",
+    textPrimary: "",
+    textSecondary: "",
+  },
+  customDarkPalette: {
+    primaryMain: "",
+    backgroundDefault: "",
+    backgroundPaper: "",
+    textPrimary: "",
+    textSecondary: "",
+  },
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

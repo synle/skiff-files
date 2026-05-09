@@ -27,7 +27,16 @@ function EffectiveThemeProvider({ children }: { children: React.ReactNode }) {
   const reducedMotion = settings.reduceMotion || prefersReduced;
   return (
     <ThemeProvider
-      theme={themeForFull(effective, reducedMotion, settings.fontSize)}
+      theme={themeForFull(
+        effective,
+        reducedMotion,
+        settings.fontSize,
+        settings.useCustomTheme
+          ? effective === "dark"
+            ? settings.customDarkPalette
+            : settings.customLightPalette
+          : undefined,
+      )}
     >
       {children}
     </ThemeProvider>

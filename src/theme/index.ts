@@ -133,6 +133,44 @@ export function fontSizePx(
   return 14;
 }
 
+/** Per-mode user palette overrides. Each field is a hex string;
+ *  empty means "fall back to the built-in default for that slot". */
+export interface CustomPaletteOverrides {
+  primaryMain?: string;
+  backgroundDefault?: string;
+  backgroundPaper?: string;
+  textPrimary?: string;
+  textSecondary?: string;
+}
+
+/** Apply a partial user palette to the built-in mode palette.
+ *  Empty-string fields are ignored so users can override one slot
+ *  without supplying values for all of them. */
+function applyCustomPalette(
+  base: typeof lightPalette | typeof darkPalette,
+  overrides: CustomPaletteOverrides | undefined,
+) {
+  if (!overrides) return base;
+  // Wider record shape so the createTheme call accepts the result;
+  // `text` is optional on MUI's PaletteOptions but not on our concrete
+  // base palette literals.
+  const merged: Record<string, unknown> = {
+    mode: base.mode,
+    primary: { main: overrides.primaryMain || base.primary.main },
+    background: {
+      default: overrides.backgroundDefault || base.background.default,
+      paper: overrides.backgroundPaper || base.background.paper,
+    },
+  };
+  if (overrides.textPrimary || overrides.textSecondary) {
+    const text: Record<string, string> = {};
+    if (overrides.textPrimary) text.primary = overrides.textPrimary;
+    if (overrides.textSecondary) text.secondary = overrides.textSecondary;
+    merged.text = text;
+  }
+  return merged as typeof base;
+}
+
 /** Build a theme honoring all UI-level user preferences in a single
  *  `createTheme` call. Critically: typography variants (body1, h1,
  *  etc.) only rescale when `fontSize` is part of the *initial*
@@ -143,9 +181,11 @@ export function themeForFull(
   effective: EffectiveMode,
   reducedMotion: boolean,
   fontSize: "small" | "medium" | "large",
+  customPalette?: CustomPaletteOverrides,
 ): Theme {
+  const basePalette = effective === "dark" ? darkPalette : lightPalette;
   return createTheme({
-    palette: effective === "dark" ? darkPalette : lightPalette,
+    palette: applyCustomPalette(basePalette, customPalette),
     typography: { ...baseTypography, fontSize: fontSizePx(fontSize) },
     shape: baseShape,
     ...(reducedMotion

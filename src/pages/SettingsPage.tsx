@@ -249,6 +249,153 @@ export default function SettingsPage() {
             }
             label="Two-pane mode (split view, FileZilla-style — Cmd/Ctrl+\\ toggles)"
           />
+
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="subtitle2">Custom palette</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Override the built-in light / dark palettes. Leave a slot empty
+            to inherit the default for that color.
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.useCustomTheme}
+                onChange={(e) => update("useCustomTheme", e.target.checked)}
+              />
+            }
+            label="Use my custom palette"
+          />
+
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                update("customLightPalette", {
+                  primaryMain: "#268bd2",
+                  backgroundDefault: "#fdf6e3",
+                  backgroundPaper: "#eee8d5",
+                  textPrimary: "#586e75",
+                  textSecondary: "#657b83",
+                });
+                update("customDarkPalette", {
+                  primaryMain: "#268bd2",
+                  backgroundDefault: "#002b36",
+                  backgroundPaper: "#073642",
+                  textPrimary: "#93a1a1",
+                  textSecondary: "#839496",
+                });
+                update("useCustomTheme", true);
+              }}
+            >
+              Solarized
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                update("customDarkPalette", {
+                  primaryMain: "#bd93f9",
+                  backgroundDefault: "#282a36",
+                  backgroundPaper: "#383a59",
+                  textPrimary: "#f8f8f2",
+                  textSecondary: "#bfbfbf",
+                });
+                update("customLightPalette", {
+                  primaryMain: "#bd93f9",
+                  backgroundDefault: "#f8f8f2",
+                  backgroundPaper: "#ffffff",
+                  textPrimary: "#282a36",
+                  textSecondary: "#44475a",
+                });
+                update("useCustomTheme", true);
+              }}
+            >
+              Dracula
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                update("customDarkPalette", {
+                  primaryMain: "#88c0d0",
+                  backgroundDefault: "#2e3440",
+                  backgroundPaper: "#3b4252",
+                  textPrimary: "#eceff4",
+                  textSecondary: "#d8dee9",
+                });
+                update("customLightPalette", {
+                  primaryMain: "#5e81ac",
+                  backgroundDefault: "#eceff4",
+                  backgroundPaper: "#e5e9f0",
+                  textPrimary: "#2e3440",
+                  textSecondary: "#3b4252",
+                });
+                update("useCustomTheme", true);
+              }}
+            >
+              Nord
+            </Button>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => {
+                update("customLightPalette", {
+                  primaryMain: "",
+                  backgroundDefault: "",
+                  backgroundPaper: "",
+                  textPrimary: "",
+                  textSecondary: "",
+                });
+                update("customDarkPalette", {
+                  primaryMain: "",
+                  backgroundDefault: "",
+                  backgroundPaper: "",
+                  textPrimary: "",
+                  textSecondary: "",
+                });
+              }}
+            >
+              Reset palette
+            </Button>
+          </Box>
+
+          {(["customLightPalette", "customDarkPalette"] as const).map((key) => (
+            <Box key={key}>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>
+                {key === "customLightPalette" ? "Light mode" : "Dark mode"}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {(
+                  [
+                    ["primaryMain", "Primary"],
+                    ["backgroundDefault", "Background"],
+                    ["backgroundPaper", "Paper"],
+                    ["textPrimary", "Text"],
+                    ["textSecondary", "Text dim"],
+                  ] as const
+                ).map(([slot, label]) => {
+                  const value = settings[key][slot] || "";
+                  return (
+                    <Box key={slot} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <input
+                        type="color"
+                        value={value || "#000000"}
+                        onChange={(e) =>
+                          update(key, {
+                            ...settings[key],
+                            [slot]: e.target.value,
+                          })
+                        }
+                        style={{ width: 32, height: 32, padding: 0, border: "none", background: "none" }}
+                      />
+                      <Typography variant="caption">{label}</Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          ))}
         </Section>
 
         <Divider />
