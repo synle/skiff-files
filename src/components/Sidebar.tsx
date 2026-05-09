@@ -566,6 +566,45 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                 <ListItem
                   key={b.id}
                   disablePadding
+                  // Mouse drag-reorder. Uses a separate MIME from the
+                  // path-drop flow on bookmark rows so the two
+                  // gestures don't collide. Reading the source id
+                  // from dataTransfer in onDrop tells us which row to
+                  // splice + where.
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      "application/x-skiff-bookmark",
+                      b.id,
+                    );
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => {
+                    if (
+                      e.dataTransfer.types.includes(
+                        "application/x-skiff-bookmark",
+                      )
+                    ) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                    }
+                  }}
+                  onDrop={(e) => {
+                    const sourceId = e.dataTransfer.getData(
+                      "application/x-skiff-bookmark",
+                    );
+                    if (!sourceId || sourceId === b.id) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const list = settings.bookmarks;
+                    const sIdx = list.findIndex((x) => x.id === sourceId);
+                    const tIdx = list.findIndex((x) => x.id === b.id);
+                    if (sIdx < 0 || tIdx < 0) return;
+                    const next = [...list];
+                    const [moved] = next.splice(sIdx, 1);
+                    next.splice(tIdx, 0, moved);
+                    update("bookmarks", next);
+                  }}
                   secondaryAction={
                     <Box sx={{ display: "flex", gap: 0.25 }}>
                       <IconButton
