@@ -776,24 +776,26 @@ export default function Browser({
         if (!path || parentPath(path) === path) return;
         e.preventDefault();
         goUp();
-      } else if (e.key === "[") {
-        // Browser muscle memory: Cmd+[ = back. Same effect as the
-        // toolbar's left arrow.
+      } else if (
+        // Cmd+← stays as a hardcoded alias for back regardless of
+        // any browser.back rebind — Finder convention is universal.
+        (e.key === "ArrowLeft" && !e.shiftKey) ||
+        matchesCombo(
+          e,
+          activeCombo("browser.back", "cmd+[", settings.shortcutOverrides),
+        )
+      ) {
         if (history.back.length <= 1) return;
         e.preventDefault();
         goBack();
-      } else if (e.key === "]") {
-        // Cmd+] = forward.
-        if (history.forward.length === 0) return;
-        e.preventDefault();
-        goForward();
-      } else if (e.key === "ArrowLeft" && !e.shiftKey) {
-        // Cmd+← also goes back (Finder convention; some users
-        // prefer arrows over brackets).
-        if (history.back.length <= 1) return;
-        e.preventDefault();
-        goBack();
-      } else if (e.key === "ArrowRight" && !e.shiftKey) {
+      } else if (
+        // Cmd+→ stays as a hardcoded alias for forward.
+        (e.key === "ArrowRight" && !e.shiftKey) ||
+        matchesCombo(
+          e,
+          activeCombo("browser.forward", "cmd+]", settings.shortcutOverrides),
+        )
+      ) {
         if (history.forward.length === 0) return;
         e.preventDefault();
         goForward();
