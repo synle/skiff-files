@@ -75,6 +75,12 @@ interface Props {
    *  the toolbar just exposes the toggle. */
   searchRecursive: boolean;
   onSearchRecursiveChange: (v: boolean) => void;
+  /** Interpret the search query as a JS regex. */
+  searchRegex?: boolean;
+  onSearchRegexChange?: (v: boolean) => void;
+  /** Make the search match case-sensitive. */
+  searchCaseSensitive?: boolean;
+  onSearchCaseSensitiveChange?: (v: boolean) => void;
   /** Ref for Cmd/Ctrl+F focus. The Browser owns the keybind so the
    *  toolbar doesn't need to know about route-level shortcuts. */
   searchInputRef?: Ref<HTMLInputElement>;
@@ -132,6 +138,10 @@ export default function Toolbar(props: Props) {
     onSearchChange,
     searchRecursive,
     onSearchRecursiveChange,
+    searchRegex,
+    onSearchRegexChange,
+    searchCaseSensitive,
+    onSearchCaseSensitiveChange,
     searchInputRef,
     backHistory = [],
     forwardHistory = [],
@@ -398,6 +408,50 @@ export default function Toolbar(props: Props) {
             <option key={q} value={q} />
           ))}
         </datalist>
+      )}
+      {/* Search-mode toggles. Only render when both setters are
+       *  wired AND a query is present — they're noise when the user
+       *  isn't searching. `Aa` for case-sensitive, `.*` for regex
+       *  follows VS Code / IntelliJ convention. */}
+      {search && onSearchCaseSensitiveChange && (
+        <Tooltip title={searchCaseSensitive ? "Case sensitive" : "Match case"}>
+          <ToggleButton
+            size="small"
+            value="case"
+            selected={!!searchCaseSensitive}
+            onChange={() => onSearchCaseSensitiveChange(!searchCaseSensitive)}
+            aria-label="Toggle case-sensitive search"
+            aria-pressed={!!searchCaseSensitive}
+            sx={{ p: 0.5 }}
+          >
+            <Box
+              component="span"
+              sx={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1, fontWeight: 600 }}
+            >
+              Aa
+            </Box>
+          </ToggleButton>
+        </Tooltip>
+      )}
+      {search && onSearchRegexChange && (
+        <Tooltip title={searchRegex ? "Regex on" : "Match as regex"}>
+          <ToggleButton
+            size="small"
+            value="regex"
+            selected={!!searchRegex}
+            onChange={() => onSearchRegexChange(!searchRegex)}
+            aria-label="Toggle regex search"
+            aria-pressed={!!searchRegex}
+            sx={{ p: 0.5 }}
+          >
+            <Box
+              component="span"
+              sx={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1, fontWeight: 600 }}
+            >
+              .*
+            </Box>
+          </ToggleButton>
+        </Tooltip>
       )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />

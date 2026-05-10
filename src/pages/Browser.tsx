@@ -148,6 +148,15 @@ export default function Browser({
    *  show its results until the user navigates / clears. */
   const [search, setSearch] = useState("");
   const [searchRecursive, setSearchRecursive] = useState(false);
+  /** Interpret the search query as a JS regex. When false (default)
+   *  the query is a substring match. */
+  const [searchRegex, setSearchRegex] = useState(false);
+  /** Case-sensitive substring / regex match. Default off mirrors
+   *  Finder + ripgrep's smart-case heuristic without the heuristic
+   *  itself — the user picks. */
+  const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
+  /** Surfaces invalid-regex errors inline. */
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [findResults, setFindResults] = useState<Entry[] | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   /** True while a Tauri drag-drop is hovering the window. Drives the
@@ -1036,9 +1045,41 @@ export default function Browser({
       });
     }
     if (!search) return base;
-    const q = search.toLowerCase();
-    return base.filter((e) => e.name.toLowerCase().includes(q));
-  }, [entries, search, searchRecursive, findResults, settings.hideSystemFiles, kindFilter, tagFilter, settings.fileTags]);
+    if (searchRegex) {
+      try {
+        const re = new RegExp(search, searchCaseSensitive ? "" : "i");
+        if (searchError) setSearchError(null);
+        return base.filter((e) => re.test(e.name));
+      } catch (err) {
+        // Invalid regex — surface the error inline (StatusBar) and
+        // fall back to no filter so the user sees their listing
+        // instead of a blank pane.
+        if (String(err) !== searchError) {
+          // setState during render would warn; defer to next tick.
+          queueMicrotask(() => setSearchError(String(err)));
+        }
+        return base;
+      }
+    }
+    const q = searchCaseSensitive ? search : search.toLowerCase();
+    return base.filter((e) =>
+      searchCaseSensitive
+        ? e.name.includes(q)
+        : e.name.toLowerCase().includes(q),
+    );
+  }, [
+    entries,
+    search,
+    searchRecursive,
+    searchRegex,
+    searchCaseSensitive,
+    findResults,
+    settings.hideSystemFiles,
+    kindFilter,
+    tagFilter,
+    settings.fileTags,
+    searchError,
+  ]);
 
   // Reset the query on every navigation — the new folder almost certainly
   // doesn't have files matching the previous folder's search.
@@ -1046,7 +1087,15 @@ export default function Browser({
     setSearch("");
     setFindResults(null);
     setSearchRecursive(false);
+    setSearchError(null);
   }, [path]);
+
+  // Clear the regex error whenever the query becomes empty so the
+  // status bar doesn't show a stale "Invalid regular expression"
+  // after the user clears the field.
+  useEffect(() => {
+    if (!search && searchError) setSearchError(null);
+  }, [search, searchError]);
 
   // Debounced recursive find. Fires 300 ms after the last keystroke so a
   // user typing "abc" doesn't trigger three full disk walks. Cancellation
@@ -1188,6 +1237,10 @@ export default function Browser({
         search={search}
         onSearchChange={setSearch}
         searchRecursive={searchRecursive}
+        searchRegex={searchRegex}
+        onSearchRegexChange={setSearchRegex}
+        searchCaseSensitive={searchCaseSensitive}
+        onSearchCaseSensitiveChange={setSearchCaseSensitive}
         onSearchRecursiveChange={setSearchRecursive}
         searchInputRef={searchInputRef}
         sortKey={sortKey}
@@ -1356,8 +1409,11 @@ export default function Browser({
         selectedSize={
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
         }
-        errorMessage={error}
-        onDismissError={() => setError(null)}
+        errorMessage={searchError ?? error}
+        onDismissError={() => {
+          setError(null);
+          setSearchError(null);
+        }}
         diskFree={diskSpace?.free ?? null}
         diskTotal={diskSpace?.total ?? null}
         findActive={searchRecursive && findResults != null && !!search}
