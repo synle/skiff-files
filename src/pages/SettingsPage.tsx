@@ -20,6 +20,7 @@ import {
 import { useEffect, useState } from "react";
 import {
   appDataDir,
+  loadSettingsFromDisk,
   useSettings,
   type Settings,
 } from "../state/settings";
@@ -1310,6 +1311,38 @@ export default function SettingsPage() {
               }}
             >
               Reveal app data folder
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={async () => {
+                // Open settings.json in the OS default text editor.
+                // appDataDir() returns the parent; settings.json lives
+                // at <appDataDir>/settings.json (created on first save
+                // by the Rust command).
+                const dir = await appDataDir();
+                if (dir) {
+                  // Use forward-slash join — `open` crate handles
+                  // both separator conventions cross-platform.
+                  void fsOpenWithDefault(`${dir}/settings.json`);
+                }
+              }}
+            >
+              Open settings.json
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={async () => {
+                // Re-read settings.json + apply. Useful when the user
+                // edited the file externally (e.g. via "Open
+                // settings.json" + a text editor) and wants the app
+                // to pick up the changes without a relaunch.
+                const fromDisk = await loadSettingsFromDisk();
+                if (fromDisk) setSettings(fromDisk);
+              }}
+            >
+              Reload from disk
             </Button>
             <Button
               variant="outlined"
