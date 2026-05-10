@@ -114,6 +114,10 @@ export interface Settings {
    *  key) = no tag filter. Values are TagColor strings. Same LRU
    *  bound as folderKindFilter. */
   folderTagFilter: Record<string, string[]>;
+  /** Per-folder active recency filter ("today" / "week" / "month").
+   *  Same LRU bound as folderKindFilter / folderTagFilter. Missing
+   *  key = no recency filter for that folder. */
+  folderRecencyFilter: Record<string, string>;
   /** Default conflict policy for new sync jobs. The Transfers form
    *  reads this on mount; saved-job templates always carry their
    *  own policy and ignore this. */
@@ -364,6 +368,7 @@ export const DEFAULTS: Settings = {
   folderSort: {},
   folderKindFilter: {},
   folderTagFilter: {},
+  folderRecencyFilter: {},
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,

@@ -126,9 +126,6 @@ export default function Browser({
   // group set isn't yet persisted (TODO: per-folder LRU like
   // folderViewMode).
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
-  // Temporal filter — session-only (matches the chip-row's session
-  // semantics for kind chips before persistence landed in 0.2.180).
-  const [recencyFilter, setRecencyFilter] = useState<RecencyGroup | null>(null);
   /** When set, the archive-viewer dialog is open against this path. */
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
     null,
@@ -248,6 +245,35 @@ export default function Browser({
       }
     },
     [path, settings.folderKindFilter, update],
+  );
+
+  // Per-folder recency filter — single value per path (or missing
+  // = no filter). Same LRU bound + setter shape as the kind / tag
+  // filter so the chip strip behaves uniformly.
+  const recencyFilter = useMemo<RecencyGroup | null>(() => {
+    if (!path) return null;
+    const v = settings.folderRecencyFilter[path];
+    return (v as RecencyGroup) ?? null;
+  }, [path, settings.folderRecencyFilter]);
+  const setRecencyFilter = useCallback(
+    (next: RecencyGroup | null) => {
+      if (!path) return;
+      const map = { ...settings.folderRecencyFilter };
+      if (next === null) {
+        delete map[path];
+      } else {
+        map[path] = next;
+      }
+      const keys = Object.keys(map);
+      if (keys.length > 200) {
+        const trimmed: typeof map = {};
+        for (const k of keys.slice(keys.length - 200)) trimmed[k] = map[k];
+        update("folderRecencyFilter", trimmed);
+      } else {
+        update("folderRecencyFilter", map);
+      }
+    },
+    [path, settings.folderRecencyFilter, update],
   );
 
   // Per-folder tag filter — same LRU shape as folderKindFilter. The

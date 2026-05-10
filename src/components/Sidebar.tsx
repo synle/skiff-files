@@ -454,6 +454,10 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
    *  "snapping back" after a resize. */
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const effectiveWidth = dragWidth ?? settings.sidebarWidth;
+  /** Bookmark filter input — only shown when there are enough
+   *  bookmarks that scrolling becomes painful (>= 10). Substring
+   *  match against label, case-insensitive. Empty = show all. */
+  const [bookmarkFilter, setBookmarkFilter] = useState("");
 
   const startDrag = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -653,9 +657,37 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             }}
           >
             {renderSectionHeader("bookmarks", "Bookmarks")}
+            {!isCollapsed("bookmarks") && settings.bookmarks.length >= 10 && (
+              <Box sx={{ px: 2, py: 0.5 }}>
+                <input
+                  type="text"
+                  placeholder="Filter bookmarks…"
+                  value={bookmarkFilter}
+                  onChange={(e) => setBookmarkFilter(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "4px 6px",
+                    fontSize: "0.75rem",
+                    background: "transparent",
+                    border: "1px solid",
+                    borderColor: "rgba(127,127,127,0.3)",
+                    borderRadius: 4,
+                    color: "inherit",
+                  }}
+                />
+              </Box>
+            )}
             {!isCollapsed("bookmarks") && (
             <List dense disablePadding id="sidebar-section-bookmarks">
-              {settings.bookmarks.map((b, i) => (
+              {settings.bookmarks
+                .filter((b) =>
+                  bookmarkFilter
+                    ? b.label
+                        .toLowerCase()
+                        .includes(bookmarkFilter.toLowerCase())
+                    : true,
+                )
+                .map((b, i) => (
                 <ListItem
                   key={b.id}
                   disablePadding
@@ -745,8 +777,16 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     onClick={() => onNavigate(b.path)}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      const isFirst = i === 0;
-                      const isLast = i === settings.bookmarks.length - 1;
+                      // Use the full-list index so Move up/down stay
+                      // consistent regardless of an active bookmark
+                      // filter — moving a row up should swap with its
+                      // original neighbor, not with whatever rendered
+                      // right above it post-filter.
+                      const realIdx = settings.bookmarks.findIndex(
+                        (x) => x.id === b.id,
+                      );
+                      const isFirst = realIdx === 0;
+                      const isLast = realIdx === settings.bookmarks.length - 1;
                       setContextMenu({
                         x: e.clientX,
                         y: e.clientY,
