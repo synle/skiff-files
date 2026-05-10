@@ -145,8 +145,24 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         actionId: "browser.rename",
         defaultCombo: "f2",
       },
-      { keys: "Cmd / Ctrl + = / -", description: "Font size up / down (S / M / L cycle)" },
-      { keys: "Cmd / Ctrl + 0", description: "Reset font size to medium" },
+      {
+        keys: "Cmd / Ctrl + =",
+        description: "Font size up (S → M → L)",
+        actionId: "app.fontSizeUp",
+        defaultCombo: "cmd+=",
+      },
+      {
+        keys: "Cmd / Ctrl + -",
+        description: "Font size down (L → M → S)",
+        actionId: "app.fontSizeDown",
+        defaultCombo: "cmd+-",
+      },
+      {
+        keys: "Cmd / Ctrl + 0",
+        description: "Reset font size to medium",
+        actionId: "app.fontSizeReset",
+        defaultCombo: "cmd+0",
+      },
       {
         keys: "Cmd / Ctrl + Shift + .",
         description: "Toggle hidden files (dotfiles)",

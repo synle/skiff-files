@@ -144,10 +144,17 @@ export default function App() {
         // VS Code muscle memory) — \\ is the user-preferred binding.
         e.preventDefault();
         update("sidebarVisible", !settings.sidebarVisible);
-      } else if (e.key === "=" || e.key === "+") {
-        // Browser muscle memory: Cmd/Ctrl+= bumps font size one step
-        // up. Cycles small → medium → large → (cap). `=` and `+`
-        // share the key on US keyboards; honor both.
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.fontSizeUp", "cmd+=", settings.shortcutOverrides),
+        ) ||
+        // Accept "+" too: on US keyboards `=` and `+` share the
+        // physical key; the user might press Shift+= and get `+`.
+        // We can't represent that as a single combo string so the
+        // additional check is a small pragmatic alias.
+        (e.key === "+" && (e.metaKey || e.ctrlKey))
+      ) {
         e.preventDefault();
         const next =
           settings.fontSize === "small"
@@ -156,7 +163,12 @@ export default function App() {
               ? "large"
               : "large";
         update("fontSize", next);
-      } else if (e.key === "-") {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.fontSizeDown", "cmd+-", settings.shortcutOverrides),
+        )
+      ) {
         e.preventDefault();
         const next =
           settings.fontSize === "large"
@@ -165,12 +177,14 @@ export default function App() {
               ? "small"
               : "small";
         update("fontSize", next);
-      } else if (e.key === "0") {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo("app.fontSizeReset", "cmd+0", settings.shortcutOverrides),
+        )
+      ) {
         // Browser muscle memory: Cmd/Ctrl+0 resets zoom. Here it
-        // resets font size to medium. Skipped when Shift is held so
-        // users with non-US layouts who type ")" via Shift+0 don't
-        // accidentally trigger.
-        if (e.shiftKey) return;
+        // resets font size to medium.
         e.preventDefault();
         update("fontSize", "medium");
       } else if (
