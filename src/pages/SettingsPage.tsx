@@ -9,7 +9,10 @@ import {
   Divider,
   FormControl,
   FormControlLabel,
+  IconButton,
   InputLabel,
+  List,
+  ListItem,
   MenuItem,
   Select,
   Stack,
@@ -17,10 +20,14 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import { useEffect, useState } from "react";
 import {
   appDataDir,
   loadSettingsFromDisk,
+  SIDEBAR_SECTION_DEFAULT_ORDER,
+  SIDEBAR_SECTION_LABELS,
   useSettings,
   type Settings,
 } from "../state/settings";
@@ -1095,50 +1102,130 @@ export default function SettingsPage() {
             sx={{ maxWidth: 240 }}
           />
 
-          {(
-            [
-              "favorites",
-              "bookmarks",
-              "workspaces",
-              "searches",
-              "syncjobs",
-              "selections",
-              "recent",
-              "hosts",
-              "devices",
-            ] as const
-          ).map((id) => {
-              const labels = {
-                favorites: "Favorites",
-                bookmarks: "Bookmarks",
-                workspaces: "Workspaces",
-                searches: "Searches",
-                syncjobs: "Sync jobs",
-                selections: "Selections",
-                recent: "Recent",
-                hosts: "Hosts",
-                devices: "Devices",
+          {SIDEBAR_SECTION_DEFAULT_ORDER.map((id) => {
+            const visible = settings.sidebarSectionsVisible[id] !== false;
+            return (
+              <FormControlLabel
+                key={id}
+                control={
+                  <Switch
+                    checked={visible}
+                    onChange={(e) =>
+                      update("sidebarSectionsVisible", {
+                        ...settings.sidebarSectionsVisible,
+                        [id]: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label={`Show ${SIDEBAR_SECTION_LABELS[id]}`}
+              />
+            );
+          })}
+
+          {/* Section order — up/down buttons. Lives next to the
+              show/hide switches because the two surfaces fight for
+              the same mental model ("which sections do I see, and
+              in what order?"). Effective order seeds from the
+              built-in default whenever `sidebarSectionOrder` is
+              empty, then the user's first reorder freezes their
+              full ordering into the array. */}
+          <Box sx={{ pt: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              Section order
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mb: 1 }}
+            >
+              Drag isn't wired here yet — use the arrows.
+              "Reset" restores the built-in order.
+            </Typography>
+            {(() => {
+              // Effective order = saved order first, then any
+              // default ids missing from the saved list (so a
+              // future-added section appears at the bottom rather
+              // than disappearing on an old settings.json).
+              const saved = settings.sidebarSectionOrder;
+              const merged: string[] = [];
+              const seen = new Set<string>();
+              for (const id of saved) {
+                if (
+                  (SIDEBAR_SECTION_DEFAULT_ORDER as readonly string[]).includes(
+                    id,
+                  ) &&
+                  !seen.has(id)
+                ) {
+                  merged.push(id);
+                  seen.add(id);
+                }
+              }
+              for (const id of SIDEBAR_SECTION_DEFAULT_ORDER) {
+                if (!seen.has(id)) {
+                  merged.push(id);
+                  seen.add(id);
+                }
+              }
+              const move = (idx: number, delta: number) => {
+                const next = [...merged];
+                const target = idx + delta;
+                if (target < 0 || target >= next.length) return;
+                [next[idx], next[target]] = [next[target], next[idx]];
+                update("sidebarSectionOrder", next);
               };
-              const visible = settings.sidebarSectionsVisible[id] !== false;
               return (
-                <FormControlLabel
-                  key={id}
-                  control={
-                    <Switch
-                      checked={visible}
-                      onChange={(e) =>
-                        update("sidebarSectionsVisible", {
-                          ...settings.sidebarSectionsVisible,
-                          [id]: e.target.checked,
-                        })
-                      }
-                    />
-                  }
-                  label={`Show ${labels[id]}`}
-                />
+                <List dense disablePadding sx={{ maxWidth: 320 }}>
+                  {merged.map((id, idx) => (
+                    <ListItem
+                      key={id}
+                      disablePadding
+                      sx={{
+                        border: 1,
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        mb: 0.5,
+                        px: 1,
+                        py: 0.5,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ flex: 1 }}>
+                        {SIDEBAR_SECTION_LABELS[id] ?? id}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        disabled={idx === 0}
+                        onClick={() => move(idx, -1)}
+                        aria-label={`Move ${SIDEBAR_SECTION_LABELS[id]} up`}
+                      >
+                        <ArrowUpwardIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        disabled={idx === merged.length - 1}
+                        onClick={() => move(idx, 1)}
+                        aria-label={`Move ${SIDEBAR_SECTION_LABELS[id]} down`}
+                      >
+                        <ArrowDownwardIcon fontSize="small" />
+                      </IconButton>
+                    </ListItem>
+                  ))}
+                </List>
               );
-            },
-          )}
+            })()}
+            <Button
+              size="small"
+              variant="outlined"
+              sx={{ mt: 1 }}
+              disabled={settings.sidebarSectionOrder.length === 0}
+              onClick={() => update("sidebarSectionOrder", [])}
+            >
+              Reset section order
+            </Button>
+          </Box>
 
           {settings.hiddenFavorites.length > 0 && (
             <Box sx={{ pt: 1 }}>

@@ -54,6 +54,7 @@ import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
+  SIDEBAR_SECTION_DEFAULT_ORDER,
   SIDEBAR_WIDTH_MAX,
   SIDEBAR_WIDTH_MIN,
   useSettings,
@@ -296,6 +297,37 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
   const isVisible = (id: string): boolean =>
     settings.sidebarSectionsVisible[id] !== false;
 
+  /** CSS `order` index for a section. We render every section in
+   *  source order but each lives inside a flex-column parent and
+   *  carries `style={{ order: orderOf(id) }}` so the user-controlled
+   *  `sidebarSectionOrder` array decides the visual stacking
+   *  without any JSX restructuring.
+   *
+   *  - Ids present in `sidebarSectionOrder` get their array index.
+   *  - Ids missing from a saved order (older settings.json files,
+   *    or a future-added section) fall back to their built-in
+   *    default position, offset past the user-chosen ids so saved
+   *    preferences still anchor at the top.
+   *  - Empty `sidebarSectionOrder` (the factory default) yields
+   *    the original built-in ordering. */
+  const orderOf = (id: string): number => {
+    const saved = settings.sidebarSectionOrder;
+    if (saved.length === 0) {
+      const fallback = SIDEBAR_SECTION_DEFAULT_ORDER.indexOf(
+        id as (typeof SIDEBAR_SECTION_DEFAULT_ORDER)[number],
+      );
+      return fallback === -1 ? 999 : fallback;
+    }
+    const idx = saved.indexOf(id);
+    if (idx !== -1) return idx;
+    // Section not in the saved list → append in default order
+    // after every saved id.
+    const defaultIdx = SIDEBAR_SECTION_DEFAULT_ORDER.indexOf(
+      id as (typeof SIDEBAR_SECTION_DEFAULT_ORDER)[number],
+    );
+    return saved.length + (defaultIdx === -1 ? 999 : defaultIdx);
+  };
+
   /** Hide a section entirely. Persisted in
    *  `Settings.sidebarSectionsVisible[id] = false`. Mirrors the
    *  toggles on Settings → Sidebar so users have a one-click escape
@@ -532,7 +564,18 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         position: "relative",
       }}
     >
-      <Box sx={{ flex: 1, overflow: "auto" }}>
+      <Box
+        sx={{
+          flex: 1,
+          overflow: "auto",
+          // Flex column so each section's `order` prop drives its
+          // visual stacking. Source order stays unchanged — the
+          // user's `sidebarSectionOrder` array decides what wins.
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <Box style={{ order: orderOf("favorites") }}>
         {isVisible("favorites") && renderSectionHeader("favorites", "Favorites")}
         {isVisible("favorites") && !isCollapsed("favorites") && (
           <List dense disablePadding id="sidebar-section-favorites">
@@ -647,7 +690,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             )}
           </List>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("bookmarks") }}>
         {isVisible("bookmarks") && settings.bookmarks.length > 0 && (
           <Box
             // Drop target for "drag folder into Bookmarks → add new
@@ -941,7 +986,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             )}
           </Box>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("workspaces") }}>
         {isVisible("workspaces") && settings.tabWorkspaces.length > 0 && (
           <>
             {renderSectionHeader("workspaces", "Workspaces")}
@@ -1103,7 +1150,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             )}
           </>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("searches") }}>
         {isVisible("searches") && settings.savedSearches.length > 0 && (
           <>
             {renderSectionHeader("searches", "Searches")}
@@ -1255,7 +1304,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             )}
           </>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("syncjobs") }}>
         {isVisible("syncjobs") && settings.savedSyncJobs.length > 0 && (
           <>
             {renderSectionHeader("syncjobs", "Sync jobs")}
@@ -1419,7 +1470,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             )}
           </>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("selections") }}>
         {isVisible("selections") && settings.savedSelections.length > 0 && (
           <>
             {renderSectionHeader("selections", "Selections")}
@@ -1590,7 +1643,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             )}
           </>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("recent") }}>
         {isVisible("recent") && settings.recentPaths.length > 0 && (
           <>
             {renderSectionHeader("recent", "Recent")}
@@ -1671,7 +1726,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             )}
           </>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("hosts") }}>
         {isVisible("hosts") && renderSectionHeader("hosts", "Hosts")}
         {isVisible("hosts") && !isCollapsed("hosts") && (
         <Box id="sidebar-section-hosts">
@@ -1773,7 +1830,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         )}
         </Box>
         )}
+        </Box>
 
+        <Box style={{ order: orderOf("devices") }}>
         {isVisible("devices") && renderSectionHeader("devices", "Devices")}
         {isVisible("devices") && !isCollapsed("devices") && (
           mounts == null ? (
@@ -1821,6 +1880,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             </List>
           )
         )}
+        </Box>
       </Box>
 
       <List dense disablePadding sx={{ borderTop: 1, borderColor: "divider" }}>

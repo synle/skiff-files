@@ -149,4 +149,56 @@ describe("Sidebar", () => {
     const moveDown = screen.getByText("Move down").closest("li");
     expect(moveDown).toHaveAttribute("aria-disabled", "true");
   });
+
+  // Regression for 0.2.238 — `Settings.sidebarSectionOrder` drives
+  // each section's CSS `order` so the visual stack reflects the
+  // user's preferred ordering. We don't assert pixel positions
+  // here (jsdom doesn't lay things out); we assert the `order`
+  // style numbers, which the layout engine consumes.
+  it("applies CSS order from sidebarSectionOrder", () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({
+        // Put hosts first, devices second, then favorites — the
+        // exact inverse of the built-in default for the three
+        // visible sections.
+        sidebarSectionOrder: ["hosts", "devices", "favorites"],
+        bookmarks: [],
+      }),
+    );
+    r();
+    // Find the wrapper Box for each visible section by walking up
+    // from the header label. The wrapper is the Box that carries
+    // `style.order` — it's the parent (skipping the header's
+    // `<button>` and inline label-flex Box).
+    const wrapperFor = (label: string): HTMLElement => {
+      let el: HTMLElement | null = screen.getByText(label);
+      while (el && (el.style?.order ?? "") === "") {
+        el = el.parentElement;
+      }
+      if (!el) throw new Error(`No order wrapper for ${label}`);
+      return el;
+    };
+    expect(wrapperFor("Hosts").style.order).toBe("0");
+    expect(wrapperFor("Devices").style.order).toBe("1");
+    expect(wrapperFor("Favorites").style.order).toBe("2");
+  });
+
+  // Empty array = built-in default order (favorites→…→devices).
+  it("uses built-in default order when sidebarSectionOrder is empty", () => {
+    r();
+    const wrapperFor = (label: string): HTMLElement => {
+      let el: HTMLElement | null = screen.getByText(label);
+      while (el && (el.style?.order ?? "") === "") {
+        el = el.parentElement;
+      }
+      if (!el) throw new Error(`No order wrapper for ${label}`);
+      return el;
+    };
+    // SIDEBAR_SECTION_DEFAULT_ORDER puts favorites first (index 0),
+    // hosts at index 7, devices at index 8.
+    expect(wrapperFor("Favorites").style.order).toBe("0");
+    expect(wrapperFor("Hosts").style.order).toBe("7");
+    expect(wrapperFor("Devices").style.order).toBe("8");
+  });
 });

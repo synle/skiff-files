@@ -176,6 +176,14 @@ export interface Settings {
    *  uses bookmarks can hide that header entirely instead of just
    *  collapsing it). */
   sidebarSectionsVisible: Record<string, boolean>;
+  /** User-controlled order of Sidebar sections. Empty array = use
+   *  the built-in default (favorites → bookmarks → workspaces →
+   *  searches → syncjobs → selections → recent → hosts → devices).
+   *  Unknown ids in the array are ignored; ids missing from the
+   *  array fall back to their default position so future-added
+   *  sections don't disappear when an old `settings.json` is
+   *  loaded. Re-orderable from Settings → Sidebar. */
+  sidebarSectionOrder: string[];
   /** Accordion mode for the Sidebar — only one section may be
    *  expanded at a time. Expanding one auto-collapses the others.
    *  Default false (Finder-style: any number open simultaneously). */
@@ -406,6 +414,38 @@ export const SEARCH_HISTORY_MAX = 10;
  *  bytes per entry; 200 caps the file at ~16 KB. */
 export const FOLDER_VIEW_MAX = 200;
 
+/** Built-in default order for Sidebar sections. The Sidebar +
+ *  Settings reorder UI both reference this so an empty
+ *  `sidebarSectionOrder` falls back to the same positions. New
+ *  sections added later should be appended here so existing users
+ *  see them at the bottom (their saved order can promote them). */
+export const SIDEBAR_SECTION_DEFAULT_ORDER = [
+  "favorites",
+  "bookmarks",
+  "workspaces",
+  "searches",
+  "syncjobs",
+  "selections",
+  "recent",
+  "hosts",
+  "devices",
+] as const;
+
+/** Friendly labels for each sidebar section id. Used by the
+ *  Settings reorder UI; the Sidebar still passes its own labels in
+ *  case a future section wants a per-locale override. */
+export const SIDEBAR_SECTION_LABELS: Record<string, string> = {
+  favorites: "Favorites",
+  bookmarks: "Bookmarks",
+  workspaces: "Workspaces",
+  searches: "Searches",
+  syncjobs: "Sync jobs",
+  selections: "Selections",
+  recent: "Recent",
+  hosts: "Hosts",
+  devices: "Devices",
+};
+
 export const DEFAULTS: Settings = {
   themeMode: "system",
   defaultView: "list",
@@ -443,6 +483,7 @@ export const DEFAULTS: Settings = {
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarCollapsed: {},
   sidebarSectionsVisible: {},
+  sidebarSectionOrder: [],
   sidebarAccordion: false,
   sidebarShowStatusDots: true,
   openNewTabAtCurrent: false,
