@@ -1703,6 +1703,16 @@ export default function Browser({
             0,
           )
         }
+        hiddenByFilter={
+          // entries.length - visibleEntries.length is the count of
+          // rows the active filter (kind / tag / recency / search /
+          // hidden / system files) is dropping. The recursive-find
+          // case is special — entries doesn't reflect the find result,
+          // so we skip the indicator there.
+          searchRecursive && findResults && search
+            ? 0
+            : Math.max(0, entries.length - visibleEntries.length)
+        }
       />}
       <Menu
         open={emptyMenu !== null}

@@ -41,6 +41,10 @@ interface Props {
    *  color tag. Surfaces as "(N tagged)" alongside the selection
    *  summary so users see tag distribution at a glance.  */
   taggedCount?: number;
+  /** Number of entries the active filter (kind / tag / recency /
+   *  search) is currently dropping from the listing. Surfaces as
+   *  "(N hidden)" so users notice they're seeing a subset. */
+  hiddenByFilter?: number;
 }
 
 export default function StatusBar({
@@ -58,6 +62,7 @@ export default function StatusBar({
   clipboardHint = null,
   selectedName = null,
   taggedCount = 0,
+  hiddenByFilter = 0,
 }: Props) {
   // Errors take precedence — a directory listing error matters more than the
   // empty-selection summary it would otherwise render alongside.
@@ -127,6 +132,11 @@ export default function StatusBar({
       {taggedCount > 0 && (
         <Typography variant="caption" color="text.secondary">
           · {taggedCount} tagged
+        </Typography>
+      )}
+      {hiddenByFilter > 0 && (
+        <Typography variant="caption" sx={{ color: "warning.main" }}>
+          · {hiddenByFilter} hidden by filter
         </Typography>
       )}
       {clipboardHint && clipboardHint.count > 0 && (

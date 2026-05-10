@@ -20,7 +20,13 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
-import { useEffect, useRef, useState, type SyntheticEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type SyntheticEvent,
+} from "react";
 import Browser from "../pages/Browser";
 import { useSettings } from "../state/settings";
 import { activeCombo, matchesCombo } from "../util/keybindings";
@@ -569,6 +575,13 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
               onContextMenu={(e) => {
                 e.preventDefault();
                 setTabMenu({ anchor: e.currentTarget, tabId: t.id });
+              }}
+              // Middle-click closes the tab — browser muscle memory.
+              // Skip pinned tabs to mirror the × button's hide behavior.
+              onAuxClick={(e: ReactMouseEvent) => {
+                if (e.button !== 1 || t.pinned) return;
+                e.preventDefault();
+                closeTab(t.id);
               }}
               // Drag-to-reorder. Browser muscle memory: Chrome / Firefox
               // / Edge / Safari all support dragging tabs in the strip.
