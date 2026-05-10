@@ -29,6 +29,32 @@ export function formatMtime(unixSeconds: number | null | undefined): string {
   return d.toLocaleString();
 }
 
+/** Format a unix-second mtime according to the user's `dateFormat`
+ *  setting. Pure helper — accepts the format string so callers can
+ *  invoke it from a useMemo without re-reading the settings store
+ *  per-row. */
+export function formatMtimeAs(
+  unixSeconds: number | null | undefined,
+  format: "locale" | "iso" | "short" | "relative",
+): string {
+  if (unixSeconds == null) return "—";
+  const d = new Date(unixSeconds * 1000);
+  if (Number.isNaN(d.getTime())) return "—";
+  switch (format) {
+    case "iso":
+      return d.toISOString().replace("T", " ").slice(0, 19);
+    case "short": {
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    case "relative":
+      return formatMtimeRelative(unixSeconds);
+    case "locale":
+    default:
+      return d.toLocaleString();
+  }
+}
+
 /**
  * Human-readable "N seconds/minutes/hours/days ago" form. Used as a
  * tooltip on the mtime column so users can read recency at a glance

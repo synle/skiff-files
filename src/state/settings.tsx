@@ -230,7 +230,15 @@ export interface Settings {
    *  folderViewMode / folderSort / folderKindFilter. Missing key =
    *  no tag. */
   fileTags: Record<string, TagColor>;
+  /** Format used for the FileList Modified + Created columns.
+   *  - "locale": Date.prototype.toLocaleString (default — matches OS locale)
+   *  - "iso": ISO-8601, sortable, locale-independent
+   *  - "short": YYYY-MM-DD HH:mm (compact)
+   *  - "relative": "5m ago" / "3h ago" / "2d ago" — human-friendly */
+  dateFormat: DateFormat;
 }
+
+export type DateFormat = "locale" | "iso" | "short" | "relative";
 
 /** Finder's seven-color palette. Stored as an enum so the colors
  *  themselves can shift with the active theme without touching every
@@ -356,6 +364,7 @@ export const DEFAULTS: Settings = {
   },
   shortcutOverrides: {},
   fileTags: {},
+  dateFormat: "locale",
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

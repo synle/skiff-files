@@ -559,28 +559,61 @@ export default function Browser({
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
-      // F5 — bare keypress, no modifier.
+      // F5 — always refreshes regardless of any rebind on the
+      // user-rebindable Cmd/Ctrl+R action. Browser convention: F5 is
+      // "reload" everywhere.
       if (e.key === "F5" && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault();
         if (path) void refresh(path);
         return;
       }
-      if (!(e.metaKey || e.ctrlKey)) return;
-      const k = e.key.toLowerCase();
-      if (k === "r" && !e.shiftKey) {
+      // User-rebindable: refresh, new folder, preview toggle. Each
+      // routes through activeCombo so a Settings → Keyboard rebind
+      // takes effect here automatically.
+      if (
+        matchesCombo(
+          e,
+          activeCombo("browser.refresh", "cmd+r", settings.shortcutOverrides),
+        )
+      ) {
         e.preventDefault();
         if (path) void refresh(path);
-      } else if (k === "n" && e.shiftKey) {
+        return;
+      }
+      if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "browser.newFolder",
+            "cmd+shift+n",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
         e.preventDefault();
         void handleNewFolder();
-      } else if (k === "l" && !e.shiftKey) {
+        return;
+      }
+      if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "browser.togglePreview",
+            "cmd+i",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
+        e.preventDefault();
+        setPreviewOpen((o) => !o);
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "l" && !e.shiftKey) {
         // Browser muscle memory: Cmd/Ctrl+L = jump to address bar.
         e.preventDefault();
         setPathBarFocusRequest((c) => c + 1);
-      } else if (k === "i" && !e.shiftKey) {
-        // Finder muscle memory: Cmd+I = Get Info / preview toggle.
-        e.preventDefault();
-        setPreviewOpen((o) => !o);
       } else if (k === "d" && !e.shiftKey) {
         // Browser muscle memory: Cmd/Ctrl+D = bookmark current page.
         // No-op when the current path is already bookmarked.
@@ -653,7 +686,7 @@ export default function Browser({
     // refresh handler reads the current value via closure capture.
     // primarySelected drives the Cmd+↓ open-entry binding.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, path, primarySelected]);
+  }, [isActive, path, primarySelected, settings.shortcutOverrides]);
 
   // Mouse thumb buttons (X1 = back, X2 = forward) — common on full-size
   // mice and some trackball setups. The browser-style affordance the
@@ -1411,6 +1444,7 @@ export default function Browser({
           onContextEmpty={(x, y) => setEmptyMenu({ x, y })}
           contextMenuPath={contextMenu?.entry.path ?? null}
           fileTags={settings.fileTags}
+          dateFormat={settings.dateFormat}
           view={settings.folderViewMode[path] ?? settings.defaultView}
           path={path}
           onRename={async (entry, newName) => {

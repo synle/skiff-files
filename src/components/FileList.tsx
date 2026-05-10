@@ -20,7 +20,11 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
 import GalleryThumb from "./GalleryThumb";
-import { formatBytes, formatMtime, formatMtimeRelative } from "../util/format";
+import {
+  formatBytes,
+  formatMtimeAs,
+  formatMtimeRelative,
+} from "../util/format";
 import { setFileClipboard } from "../util/fileClipboard";
 import {
   fetchFolderSize,
@@ -96,6 +100,10 @@ interface Props {
    *  values are TagColor enum strings. Optional — when omitted no
    *  tag dots render. */
   fileTags?: Record<string, string>;
+  /** Date format for the Modified column. Defaults to "locale".
+   *  Optional so existing callers / tests continue to work without
+   *  touching the prop. */
+  dateFormat?: "locale" | "iso" | "short" | "relative";
   /** Visual layout. `list` is the virtualized list (default); other
    *  modes render a non-virtualized grid of cards (tile = small
    *  icons, gallery = larger icons / thumbs, column = wide rows).
@@ -425,6 +433,8 @@ interface FileGridViewProps {
    *  when the user held Cmd / Shift during the drag — those modes
    *  add to the existing selection instead of replacing it. */
   onRubberBand?: (paths: Set<string>, additive: boolean) => void;
+  /** Date format used in the column-view metadata line. */
+  dateFormat?: "locale" | "iso" | "short" | "relative";
 }
 
 function FileGridView(props: FileGridViewProps) {
@@ -452,6 +462,7 @@ function FileGridView(props: FileGridViewProps) {
     onRenameDraftChange,
     onCommitRename,
     onCancelRename,
+    dateFormat = "locale",
   } = props;
 
   // Per-view sizing tuned to make the four grid modes visibly
@@ -1086,7 +1097,7 @@ function FileGridView(props: FileGridViewProps) {
                               }}
                             >
                               {e.isDir ? "Folder" : formatBytes(e.size)}
-                              {e.mtime ? ` · ${formatMtime(e.mtime)}` : ""}
+                              {e.mtime ? ` · ${formatMtimeAs(e.mtime, dateFormat)}` : ""}
                               {!e.isDir && e.kind ? ` · ${e.kind}` : ""}
                             </Typography>
                           )}
@@ -1125,6 +1136,7 @@ export default function FileList(props: Props) {
     onContextEmpty,
     contextMenuPath = null,
     fileTags = {},
+    dateFormat = "locale",
     view = "list",
     path,
     onRename,
@@ -1640,6 +1652,7 @@ export default function FileList(props: Props) {
         contextMenuPath={contextMenuPath}
         showExtensions={showExtensions}
         highlightQuery={highlightQuery}
+        dateFormat={dateFormat}
         path={path}
         onRowClick={onRowClick}
         onRowMouseDown={onRowMouseDown}
@@ -1999,7 +2012,7 @@ export default function FileList(props: Props) {
                     noWrap
                     title={formatMtimeRelative(e.mtime)}
                   >
-                    {formatMtime(e.mtime)}
+                    {formatMtimeAs(e.mtime, dateFormat)}
                   </Typography>
                   <Typography
                     variant="body2"

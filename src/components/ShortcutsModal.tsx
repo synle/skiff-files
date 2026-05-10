@@ -17,6 +17,8 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState } from "react";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
+import { activeCombo, matchesCombo } from "../util/keybindings";
+import { useSettings } from "../state/settings";
 
 // Shortcuts source-of-truth lives in `util/shortcuts.ts` so the
 // Settings → Keyboard listing renders the same data.
@@ -28,12 +30,22 @@ const GROUPS = SHORTCUT_GROUPS;
  *  form don't get hijacked. */
 export default function ShortcutsModal() {
   const [open, setOpen] = useState(false);
+  const { settings } = useSettings();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // F1 mirrors the `?` shortcut for users coming from Windows /
-      // many web apps where F1 is the canonical "help" binding.
-      if (e.key !== "?" && e.key !== "F1") return;
+      // Two ways to open the cheatsheet:
+      //   1. The user-rebindable `app.cheatsheet` action (defaults to
+      //      Shift+/, i.e. `?`).
+      //   2. F1, always — Windows / web-app convention. We hardcode
+      //      F1 because users coming from those platforms expect it
+      //      regardless of any `app.cheatsheet` rebind.
+      const isF1 = e.key === "F1";
+      const isCombo = matchesCombo(
+        e,
+        activeCombo("app.cheatsheet", "shift+/", settings.shortcutOverrides),
+      );
+      if (!isF1 && !isCombo) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (
@@ -48,7 +60,7 @@ export default function ShortcutsModal() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [settings.shortcutOverrides]);
 
   return (
     <Dialog

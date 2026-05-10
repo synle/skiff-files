@@ -91,8 +91,18 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         actionId: "app.toggleSidebar",
         defaultCombo: "cmd+\\",
       },
-      { keys: "Cmd / Ctrl + I", description: "Toggle preview pane" },
-      { keys: "Cmd / Ctrl + R · F5", description: "Refresh current folder" },
+      {
+        keys: "Cmd / Ctrl + I",
+        description: "Toggle preview pane",
+        actionId: "browser.togglePreview",
+        defaultCombo: "cmd+i",
+      },
+      {
+        keys: "Cmd / Ctrl + R · F5",
+        description: "Refresh current folder",
+        actionId: "browser.refresh",
+        defaultCombo: "cmd+r",
+      },
       { keys: "Cmd / Ctrl + L", description: "Edit path (focus path bar)" },
       {
         keys: "Cmd / Ctrl + K",
@@ -112,7 +122,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         actionId: "app.openSettings",
         defaultCombo: "cmd+,",
       },
-      { keys: "Cmd / Ctrl + Shift + N", description: "New folder" },
+      {
+        keys: "Cmd / Ctrl + Shift + N",
+        description: "New folder",
+        actionId: "browser.newFolder",
+        defaultCombo: "cmd+shift+n",
+      },
       { keys: "Cmd / Ctrl + D", description: "Bookmark current folder" },
       {
         keys: "F2",
@@ -152,7 +167,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Help",
     items: [
-      { keys: "? · F1", description: "Show this cheatsheet" },
+      {
+        keys: "? · F1",
+        description: "Show this cheatsheet (F1 is always an alias)",
+        actionId: "app.cheatsheet",
+        defaultCombo: "shift+/",
+      },
       { keys: "Esc", description: "Close this cheatsheet" },
     ],
   },

@@ -349,6 +349,26 @@ export default function SettingsPage() {
             </Select>
           </FormControl>
 
+          <FormControl size="small" sx={{ maxWidth: 240 }}>
+            <InputLabel id="date-format-label">Date format</InputLabel>
+            <Select
+              labelId="date-format-label"
+              label="Date format"
+              value={settings.dateFormat}
+              onChange={(e) =>
+                update(
+                  "dateFormat",
+                  e.target.value as typeof settings.dateFormat,
+                )
+              }
+            >
+              <MenuItem value="locale">Locale (default)</MenuItem>
+              <MenuItem value="iso">ISO-8601 (sortable)</MenuItem>
+              <MenuItem value="short">Short (YYYY-MM-DD HH:mm)</MenuItem>
+              <MenuItem value="relative">Relative (5m ago)</MenuItem>
+            </Select>
+          </FormControl>
+
           <FormControlLabel
             control={
               <Switch
