@@ -108,6 +108,9 @@ interface Props {
    *  Optional so existing callers / tests continue to work without
    *  touching the prop. */
   dateFormat?: "locale" | "iso" | "short" | "relative";
+  /** Per-column visibility for list view. Name is always shown;
+   *  the other three are individually hideable. */
+  hideColumns?: { size?: boolean; modified?: boolean; kind?: boolean };
   /** Visual layout. `list` is the virtualized list (default); other
    *  modes render a non-virtualized grid of cards (tile = small
    *  icons, gallery = larger icons / thumbs, column = wide rows).
@@ -1160,6 +1163,7 @@ export default function FileList(props: Props) {
     fileTags = {},
     customFileKinds = {},
     dateFormat = "locale",
+    hideColumns = {},
     view = "list",
     path,
     onRename,
@@ -1737,27 +1741,33 @@ export default function FileList(props: Props) {
           onClick={() => onSortChange("name")}
           width={undefined}
         />
-        <HeaderCell
-          label="Size"
-          active={sortKey === "size"}
-          dir={sortDir}
-          onClick={() => onSortChange("size")}
-          width={96}
-        />
-        <HeaderCell
-          label="Modified"
-          active={sortKey === "mtime"}
-          dir={sortDir}
-          onClick={() => onSortChange("mtime")}
-          width={180}
-        />
-        <HeaderCell
-          label="Kind"
-          active={sortKey === "kind"}
-          dir={sortDir}
-          onClick={() => onSortChange("kind")}
-          width={120}
-        />
+        {!hideColumns.size && (
+          <HeaderCell
+            label="Size"
+            active={sortKey === "size"}
+            dir={sortDir}
+            onClick={() => onSortChange("size")}
+            width={96}
+          />
+        )}
+        {!hideColumns.modified && (
+          <HeaderCell
+            label="Modified"
+            active={sortKey === "mtime"}
+            dir={sortDir}
+            onClick={() => onSortChange("mtime")}
+            width={180}
+          />
+        )}
+        {!hideColumns.kind && (
+          <HeaderCell
+            label="Kind"
+            active={sortKey === "kind"}
+            dir={sortDir}
+            onClick={() => onSortChange("kind")}
+            width={120}
+          />
+        )}
       </Box>
 
       <Box
@@ -2013,39 +2023,45 @@ export default function FileList(props: Props) {
                       />
                     )}
                   </Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ width: 96, px: 1 }}
-                    title={
-                      e.isDir && folderSizes[e.path] != null
-                        ? `Recursive size: ${formatBytes(folderSizes[e.path])}`
-                        : undefined
-                    }
-                  >
-                    {e.isDir
-                      ? folderSizes[e.path] != null
-                        ? formatBytes(folderSizes[e.path])
-                        : "—"
-                      : formatBytes(e.size)}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ width: 180, px: 1 }}
-                    noWrap
-                    title={formatMtimeRelative(e.mtime)}
-                  >
-                    {formatMtimeAs(e.mtime, dateFormat)}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ width: 120, px: 1 }}
-                    noWrap
-                  >
-                    {e.kind}
-                  </Typography>
+                  {!hideColumns.size && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ width: 96, px: 1 }}
+                      title={
+                        e.isDir && folderSizes[e.path] != null
+                          ? `Recursive size: ${formatBytes(folderSizes[e.path])}`
+                          : undefined
+                      }
+                    >
+                      {e.isDir
+                        ? folderSizes[e.path] != null
+                          ? formatBytes(folderSizes[e.path])
+                          : "—"
+                        : formatBytes(e.size)}
+                    </Typography>
+                  )}
+                  {!hideColumns.modified && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ width: 180, px: 1 }}
+                      noWrap
+                      title={formatMtimeRelative(e.mtime)}
+                    >
+                      {formatMtimeAs(e.mtime, dateFormat)}
+                    </Typography>
+                  )}
+                  {!hideColumns.kind && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ width: 120, px: 1 }}
+                      noWrap
+                    >
+                      {e.kind}
+                    </Typography>
+                  )}
                 </Box>
               );
             })}

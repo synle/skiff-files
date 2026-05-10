@@ -257,6 +257,11 @@ export interface Settings {
    *  kind continues to use the underlying value to avoid resorting
    *  the listing every time the user tweaks this map. */
   customFileKinds: Record<string, string>;
+  /** FileList column visibility (list view only — grid views use a
+   *  single cell). The `name` column is always visible; the others
+   *  toggle. Useful in narrow windows or when the user only cares
+   *  about the file name. */
+  hideColumns: { size: boolean; modified: boolean; kind: boolean };
   /** Whether the window should stay above other apps. Useful for
    *  drag-dropping files OUT of Skiff into apps whose window would
    *  otherwise cover us. Synced via the new `window_set_always_on_top`
@@ -414,6 +419,7 @@ export const DEFAULTS: Settings = {
   operationsDrawerExpanded: true,
   recentPathsMax: 10,
   customFileKinds: {},
+  hideColumns: { size: false, modified: false, kind: false },
   alwaysOnTop: false,
   savedSearches: [],
 };

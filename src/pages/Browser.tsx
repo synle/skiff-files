@@ -1595,6 +1595,7 @@ export default function Browser({
           fileTags={settings.fileTags}
           dateFormat={settings.dateFormat}
           customFileKinds={settings.customFileKinds}
+          hideColumns={settings.hideColumns}
           view={settings.folderViewMode[path] ?? settings.defaultView}
           path={path}
           onRename={async (entry, newName) => {

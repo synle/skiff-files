@@ -789,6 +789,31 @@ export default function SettingsPage() {
             label="Group folders before files"
           />
 
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              List view columns
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {(["size", "modified", "kind"] as const).map((col) => (
+                <FormControlLabel
+                  key={col}
+                  control={
+                    <Switch
+                      checked={!settings.hideColumns[col]}
+                      onChange={(e) =>
+                        update("hideColumns", {
+                          ...settings.hideColumns,
+                          [col]: !e.target.checked,
+                        })
+                      }
+                    />
+                  }
+                  label={col.charAt(0).toUpperCase() + col.slice(1)}
+                />
+              ))}
+            </Box>
+          </Box>
+
           <FormControlLabel
             control={
               <Switch
@@ -1131,6 +1156,26 @@ export default function SettingsPage() {
               Clear bookmarks
               {settings.bookmarks.length > 0
                 ? ` (${settings.bookmarks.length})`
+                : ""}
+            </Button>
+            <Button
+              variant="outlined"
+              color="warning"
+              size="small"
+              disabled={settings.searchHistory.length === 0}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Clear ${settings.searchHistory.length} search ${settings.searchHistory.length === 1 ? "query" : "queries"}?`,
+                  )
+                ) {
+                  update("searchHistory", []);
+                }
+              }}
+            >
+              Clear search history
+              {settings.searchHistory.length > 0
+                ? ` (${settings.searchHistory.length})`
                 : ""}
             </Button>
             <Button
