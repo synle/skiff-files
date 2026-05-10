@@ -202,6 +202,33 @@ export const fsImageExif = (path: string): Promise<ImageExif> =>
 export const fsImageRotate = (path: string, degrees: number): Promise<void> =>
   invoke<void>("fs_image_rotate", { path, degrees });
 
+/** Fetch (or compute + cache) a thumbnail for a local image.
+ *  Returns a base64 PNG payload that the caller can drop straight
+ *  into a `data:image/png;base64,…` URL. The Rust side keeps a
+ *  SQLite-backed cache keyed by (path, mtime, size, sizePx) so a
+ *  re-render of the same file at the same size is one DB lookup. */
+export const fsThumbnail = (
+  path: string,
+  sizePx: number,
+): Promise<string> => invoke<string>("fs_thumbnail", { path, sizePx });
+
+/** Stats for the thumbnail cache (row count + on-disk byte size).
+ *  Used by the Settings → Advanced row that surfaces a "Clear
+ *  thumbnail cache" button alongside the current size. */
+export interface ThumbnailCacheStats {
+  count: number;
+  bytes: number;
+}
+
+export const fsThumbnailStats = (): Promise<ThumbnailCacheStats> =>
+  invoke<ThumbnailCacheStats>("fs_thumbnail_stats");
+
+/** Wipe every cached thumbnail. Returns the number of rows that
+ *  were dropped (the Settings UI shows it as a confirmation
+ *  toast). */
+export const fsThumbnailClear = (): Promise<number> =>
+  invoke<number>("fs_thumbnail_clear");
+
 /** Filesystem totals for the partition that hosts `path`. Bytes. */
 export interface DiskSpace {
   total: number;

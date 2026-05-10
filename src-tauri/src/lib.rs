@@ -20,6 +20,7 @@ use commands::{
     fs_copy_file, fs_dir_summary, fs_find, fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64,
     fs_compress_zip, fs_copy_recursive, fs_create_empty_file, fs_disk_space,
     fs_extract_zip, fs_hash_sha256, fs_image_exif, fs_image_rotate, fs_mounts, fs_open_in_terminal,
+    fs_thumbnail, fs_thumbnail_clear, fs_thumbnail_stats,
     fs_open_with_default, fs_read_text, fs_remove, fs_rename, fs_reveal_in_os,
     fs_trash_path,
     fs_stat, fs_trash, fs_trash_many, fs_trash_restore, get_app_version, settings_app_data_dir, settings_load,
@@ -30,6 +31,7 @@ use commands::{
     sync_start_repo,
 };
 use fs::registry::Registry;
+use fs::thumbnail::ThumbnailCache;
 use std::sync::Arc;
 use sync::registry::JobRegistry;
 use sync::resolver::ResolverHub;
@@ -59,6 +61,22 @@ pub fn run() {
                 if crash::crash_reports_enabled(&dir) {
                     crash::install_panic_hook(dir.join("crashes"));
                 }
+                // Open the thumbnail cache against the same data
+                // dir. We `manage` it as Tauri State so the
+                // fs_thumbnail* commands can borrow it on every
+                // call. Failure here is non-fatal — the worst case
+                // is thumbnail commands erroring out + GalleryThumb
+                // falling back to the kind icon (its existing
+                // failure mode), so we log + continue rather than
+                // refusing to launch the app.
+                match ThumbnailCache::open(&dir.join("thumbnails.db")) {
+                    Ok(cache) => {
+                        app.manage(Arc::new(cache));
+                    }
+                    Err(e) => {
+                        eprintln!("thumbnail cache init: {e}");
+                    }
+                }
             }
             Ok(())
         })
@@ -86,6 +104,9 @@ pub fn run() {
             fs_open_in_terminal,
             fs_image_exif,
             fs_image_rotate,
+            fs_thumbnail,
+            fs_thumbnail_stats,
+            fs_thumbnail_clear,
             fs_hash_sha256,
             fs_mounts,
             fs_create_empty_file,

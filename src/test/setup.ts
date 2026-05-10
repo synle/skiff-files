@@ -82,6 +82,14 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "fs_copy_recursive") return null;
     if (cmd === "fs_trash_path") return "/home/test/.Trash";
     if (cmd === "fs_image_rotate") return null;
+    if (cmd === "fs_thumbnail") {
+      // Reuse the 1x1 PNG mock from fs_read_base64 — GalleryThumb
+      // just shoves it into a data: URL, so anything the webview
+      // can decode is fine.
+      return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=";
+    }
+    if (cmd === "fs_thumbnail_stats") return { count: 0, bytes: 0 };
+    if (cmd === "fs_thumbnail_clear") return 0;
     if (cmd === "fs_image_exif") {
       return {
         dateTaken: null,

@@ -1093,6 +1093,56 @@ pub fn settings_app_data_dir(app: tauri::AppHandle) -> FsResult<String> {
     Ok(dir.to_string_lossy().into_owned())
 }
 
+/// Get (or create + cache) a thumbnail for a local image. The
+/// returned base64 is a PNG encoding of the source resized so its
+/// longest side is `size_px`. Cache key includes (mtime, size,
+/// size_px) so an edit invalidates automatically + different
+/// thumbnail sizes coexist.
+///
+/// Errors when the file isn't a decodable image — callers fall back
+/// to the kind icon, same as before the cache shipped.
+#[tauri::command]
+pub fn fs_thumbnail(
+    path: String,
+    size_px: u32,
+    cache: tauri::State<'_, std::sync::Arc<crate::fs::thumbnail::ThumbnailCache>>,
+) -> FsResult<String> {
+    use base64::Engine as _;
+    let meta = std::fs::metadata(&path).map_err(|e| format!("stat({path}): {e}"))?;
+    let size_bytes = meta.len() as i64;
+    let mtime_ms = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+
+    if let Some(cached) = cache.get(&path, mtime_ms, size_bytes, size_px)? {
+        return Ok(base64::engine::general_purpose::STANDARD.encode(&cached));
+    }
+    let png = crate::fs::thumbnail::render_thumbnail(&path, size_px)?;
+    cache.put(&path, mtime_ms, size_bytes, size_px, &png)?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&png))
+}
+
+/// Cache stats for the Settings → Advanced "Clear thumbnail cache"
+/// row. Returns `{ count, bytes }`.
+#[tauri::command]
+pub fn fs_thumbnail_stats(
+    cache: tauri::State<'_, std::sync::Arc<crate::fs::thumbnail::ThumbnailCache>>,
+) -> FsResult<crate::fs::thumbnail::CacheStats> {
+    cache.stats()
+}
+
+/// Wipe every cached thumbnail + VACUUM the database. Returns the
+/// number of rows deleted.
+#[tauri::command]
+pub fn fs_thumbnail_clear(
+    cache: tauri::State<'_, std::sync::Arc<crate::fs::thumbnail::ThumbnailCache>>,
+) -> FsResult<u64> {
+    cache.clear()
+}
+
 /// Path to the crash-log directory used by the opt-in panic hook
 /// (`crashReportsEnabled` in Settings → Advanced). Returned even
 /// when reporting is disabled so the Settings UI can offer

@@ -1,20 +1,25 @@
-// Lazy-loaded image thumbnail for the Gallery / Tile views. Uses
-// fs_read_base64 (subject to the 16 MB cap on the Rust side, which is
-// fine — anything larger is a RAW we don't want to inline anyway) and
-// caches the resulting data URL module-globally so scroll-back doesn't
-// re-trigger a Tauri round-trip.
+// Lazy-loaded image thumbnail for the Gallery / Tile views.
+//
+// As of 0.2.245 we go through `fs_thumbnail`, which returns a
+// resized PNG straight from the SQLite-backed thumbnail cache. The
+// Rust side does the decode + resize + encode; the cache key
+// includes (mtime, size, sizePx) so an edit invalidates
+// automatically and the same file at different thumbnail sizes
+// (Tile vs Gallery) coexists without thrashing. We still keep an
+// in-memory LRU on top to dodge the IPC round-trip on scroll-back.
 //
 // Falls back to the kind icon when:
-//   - The file exceeds the read cap (Rust returns an error)
-//   - The path is remote (sftp://) — we'd need a separate read path
+//   - Rust can't decode the file (corrupt / unsupported format)
+//   - The path is remote (sftp://) — the thumbnail command is
+//     local-only at this stage
 //   - The webview can't render the format (the <img> onError fires)
 //
-// Cache size is capped at MAX_CACHE entries with simple LRU eviction so
-// browsing a 50k-image folder doesn't OOM the renderer.
+// Cache size is capped at MAX_CACHE entries with simple LRU eviction
+// so browsing a 50k-image folder doesn't OOM the renderer.
 
 import { useEffect, useState } from "react";
 import { Box } from "@mui/material";
-import { fsReadBase64, type FileKind } from "../api/fs";
+import { fsThumbnail, type FileKind } from "../api/fs";
 import IconForKind from "./IconForKind";
 
 /** Hard cap on cached thumbnails. ~200 entries at ~500 KB each is
@@ -26,18 +31,25 @@ const MAX_CACHE = 200;
  *  first when we hit the cap. */
 const cache = new Map<string, string>();
 
-function getCached(path: string): string | undefined {
-  const hit = cache.get(path);
+/** Key includes size so Tile + Gallery views of the same file don't
+ *  collide on a single cache row at differing thumbnail dimensions. */
+function cacheKey(path: string, size: number): string {
+  return `${size}|${path}`;
+}
+
+function getCached(path: string, size: number): string | undefined {
+  const key = cacheKey(path, size);
+  const hit = cache.get(key);
   if (hit !== undefined) {
     // Re-insert to mark as most-recently-used.
-    cache.delete(path);
-    cache.set(path, hit);
+    cache.delete(key);
+    cache.set(key, hit);
   }
   return hit;
 }
 
-function putCached(path: string, dataUrl: string): void {
-  cache.set(path, dataUrl);
+function putCached(path: string, size: number, dataUrl: string): void {
+  cache.set(cacheKey(path, size), dataUrl);
   while (cache.size > MAX_CACHE) {
     // Map iteration is insertion order — delete the oldest.
     const oldest = cache.keys().next().value;
@@ -46,23 +58,9 @@ function putCached(path: string, dataUrl: string): void {
   }
 }
 
-/** Path-suffix → MIME for the data URL. We already know the entry is
- *  an image (the parent gates on `kind === "image"`) so we don't need
- *  to handle non-image extensions. */
-function mimeFor(path: string): string {
-  const lower = path.toLowerCase();
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".gif")) return "image/gif";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".bmp")) return "image/bmp";
-  if (lower.endsWith(".svg")) return "image/svg+xml";
-  if (lower.endsWith(".avif")) return "image/avif";
-  if (lower.endsWith(".heic") || lower.endsWith(".heif")) {
-    return "image/heic";
-  }
-  // Most common case: jpg / jpeg / .jfif fall through to image/jpeg.
-  return "image/jpeg";
-}
+// `fs_thumbnail` always returns PNG bytes, so the data-URL MIME is
+// fixed regardless of the source file's extension.
+const THUMB_MIME = "image/png";
 
 interface Props {
   path: string;
@@ -89,36 +87,37 @@ export default function GalleryThumb({
   const skipFetch = !isImage || remote;
 
   const [dataUrl, setDataUrl] = useState<string | null>(() =>
-    skipFetch ? null : getCached(path) ?? null,
+    skipFetch ? null : getCached(path, size) ?? null,
   );
   const [errored, setErrored] = useState(false);
 
   useEffect(() => {
     if (skipFetch) return;
     // Fast path: cache hit.
-    const hit = getCached(path);
+    const hit = getCached(path, size);
     if (hit !== undefined) {
       setDataUrl(hit);
       return;
     }
     let cancelled = false;
     setErrored(false);
-    void fsReadBase64(path)
+    void fsThumbnail(path, size)
       .then((b64) => {
         if (cancelled) return;
-        const url = `data:${mimeFor(path)};base64,${b64}`;
-        putCached(path, url);
+        const url = `data:${THUMB_MIME};base64,${b64}`;
+        putCached(path, size, url);
         setDataUrl(url);
       })
       .catch(() => {
         if (cancelled) return;
-        // Common: file > 16 MB cap. Fall back to the kind icon.
+        // Common: unsupported format / decode error. Fall back to
+        // the kind icon — same UX as the pre-cache code path.
         setErrored(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [path, skipFetch]);
+  }, [path, size, skipFetch]);
 
   // Fallback path: render the kind icon (folder / image-without-thumb /
   // remote / errored). Same dimensions as the loaded thumbnail so

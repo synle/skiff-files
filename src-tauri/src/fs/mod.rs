@@ -8,5 +8,6 @@ pub mod local;
 pub mod registry;
 pub mod sftp;
 pub mod ssh_config;
+pub mod thumbnail;
 pub mod types;
 pub mod watch;

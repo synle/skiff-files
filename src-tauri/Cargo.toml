@@ -38,6 +38,10 @@ kamadak-exif = "0.6"
 # size tight (TODO/BUNDLE_SIZE.md is the audit baseline). Same
 # format list as the PreviewPane image-format support.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
+# SQLite for the thumbnail cache. `bundled` builds libsqlite from
+# source so we don't depend on the OS-installed copy — saves
+# packaging headaches across macOS / Windows / Linux.
+rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
 sysinfo = "0.32"
 zip = { version = "2", default-features = false, features = ["deflate"] }

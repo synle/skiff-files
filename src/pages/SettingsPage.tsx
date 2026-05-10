@@ -33,6 +33,11 @@ import {
   useSettings,
   type Settings,
 } from "../state/settings";
+import {
+  fsThumbnailClear,
+  fsThumbnailStats,
+  type ThumbnailCacheStats,
+} from "../api/fs";
 import { SUPPORTED_LOCALES, type LocaleCode } from "../i18n";
 
 /** Display labels for the Language dropdown. Add a row here when
@@ -367,6 +372,76 @@ function CrashReportingBlock() {
           {count !== null && count > 0 ? ` (${count})` : ""}
         </Button>
       </Box>
+    </Box>
+  );
+}
+
+/** Settings → Advanced widget for the SQLite-backed thumbnail
+ *  cache (added 0.2.245). Shows the live row count + on-disk byte
+ *  size and offers a "Clear cache" button. The fetch is best-
+ *  effort: if the Tauri State wasn't mounted (cache init failed)
+ *  the API throws and we fall back to a quiet "(unavailable)"
+ *  state so this widget never blocks the rest of Advanced from
+ *  rendering. */
+function ThumbnailCacheBlock() {
+  const [stats, setStats] = useState<ThumbnailCacheStats | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const refresh = () => {
+    void fsThumbnailStats()
+      .then((s) => {
+        setStats(s);
+        setUnavailable(false);
+      })
+      .catch(() => {
+        setStats(null);
+        setUnavailable(true);
+      });
+  };
+  useEffect(() => {
+    refresh();
+  }, []);
+  const fmtBytes = (b: number): string => {
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  };
+  return (
+    <Box>
+      <Typography variant="body2" sx={{ mb: 0.5 }}>
+        Thumbnail cache
+      </Typography>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block", mb: 1 }}
+      >
+        SQLite-backed cache used by Tile + Gallery views. Keyed by
+        (path, mtime, size, requested size) so edits invalidate
+        automatically.
+        {unavailable
+          ? " (unavailable — cache failed to initialize)"
+          : stats
+            ? ` ${stats.count} entry${stats.count === 1 ? "" : "ies"}, ${fmtBytes(stats.bytes)}.`
+            : " Loading…"}
+      </Typography>
+      <Button
+        size="small"
+        variant="outlined"
+        disabled={unavailable || (stats?.count ?? 0) === 0}
+        onClick={async () => {
+          if (
+            !window.confirm(
+              `Clear ${stats?.count ?? 0} cached thumbnail${stats?.count === 1 ? "" : "s"}?`,
+            )
+          ) {
+            return;
+          }
+          await fsThumbnailClear().catch(() => {});
+          refresh();
+        }}
+      >
+        Clear thumbnail cache
+      </Button>
     </Box>
   );
 }
@@ -1472,6 +1547,8 @@ export default function SettingsPage() {
           </FormControl>
 
           <CrashReportingBlock />
+
+          <ThumbnailCacheBlock />
 
           <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
             <Button
