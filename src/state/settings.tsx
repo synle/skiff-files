@@ -272,6 +272,22 @@ export interface Settings {
    *  the query + flags and runs the search. Distinct from
    *  searchHistory which is auto-tracked + capped + label-less. */
   savedSearches: SavedSearch[];
+  /** Named selection groups — capture the current multi-selection
+   *  under a label so users can re-select the same N paths later
+   *  without re-clicking each one. Restoration happens against the
+   *  current folder: any path in the group that still exists there
+   *  is selected; missing paths are silently dropped. Capped at 50
+   *  entries; oldest insertion-order entries dropped on overflow. */
+  savedSelections: SavedSelection[];
+}
+
+export interface SavedSelection {
+  id: string;
+  label: string;
+  paths: string[];
+  /** Wall-clock save timestamp (ms). Surfaces in the palette hint
+   *  so users can tell stale groups apart. */
+  savedAt: number;
 }
 
 export interface SavedSearch {
@@ -422,6 +438,7 @@ export const DEFAULTS: Settings = {
   hideColumns: { size: false, modified: false, kind: false },
   alwaysOnTop: false,
   savedSearches: [],
+  savedSelections: [],
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

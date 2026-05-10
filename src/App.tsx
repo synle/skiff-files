@@ -588,6 +588,22 @@ function buildCommandActions(deps: {
           new CustomEvent("skiff:tag-selection", { detail: null }),
         ),
     },
+    // Saved selection groups — palette restoration. Browser listens
+    // for the event, picks paths that exist in the current folder.
+    ...settings.savedSelections.map((s) => ({
+      id: `selection.${s.id}`,
+      label: `Restore selection: ${s.label}`,
+      hint: `${s.paths.length} item${s.paths.length === 1 ? "" : "s"}`,
+      keywords: `selection group restore ${s.label}`,
+      run: () => {
+        setPage("browser");
+        queueMicrotask(() =>
+          window.dispatchEvent(
+            new CustomEvent("skiff:restore-selection", { detail: s.paths }),
+          ),
+        );
+      },
+    })),
     // View modes
     {
       id: "view.list",

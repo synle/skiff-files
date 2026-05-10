@@ -509,21 +509,36 @@ export default function Browser({
         update("fileTags", next);
       }
     };
+    // Restore a saved selection group. Palette dispatches with the
+    // group's path list as detail; we pick the paths that actually
+    // exist in the current folder + select them. Missing paths are
+    // silently dropped — saved groups can outlive the files they
+    // captured.
+    const onRestoreSelection = (e: Event) => {
+      const paths = (e as CustomEvent<string[]>).detail;
+      if (!paths || paths.length === 0) return;
+      const visible = new Set(entries.map((x) => x.path));
+      const picked = paths.filter((p) => visible.has(p));
+      if (picked.length === 0) return;
+      setSelectedPaths(picked);
+    };
     if (isActive) {
       window.addEventListener("skiff:refresh", onRefresh);
       window.addEventListener("skiff:new-folder", onNewFolder);
       window.addEventListener("skiff:tag-selection", onTagSelection);
+      window.addEventListener("skiff:restore-selection", onRestoreSelection);
     }
     return () => {
       window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
       window.removeEventListener("skiff:refresh", onRefresh);
       window.removeEventListener("skiff:new-folder", onNewFolder);
       window.removeEventListener("skiff:tag-selection", onTagSelection);
+      window.removeEventListener("skiff:restore-selection", onRestoreSelection);
     };
     // handleNewFolder is stable enough — re-binding on every render
     // would also be acceptable since these are window-level events.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, path, refresh]);
+  }, [isActive, path, refresh, entries]);
 
   // OS-level drag-and-drop. Tauri emits a unified event for enter / over
   // / drop / leave. On drop, we route each dropped path through
@@ -1546,6 +1561,27 @@ export default function Browser({
           } else {
             update("fileTags", next);
           }
+        }}
+        onSaveSelectionGroup={() => {
+          if (selectedPaths.length === 0) return;
+          const label = window.prompt(
+            `Name this group of ${selectedPaths.length} item${selectedPaths.length === 1 ? "" : "s"}:`,
+            "",
+          );
+          if (!label || !label.trim()) return;
+          // Cap at 50 entries; drop the oldest by insertion order
+          // (front of the array) when over.
+          const next = [
+            ...settings.savedSelections,
+            {
+              id: crypto.randomUUID(),
+              label: label.trim(),
+              paths: [...selectedPaths],
+              savedAt: Date.now(),
+            },
+          ];
+          if (next.length > 50) next.splice(0, next.length - 50);
+          update("savedSelections", next);
         }}
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>

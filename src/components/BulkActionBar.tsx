@@ -19,6 +19,7 @@ import ArchiveIcon from "@mui/icons-material/Archive";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
+import SaveIcon from "@mui/icons-material/Save";
 import { useState } from "react";
 import { TAG_COLORS, tagColorHex, tagColorLabel } from "../util/tagColors";
 import type { TagColor } from "../state/settings";
@@ -34,6 +35,9 @@ interface Props {
   /** Apply the picked tag (or `null` to clear) to the current
    *  multi-selection. Drives the Tag popover's color strip. */
   onSetTag?: (color: TagColor | null) => void;
+  /** Save the current selection as a named group. Caller prompts
+   *  for the name. */
+  onSaveSelectionGroup?: () => void;
 }
 
 export default function BulkActionBar({
@@ -45,6 +49,7 @@ export default function BulkActionBar({
   onBulkRename,
   onClear,
   onSetTag,
+  onSaveSelectionGroup,
 }: Props) {
   const [tagAnchor, setTagAnchor] = useState<HTMLElement | null>(null);
   if (count < 2) return null;
@@ -101,6 +106,15 @@ export default function BulkActionBar({
           onClick={onBulkRename}
         >
           Rename
+        </Button>
+      )}
+      {onSaveSelectionGroup && (
+        <Button
+          size="small"
+          startIcon={<SaveIcon fontSize="small" />}
+          onClick={onSaveSelectionGroup}
+        >
+          Save group
         </Button>
       )}
       {onSetTag && (
