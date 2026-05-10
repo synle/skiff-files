@@ -47,6 +47,7 @@ import {
   type MountedVolume,
 } from "../api/fs";
 import LaunchIcon from "@mui/icons-material/Launch";
+import SortByAlphaIcon from "@mui/icons-material/SortByAlpha";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
@@ -99,7 +100,10 @@ function SectionHeader({
   id: string;
   label: string;
   collapsed: boolean;
-  onToggle: () => void;
+  /** Receives the modifier flag — when Cmd/Ctrl is held, the
+   *  parent should collapse / expand ALL sections instead of just
+   *  the clicked one. */
+  onToggle: (modifier: boolean) => void;
   onHide?: () => void;
 }) {
   return (
@@ -116,7 +120,9 @@ function SectionHeader({
       <Box
         component="button"
         type="button"
-        onClick={onToggle}
+        onClick={(e: React.MouseEvent) =>
+          onToggle(e.metaKey || e.ctrlKey)
+        }
         aria-expanded={!collapsed}
         aria-controls={`sidebar-section-${id}`}
         sx={{
@@ -239,14 +245,26 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
   /** Are we currently collapsed for a section? Missing key = expanded. */
   const isCollapsed = (id: string): boolean =>
     !!settings.sidebarCollapsed[id];
-  const toggleSection = (id: string) => {
+  const toggleSection = (id: string, allSections = false) => {
+    const ALL_IDS = ["favorites", "bookmarks", "recent", "hosts", "devices"];
+    if (allSections) {
+      // Cmd-click on a header → flip ALL sections to the OPPOSITE
+      // of the clicked section's current state. So if the clicked
+      // section was expanded, every section collapses; if it was
+      // collapsed, every section expands. Matches OS-tree gestures
+      // (Finder Cmd-click on a disclosure triangle).
+      const target = !isCollapsed(id);
+      const next: Record<string, boolean> = { ...settings.sidebarCollapsed };
+      for (const k of ALL_IDS) next[k] = target;
+      update("sidebarCollapsed", next);
+      return;
+    }
     const collapsed = isCollapsed(id);
     if (settings.sidebarAccordion && collapsed) {
       // Accordion mode: expanding one auto-collapses every other
       // visible section. Hidden sections aren't touched (their
       // collapsed state is moot). Keys are derived from the section
       // IDs the Sidebar renders.
-      const ALL_IDS = ["favorites", "bookmarks", "recent", "hosts", "devices"];
       const next: Record<string, boolean> = { ...settings.sidebarCollapsed };
       for (const k of ALL_IDS) {
         if (k !== id) next[k] = true;
@@ -319,7 +337,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       id={id}
       label={label}
       collapsed={isCollapsed(id)}
-      onToggle={() => toggleSection(id)}
+      onToggle={(modifier) => toggleSection(id, modifier)}
       onHide={() => hideSection(id)}
     />
   );
@@ -657,24 +675,43 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             }}
           >
             {renderSectionHeader("bookmarks", "Bookmarks")}
-            {!isCollapsed("bookmarks") && settings.bookmarks.length >= 10 && (
-              <Box sx={{ px: 2, py: 0.5 }}>
-                <input
-                  type="text"
-                  placeholder="Filter bookmarks…"
-                  value={bookmarkFilter}
-                  onChange={(e) => setBookmarkFilter(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "4px 6px",
-                    fontSize: "0.75rem",
-                    background: "transparent",
-                    border: "1px solid",
-                    borderColor: "rgba(127,127,127,0.3)",
-                    borderRadius: 4,
-                    color: "inherit",
-                  }}
-                />
+            {!isCollapsed("bookmarks") && settings.bookmarks.length >= 5 && (
+              <Box sx={{ px: 2, py: 0.5, display: "flex", gap: 0.5, alignItems: "center" }}>
+                {settings.bookmarks.length >= 10 && (
+                  <input
+                    type="text"
+                    placeholder="Filter bookmarks…"
+                    value={bookmarkFilter}
+                    onChange={(e) => setBookmarkFilter(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: "4px 6px",
+                      fontSize: "0.75rem",
+                      background: "transparent",
+                      border: "1px solid",
+                      borderColor: "rgba(127,127,127,0.3)",
+                      borderRadius: 4,
+                      color: "inherit",
+                    }}
+                  />
+                )}
+                <Tooltip title="Sort A→Z">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      const sorted = [...settings.bookmarks].sort((a, b) =>
+                        a.label.localeCompare(b.label, undefined, {
+                          sensitivity: "base",
+                          numeric: true,
+                        }),
+                      );
+                      update("bookmarks", sorted);
+                    }}
+                    aria-label="Sort bookmarks A to Z"
+                  >
+                    <SortByAlphaIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
             )}
             {!isCollapsed("bookmarks") && (
