@@ -522,11 +522,30 @@ export default function Browser({
       if (picked.length === 0) return;
       setSelectedPaths(picked);
     };
+    // Run a saved search — set search state to the saved query +
+    // flags. Browser's existing useEffect on (search, regex, case)
+    // picks it up.
+    const onRunSavedSearch = (e: Event) => {
+      const s = (
+        e as CustomEvent<{
+          query: string;
+          regex: boolean;
+          caseSensitive: boolean;
+          recursive: boolean;
+        }>
+      ).detail;
+      if (!s) return;
+      setSearch(s.query);
+      setSearchRegex(s.regex);
+      setSearchCaseSensitive(s.caseSensitive);
+      setSearchRecursive(s.recursive);
+    };
     if (isActive) {
       window.addEventListener("skiff:refresh", onRefresh);
       window.addEventListener("skiff:new-folder", onNewFolder);
       window.addEventListener("skiff:tag-selection", onTagSelection);
       window.addEventListener("skiff:restore-selection", onRestoreSelection);
+      window.addEventListener("skiff:run-saved-search", onRunSavedSearch);
     }
     return () => {
       window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
@@ -534,6 +553,7 @@ export default function Browser({
       window.removeEventListener("skiff:new-folder", onNewFolder);
       window.removeEventListener("skiff:tag-selection", onTagSelection);
       window.removeEventListener("skiff:restore-selection", onRestoreSelection);
+      window.removeEventListener("skiff:run-saved-search", onRunSavedSearch);
     };
     // handleNewFolder is stable enough — re-binding on every render
     // would also be acceptable since these are window-level events.

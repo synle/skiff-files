@@ -49,6 +49,7 @@ import {
 import LaunchIcon from "@mui/icons-material/Launch";
 import SortByAlphaIcon from "@mui/icons-material/SortByAlpha";
 import ViewWeekIcon from "@mui/icons-material/ViewWeek";
+import SearchIcon from "@mui/icons-material/Search";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
@@ -251,6 +252,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       "favorites",
       "bookmarks",
       "workspaces",
+      "searches",
       "recent",
       "hosts",
       "devices",
@@ -1089,6 +1091,99 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                         slotProps={{
                           primary: { variant: "body2", noWrap: true },
                           secondary: { variant: "caption" },
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </>
+        )}
+
+        {isVisible("searches") && settings.savedSearches.length > 0 && (
+          <>
+            {renderSectionHeader("searches", "Searches")}
+            {!isCollapsed("searches") && (
+              <List dense disablePadding id="sidebar-section-searches">
+                {settings.savedSearches.map((s) => (
+                  <ListItem key={s.id} disablePadding>
+                    <ListItemButton
+                      onClick={() => {
+                        // Browser listens; switching to the Browser
+                        // page first ensures the search applies to a
+                        // visible Browser instance.
+                        onSwitchPage("browser");
+                        queueMicrotask(() =>
+                          window.dispatchEvent(
+                            new CustomEvent("skiff:run-saved-search", {
+                              detail: s,
+                            }),
+                          ),
+                        );
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          section: "bookmarks",
+                          itemId: s.id,
+                          actions: [
+                            {
+                              key: "rename",
+                              icon: <EditIcon fontSize="small" />,
+                              label: "Rename…",
+                              onClick: () => {
+                                const next = window.prompt(
+                                  "Rename saved search:",
+                                  s.label,
+                                );
+                                if (next === null) return;
+                                const trimmed = next.trim();
+                                if (!trimmed) return;
+                                update(
+                                  "savedSearches",
+                                  settings.savedSearches.map((x) =>
+                                    x.id === s.id
+                                      ? { ...x, label: trimmed }
+                                      : x,
+                                  ),
+                                );
+                              },
+                            },
+                            {
+                              key: "delete",
+                              icon: <CloseIcon fontSize="small" />,
+                              label: "Delete",
+                              onClick: () =>
+                                update(
+                                  "savedSearches",
+                                  settings.savedSearches.filter(
+                                    (x) => x.id !== s.id,
+                                  ),
+                                ),
+                            },
+                          ],
+                        });
+                      }}
+                      title={`Run "${s.label}" — ${s.query}${s.regex ? " (regex)" : ""}${s.caseSensitive ? " (case)" : ""}${s.recursive ? " (recursive)" : ""}`}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <SearchIcon
+                          fontSize="small"
+                          sx={{ color: "text.secondary" }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={s.label}
+                        secondary={s.query}
+                        slotProps={{
+                          primary: { variant: "body2", noWrap: true },
+                          secondary: {
+                            variant: "caption",
+                            sx: { fontFamily: "monospace" },
+                          },
                         }}
                       />
                     </ListItemButton>
