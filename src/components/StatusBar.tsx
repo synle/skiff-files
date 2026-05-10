@@ -37,6 +37,10 @@ interface Props {
    *  confirmation of what's selected (especially useful when the row
    *  highlight scrolls out of view). */
   selectedName?: string | null;
+  /** Number of currently-visible entries that have a Finder-style
+   *  color tag. Surfaces as "(N tagged)" alongside the selection
+   *  summary so users see tag distribution at a glance.  */
+  taggedCount?: number;
 }
 
 export default function StatusBar({
@@ -53,6 +57,7 @@ export default function StatusBar({
   findHitCap = false,
   clipboardHint = null,
   selectedName = null,
+  taggedCount = 0,
 }: Props) {
   // Errors take precedence — a directory listing error matters more than the
   // empty-selection summary it would otherwise render alongside.
@@ -117,6 +122,11 @@ export default function StatusBar({
       {diskFree != null && diskTotal != null && (
         <Typography variant="caption" color="text.secondary">
           · {formatBytes(diskFree)} free of {formatBytes(diskTotal)}
+        </Typography>
+      )}
+      {taggedCount > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          · {taggedCount} tagged
         </Typography>
       )}
       {clipboardHint && clipboardHint.count > 0 && (

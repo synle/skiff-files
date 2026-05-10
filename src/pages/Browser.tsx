@@ -408,11 +408,19 @@ export default function Browser({
   // contributes so multiple inactive tabs don't pollute history.
   useEffect(() => {
     if (!isActive || !path) return;
+    // Cap of 0 disables recent-path tracking entirely so privacy-
+    // conscious users can opt out without the sidebar's Recent
+    // section staying perpetually frozen on stale entries.
+    const cap = settings.recentPathsMax;
+    if (cap === 0) {
+      if (settings.recentPaths.length > 0) update("recentPaths", []);
+      return;
+    }
     if (settings.recentPaths[0] === path) return;
     const next = [
       path,
       ...settings.recentPaths.filter((p) => p !== path),
-    ].slice(0, 10);
+    ].slice(0, cap);
     update("recentPaths", next);
     // We deliberately don't depend on `settings.recentPaths` — the
     // update function reads its current value through useState, and
@@ -1528,6 +1536,15 @@ export default function Browser({
           selectionStats.count === 1 && primarySelected
             ? primarySelected.name
             : null
+        }
+        taggedCount={
+          // Count how many *visible* (post-filter) entries carry a tag.
+          // Cheap O(n) scan — n is bounded by the listing window the
+          // user has open. Recomputes on entries / fileTags change.
+          visibleEntries.reduce(
+            (acc, e) => (settings.fileTags[e.path] ? acc + 1 : acc),
+            0,
+          )
         }
       />}
       <Menu

@@ -86,15 +86,31 @@ function KeyboardShortcutList() {
     update("shortcutOverrides", next);
   };
 
+  const overrideCount = Object.keys(settings.shortcutOverrides).length;
   return (
     <Stack spacing={2}>
-      <TextField
-        size="small"
-        placeholder="Search shortcuts (e.g. tab, rename, font)…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        sx={{ maxWidth: 480 }}
-      />
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+        <TextField
+          size="small"
+          placeholder="Search shortcuts (e.g. tab, rename, font)…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          sx={{ flex: 1, maxWidth: 480 }}
+        />
+        <Button
+          size="small"
+          variant="outlined"
+          disabled={overrideCount === 0}
+          onClick={() => {
+            const ok = window.confirm(
+              `Reset ${overrideCount} keybinding${overrideCount === 1 ? "" : "s"} to their defaults?`,
+            );
+            if (ok) update("shortcutOverrides", {});
+          }}
+        >
+          Reset all{overrideCount > 0 ? ` (${overrideCount})` : ""}
+        </Button>
+      </Box>
       <Typography variant="caption" color="text.secondary">
         Shortcuts marked with an Edit button are rebindable. The rest are
         documentation-only — their handlers will migrate to the rebindable
@@ -743,6 +759,20 @@ export default function SettingsPage() {
               />
             }
             label="Show connection-status dots"
+          />
+
+          <TextField
+            label="Recent paths cap"
+            size="small"
+            type="number"
+            value={settings.recentPathsMax}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isFinite(n)) return;
+              update("recentPathsMax", Math.max(0, Math.min(50, Math.floor(n))));
+            }}
+            helperText="0 disables recent-path tracking. Sidebar shows up to 5 entries from the head."
+            sx={{ maxWidth: 240 }}
           />
 
           {(["favorites", "bookmarks", "recent", "hosts", "devices"] as const).map(

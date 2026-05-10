@@ -241,6 +241,10 @@ export interface Settings {
    *  to just the header. Persists so a user who collapses the
    *  drawer doesn't have it re-expand on every new job. */
   operationsDrawerExpanded: boolean;
+  /** Cap on `recentPaths` length. 0 disables tracking entirely. The
+   *  Sidebar's Recent section always shows up to 5 entries from the
+   *  head of the list regardless of the cap. */
+  recentPathsMax: number;
 }
 
 export type DateFormat = "locale" | "iso" | "short" | "relative";
@@ -371,6 +375,7 @@ export const DEFAULTS: Settings = {
   fileTags: {},
   dateFormat: "locale",
   operationsDrawerExpanded: true,
+  recentPathsMax: 10,
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";
