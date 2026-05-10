@@ -507,6 +507,16 @@ export default function SettingsPage() {
           <FormControlLabel
             control={
               <Switch
+                checked={settings.alwaysOnTop}
+                onChange={(e) => update("alwaysOnTop", e.target.checked)}
+              />
+            }
+            label="Keep window always on top"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
                 checked={settings.reduceMotion}
                 onChange={(e) => update("reduceMotion", e.target.checked)}
               />

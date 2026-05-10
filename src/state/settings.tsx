@@ -253,6 +253,11 @@ export interface Settings {
    *  kind continues to use the underlying value to avoid resorting
    *  the listing every time the user tweaks this map. */
   customFileKinds: Record<string, string>;
+  /** Whether the window should stay above other apps. Useful for
+   *  drag-dropping files OUT of Skiff into apps whose window would
+   *  otherwise cover us. Synced via the new `window_set_always_on_top`
+   *  Tauri command on every change. */
+  alwaysOnTop: boolean;
 }
 
 export type DateFormat = "locale" | "iso" | "short" | "relative";
@@ -390,6 +395,7 @@ export const DEFAULTS: Settings = {
   operationsDrawerExpanded: true,
   recentPathsMax: 10,
   customFileKinds: {},
+  alwaysOnTop: false,
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

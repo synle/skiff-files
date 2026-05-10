@@ -16,12 +16,14 @@ import {
   Typography,
 } from "@mui/material";
 import LaunchIcon from "@mui/icons-material/Launch";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
 import { useEffect, useRef, useState } from "react";
 import {
   fsImageExif,
   fsOpenWithDefault,
+  fsRevealInOs,
   type DirSummary,
   type Entry,
   type ImageExif,
@@ -744,6 +746,19 @@ export default function PreviewPane({ selected, width }: Props) {
             >
               {selected.name}
             </Typography>
+            {!selected.path.startsWith("sftp://") && (
+              <Tooltip title="Reveal in Finder/Explorer">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    void fsRevealInOs(selected.path).catch(() => {});
+                  }}
+                  aria-label="Reveal in Finder/Explorer"
+                >
+                  <FolderOpenIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             {!selected.isDir && !selected.path.startsWith("sftp://") && (
               <Tooltip title="Open with default app">
                 <IconButton

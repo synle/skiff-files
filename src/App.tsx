@@ -13,7 +13,12 @@ import OperationsDrawer from "./components/OperationsDrawer";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
-import { fsHomeDir, fsStat, windowOpenNew } from "./api/fs";
+import {
+  fsHomeDir,
+  fsStat,
+  windowOpenNew,
+  windowSetAlwaysOnTop,
+} from "./api/fs";
 import { listen } from "@tauri-apps/api/event";
 import { loadSettingsFromDisk } from "./state/settings";
 import { useSettings } from "./state/settings";
@@ -203,6 +208,15 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // Apply the always-on-top setting on every change. Calling the
+  // Tauri command is cheap (~µs); the noisy guard would just be the
+  // string-equality compare we'd write here, so we call every time.
+  useEffect(() => {
+    void windowSetAlwaysOnTop(settings.alwaysOnTop).catch(() => {
+      /* silent fallback in tests / browser dev */
+    });
+  }, [settings.alwaysOnTop]);
 
   // Multi-window settings sync. The Rust `settings_save` command
   // emits a `settings:changed` event after every write; every window
@@ -529,6 +543,14 @@ function buildCommandActions(deps: {
       label: settings.twoPaneMode ? "Disable two-pane mode" : "Enable two-pane mode",
       hint: "Cmd+Shift+\\",
       run: () => update("twoPaneMode", !settings.twoPaneMode),
+    },
+    {
+      id: "toggle.alwaysOnTop",
+      label: settings.alwaysOnTop
+        ? "Disable always-on-top window"
+        : "Enable always-on-top window",
+      keywords: "pin pinned floating sticky",
+      run: () => update("alwaysOnTop", !settings.alwaysOnTop),
     },
     // View modes
     {

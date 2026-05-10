@@ -1078,6 +1078,20 @@ pub fn window_open_at(path: String, app: tauri::AppHandle) -> Result<(), String>
 /// but possible — e.g. an SFTP-only session) don't pay the cost.
 pub type FsWatchState = std::sync::Mutex<Option<crate::fs::watch::WatchHandle>>;
 
+/// Toggle the active window's always-on-top state. Useful for
+/// keeping Skiff visible while drag-dropping files OUT of another
+/// app — without this, the source app's window would cover Skiff
+/// and the user couldn't see where to drop.
+#[tauri::command]
+pub fn window_set_always_on_top(
+    enabled: bool,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    window
+        .set_always_on_top(enabled)
+        .map_err(|e| format!("set_always_on_top: {e}"))
+}
+
 /// Switch the file watcher to `path`. The frontend calls this on every
 /// navigation; the watcher then emits `fs:changed` Tauri events when
 /// anything changes in that folder so the Browser can auto-refresh.

@@ -236,6 +236,9 @@ export const fsDirSummary = (path: string): Promise<DirSummary> =>
 
 /** Recursive substring find. Returns up to 1000 entries; stops walking
  *  after 10 s. `.git` / `node_modules` / `_recycleBin` are pruned. */
+export const windowSetAlwaysOnTop = (enabled: boolean): Promise<void> =>
+  invoke<void>("window_set_always_on_top", { enabled });
+
 export const fsFind = (
   path: string,
   query: string,
