@@ -5,7 +5,14 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import App from "./App";
-import { SettingsProvider, useSettings } from "./state/settings";
+import { initI18n } from "./i18n";
+import { loadSettings, SettingsProvider, useSettings } from "./state/settings";
+
+// Boot i18next BEFORE React mounts so `useTranslation` reads from a
+// populated bundle on the first render. We seed from the persisted
+// `Settings.language` (synchronous localStorage read) so the user
+// doesn't see an English flash before their preferred locale loads.
+initI18n(loadSettings().language);
 import {
   themeForFull,
   useEffectiveMode,

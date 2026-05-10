@@ -1,5 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
+import { initI18n } from "../i18n";
+
+// Boot i18next once for the whole test suite. Without this, every
+// `useTranslation()` consumer renders raw keys ("sidebar.nav.settings")
+// which breaks the existing `getByText("Settings")` queries.
+initI18n("en");
 
 /**
  * Mock the Tauri API surfaces used by the app so component tests can render

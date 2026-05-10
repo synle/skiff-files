@@ -61,6 +61,7 @@ import {
 } from "../state/settings";
 import { startSync } from "../api/client";
 import { pushTrashBatch } from "../util/trashStack";
+import { useTranslation } from "react-i18next";
 
 /** MIME type the FileList row uses to carry dragged paths. Newline-
  *  joined for multi-select drops. Sidebar host items handle this MIME
@@ -202,6 +203,7 @@ interface Props {
 
 /** Simple list of favorite shortcuts + Connections + a Settings link. */
 export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props) {
+  const { t } = useTranslation();
   // POSIX-style join is fine here — Tauri normalizes the slashes for us when
   // we hand the path to canonicalize / list_dir.
   const join = (rel: string) => (rel ? `${home}/${rel}` : home);
@@ -576,7 +578,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         }}
       >
         <Box style={{ order: orderOf("favorites") }}>
-        {isVisible("favorites") && renderSectionHeader("favorites", "Favorites")}
+        {isVisible("favorites") && renderSectionHeader("favorites", t("sidebar.section.favorites"))}
         {isVisible("favorites") && !isCollapsed("favorites") && (
           <List dense disablePadding id="sidebar-section-favorites">
             {FAVORITES.filter(
@@ -732,7 +734,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               update("bookmarks", [...settings.bookmarks, ...incoming]);
             }}
           >
-            {renderSectionHeader("bookmarks", "Bookmarks")}
+            {renderSectionHeader("bookmarks", t("sidebar.section.bookmarks"))}
             {!isCollapsed("bookmarks") && settings.bookmarks.length >= 5 && (
               <Box sx={{ px: 2, py: 0.5, display: "flex", gap: 0.5, alignItems: "center" }}>
                 {settings.bookmarks.length >= 10 && (
@@ -991,7 +993,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         <Box style={{ order: orderOf("workspaces") }}>
         {isVisible("workspaces") && settings.tabWorkspaces.length > 0 && (
           <>
-            {renderSectionHeader("workspaces", "Workspaces")}
+            {renderSectionHeader("workspaces", t("sidebar.section.workspaces"))}
             {!isCollapsed("workspaces") &&
               settings.tabWorkspaces.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
@@ -1155,7 +1157,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         <Box style={{ order: orderOf("searches") }}>
         {isVisible("searches") && settings.savedSearches.length > 0 && (
           <>
-            {renderSectionHeader("searches", "Searches")}
+            {renderSectionHeader("searches", t("sidebar.section.searches"))}
             {!isCollapsed("searches") &&
               settings.savedSearches.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
@@ -1309,7 +1311,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         <Box style={{ order: orderOf("syncjobs") }}>
         {isVisible("syncjobs") && settings.savedSyncJobs.length > 0 && (
           <>
-            {renderSectionHeader("syncjobs", "Sync jobs")}
+            {renderSectionHeader("syncjobs", t("sidebar.section.syncjobs"))}
             {!isCollapsed("syncjobs") &&
               settings.savedSyncJobs.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
@@ -1475,7 +1477,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         <Box style={{ order: orderOf("selections") }}>
         {isVisible("selections") && settings.savedSelections.length > 0 && (
           <>
-            {renderSectionHeader("selections", "Selections")}
+            {renderSectionHeader("selections", t("sidebar.section.selections"))}
             {!isCollapsed("selections") &&
               settings.savedSelections.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
@@ -1648,7 +1650,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         <Box style={{ order: orderOf("recent") }}>
         {isVisible("recent") && settings.recentPaths.length > 0 && (
           <>
-            {renderSectionHeader("recent", "Recent")}
+            {renderSectionHeader("recent", t("sidebar.section.recent"))}
             {!isCollapsed("recent") && (
             <List dense disablePadding id="sidebar-section-recent">
               {settings.recentPaths.slice(0, 5).map((p) => {
@@ -1729,7 +1731,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         </Box>
 
         <Box style={{ order: orderOf("hosts") }}>
-        {isVisible("hosts") && renderSectionHeader("hosts", "Hosts")}
+        {isVisible("hosts") && renderSectionHeader("hosts", t("sidebar.section.hosts"))}
         {isVisible("hosts") && !isCollapsed("hosts") && (
         <Box id="sidebar-section-hosts">
         {connections == null ? (
@@ -1833,7 +1835,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         </Box>
 
         <Box style={{ order: orderOf("devices") }}>
-        {isVisible("devices") && renderSectionHeader("devices", "Devices")}
+        {isVisible("devices") && renderSectionHeader("devices", t("sidebar.section.devices"))}
         {isVisible("devices") && !isCollapsed("devices") && (
           mounts == null ? (
             <Box sx={{ px: 2, py: 0.5 }} id="sidebar-section-devices">
@@ -1896,7 +1898,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                 <SwapHorizIcon fontSize="small" />
               </Badge>
             </ListItemIcon>
-            <ListItemText primary="Transfers" />
+            <ListItemText primary={t("sidebar.nav.transfers")} />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
@@ -1907,7 +1909,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             <ListItemIcon sx={{ minWidth: 32 }}>
               <SettingsIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary="Settings" />
+            <ListItemText primary={t("sidebar.nav.settings")} />
           </ListItemButton>
         </ListItem>
       </List>

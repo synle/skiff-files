@@ -351,7 +351,7 @@ Goal: port `cpsync`'s spirit to a cross-protocol, cross-platform engine. **The h
 
 ## Phase 6 — Polish, Performance, Distribution
 
-⏳ **Partial.** Most polish themes shipped under the 0.2.x run (see "0.2.x polish summary" above) — virtualized list, keyboard cheatsheet (`?`), tabs, drag-and-drop, OS trash via `trash` crate, configurable shortcuts, recursive find. Bundle-size audit baseline captured in [`BUNDLE_SIZE.md`](./BUNDLE_SIZE.md) (0.2.239 — 6.4 MB stripped, well under the 15 MB target). Opt-in crash reporting shipped 0.2.241. Still open: thumbnail cache, i18n scaffold, accessibility audit.
+⏳ **Partial.** Most polish themes shipped under the 0.2.x run (see "0.2.x polish summary" above) — virtualized list, keyboard cheatsheet (`?`), tabs, drag-and-drop, OS trash via `trash` crate, configurable shortcuts, recursive find. Bundle-size audit baseline captured in [`BUNDLE_SIZE.md`](./BUNDLE_SIZE.md) (0.2.239 — 6.4 MB stripped, well under the 15 MB target). Opt-in crash reporting shipped 0.2.241. i18n scaffold (English bundle + Language picker) shipped 0.2.243. Still open: thumbnail cache, accessibility audit.
 
 - [ ] **Bundle size budget**: < 15 MB on macOS, < 10 MB on Windows. Audit deps with `cargo bloat`
 - [ ] **Large-directory perf**: virtualized list smooth at 100k entries

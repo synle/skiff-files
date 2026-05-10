@@ -25,8 +25,10 @@
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@types/diff": "^7.0.2",
     "diff": "^9.0.0",
+    "i18next": "^26.0.10",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-i18next": "^17.0.7",
     "react-router": "^7.14.2"
   },
   "devDependencies": {

@@ -33,6 +33,14 @@ import {
   useSettings,
   type Settings,
 } from "../state/settings";
+import { SUPPORTED_LOCALES, type LocaleCode } from "../i18n";
+
+/** Display labels for the Language dropdown. Add a row here when
+ *  shipping a new translation bundle. Codes that aren't in this map
+ *  fall back to rendering the raw code. */
+const LOCALE_LABELS: Record<LocaleCode, string> = {
+  en: "English",
+};
 import { fsOpenWithDefault, fsRevealInOs, getAppVersion } from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
 import {
@@ -684,6 +692,22 @@ export default function SettingsPage() {
               <MenuItem value="system">System</MenuItem>
               <MenuItem value="light">Light</MenuItem>
               <MenuItem value="dark">Dark</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ maxWidth: 240 }}>
+            <InputLabel id="language-label">Language</InputLabel>
+            <Select
+              labelId="language-label"
+              label="Language"
+              value={settings.language}
+              onChange={(e) => update("language", e.target.value)}
+            >
+              {SUPPORTED_LOCALES.map((code) => (
+                <MenuItem key={code} value={code}>
+                  {LOCALE_LABELS[code] ?? code}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
 

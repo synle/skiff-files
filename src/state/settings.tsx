@@ -146,6 +146,11 @@ export interface Settings {
    *  hidden — selection summary / disk space / errors don't render.
    *  Default true. */
   showStatusBar: boolean;
+  /** UI language code. Matches the bundles registered in
+   *  `src/i18n/index.ts`. Falls back to `"en"` at lookup time when
+   *  the value isn't a registered locale, so a stale settings.json
+   *  from a future-shipped locale doesn't render keys verbatim. */
+  language: string;
   /** Opt-in local crash reporting. When true, a Rust-side panic
    *  hook writes one log file per panic to
    *  `<app_data_dir>/crashes/<ts>.log`. Local-only, never
@@ -486,6 +491,7 @@ export const DEFAULTS: Settings = {
   reduceMotion: false,
   logLevel: "warn",
   showStatusBar: true,
+  language: "en",
   crashReportsEnabled: false,
   showFullPathInTitle: false,
   sidebarVisible: true,
@@ -655,6 +661,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setLogLevelGetter(() => settings.logLevel);
     });
   }, [settings.logLevel]);
+
+  // Sync the live i18n locale to the persisted preference. Lazy-
+  // imported so tests / hot paths that never touch i18n don't pay
+  // the bundle cost. main.tsx seeds the initial language at startup;
+  // this effect is the runtime "Language" picker plumbing.
+  useEffect(() => {
+    void import("../i18n").then(({ default: i18n }) => {
+      if (i18n.language !== settings.language) {
+        void i18n.changeLanguage(settings.language);
+      }
+    });
+  }, [settings.language]);
 
   useEffect(() => {
     let cancelled = false;
