@@ -7,13 +7,15 @@
 //! are exposed.
 
 pub mod commands;
+pub mod crash;
 pub mod fs;
 pub mod sync;
 
 use commands::{
     conn_create_sftp, conn_dir_summary, conn_disconnect, conn_hash_sha256,
     conn_known_hosts_list, conn_known_hosts_remove, conn_list, conn_list_dir, conn_mkdir,
-    conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, fs_archive_extract_one,
+    conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, crash_logs_count,
+    crash_logs_dir, fs_archive_extract_one,
     fs_archive_list, fs_canonicalize,
     fs_copy_file, fs_dir_summary, fs_find, fs_home_dir, fs_list_dir, fs_mkdir, fs_read_base64,
     fs_compress_zip, fs_copy_recursive, fs_create_empty_file, fs_disk_space,
@@ -45,6 +47,21 @@ pub fn run() {
         .manage(Arc::new(JobRegistry::new()))
         .manage(Arc::new(ResolverHub::new()))
         .manage(Arc::new(FsWatchState::new(None)))
+        .setup(|app| {
+            // Opt-in panic-hook installation. We read the user's
+            // `crashReportsEnabled` flag straight out of the
+            // settings.json on disk because it has to be decided
+            // before any Rust code can panic — long before the
+            // frontend mounts and pushes settings via IPC. Default
+            // false means most users never see this code path.
+            use tauri::Manager;
+            if let Ok(dir) = app.path().app_data_dir() {
+                if crash::crash_reports_enabled(&dir) {
+                    crash::install_panic_hook(dir.join("crashes"));
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // local
             get_app_version,
@@ -80,6 +97,8 @@ pub fn run() {
             settings_load,
             settings_save,
             settings_app_data_dir,
+            crash_logs_dir,
+            crash_logs_count,
             window_open_new,
             window_open_at,
             window_set_always_on_top,

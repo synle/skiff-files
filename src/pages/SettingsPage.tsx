@@ -25,6 +25,8 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import { useEffect, useState } from "react";
 import {
   appDataDir,
+  crashLogsCount,
+  crashLogsDir,
   loadSettingsFromDisk,
   SIDEBAR_SECTION_DEFAULT_ORDER,
   SIDEBAR_SECTION_LABELS,
@@ -299,6 +301,65 @@ function KeyRecorderDialog({
         </Box>
       </Box>
     </Dialog>
+  );
+}
+
+/** Settings → Advanced widget for the opt-in crash reporting
+ *  toggle. Reads the current crash-log count from the Rust side
+ *  on mount + after every visibility refresh so the user sees
+ *  whether anything has actually been written. The flag is read
+ *  by Rust at app start, so flipping it requires a relaunch to
+ *  arm the panic hook for new panics — we surface that note here
+ *  rather than silently no-op for the first session. */
+function CrashReportingBlock() {
+  const { settings, update } = useSettings();
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void crashLogsCount().then((n) => {
+      if (alive) setCount(n);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return (
+    <Box>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={settings.crashReportsEnabled}
+            onChange={(e) =>
+              update("crashReportsEnabled", e.target.checked)
+            }
+          />
+        }
+        label="Save crash logs (opt-in, local only)"
+      />
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block", mb: 1 }}
+      >
+        Writes one log per Rust panic to{" "}
+        <code>app_data/crashes/&lt;ts&gt;.log</code>. Local-only — never
+        submitted anywhere. Toggle takes effect on the next app launch.
+        {count !== null && count > 0 && ` ${count} log${count === 1 ? "" : "s"} saved.`}
+      </Typography>
+      <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={async () => {
+            const dir = await crashLogsDir();
+            if (dir) void fsRevealInOs(dir);
+          }}
+        >
+          Reveal crash logs folder
+          {count !== null && count > 0 ? ` (${count})` : ""}
+        </Button>
+      </Box>
+    </Box>
   );
 }
 
@@ -1385,6 +1446,8 @@ export default function SettingsPage() {
               <MenuItem value="debug">Debug</MenuItem>
             </Select>
           </FormControl>
+
+          <CrashReportingBlock />
 
           <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
             <Button

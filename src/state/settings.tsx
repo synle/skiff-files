@@ -146,6 +146,14 @@ export interface Settings {
    *  hidden — selection summary / disk space / errors don't render.
    *  Default true. */
   showStatusBar: boolean;
+  /** Opt-in local crash reporting. When true, a Rust-side panic
+   *  hook writes one log file per panic to
+   *  `<app_data_dir>/crashes/<ts>.log`. Local-only, never
+   *  submitted anywhere. Default false. The flag is read from
+   *  settings.json at Rust startup, so flipping it takes effect
+   *  on the next app launch (Settings → Advanced surfaces that
+   *  caveat). */
+  crashReportsEnabled: boolean;
   /** Console log threshold. `off` drops every call routed through
    *  `util/log`; the standard hierarchy `error > warn > info > debug`
    *  controls what passes through. Default `warn`. */
@@ -478,6 +486,7 @@ export const DEFAULTS: Settings = {
   reduceMotion: false,
   logLevel: "warn",
   showStatusBar: true,
+  crashReportsEnabled: false,
   showFullPathInTitle: false,
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
@@ -596,6 +605,27 @@ export async function appDataDir(): Promise<string | null> {
     return await invoke<string>("settings_app_data_dir");
   } catch {
     return null;
+  }
+}
+
+/** Path to the crash-log directory used by the opt-in panic hook
+ *  (`crashReportsEnabled`). Returned even when reporting is off so
+ *  the Settings UI can offer "Reveal" without a separate gate. */
+export async function crashLogsDir(): Promise<string | null> {
+  try {
+    return await invoke<string>("crash_logs_dir");
+  } catch {
+    return null;
+  }
+}
+
+/** Number of `.log` files in the crash directory. 0 when the
+ *  directory is missing (the common case — reporting off). */
+export async function crashLogsCount(): Promise<number> {
+  try {
+    return await invoke<number>("crash_logs_count");
+  } catch {
+    return 0;
   }
 }
 

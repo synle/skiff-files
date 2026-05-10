@@ -1014,6 +1014,52 @@ pub fn settings_app_data_dir(app: tauri::AppHandle) -> FsResult<String> {
     Ok(dir.to_string_lossy().into_owned())
 }
 
+/// Path to the crash-log directory used by the opt-in panic hook
+/// (`crashReportsEnabled` in Settings → Advanced). Returned even
+/// when reporting is disabled so the Settings UI can offer
+/// "Reveal" without a separate gate. Creates the directory on
+/// first call so the OS file manager doesn't choke on a missing
+/// path.
+#[tauri::command]
+pub fn crash_logs_dir(app: tauri::AppHandle) -> FsResult<String> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app_data_dir: {e}"))?
+        .join("crashes");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir({}): {e}", dir.display()))?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
+/// Count of `.log` files in the crash-log directory. Used by the
+/// Settings → Advanced "Crash logs" badge so users see at a glance
+/// whether any reports have been written. Returns 0 if the
+/// directory is missing — that's the common case (reporting off).
+#[tauri::command]
+pub fn crash_logs_count(app: tauri::AppHandle) -> FsResult<u32> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app_data_dir: {e}"))?
+        .join("crashes");
+    if !dir.exists() {
+        return Ok(0);
+    }
+    let entries = std::fs::read_dir(&dir)
+        .map_err(|e| format!("read_dir({}): {e}", dir.display()))?;
+    let mut n: u32 = 0;
+    for entry in entries.flatten() {
+        if let Some(ext) = entry.path().extension() {
+            if ext == "log" {
+                n += 1;
+            }
+        }
+    }
+    Ok(n)
+}
+
 /// Persist the settings blob. We write atomically via a temp file +
 /// rename so a partial write doesn't corrupt user state on a crash.
 /// After a successful write, broadcasts a `settings:changed` event so
