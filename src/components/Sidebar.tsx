@@ -50,6 +50,7 @@ import LaunchIcon from "@mui/icons-material/Launch";
 import SortByAlphaIcon from "@mui/icons-material/SortByAlpha";
 import ViewWeekIcon from "@mui/icons-material/ViewWeek";
 import SearchIcon from "@mui/icons-material/Search";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
@@ -253,6 +254,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       "bookmarks",
       "workspaces",
       "searches",
+      "selections",
       "recent",
       "hosts",
       "devices",
@@ -1104,10 +1106,69 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         {isVisible("searches") && settings.savedSearches.length > 0 && (
           <>
             {renderSectionHeader("searches", "Searches")}
+            {!isCollapsed("searches") &&
+              settings.savedSearches.length >= 5 && (
+                <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
+                  <Tooltip title="Sort A→Z">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const sorted = [...settings.savedSearches].sort(
+                          (a, b) =>
+                            a.label.localeCompare(b.label, undefined, {
+                              sensitivity: "base",
+                              numeric: true,
+                            }),
+                        );
+                        update("savedSearches", sorted);
+                      }}
+                      aria-label="Sort searches A to Z"
+                    >
+                      <SortByAlphaIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
             {!isCollapsed("searches") && (
               <List dense disablePadding id="sidebar-section-searches">
                 {settings.savedSearches.map((s) => (
-                  <ListItem key={s.id} disablePadding>
+                  <ListItem
+                    key={s.id}
+                    disablePadding
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        "application/x-skiff-search",
+                        s.id,
+                      );
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      if (
+                        e.dataTransfer.types.includes(
+                          "application/x-skiff-search",
+                        )
+                      ) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }
+                    }}
+                    onDrop={(e) => {
+                      const sourceId = e.dataTransfer.getData(
+                        "application/x-skiff-search",
+                      );
+                      if (!sourceId || sourceId === s.id) return;
+                      e.preventDefault();
+                      const list = settings.savedSearches;
+                      const fromIdx = list.findIndex((x) => x.id === sourceId);
+                      const toIdx = list.findIndex((x) => x.id === s.id);
+                      if (fromIdx < 0 || toIdx < 0) return;
+                      const next = [...list];
+                      const [moved] = next.splice(fromIdx, 1);
+                      next.splice(toIdx, 0, moved);
+                      update("savedSearches", next);
+                    }}
+                  >
                     <ListItemButton
                       onClick={() => {
                         // Browser listens; switching to the Browser
@@ -1184,6 +1245,95 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                             variant: "caption",
                             sx: { fontFamily: "monospace" },
                           },
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </>
+        )}
+
+        {isVisible("selections") && settings.savedSelections.length > 0 && (
+          <>
+            {renderSectionHeader("selections", "Selections")}
+            {!isCollapsed("selections") && (
+              <List dense disablePadding id="sidebar-section-selections">
+                {settings.savedSelections.map((s) => (
+                  <ListItem key={s.id} disablePadding>
+                    <ListItemButton
+                      onClick={() => {
+                        // Switch to Browser then dispatch — same
+                        // pattern as workspaces / searches.
+                        onSwitchPage("browser");
+                        queueMicrotask(() =>
+                          window.dispatchEvent(
+                            new CustomEvent("skiff:restore-selection", {
+                              detail: s.paths,
+                            }),
+                          ),
+                        );
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          section: "bookmarks",
+                          itemId: s.id,
+                          actions: [
+                            {
+                              key: "rename",
+                              icon: <EditIcon fontSize="small" />,
+                              label: "Rename…",
+                              onClick: () => {
+                                const next = window.prompt(
+                                  "Rename selection group:",
+                                  s.label,
+                                );
+                                if (next === null) return;
+                                const trimmed = next.trim();
+                                if (!trimmed) return;
+                                update(
+                                  "savedSelections",
+                                  settings.savedSelections.map((x) =>
+                                    x.id === s.id
+                                      ? { ...x, label: trimmed }
+                                      : x,
+                                  ),
+                                );
+                              },
+                            },
+                            {
+                              key: "delete",
+                              icon: <CloseIcon fontSize="small" />,
+                              label: "Delete",
+                              onClick: () =>
+                                update(
+                                  "savedSelections",
+                                  settings.savedSelections.filter(
+                                    (x) => x.id !== s.id,
+                                  ),
+                                ),
+                            },
+                          ],
+                        });
+                      }}
+                      title={`Restore "${s.label}" — ${s.paths.length} path${s.paths.length === 1 ? "" : "s"}`}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <CheckBoxOutlineBlankIcon
+                          fontSize="small"
+                          sx={{ color: "text.secondary" }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={s.label}
+                        secondary={`${s.paths.length} path${s.paths.length === 1 ? "" : "s"}`}
+                        slotProps={{
+                          primary: { variant: "body2", noWrap: true },
+                          secondary: { variant: "caption" },
                         }}
                       />
                     </ListItemButton>
