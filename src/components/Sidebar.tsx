@@ -254,6 +254,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       "bookmarks",
       "workspaces",
       "searches",
+      "syncjobs",
       "selections",
       "recent",
       "hosts",
@@ -1245,6 +1246,158 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                             variant: "caption",
                             sx: { fontFamily: "monospace" },
                           },
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </>
+        )}
+
+        {isVisible("syncjobs") && settings.savedSyncJobs.length > 0 && (
+          <>
+            {renderSectionHeader("syncjobs", "Sync jobs")}
+            {!isCollapsed("syncjobs") &&
+              settings.savedSyncJobs.length >= 5 && (
+                <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
+                  <Tooltip title="Sort A→Z">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const sorted = [...settings.savedSyncJobs].sort(
+                          (a, b) =>
+                            a.label.localeCompare(b.label, undefined, {
+                              sensitivity: "base",
+                              numeric: true,
+                            }),
+                        );
+                        update("savedSyncJobs", sorted);
+                      }}
+                      aria-label="Sort sync jobs A to Z"
+                    >
+                      <SortByAlphaIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
+            {!isCollapsed("syncjobs") && (
+              <List dense disablePadding id="sidebar-section-syncjobs">
+                {settings.savedSyncJobs.map((j) => (
+                  <ListItem
+                    key={j.id}
+                    disablePadding
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        "application/x-skiff-syncjob",
+                        j.id,
+                      );
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      if (
+                        e.dataTransfer.types.includes(
+                          "application/x-skiff-syncjob",
+                        )
+                      ) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }
+                    }}
+                    onDrop={(e) => {
+                      const sourceId = e.dataTransfer.getData(
+                        "application/x-skiff-syncjob",
+                      );
+                      if (!sourceId || sourceId === j.id) return;
+                      e.preventDefault();
+                      const list = settings.savedSyncJobs;
+                      const fromIdx = list.findIndex((x) => x.id === sourceId);
+                      const toIdx = list.findIndex((x) => x.id === j.id);
+                      if (fromIdx < 0 || toIdx < 0) return;
+                      const next = [...list];
+                      const [moved] = next.splice(fromIdx, 1);
+                      next.splice(toIdx, 0, moved);
+                      update("savedSyncJobs", next);
+                    }}
+                  >
+                    <ListItemButton
+                      onClick={() => {
+                        // Mirrors the palette flow: confirm before
+                        // running a real transfer.
+                        const ok = window.confirm(
+                          `Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`,
+                        );
+                        if (!ok) return;
+                        onSwitchPage("transfers");
+                        queueMicrotask(() =>
+                          window.dispatchEvent(
+                            new CustomEvent("skiff:run-sync-job", {
+                              detail: j.id,
+                            }),
+                          ),
+                        );
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          section: "bookmarks",
+                          itemId: j.id,
+                          actions: [
+                            {
+                              key: "rename",
+                              icon: <EditIcon fontSize="small" />,
+                              label: "Rename…",
+                              onClick: () => {
+                                const next = window.prompt(
+                                  "Rename sync job:",
+                                  j.label,
+                                );
+                                if (next === null) return;
+                                const trimmed = next.trim();
+                                if (!trimmed) return;
+                                update(
+                                  "savedSyncJobs",
+                                  settings.savedSyncJobs.map((x) =>
+                                    x.id === j.id
+                                      ? { ...x, label: trimmed }
+                                      : x,
+                                  ),
+                                );
+                              },
+                            },
+                            {
+                              key: "delete",
+                              icon: <CloseIcon fontSize="small" />,
+                              label: "Delete",
+                              onClick: () =>
+                                update(
+                                  "savedSyncJobs",
+                                  settings.savedSyncJobs.filter(
+                                    (x) => x.id !== j.id,
+                                  ),
+                                ),
+                            },
+                          ],
+                        });
+                      }}
+                      title={`Run "${j.label}" — ${j.src} → ${j.dest}`}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <SwapHorizIcon
+                          fontSize="small"
+                          sx={{ color: "text.secondary" }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={j.label}
+                        secondary={j.conflictPolicy}
+                        slotProps={{
+                          primary: { variant: "body2", noWrap: true },
+                          secondary: { variant: "caption" },
                         }}
                       />
                     </ListItemButton>
