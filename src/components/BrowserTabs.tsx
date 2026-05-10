@@ -24,6 +24,7 @@ import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import Browser from "../pages/Browser";
 import { useSettings } from "../state/settings";
 import { activeCombo, matchesCombo } from "../util/keybindings";
+import { onDone, onError, onProgress, syncList } from "../api/sync";
 import { OPEN_IN_TAB_EVENT } from "../App";
 
 interface TabRow {
@@ -438,10 +439,72 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
     );
   };
 
+  // Active sync job count — reflected in the window title so users
+  // see "(2) Skiff Files" in the OS taskbar / dock when transfers
+  // are running. Subscribes to the same sync:* events the Sidebar
+  // badge + OperationsDrawer use; the cost is one cheap Set per
+  // window pane so duplicate listeners are fine.
+  const [activeJobs, setActiveJobs] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    let unsubP: (() => void) | null = null;
+    let unsubD: (() => void) | null = null;
+    let unsubE: (() => void) | null = null;
+    void (async () => {
+      try {
+        const list = await syncList();
+        const inFlight = new Set<string>();
+        for (const j of list) {
+          if (
+            j.state === "running" ||
+            j.state === "paused" ||
+            j.state === "planning"
+          ) {
+            inFlight.add(j.id);
+          }
+        }
+        setActiveJobs(inFlight);
+      } catch {
+        /* outside Tauri — keep empty */
+      }
+    })();
+    void (async () => {
+      unsubP = await onProgress((p) => {
+        setActiveJobs((prev) => {
+          if (prev.has(p.jobId)) return prev;
+          const next = new Set(prev);
+          next.add(p.jobId);
+          return next;
+        });
+      });
+      unsubD = await onDone((s) => {
+        setActiveJobs((prev) => {
+          if (!prev.has(s.jobId)) return prev;
+          const next = new Set(prev);
+          next.delete(s.jobId);
+          return next;
+        });
+      });
+      unsubE = await onError((e) => {
+        setActiveJobs((prev) => {
+          if (!prev.has(e.jobId)) return prev;
+          const next = new Set(prev);
+          next.delete(e.jobId);
+          return next;
+        });
+      });
+    })();
+    return () => {
+      unsubP?.();
+      unsubD?.();
+      unsubE?.();
+    };
+  }, []);
+
   // Sync the OS window title with either "Skiff Files" or the active
   // tab's full path, depending on the `showFullPathInTitle` setting.
   // Wrapped in try/catch + dynamic import so tests + browser-mode dev
-  // (no Tauri runtime) silently no-op.
+  // (no Tauri runtime) silently no-op. Active job count gets prefixed
+  // when there's transfer activity so users notice from the taskbar.
   const activePath =
     tabs.find((t) => t.id === activeId)?.currentPath ?? "";
   useEffect(() => {
@@ -449,16 +512,18 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const win = getCurrentWindow();
-        const next =
+        const base =
           settings.showFullPathInTitle && activePath
             ? `${activePath} — Skiff Files`
             : "Skiff Files";
+        const next =
+          activeJobs.size > 0 ? `(${activeJobs.size}) ${base}` : base;
         await win.setTitle(next);
       } catch {
         /* outside Tauri — no-op */
       }
     })();
-  }, [activePath, settings.showFullPathInTitle]);
+  }, [activePath, settings.showFullPathInTitle, activeJobs]);
 
   return (
     <Box

@@ -29,6 +29,7 @@ import {
   type ImageExif,
 } from "../api/fs";
 import { dirSummary, readBase64, readText } from "../api/client";
+import { startNativeDrag } from "../api/drag";
 import { formatBytes, formatMtime } from "../util/format";
 import { isImage, mimeForPath } from "../util/mime";
 import {
@@ -148,7 +149,24 @@ function ImageBody({
           component="img"
           src={src}
           alt={entry.name}
-          draggable={false}
+          // When NOT zoomed, allow drag-out to OS Finder / Desktop
+          // via the native drag-source plugin. When zoomed, dragging
+          // is reserved for pan, so we disable HTML5 drag entirely.
+          draggable={!zoomed && !entry.path.startsWith("sftp://")}
+          onDragStart={(e) => {
+            // The HTML5 drag still fires inside our window for the
+            // existing in-app drop targets (sidebar host items,
+            // bookmarks, folder rows), so set the standard MIME too.
+            e.dataTransfer.setData(
+              "application/x-skiff-paths",
+              entry.path,
+            );
+            e.dataTransfer.effectAllowed = "copy";
+            // Fire native drag in parallel so the OS picks it up
+            // when the cursor leaves the window. Local-only — guarded
+            // by the `draggable=` check above already.
+            void startNativeDrag([entry.path]).catch(() => {});
+          }}
           onLoad={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             if (img.naturalWidth > 0 && img.naturalHeight > 0) {
