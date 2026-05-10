@@ -517,7 +517,6 @@ pub fn fs_archive_extract_one(
                         }
                     };
                     let mut buf = vec![0u8; 64 * 1024];
-                    use std::io::Read;
                     loop {
                         let n = match reader.read(&mut buf) {
                             Ok(n) => n,
