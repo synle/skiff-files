@@ -846,6 +846,85 @@ pub fn fs_image_exif(path: String) -> FsResult<ImageExif> {
     })
 }
 
+/// Rotate an on-disk image by ±90 / ±180 / ±270 degrees, in place.
+///
+/// `degrees` is normalized to a {0, 90, 180, 270} bucket (multiples
+/// of 90) — anything else is rejected. The image is decoded, rotated
+/// in pixel space (lossy round-trip for JPEG; lossless for PNG / GIF
+/// / BMP / WebP-lossless), then re-encoded back to its original
+/// format. We don't try the EXIF-orientation fast path for JPEG —
+/// the gap between "what the user sees in PreviewPane" and "what the
+/// file actually contains" is what makes the existing CSS rotation
+/// confusing, and an EXIF-only rotate keeps that gap. Going through
+/// the pixel buffer is dependable across every image we already
+/// preview.
+///
+/// We write the result atomically via temp + rename so a crash
+/// mid-write doesn't leave a half-finished file.
+#[tauri::command]
+pub fn fs_image_rotate(path: String, degrees: i32) -> FsResult<()> {
+    use image::ImageFormat;
+    // Normalize to one of {0, 90, 180, 270}. Negative + huge values
+    // collapse cleanly via euclidean rem.
+    let deg = ((degrees % 360) + 360) % 360;
+    if deg % 90 != 0 {
+        return Err(format!(
+            "fs_image_rotate: degrees must be a multiple of 90 (got {degrees})"
+        ));
+    }
+    if deg == 0 {
+        // Nothing to do — caller saved with rotation=0.
+        return Ok(());
+    }
+
+    let format = ImageFormat::from_path(&path)
+        .map_err(|e| format!("fs_image_rotate: unknown format for {path}: {e}"))?;
+    // Refuse formats we don't ship encoders for (defense-in-depth —
+    // the Cargo.toml feature set already constrains this, but a user
+    // could rename a TIFF to .png and we'd surface a confusing decode
+    // error otherwise).
+    if !matches!(
+        format,
+        ImageFormat::Jpeg | ImageFormat::Png | ImageFormat::Gif | ImageFormat::WebP | ImageFormat::Bmp
+    ) {
+        return Err(format!(
+            "fs_image_rotate: unsupported format ({format:?}) — only JPEG / PNG / GIF / WebP / BMP can be rotated"
+        ));
+    }
+
+    let img = image::open(&path).map_err(|e| format!("decode({path}): {e}"))?;
+    let rotated = match deg {
+        90 => img.rotate90(),
+        180 => img.rotate180(),
+        270 => img.rotate270(),
+        _ => unreachable!("checked above"),
+    };
+
+    // Atomic write: temp file in same directory, then rename. Same
+    // pattern as `settings_save` so a crash mid-encode doesn't
+    // truncate the original.
+    let path_buf = std::path::PathBuf::from(&path);
+    let parent = path_buf
+        .parent()
+        .ok_or_else(|| format!("fs_image_rotate: no parent dir for {path}"))?;
+    let tmp = parent.join(format!(
+        ".skiff-rotate-{}.tmp",
+        uuid::Uuid::new_v4()
+    ));
+    rotated
+        .save_with_format(&tmp, format)
+        .map_err(|e| {
+            // Best-effort cleanup of the temp file on encoder error.
+            std::fs::remove_file(&tmp).ok();
+            format!("encode({}): {e}", tmp.display())
+        })?;
+    std::fs::rename(&tmp, &path_buf).map_err(|e| {
+        std::fs::remove_file(&tmp).ok();
+        format!("rename({} → {}): {e}", tmp.display(), path)
+    })?;
+    Ok(())
+}
+
 /// Total + free bytes on the filesystem that hosts `path`. Used by the
 /// StatusBar to show "X free of Y" alongside the selection summary.
 /// `fs4` reads the per-platform filesystem stats (statvfs / GetDiskFreeSpaceEx)
@@ -1999,4 +2078,102 @@ pub fn sync_start_repo(
     });
 
     Ok(id)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Per-test scratch dir under /tmp. Sequence + nanos so parallel
+    /// tests don't collide. Same uniq() pattern as the fs/sync tests.
+    fn uniq(prefix: &str) -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let p = std::env::temp_dir().join(format!("skiff-{prefix}-{nanos}"));
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    /// Encode a small all-red PNG to disk, rotate 90 degrees, and
+    /// verify the resulting file (a) still decodes, (b) has its
+    /// width / height swapped, and (c) the corner pixel is still
+    /// the same color (rotation is lossless for PNG).
+    #[test]
+    fn rotates_a_png_lossless_and_swaps_dimensions() {
+        let dir = uniq("img-rotate");
+        let p = dir.join("red.png");
+
+        // 8x4 red rectangle so the rotation actually changes
+        // dimensions (8x4 -> 4x8 after a quarter turn).
+        let mut buf = image::RgbImage::new(8, 4);
+        for px in buf.pixels_mut() {
+            *px = image::Rgb([220, 30, 30]);
+        }
+        buf.save_with_format(&p, image::ImageFormat::Png).unwrap();
+
+        let path_str = p.to_string_lossy().to_string();
+        fs_image_rotate(path_str.clone(), 90).unwrap();
+
+        let after = image::open(&p).unwrap();
+        assert_eq!(after.width(), 4, "width should be old height");
+        assert_eq!(after.height(), 8, "height should be old width");
+        // Color preserved (rotation just permutes pixels).
+        let rgb = after.to_rgb8().get_pixel(0, 0).0;
+        assert_eq!(rgb, [220, 30, 30]);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// 0 / 360 / -720 all collapse to a no-op. Confirms the
+    /// modular-arithmetic normalization handles negatives + huge
+    /// values without panicking.
+    #[test]
+    fn zero_or_full_turn_is_noop() {
+        let dir = uniq("img-rotate-noop");
+        let p = dir.join("a.png");
+        let mut buf = image::RgbImage::new(2, 3);
+        for px in buf.pixels_mut() {
+            *px = image::Rgb([10, 20, 30]);
+        }
+        buf.save_with_format(&p, image::ImageFormat::Png).unwrap();
+        let path_str = p.to_string_lossy().to_string();
+
+        // Original mtime to confirm the no-op path doesn't rewrite.
+        let mtime_before = std::fs::metadata(&p).unwrap().modified().unwrap();
+
+        fs_image_rotate(path_str.clone(), 0).unwrap();
+        fs_image_rotate(path_str.clone(), 360).unwrap();
+        fs_image_rotate(path_str.clone(), -720).unwrap();
+
+        let mtime_after = std::fs::metadata(&p).unwrap().modified().unwrap();
+        assert_eq!(
+            mtime_before, mtime_after,
+            "0 / full-turn should not rewrite the file"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Rejects degree counts that aren't multiples of 90 — we don't
+    /// support arbitrary rotation so a 45-degree request must fail
+    /// cleanly rather than silently round.
+    #[test]
+    fn rejects_non_quarter_rotations() {
+        let dir = uniq("img-rotate-reject");
+        let p = dir.join("a.png");
+        image::RgbImage::new(4, 4)
+            .save_with_format(&p, image::ImageFormat::Png)
+            .unwrap();
+        let path_str = p.to_string_lossy().to_string();
+
+        let err = fs_image_rotate(path_str.clone(), 45).unwrap_err();
+        assert!(err.contains("multiple of 90"), "got: {err}");
+        let err = fs_image_rotate(path_str.clone(), 1).unwrap_err();
+        assert!(err.contains("multiple of 90"), "got: {err}");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

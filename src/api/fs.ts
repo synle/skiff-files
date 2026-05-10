@@ -194,6 +194,14 @@ export const fsHashSha256 = (path: string): Promise<string> =>
 export const fsImageExif = (path: string): Promise<ImageExif> =>
   invoke<ImageExif>("fs_image_exif", { path });
 
+/** Rotate an on-disk image by ±90 / ±180 / ±270 degrees, in place.
+ *  Decodes + rotates pixel buffer + re-encodes back to the original
+ *  format. Atomic write (temp + rename) so a crash mid-encode
+ *  doesn't truncate the original. JPEG round-trip is lossy at high
+ *  quality; PNG / GIF / BMP / lossless WebP are bit-perfect. */
+export const fsImageRotate = (path: string, degrees: number): Promise<void> =>
+  invoke<void>("fs_image_rotate", { path, degrees });
+
 /** Filesystem totals for the partition that hosts `path`. Bytes. */
 export interface DiskSpace {
   total: number;

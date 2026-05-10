@@ -433,7 +433,7 @@ These are tracked here so they don't get lost, but the user has asked that they 
 
 - [x] **Sidebar section reorder** *(shipped 0.2.238)* — `Settings.sidebarSectionOrder` drives each section's CSS `order` inside a flex-column wrapper, so JSX source order stays untouched. Settings → Sidebar gains an arrow-driven reorder list + Reset.
 
-- [ ] **Image rotate save** — PreviewPane has rotate buttons that update local state; persisting requires the `image` crate (~500 KB). Decompressed-rotate-recompress is lossy for JPEGs (EXIF-only rotation is the right answer for JPEG; pixel rotation for PNG / GIF / etc.). Two paths needed.
+- [x] **Image rotate save** *(shipped 0.2.242)* — `fs_image_rotate(path, degrees)` Tauri command using the `image` crate (default-features=false + JPEG/PNG/GIF/WebP/BMP feature list). PreviewPane gains a Save button next to Rotate-left / Rotate-right. JPEG round-trip is lossy (documented in the tooltip); PNG / GIF / BMP / lossless-WebP are bit-perfect. EXIF-only fast-path for JPEG was scoped out — pixel rotation works uniformly across every format the preview shows.
 
 - [ ] **Streaming `fs_list_dir`** — Rayon-parallel stat (0.2.144) is fast enough for 10k entries. Streaming chunks would help 50k+ folders but adds frontend buffer complexity. Wait until users hit it.
 

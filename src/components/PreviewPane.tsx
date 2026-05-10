@@ -19,9 +19,11 @@ import LaunchIcon from "@mui/icons-material/Launch";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
+import SaveIcon from "@mui/icons-material/Save";
 import { useEffect, useRef, useState } from "react";
 import {
   fsImageExif,
+  fsImageRotate,
   fsOpenWithDefault,
   fsRevealInOs,
   type DirSummary,
@@ -77,8 +79,20 @@ function ImageBody({
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** Rotation in degrees, applied via CSS transform. Resets to 0
-   *  whenever the selection changes so the next image starts upright. */
+   *  whenever the selection changes so the next image starts upright.
+   *  When the user clicks Save, we hand the rotation off to the
+   *  Rust-side `fs_image_rotate` and reset back to 0 — the file
+   *  itself is now physically rotated, so the CSS transform should
+   *  no longer apply. */
   const [rotation, setRotation] = useState<number>(0);
+  /** True while the Save command is in flight. Locks the rotate
+   *  buttons + disables Save itself so the user can't double-fire
+   *  during the encode. */
+  const [saving, setSaving] = useState<boolean>(false);
+  /** Bumped whenever Save succeeds so the load effect re-fetches
+   *  the file (bypassing the previous data-URL state). The path
+   *  alone isn't enough — same path before + after the rotate. */
+  const [reloadKey, setReloadKey] = useState<number>(0);
   /** Click-to-zoom toggle. Off = fit-to-pane (max 360 px tall);
    *  on = native pixel size, scroll inside the pane to inspect.
    *  Resets on selection change so each new image starts fitted. */
@@ -115,8 +129,9 @@ function ImageBody({
       cancelled = true;
     };
     // onDimensions is stable from the parent's useState setter.
+    // reloadKey re-runs the effect after a rotation save lands.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry.path]);
+  }, [entry.path, reloadKey]);
 
   if (error) {
     return (
@@ -238,22 +253,62 @@ function ImageBody({
       </Box>
       <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
         <Tooltip title="Rotate left">
-          <IconButton
-            size="small"
-            onClick={() => setRotation((r) => r - 90)}
-            aria-label="Rotate image left"
-          >
-            <RotateLeftIcon fontSize="small" />
-          </IconButton>
+          <span>
+            <IconButton
+              size="small"
+              disabled={saving}
+              onClick={() => setRotation((r) => r - 90)}
+              aria-label="Rotate image left"
+            >
+              <RotateLeftIcon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
         <Tooltip title="Rotate right">
-          <IconButton
-            size="small"
-            onClick={() => setRotation((r) => r + 90)}
-            aria-label="Rotate image right"
-          >
-            <RotateRightIcon fontSize="small" />
-          </IconButton>
+          <span>
+            <IconButton
+              size="small"
+              disabled={saving}
+              onClick={() => setRotation((r) => r + 90)}
+              aria-label="Rotate image right"
+            >
+              <RotateRightIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip
+          title={
+            rotation === 0
+              ? "Rotate the image first"
+              : "Save rotation to the file (JPEG round-trip is lossy)"
+          }
+        >
+          {/* `<span>` so the disabled state still surfaces a tooltip — MUI
+              swallows hover on disabled IconButtons otherwise. */}
+          <span>
+            <IconButton
+              size="small"
+              disabled={rotation === 0 || saving}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await fsImageRotate(entry.path, rotation);
+                  // The file is now physically rotated. Drop the CSS
+                  // transform so we don't double-rotate visually,
+                  // then bump reloadKey so the load effect re-fetches.
+                  setRotation(0);
+                  setReloadKey((k) => k + 1);
+                } catch (e) {
+                  setError(`Save rotation: ${String(e)}`);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              aria-label="Save rotation"
+            >
+              <SaveIcon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
       </Stack>
     </Box>
