@@ -940,6 +940,44 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         >
           Close tabs to the right
         </MenuItem>
+        <MenuItem
+          disabled={tabs.length <= 1}
+          onClick={() => {
+            // Mirror of Close-to-the-right: close every NON-PINNED
+            // tab strictly to the LEFT of the right-clicked one.
+            if (!tabMenu) return;
+            const idx = tabs.findIndex((t) => t.id === tabMenu.tabId);
+            if (idx >= 0) {
+              setTabs((prev) =>
+                prev.filter((t, i) => i >= idx || t.pinned),
+              );
+              const surviving = tabs.filter(
+                (t, i) => i >= idx || t.pinned,
+              );
+              if (!surviving.some((t) => t.id === activeId)) {
+                setActiveId(tabMenu.tabId);
+              }
+            }
+            setTabMenu(null);
+          }}
+        >
+          Close tabs to the left
+        </MenuItem>
+        {tabMenu && (
+          <MenuItem
+            onClick={() => {
+              const target = tabs.find((t) => t.id === tabMenu.tabId);
+              setTabMenu(null);
+              if (!target) return;
+              // Same path as the right-clicked tab; addTab gives the
+              // new one a fresh id + initial path. The user lands on
+              // the duplicate immediately.
+              addTab(target.currentPath || target.initialPath);
+            }}
+          >
+            Duplicate this folder
+          </MenuItem>
+        )}
         {tabs.length > 1 && (
           <MenuItem
             onClick={() => {
@@ -953,6 +991,42 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
             {tabs.every((t) => t.pinned) ? "Unpin all" : "Pin all"}
           </MenuItem>
         )}
+        {(() => {
+          const target = tabMenu
+            ? tabs.find((t) => t.id === tabMenu.tabId)
+            : null;
+          const targetPath = target?.currentPath || target?.initialPath;
+          const alreadyBookmarked =
+            !!targetPath &&
+            settings.bookmarks.some((b) => b.path === targetPath);
+          return (
+            target && (
+              <MenuItem
+                disabled={!targetPath || alreadyBookmarked}
+                onClick={() => {
+                  setTabMenu(null);
+                  if (!targetPath || alreadyBookmarked) return;
+                  const segs = targetPath
+                    .split(/[\\/]/)
+                    .filter(Boolean);
+                  const label = segs.at(-1) || targetPath;
+                  update("bookmarks", [
+                    ...settings.bookmarks,
+                    {
+                      id: crypto.randomUUID(),
+                      label,
+                      path: targetPath,
+                    },
+                  ]);
+                }}
+              >
+                {alreadyBookmarked
+                  ? "Bookmark this folder (already saved)"
+                  : "Bookmark this folder"}
+              </MenuItem>
+            )
+          );
+        })()}
         <Divider />
         <MenuItem
           onClick={() => {
