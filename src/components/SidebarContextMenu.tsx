@@ -28,7 +28,7 @@ export interface SidebarContextState {
   /** Section the right-click landed in — "favorites" / "bookmarks" /
    *  "recent". The menu doesn't read it, but parents use it to decide
    *  the action list. */
-  section: "favorites" | "bookmarks" | "recent" | "hosts";
+  section: "favorites" | "bookmarks" | "workspaces" | "recent" | "hosts";
   /** Stable identifier for the sub-row (bookmark id, recent path,
    *  favorite rel, host id). Parents use this to look up the actions. */
   itemId: string;

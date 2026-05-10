@@ -958,7 +958,52 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                           }),
                         );
                       }}
-                      title={`Restore "${ws.label}" — ${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}`}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          section: "workspaces",
+                          itemId: ws.id,
+                          actions: [
+                            {
+                              key: "rename",
+                              icon: <EditIcon fontSize="small" />,
+                              label: "Rename…",
+                              onClick: () => {
+                                const next = window.prompt(
+                                  "Rename workspace:",
+                                  ws.label,
+                                );
+                                if (next === null) return;
+                                const trimmed = next.trim();
+                                if (!trimmed) return;
+                                update(
+                                  "tabWorkspaces",
+                                  settings.tabWorkspaces.map((x) =>
+                                    x.id === ws.id
+                                      ? { ...x, label: trimmed }
+                                      : x,
+                                  ),
+                                );
+                              },
+                            },
+                            {
+                              key: "delete",
+                              icon: <CloseIcon fontSize="small" />,
+                              label: "Delete",
+                              onClick: () =>
+                                update(
+                                  "tabWorkspaces",
+                                  settings.tabWorkspaces.filter(
+                                    (x) => x.id !== ws.id,
+                                  ),
+                                ),
+                            },
+                          ],
+                        });
+                      }}
+                      title={`Restore "${ws.label}" — ${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"} · right-click to rename / delete`}
                     >
                       <ListItemIcon sx={{ minWidth: 32 }}>
                         <ViewWeekIcon

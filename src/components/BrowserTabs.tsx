@@ -353,18 +353,63 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           e.preventDefault();
           setActiveId(tabs[idx].id);
         }
-      } else if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "tabs.moveLeft",
+            "cmd+shift+arrowleft",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
         e.preventDefault();
-        moveActiveTab(e.key === "ArrowLeft" ? "left" : "right");
-      } else if (e.shiftKey && (e.key === "[" || e.key === "]")) {
-        // Cmd/Ctrl+Shift+[ / ] cycles between tabs (Chrome muscle
-        // memory). Wraps at the ends so repeated presses are circular.
-        // Distinct from plain Cmd+[/] which is back/forward inside a
-        // tab's history.
+        moveActiveTab("left");
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "tabs.moveRight",
+            "cmd+shift+arrowright",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
+        e.preventDefault();
+        moveActiveTab("right");
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "tabs.cyclePrev",
+            "cmd+shift+[",
+            settings.shortcutOverrides,
+          ),
+        ) ||
+        matchesCombo(
+          e,
+          activeCombo(
+            "tabs.cycleNext",
+            "cmd+shift+]",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
+        // Browser muscle memory: Cmd/Ctrl+Shift+[ / ] cycles between
+        // tabs. Wraps at the ends. Distinct from plain Cmd+[/] which
+        // is back/forward inside a tab's history.
         const idx = tabs.findIndex((t) => t.id === activeId);
         if (idx >= 0 && tabs.length > 1) {
           e.preventDefault();
-          const delta = e.key === "[" ? -1 : 1;
+          const isPrev = matchesCombo(
+            e,
+            activeCombo(
+              "tabs.cyclePrev",
+              "cmd+shift+[",
+              settings.shortcutOverrides,
+            ),
+          );
+          const delta = isPrev ? -1 : 1;
           const next = (idx + delta + tabs.length) % tabs.length;
           setActiveId(tabs[next].id);
         }

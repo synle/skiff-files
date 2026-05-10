@@ -199,8 +199,30 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         defaultCombo: "cmd+n",
       },
       { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
-      { keys: "Cmd / Ctrl + Shift + [ / ]", description: "Switch to previous / next tab" },
-      { keys: "Cmd / Ctrl + Shift + ← / →", description: "Move active tab left / right" },
+      {
+        keys: "Cmd / Ctrl + Shift + [",
+        description: "Switch to previous tab",
+        actionId: "tabs.cyclePrev",
+        defaultCombo: "cmd+shift+[",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + ]",
+        description: "Switch to next tab",
+        actionId: "tabs.cycleNext",
+        defaultCombo: "cmd+shift+]",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + ←",
+        description: "Move active tab left",
+        actionId: "tabs.moveLeft",
+        defaultCombo: "cmd+shift+arrowleft",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + →",
+        description: "Move active tab right",
+        actionId: "tabs.moveRight",
+        defaultCombo: "cmd+shift+arrowright",
+      },
       { keys: "Middle-click folder", description: "Open folder in new tab" },
       {
         keys: "Cmd / Ctrl + Shift + \\",
