@@ -1813,6 +1813,12 @@ export default function FileList(props: Props) {
                   key={e.path}
                   role="row"
                   aria-selected={isSel}
+                  // Keyboard focus target. Roving tabindex pattern:
+                  // only the focused row is in the tab order; arrow
+                  // keys move `focusedIdx` and the next render
+                  // promotes the new row. Prevents Tab from cycling
+                  // through every row in a 10k-entry list.
+                  tabIndex={isFocused ? 0 : -1}
                   data-testid="file-row"
                   draggable
                   onDragStart={(evt) => {

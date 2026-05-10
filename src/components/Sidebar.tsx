@@ -1801,6 +1801,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     {settings.sidebarShowStatusDots ? (
                       <Tooltip title="Connected">
                         <CircleIcon
+                          aria-label="Connection status: connected"
                           sx={{ fontSize: 10, color: "success.main" }}
                         />
                       </Tooltip>

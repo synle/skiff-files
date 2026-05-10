@@ -116,9 +116,28 @@ export default function CommandPalette({ open, onClose, actions }: Props) {
           fullWidth
           size="small"
           autoFocus
+          // Combobox accessibility wiring. Together with role="listbox"
+          // on the result list + matching ids on each option, this
+          // lets screen readers announce the currently-highlighted
+          // command as the user types / arrows.
+          slotProps={{
+            htmlInput: {
+              role: "combobox",
+              "aria-expanded": open,
+              "aria-controls": "command-palette-listbox",
+              "aria-autocomplete": "list",
+              "aria-activedescendant":
+                filtered[highlight]?.id
+                  ? `command-palette-option-${filtered[highlight].id}`
+                  : undefined,
+              "aria-label": "Command palette",
+            },
+          }}
         />
       </Box>
       <List
+        id="command-palette-listbox"
+        role="listbox"
         dense
         sx={{
           maxHeight: "60vh",
@@ -136,6 +155,9 @@ export default function CommandPalette({ open, onClose, actions }: Props) {
         {filtered.map((a, i) => (
           <ListItemButton
             key={a.id}
+            id={`command-palette-option-${a.id}`}
+            role="option"
+            aria-selected={i === highlight}
             selected={i === highlight}
             disabled={a.disabled}
             onMouseEnter={() => setHighlight(i)}

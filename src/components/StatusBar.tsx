@@ -81,6 +81,7 @@ export default function StatusBar({
           gap: 1,
         }}
         role="status"
+        aria-live="assertive"
       >
         <Typography variant="caption" sx={{ flex: 1 }}>
           {errorMessage}
@@ -109,6 +110,7 @@ export default function StatusBar({
         gap: 2,
       }}
       role="status"
+      aria-live="polite"
     >
       <Typography variant="caption" color="text.secondary">
         {selectedEntries > 0
