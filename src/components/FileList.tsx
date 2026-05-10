@@ -27,6 +27,8 @@ import {
   getCachedFolderSize,
 } from "../util/folderSizeCache";
 import { startNativeDrag } from "../api/drag";
+import { tagColorHex } from "../util/tagColors";
+import type { TagColor } from "../state/settings";
 import type { Density, ShowExtensions, ViewMode } from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "ctime" | "kind";
@@ -90,6 +92,10 @@ interface Props {
    *  which row the menu is operating on (separate from selection /
    *  focus). When `null` no row is highlighted. */
   contextMenuPath?: string | null;
+  /** Per-path color tags (Finder-style). Keys are full paths;
+   *  values are TagColor enum strings. Optional — when omitted no
+   *  tag dots render. */
+  fileTags?: Record<string, string>;
   /** Visual layout. `list` is the virtualized list (default); other
    *  modes render a non-virtualized grid of cards (tile = small
    *  icons, gallery = larger icons / thumbs, column = wide rows).
@@ -1101,6 +1107,7 @@ export default function FileList(props: Props) {
     onDropOntoFolder,
     onContextEmpty,
     contextMenuPath = null,
+    fileTags = {},
     view = "list",
     path,
     onRename,
@@ -1934,6 +1941,22 @@ export default function FileList(props: Props) {
                         )}
                         {e.isSymlink ? " ↪" : ""}
                       </Typography>
+                    )}
+                    {fileTags[e.path] && (
+                      <Box
+                        component="span"
+                        title={`Tag: ${fileTags[e.path]}`}
+                        sx={{
+                          display: "inline-block",
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          flexShrink: 0,
+                          backgroundColor: tagColorHex(
+                            fileTags[e.path] as TagColor,
+                          ),
+                        }}
+                      />
                     )}
                   </Box>
                   <Typography

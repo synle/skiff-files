@@ -220,7 +220,25 @@ export interface Settings {
    *  the rest of the catalog is read-only until their handlers
    *  migrate to the same `matchesCombo` lookup. */
   shortcutOverrides: Record<string, string | null>;
+  /** Per-path color tag, Finder-style. Keys are full paths
+   *  (local or sftp://). Values are TagColor enum strings. Capped
+   *  at FOLDER_VIEW_MAX entries via the same LRU pattern as
+   *  folderViewMode / folderSort / folderKindFilter. Missing key =
+   *  no tag. */
+  fileTags: Record<string, TagColor>;
 }
+
+/** Finder's seven-color palette. Stored as an enum so the colors
+ *  themselves can shift with the active theme without touching every
+ *  user's settings.json. */
+export type TagColor =
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "blue"
+  | "purple"
+  | "gray";
 
 /** User-editable palette slots. Maps directly onto MUI's `palette`
  *  options; theme builder spreads them in when `useCustomTheme` is
@@ -332,6 +350,7 @@ export const DEFAULTS: Settings = {
     textSecondary: "",
   },
   shortcutOverrides: {},
+  fileTags: {},
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

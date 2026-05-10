@@ -23,7 +23,11 @@ import LaunchIcon from "@mui/icons-material/Launch";
 import TabIcon from "@mui/icons-material/Tab";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import CircleIcon from "@mui/icons-material/Circle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import type { Entry } from "../api/fs";
+import type { TagColor } from "../state/settings";
+import { TAG_COLORS, tagColorHex, tagColorLabel } from "../util/tagColors";
 
 interface Props {
   /** Anchor point + entry — `null` when the menu is closed. */
@@ -70,6 +74,11 @@ interface Props {
   /** True when a base file is already pending. Drives the menu label
    *  ("Compare with this file" instead of "Compare with…"). */
   comparePending?: boolean;
+  /** Currently-applied tag color (or null = untagged). Drives the
+   *  selection indicator in the Tag submenu. */
+  currentTag?: TagColor | null;
+  /** Set or clear a tag on the entry. `null` clears. */
+  onSetTag?: (entry: Entry, color: TagColor | null) => void;
 }
 
 export default function EntryContextMenu({
@@ -91,6 +100,8 @@ export default function EntryContextMenu({
   onExtractZip,
   onViewArchive,
   comparePending = false,
+  currentTag = null,
+  onSetTag,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
@@ -382,6 +393,71 @@ export default function EntryContextMenu({
             <BookmarkIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Add to bookmarks</ListItemText>
+        </MenuItem>
+      )}
+      {onSetTag && state && (
+        <MenuItem
+          // Disable the built-in highlight/click — this row is a
+          // container for the color dots, not a single action.
+          disableRipple
+          sx={{ "&:hover": { backgroundColor: "transparent" } }}
+        >
+          <ListItemIcon>
+            <CircleIcon
+              fontSize="small"
+              sx={{
+                color: currentTag ? tagColorHex(currentTag) : "text.disabled",
+              }}
+            />
+          </ListItemIcon>
+          <ListItemText sx={{ mr: 1 }}>Tag</ListItemText>
+          {/* Colored-dot strip: clicking sets that tag. The active tag
+              renders with a primary-tinted ring so the current state
+              is glanceable. */}
+          {TAG_COLORS.map((c) => (
+            <span
+              key={c}
+              role="button"
+              aria-label={`Tag ${tagColorLabel(c)}`}
+              title={tagColorLabel(c)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetTag(state.entry, c);
+                onClose();
+              }}
+              style={{
+                display: "inline-block",
+                width: 14,
+                height: 14,
+                borderRadius: "50%",
+                margin: "0 2px",
+                cursor: "pointer",
+                backgroundColor: tagColorHex(c),
+                outline: c === currentTag ? "2px solid #1976d2" : "none",
+                outlineOffset: 1,
+              }}
+            />
+          ))}
+          {currentTag && (
+            <span
+              role="button"
+              aria-label="Clear tag"
+              title="Clear tag"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetTag(state.entry, null);
+                onClose();
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                marginLeft: 6,
+                cursor: "pointer",
+              }}
+            >
+              <RadioButtonUncheckedIcon fontSize="small" />
+            </span>
+          )}
         </MenuItem>
       )}
       <MenuItem

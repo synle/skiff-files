@@ -1280,6 +1280,7 @@ export default function Browser({
           highlightQuery={search}
           onContextEmpty={(x, y) => setEmptyMenu({ x, y })}
           contextMenuPath={contextMenu?.entry.path ?? null}
+          fileTags={settings.fileTags}
           view={settings.folderViewMode[path] ?? settings.defaultView}
           path={path}
           onRename={async (entry, newName) => {
@@ -1437,6 +1438,27 @@ export default function Browser({
           }
         }}
         onProperties={(e) => setPropertiesTarget(e)}
+        currentTag={
+          contextMenu ? settings.fileTags[contextMenu.entry.path] ?? null : null
+        }
+        onSetTag={(e, color) => {
+          const next = { ...settings.fileTags };
+          if (color === null) {
+            delete next[e.path];
+          } else {
+            next[e.path] = color;
+          }
+          // LRU-bound at 200 entries (matches folderViewMode +
+          // folderSort + folderKindFilter).
+          const keys = Object.keys(next);
+          if (keys.length > 200) {
+            const trimmed: typeof next = {};
+            for (const k of keys.slice(keys.length - 200)) trimmed[k] = next[k];
+            update("fileTags", trimmed);
+          } else {
+            update("fileTags", next);
+          }
+        }}
         onOpenWithDefault={(e) => {
           void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
         }}
