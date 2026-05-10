@@ -1,0 +1,47 @@
+name: Auto-merge
+
+# Enable squash-merge auto-merge on every PR as soon as it opens
+# or gets a new commit. GitHub holds the merge until every required
+# check passes + every required reviewer approves; if either gate
+# fails, the PR stays open with auto-merge armed but unfired.
+#
+# This is the workflow side. The matching repo-level settings —
+# `allow_auto_merge=true`, default merge method `squash`,
+# `delete_branch_on_merge=true` — need to be flipped once via the
+# repo Settings page (or via `gh api -X PATCH repos/<owner>/<repo>`
+# with those keys). They're not workflow-configurable.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+# `pull_request` events from forks run with a read-only token by
+# default; `pull-requests: write` here makes auto-merge enabling
+# work for forks too, while staying scoped to PR metadata.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  enable:
+    # Drafts shouldn't auto-merge — that's the whole point of the
+    # draft state. They re-enter the workflow when marked
+    # "ready for review" via the trigger above.
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge (squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        # `gh pr merge --auto` arms auto-merge; `--squash` pins the
+        # method. Idempotent — re-running on a `synchronize` event
+        # for an already-armed PR is a no-op. If the repo's
+        # `allow_auto_merge` setting isn't enabled this step will
+        # fail with a clear message; that's the only manual flip
+        # needed (see header comment).
+        run: gh pr merge --auto --squash "$PR_URL"

@@ -22,6 +22,20 @@ Guidance for Claude Code in this repo.
 - **Performance is a feature.** Never block the UI thread; never `read_to_end` on user files; always virtualize lists; always cancel inflight scans on navigation.
 - Versioning: only `src-tauri/tauri.conf.json#version` matters. `package.json` and `src-tauri/Cargo.toml` versions are unused — leave them at `0.1.0` / `0.0.0`.
 
+## Secrets & environment hygiene — non-negotiable
+
+The coverage pipeline (0.2.250) ships full source-code HTML reports as a CI artifact, and the workflow run page surfaces them publicly on every push. Treat coverage artifacts, commits, comments, logs, and chat output as **all equally public**. The rules:
+
+- **Never write a real secret to disk, ever.** Not in code, not in tests, not in comments, not in commit messages, not in changelogs, not in docs, not in `.env.example`, not in fixture files. If you need to reference a real key (debugging, etc.) ask the user to paste it transiently into the conversation; never echo it back, log it, or write it to a file.
+- **No real-looking credentials in test fixtures.** Mock values must be obviously fictional — `"test-conn-id"`, `"x".repeat(N)`, `"DUMMY_TOKEN"`. Strings that read like plausible passwords (`"hunter2"`, `"password123"`) get embedded by name in Vitest's coverage HTML and look suspicious to anyone scanning the artifact. Extract to a `DUMMY_*` constant if a string literal is unavoidable.
+- **Never read secrets from process.env / std::env at module load.** The variable *name* alone tells an attacker what to phish for. If you must read env, do it inside a function called at runtime, not at top-level, and never echo the value.
+- **CI workflow secrets are job-scoped.** `${{ secrets.X }}` may only appear in jobs that genuinely need it (release, signing). The `coverage` + `build` + `pr_comment` jobs should never reference repo secrets. `GITHUB_TOKEN` flows only where `tauri-action` / artifact upload needs it.
+- **Don't commit `.env`, `.env.local`, `.npmrc` with auth, `.cargo/config.toml` with registry tokens, `secrets.json`, signing keys, or any keychain export.** `.gitignore` already covers `.env*` — keep that line intact.
+- **Sanitize before logging.** If a log statement could touch user data (path, host, user, query), confirm it's a non-identifying discriminator (size, count, kind, status code) before merging. Identifiers in URLs / paths / workflow keys are PII; see footguns in DEV.md.
+- **Audit before shipping anything that publishes source publicly.** Coverage HTML, screenshot uploads, paste-bins, PR diffs in external systems — they all bake source in. Grep for `AKIA`, `xoxb-`, `ghp_`, `sk-`, `eyJ`, `BEGIN PRIVATE KEY`, `password.*=.*"` before publishing artifacts you didn't write.
+
+If you spot a leak in an existing file: flag it before fixing, because rotation of the underlying credential is the actual fix — the source change is just hygiene.
+
 ## Backlog policy
 
 The "Backlog" section at the bottom of TODO.md contains items the user has explicitly deferred. **Do not implement or test them unless the user explicitly says "go work on X" by name.**

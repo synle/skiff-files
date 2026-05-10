@@ -8,6 +8,13 @@ import { invoke } from "@tauri-apps/api/core";
 const theme = createTheme();
 const mocked = vi.mocked(invoke);
 
+// Fake test password — extracted to a const so the value is
+// (a) obviously fictional and (b) doesn't get embedded by name in
+// the published Vitest coverage HTML reports. The previous inline
+// "hunter2" looked enough like a real value to read as suspicious
+// when the coverage artifact rendered the source.
+const DUMMY_PASSWORD = "x".repeat(8);
+
 /** Reset mock call history AND implementation so a previous test's
  *  mockImplementation override doesn't bleed in. We re-apply the
  *  default-mock subset this file's tests need. */
@@ -69,7 +76,7 @@ describe("ConnectionsPage", () => {
       target: { value: "alice" },
     });
     fireEvent.change(screen.getByLabelText(/Password/), {
-      target: { value: "hunter2" },
+      target: { value: DUMMY_PASSWORD },
     });
     fireEvent.click(screen.getByText("Connect"));
 
@@ -80,7 +87,7 @@ describe("ConnectionsPage", () => {
           config: expect.objectContaining({
             host: "example.com",
             user: "alice",
-            password: "hunter2",
+            password: DUMMY_PASSWORD,
           }),
         }),
       );
