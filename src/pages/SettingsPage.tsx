@@ -1075,11 +1075,20 @@ export default function SettingsPage() {
             sx={{ maxWidth: 240 }}
           />
 
-          {(["favorites", "bookmarks", "recent", "hosts", "devices"] as const).map(
-            (id) => {
+          {(
+            [
+              "favorites",
+              "bookmarks",
+              "workspaces",
+              "recent",
+              "hosts",
+              "devices",
+            ] as const
+          ).map((id) => {
               const labels = {
                 favorites: "Favorites",
                 bookmarks: "Bookmarks",
+                workspaces: "Workspaces",
                 recent: "Recent",
                 hosts: "Hosts",
                 devices: "Devices",

@@ -48,6 +48,7 @@ import {
 } from "../api/fs";
 import LaunchIcon from "@mui/icons-material/Launch";
 import SortByAlphaIcon from "@mui/icons-material/SortByAlpha";
+import ViewWeekIcon from "@mui/icons-material/ViewWeek";
 import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
@@ -246,7 +247,14 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
   const isCollapsed = (id: string): boolean =>
     !!settings.sidebarCollapsed[id];
   const toggleSection = (id: string, allSections = false) => {
-    const ALL_IDS = ["favorites", "bookmarks", "recent", "hosts", "devices"];
+    const ALL_IDS = [
+      "favorites",
+      "bookmarks",
+      "workspaces",
+      "recent",
+      "hosts",
+      "devices",
+    ];
     if (allSections) {
       // Cmd-click on a header → flip ALL sections to the OPPOSITE
       // of the clicked section's current state. So if the clicked
@@ -927,6 +935,51 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             </List>
             )}
           </Box>
+        )}
+
+        {isVisible("workspaces") && settings.tabWorkspaces.length > 0 && (
+          <>
+            {renderSectionHeader("workspaces", "Workspaces")}
+            {!isCollapsed("workspaces") && (
+              <List dense disablePadding id="sidebar-section-workspaces">
+                {settings.tabWorkspaces.map((ws) => (
+                  <ListItem key={ws.id} disablePadding>
+                    <ListItemButton
+                      onClick={() => {
+                        const ok = window.confirm(
+                          `Replace your current tabs with "${ws.label}" (${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"})?`,
+                        );
+                        if (!ok) return;
+                        // Same event the command palette uses;
+                        // BrowserTabs listens.
+                        window.dispatchEvent(
+                          new CustomEvent("skiff:restore-workspace", {
+                            detail: ws,
+                          }),
+                        );
+                      }}
+                      title={`Restore "${ws.label}" — ${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}`}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <ViewWeekIcon
+                          fontSize="small"
+                          sx={{ color: "text.secondary" }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={ws.label}
+                        secondary={`${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}`}
+                        slotProps={{
+                          primary: { variant: "body2", noWrap: true },
+                          secondary: { variant: "caption" },
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </>
         )}
 
         {isVisible("recent") && settings.recentPaths.length > 0 && (
