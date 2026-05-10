@@ -940,10 +940,72 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         {isVisible("workspaces") && settings.tabWorkspaces.length > 0 && (
           <>
             {renderSectionHeader("workspaces", "Workspaces")}
+            {!isCollapsed("workspaces") &&
+              settings.tabWorkspaces.length >= 5 && (
+                <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
+                  <Tooltip title="Sort A→Z">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const sorted = [...settings.tabWorkspaces].sort(
+                          (a, b) =>
+                            a.label.localeCompare(b.label, undefined, {
+                              sensitivity: "base",
+                              numeric: true,
+                            }),
+                        );
+                        update("tabWorkspaces", sorted);
+                      }}
+                      aria-label="Sort workspaces A to Z"
+                    >
+                      <SortByAlphaIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
             {!isCollapsed("workspaces") && (
               <List dense disablePadding id="sidebar-section-workspaces">
                 {settings.tabWorkspaces.map((ws) => (
-                  <ListItem key={ws.id} disablePadding>
+                  <ListItem
+                    key={ws.id}
+                    disablePadding
+                    // Drag-reorder: same shape as the bookmarks
+                    // section. Custom MIME so it doesn't collide
+                    // with file-row drags or bookmark drags.
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        "application/x-skiff-workspace",
+                        ws.id,
+                      );
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      if (
+                        e.dataTransfer.types.includes(
+                          "application/x-skiff-workspace",
+                        )
+                      ) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }
+                    }}
+                    onDrop={(e) => {
+                      const sourceId = e.dataTransfer.getData(
+                        "application/x-skiff-workspace",
+                      );
+                      if (!sourceId || sourceId === ws.id) return;
+                      e.preventDefault();
+                      const list = settings.tabWorkspaces;
+                      const fromIdx = list.findIndex((x) => x.id === sourceId);
+                      const toIdx = list.findIndex((x) => x.id === ws.id);
+                      if (fromIdx < 0 || toIdx < 0) return;
+                      const next = [...list];
+                      const [moved] = next.splice(fromIdx, 1);
+                      next.splice(toIdx, 0, moved);
+                      update("tabWorkspaces", next);
+                    }}
+                  >
                     <ListItemButton
                       onClick={() => {
                         const ok = window.confirm(
