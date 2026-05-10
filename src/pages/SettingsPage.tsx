@@ -18,7 +18,11 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
-import { appDataDir, useSettings } from "../state/settings";
+import {
+  appDataDir,
+  useSettings,
+  type Settings,
+} from "../state/settings";
 import { fsOpenWithDefault, fsRevealInOs, getAppVersion } from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
 import {
@@ -394,6 +398,160 @@ function CustomFileKindsEditor() {
         </Box>
       )}
     </Box>
+  );
+}
+
+/** Settings → Saved data widget. Lists each saved-X type
+ *  (workspaces, selection groups, searches) with rename + delete
+ *  buttons. Closes the management gap — without this, deleting
+ *  workspaces or selections has no UI surface, and renaming any
+ *  is impossible after creation. */
+function SavedDataEditor() {
+  const { settings, update } = useSettings();
+
+  const renameItem = <
+    K extends "tabWorkspaces" | "savedSelections" | "savedSearches",
+  >(
+    key: K,
+    id: string,
+    current: string,
+  ) => {
+    const next = window.prompt("Rename:", current);
+    if (next === null) return; // user cancelled
+    const trimmed = next.trim();
+    if (!trimmed) return;
+    const list = settings[key] as Array<{ id: string; label: string }>;
+    update(
+      key,
+      list.map((x) =>
+        x.id === id ? { ...x, label: trimmed } : x,
+      ) as Settings[K],
+    );
+  };
+  const deleteItem = <
+    K extends "tabWorkspaces" | "savedSelections" | "savedSearches",
+  >(
+    key: K,
+    id: string,
+    label: string,
+  ) => {
+    if (!window.confirm(`Delete "${label}"?`)) return;
+    const list = settings[key] as Array<{ id: string }>;
+    update(key, list.filter((x) => x.id !== id) as Settings[K]);
+  };
+
+  const Block = ({
+    title,
+    items,
+    onRename,
+    onDelete,
+    secondary,
+  }: {
+    title: string;
+    items: Array<{ id: string; label: string }>;
+    onRename: (id: string, current: string) => void;
+    onDelete: (id: string, label: string) => void;
+    secondary?: (item: { id: string; label: string }) => string;
+  }) => (
+    <Box>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        {title}
+      </Typography>
+      {items.length === 0 ? (
+        <Typography variant="caption" color="text.secondary">
+          None saved yet.
+        </Typography>
+      ) : (
+        <Stack spacing={0.5}>
+          {items.map((it) => (
+            <Box
+              key={it.id}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                px: 1,
+                py: 0.5,
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" noWrap>
+                  {it.label}
+                </Typography>
+                {secondary && (
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {secondary(it)}
+                  </Typography>
+                )}
+              </Box>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => onRename(it.id, it.label)}
+              >
+                Rename
+              </Button>
+              <Button
+                size="small"
+                color="warning"
+                variant="text"
+                onClick={() => onDelete(it.id, it.label)}
+              >
+                Delete
+              </Button>
+            </Box>
+          ))}
+        </Stack>
+      )}
+    </Box>
+  );
+
+  return (
+    <Stack spacing={2}>
+      <Block
+        title={`Tab workspaces (${settings.tabWorkspaces.length})`}
+        items={settings.tabWorkspaces}
+        onRename={(id, current) => renameItem("tabWorkspaces", id, current)}
+        onDelete={(id, label) => deleteItem("tabWorkspaces", id, label)}
+        secondary={(it) => {
+          const ws = settings.tabWorkspaces.find((x) => x.id === it.id);
+          return ws ? `${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}` : "";
+        }}
+      />
+      <Block
+        title={`Selection groups (${settings.savedSelections.length})`}
+        items={settings.savedSelections}
+        onRename={(id, current) => renameItem("savedSelections", id, current)}
+        onDelete={(id, label) => deleteItem("savedSelections", id, label)}
+        secondary={(it) => {
+          const sel = settings.savedSelections.find((x) => x.id === it.id);
+          return sel
+            ? `${sel.paths.length} path${sel.paths.length === 1 ? "" : "s"}`
+            : "";
+        }}
+      />
+      <Block
+        title={`Saved searches (${settings.savedSearches.length})`}
+        items={settings.savedSearches}
+        onRename={(id, current) => renameItem("savedSearches", id, current)}
+        onDelete={(id, label) => deleteItem("savedSearches", id, label)}
+        secondary={(it) => {
+          const s = settings.savedSearches.find((x) => x.id === it.id);
+          if (!s) return "";
+          const flags = [
+            s.regex ? "regex" : null,
+            s.caseSensitive ? "case" : null,
+            s.recursive ? "recursive" : null,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return flags ? `${s.query} · ${flags}` : s.query;
+        }}
+      />
+    </Stack>
   );
 }
 
@@ -961,6 +1119,15 @@ export default function SettingsPage() {
               </Button>
             </Box>
           )}
+        </Section>
+
+        <Divider />
+
+        <Section
+          title="Saved data"
+          description="Review and clean up the named items you've saved (workspaces, selections, searches)."
+        >
+          <SavedDataEditor />
         </Section>
 
         <Divider />
