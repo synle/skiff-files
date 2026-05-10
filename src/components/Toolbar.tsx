@@ -189,7 +189,9 @@ export default function Toolbar(props: Props) {
           ? "Modified"
           : k === "ctime"
             ? "Created"
-            : "Kind";
+            : k === "tag"
+              ? "Tag"
+              : "Kind";
 
   // Anchor for the history dropdowns. We share one state slot for both
   // arrows since only one menu is ever open at a time.
@@ -613,7 +615,7 @@ export default function Toolbar(props: Props) {
             </MenuItem>
           )}
           <Divider />
-          {(["name", "size", "mtime", "ctime", "kind"] as const).map((k) => {
+          {(["name", "size", "mtime", "ctime", "kind", "tag"] as const).map((k) => {
             const active = k === sortKey;
             return (
               <MenuItem
@@ -645,7 +647,7 @@ export default function Toolbar(props: Props) {
         onClose={() => setSortMenuAnchor(null)}
         slotProps={{ list: { dense: true } }}
       >
-        {(["name", "size", "mtime", "ctime", "kind"] as const).map((k) => {
+        {(["name", "size", "mtime", "ctime", "kind", "tag"] as const).map((k) => {
           const active = k === sortKey;
           return (
             <MenuItem

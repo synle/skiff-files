@@ -27,11 +27,11 @@ import {
   getCachedFolderSize,
 } from "../util/folderSizeCache";
 import { startNativeDrag } from "../api/drag";
-import { tagColorHex } from "../util/tagColors";
+import { TAG_COLORS, tagColorHex } from "../util/tagColors";
 import type { TagColor } from "../state/settings";
 import type { Density, ShowExtensions, ViewMode } from "../state/settings";
 
-export type SortKey = "name" | "size" | "mtime" | "ctime" | "kind";
+export type SortKey = "name" | "size" | "mtime" | "ctime" | "kind" | "tag";
 export type SortDir = "asc" | "desc";
 
 interface Props {
@@ -122,8 +122,19 @@ function sortEntries(
   key: SortKey,
   dir: SortDir,
   groupFoldersFirst: boolean,
+  fileTags: Record<string, string> = {},
 ): Entry[] {
   const mul = dir === "asc" ? 1 : -1;
+  // Tag-sort uses the canonical TAG_COLORS order so reds cluster
+  // before oranges before yellows etc. — same order the chip strip
+  // renders. Untagged rows go to the end regardless of direction;
+  // the user wants tagged things grouped together.
+  const tagRank = (path: string): number => {
+    const t = fileTags[path];
+    if (!t) return Number.MAX_SAFE_INTEGER;
+    const idx = TAG_COLORS.indexOf(t as TagColor);
+    return idx < 0 ? Number.MAX_SAFE_INTEGER : idx;
+  };
   const cmp = (a: Entry, b: Entry): number => {
     switch (key) {
       case "size":
@@ -134,6 +145,12 @@ function sortEntries(
         return ((a.ctime ?? 0) - (b.ctime ?? 0)) * mul;
       case "kind":
         return a.kind.localeCompare(b.kind) * mul || a.name.localeCompare(b.name);
+      case "tag": {
+        const ra = tagRank(a.path);
+        const rb = tagRank(b.path);
+        if (ra !== rb) return (ra - rb) * mul;
+        return a.name.localeCompare(b.name);
+      }
       case "name":
       default:
         return a.name.localeCompare(b.name, undefined, { numeric: true }) * mul;
@@ -1199,8 +1216,8 @@ export default function FileList(props: Props) {
 
   // Memoized so a re-render that doesn't change entries/sort doesn't re-sort.
   const sorted = useMemo(
-    () => sortEntries(entries, sortKey, sortDir, groupFoldersFirst),
-    [entries, sortKey, sortDir, groupFoldersFirst],
+    () => sortEntries(entries, sortKey, sortDir, groupFoldersFirst, fileTags),
+    [entries, sortKey, sortDir, groupFoldersFirst, fileTags],
   );
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
