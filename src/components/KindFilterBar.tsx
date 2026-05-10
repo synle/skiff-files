@@ -47,14 +47,28 @@ interface Props {
   /** Setter for the tag filter. When omitted, the tag chip strip
    *  doesn't render. */
   onTagsChange?: (next: TagColor[]) => void;
+  /** Temporal filter — restricts the listing to entries with mtime
+   *  within the chosen recency window. `null` = no filter. */
+  activeRecency?: RecencyGroup | null;
+  onRecencyChange?: (next: RecencyGroup | null) => void;
   onClose?: () => void;
 }
+
+export type RecencyGroup = "today" | "week" | "month";
+
+export const RECENCY_LABELS: Record<RecencyGroup, string> = {
+  today: "Today",
+  week: "This week",
+  month: "This month",
+};
 
 export default function KindFilterBar({
   active,
   onChange,
   activeTags = [],
   onTagsChange,
+  activeRecency = null,
+  onRecencyChange,
   onClose,
 }: Props) {
   const toggle = (id: KindGroup) => {
@@ -157,6 +171,28 @@ export default function KindFilterBar({
           )}
         </>
       )}
+      {onRecencyChange && (
+        <>
+          <Box sx={{ width: 12 }} />
+          <Typography variant="caption" sx={{ color: "text.secondary", mr: 0.5 }}>
+            Recency:
+          </Typography>
+          {(Object.keys(RECENCY_LABELS) as RecencyGroup[]).map((r) => {
+            const isActive = activeRecency === r;
+            return (
+              <Chip
+                key={r}
+                label={RECENCY_LABELS[r]}
+                size="small"
+                color={isActive ? "primary" : "default"}
+                variant={isActive ? "filled" : "outlined"}
+                onClick={() => onRecencyChange(isActive ? null : r)}
+                sx={{ cursor: "pointer" }}
+              />
+            );
+          })}
+        </>
+      )}
       <Box sx={{ flex: 1 }} />
       {onClose && (
         <Tooltip title="Hide filter row">
@@ -167,6 +203,33 @@ export default function KindFilterBar({
       )}
     </Box>
   );
+}
+
+/** Returns true when an entry's mtime is inside the recency window.
+ *  `null` recency or missing mtime always returns true (no filter
+ *  applied). Uses calendar boundaries (start-of-day / start-of-week
+ *  / start-of-month) rather than rolling 24h/7d/30d so "today" means
+ *  "since midnight" — matches user mental model. */
+export function entryMatchesRecency(
+  mtimeUnixSec: number | null | undefined,
+  recency: RecencyGroup | null | undefined,
+): boolean {
+  if (!recency) return true;
+  if (mtimeUnixSec == null) return false;
+  const now = new Date();
+  let cutoff: Date;
+  if (recency === "today") {
+    cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (recency === "week") {
+    // Start-of-week = current day minus weekday offset (Sunday = 0).
+    // Locale-week-start aware would be nicer; this keeps the helper
+    // pure + dependency-free.
+    const dow = now.getDay();
+    cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+  } else {
+    cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  return mtimeUnixSec * 1000 >= cutoff.getTime();
 }
 
 /** Returns true when an entry kind matches at least one active group.

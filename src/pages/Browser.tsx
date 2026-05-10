@@ -20,7 +20,9 @@ import Toolbar from "../components/Toolbar";
 import BulkActionBar from "../components/BulkActionBar";
 import KindFilterBar, {
   entryMatchesFilter,
+  entryMatchesRecency,
   type KindGroup,
+  type RecencyGroup,
 } from "../components/KindFilterBar";
 import type { TagColor } from "../state/settings";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
@@ -124,6 +126,9 @@ export default function Browser({
   // group set isn't yet persisted (TODO: per-folder LRU like
   // folderViewMode).
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
+  // Temporal filter — session-only (matches the chip-row's session
+  // semantics for kind chips before persistence landed in 0.2.180).
+  const [recencyFilter, setRecencyFilter] = useState<RecencyGroup | null>(null);
   /** When set, the archive-viewer dialog is open against this path. */
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
     null,
@@ -1159,6 +1164,9 @@ export default function Browser({
         return t != null && tagSet.has(t);
       });
     }
+    if (recencyFilter) {
+      base = base.filter((e) => entryMatchesRecency(e.mtime, recencyFilter));
+    }
     if (!search) return base;
     if (searchRegex) {
       try {
@@ -1192,6 +1200,7 @@ export default function Browser({
     settings.hideSystemFiles,
     kindFilter,
     tagFilter,
+    recencyFilter,
     settings.fileTags,
     searchError,
   ]);
@@ -1416,7 +1425,9 @@ export default function Browser({
         onShowHiddenToggle={() => update("showHidden", !settings.showHidden)}
         kindFilterOpen={kindFilterOpen}
         onKindFilterToggle={() => setKindFilterOpen((o) => !o)}
-        kindFilterActiveCount={kindFilter.length + tagFilter.length}
+        kindFilterActiveCount={
+          kindFilter.length + tagFilter.length + (recencyFilter ? 1 : 0)
+        }
         searchHistory={settings.searchHistory}
         onSearchCommit={(q) => {
           // Push to head, dedup, cap at SEARCH_HISTORY_MAX (10). Most-
@@ -1439,6 +1450,8 @@ export default function Browser({
           onChange={setKindFilter}
           activeTags={tagFilter}
           onTagsChange={setTagFilter}
+          activeRecency={recencyFilter}
+          onRecencyChange={setRecencyFilter}
           onClose={() => setKindFilterOpen(false)}
         />
       )}
@@ -1706,14 +1719,19 @@ export default function Browser({
           contextMenu ? settings.fileTags[contextMenu.entry.path] ?? null : null
         }
         onSetTag={(e, color) => {
+          // When the right-clicked entry is part of the current
+          // multi-selection, tag the whole selection — same gesture
+          // semantics as the trash + bookmark right-click flows.
+          // Otherwise just the right-clicked entry.
+          const targets =
+            selectedPaths.length > 1 && selectedPaths.includes(e.path)
+              ? selectedPaths
+              : [e.path];
           const next = { ...settings.fileTags };
-          if (color === null) {
-            delete next[e.path];
-          } else {
-            next[e.path] = color;
+          for (const p of targets) {
+            if (color === null) delete next[p];
+            else next[p] = color;
           }
-          // LRU-bound at 200 entries (matches folderViewMode +
-          // folderSort + folderKindFilter).
           const keys = Object.keys(next);
           if (keys.length > 200) {
             const trimmed: typeof next = {};
