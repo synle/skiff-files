@@ -198,7 +198,15 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         actionId: "app.newWindow",
         defaultCombo: "cmd+n",
       },
-      { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
+      // Cmd/Ctrl+1..9 — generated as 9 separate catalog entries so
+      // each tab-switch keybinding can be individually rebound from
+      // Settings → Keyboard.
+      ...Array.from({ length: 9 }, (_, i) => ({
+        keys: `Cmd / Ctrl + ${i + 1}`,
+        description: `Switch to tab ${i + 1}`,
+        actionId: `tabs.switchTo${i + 1}`,
+        defaultCombo: `cmd+${i + 1}`,
+      })),
       {
         keys: "Cmd / Ctrl + Shift + [",
         description: "Switch to previous tab",

@@ -367,14 +367,28 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         closeTab(activeId);
         return;
       }
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (/^[1-9]$/.test(e.key)) {
-        const idx = Number(e.key) - 1;
-        if (tabs[idx]) {
-          e.preventDefault();
-          setActiveId(tabs[idx].id);
+      // Tab-switch by index — Cmd/Ctrl+1..9. Migrated to the
+      // rebindable framework: each digit gets its own actionId so
+      // users can rebind individually (or disable, e.g. when one
+      // collides with a system shortcut).
+      for (let i = 1; i <= 9; i++) {
+        const matched = matchesCombo(
+          e,
+          activeCombo(
+            `tabs.switchTo${i}`,
+            `cmd+${i}`,
+            settings.shortcutOverrides,
+          ),
+        );
+        if (matched) {
+          if (tabs[i - 1]) {
+            e.preventDefault();
+            setActiveId(tabs[i - 1].id);
+          }
+          return;
         }
-      } else if (
+      }
+      if (
         matchesCombo(
           e,
           activeCombo(
