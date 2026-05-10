@@ -452,14 +452,42 @@ export default function Browser({
     const onNewFolder = () => {
       void handleNewFolder();
     };
+    // Tag-set from the command palette. detail is a TagColor or null
+    // (clear). Apply to the current multi-selection (or primary
+    // selection when nothing is multi-selected).
+    const onTagSelection = (e: Event) => {
+      const color = (e as CustomEvent<TagColor | null>).detail;
+      const targets = selectedPaths.length > 0
+        ? selectedPaths
+        : primarySelected
+          ? [primarySelected.path]
+          : [];
+      if (targets.length === 0) return;
+      const next = { ...settings.fileTags };
+      for (const p of targets) {
+        if (color === null) delete next[p];
+        else next[p] = color;
+      }
+      // LRU bound at 200 (matches the rest of the per-path maps).
+      const keys = Object.keys(next);
+      if (keys.length > 200) {
+        const trimmed: typeof next = {};
+        for (const k of keys.slice(keys.length - 200)) trimmed[k] = next[k];
+        update("fileTags", trimmed);
+      } else {
+        update("fileTags", next);
+      }
+    };
     if (isActive) {
       window.addEventListener("skiff:refresh", onRefresh);
       window.addEventListener("skiff:new-folder", onNewFolder);
+      window.addEventListener("skiff:tag-selection", onTagSelection);
     }
     return () => {
       window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
       window.removeEventListener("skiff:refresh", onRefresh);
       window.removeEventListener("skiff:new-folder", onNewFolder);
+      window.removeEventListener("skiff:tag-selection", onTagSelection);
     };
     // handleNewFolder is stable enough — re-binding on every render
     // would also be acceptable since these are window-level events.
@@ -1347,6 +1375,35 @@ export default function Browser({
         onSearchRegexChange={setSearchRegex}
         searchCaseSensitive={searchCaseSensitive}
         onSearchCaseSensitiveChange={setSearchCaseSensitive}
+        savedSearches={settings.savedSearches}
+        onSaveCurrentSearch={(label) => {
+          if (!search.trim()) return;
+          update("savedSearches", [
+            ...settings.savedSearches,
+            {
+              id: crypto.randomUUID(),
+              label,
+              query: search,
+              regex: searchRegex,
+              caseSensitive: searchCaseSensitive,
+              recursive: searchRecursive,
+            },
+          ]);
+        }}
+        onLoadSavedSearch={(id) => {
+          const s = settings.savedSearches.find((x) => x.id === id);
+          if (!s) return;
+          setSearch(s.query);
+          setSearchRegex(s.regex);
+          setSearchCaseSensitive(s.caseSensitive);
+          setSearchRecursive(s.recursive);
+        }}
+        onDeleteSavedSearch={(id) =>
+          update(
+            "savedSearches",
+            settings.savedSearches.filter((s) => s.id !== id),
+          )
+        }
         onSearchRecursiveChange={setSearchRecursive}
         searchInputRef={searchInputRef}
         sortKey={sortKey}

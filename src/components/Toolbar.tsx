@@ -31,6 +31,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import SortIcon from "@mui/icons-material/Sort";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import type { ViewMode } from "../state/settings";
 import type { SortDir, SortKey } from "./FileList";
 
@@ -81,6 +82,14 @@ interface Props {
   /** Make the search match case-sensitive. */
   searchCaseSensitive?: boolean;
   onSearchCaseSensitiveChange?: (v: boolean) => void;
+  /** Saved-searches list. When non-empty + setters are wired, the
+   *  toolbar shows a Bookmark icon button that opens a menu of
+   *  saved searches (and a "Save current…" entry when a query is
+   *  active). */
+  savedSearches?: import("../state/settings").SavedSearch[];
+  onSaveCurrentSearch?: (label: string) => void;
+  onLoadSavedSearch?: (id: string) => void;
+  onDeleteSavedSearch?: (id: string) => void;
   /** Ref for Cmd/Ctrl+F focus. The Browser owns the keybind so the
    *  toolbar doesn't need to know about route-level shortcuts. */
   searchInputRef?: Ref<HTMLInputElement>;
@@ -142,6 +151,10 @@ export default function Toolbar(props: Props) {
     onSearchRegexChange,
     searchCaseSensitive,
     onSearchCaseSensitiveChange,
+    savedSearches = [],
+    onSaveCurrentSearch,
+    onLoadSavedSearch,
+    onDeleteSavedSearch,
     searchInputRef,
     backHistory = [],
     forwardHistory = [],
@@ -166,6 +179,8 @@ export default function Toolbar(props: Props) {
   const [overflowAnchor, setOverflowAnchor] = useState<HTMLElement | null>(
     null,
   );
+  const [savedSearchAnchor, setSavedSearchAnchor] =
+    useState<HTMLElement | null>(null);
 
   /** Breakpoint at which we collapse the trailing controls into a ⋮
    *  menu. Below `md` (900px), the toolbar's preview / kind filter /
@@ -454,6 +469,85 @@ export default function Toolbar(props: Props) {
             </Box>
           </ToggleButton>
         </Tooltip>
+      )}
+      {/* Saved searches menu — only renders when wiring + content is
+       *  available (a query to save OR existing saved entries to load). */}
+      {(savedSearches.length > 0 || (search && onSaveCurrentSearch)) && (
+        <>
+          <Tooltip title="Saved searches">
+            <IconButton
+              size="small"
+              onClick={(e) => setSavedSearchAnchor(e.currentTarget)}
+              aria-label="Saved searches"
+            >
+              <BookmarkBorderIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Menu
+            open={savedSearchAnchor != null}
+            anchorEl={savedSearchAnchor}
+            onClose={() => setSavedSearchAnchor(null)}
+            slotProps={{ list: { dense: true } }}
+          >
+            {search && onSaveCurrentSearch && (
+              <MenuItem
+                onClick={() => {
+                  setSavedSearchAnchor(null);
+                  const label = window.prompt(
+                    "Name this search:",
+                    search.slice(0, 40),
+                  );
+                  if (label && label.trim()) {
+                    onSaveCurrentSearch(label.trim());
+                  }
+                }}
+              >
+                Save current search…
+              </MenuItem>
+            )}
+            {savedSearches.length > 0 && search && onSaveCurrentSearch && (
+              <Divider />
+            )}
+            {savedSearches.map((s) => (
+              <MenuItem
+                key={s.id}
+                onClick={() => {
+                  setSavedSearchAnchor(null);
+                  onLoadSavedSearch?.(s.id);
+                }}
+                sx={{ display: "flex", gap: 1, alignItems: "center" }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ fontSize: "0.875rem" }}>{s.label}</Box>
+                  <Box
+                    sx={{
+                      fontFamily: "monospace",
+                      fontSize: "0.7rem",
+                      color: "text.secondary",
+                    }}
+                  >
+                    {s.query}
+                    {s.regex ? " · regex" : ""}
+                    {s.caseSensitive ? " · case" : ""}
+                    {s.recursive ? " · recursive" : ""}
+                  </Box>
+                </Box>
+                {onDeleteSavedSearch && (
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSavedSearch(s.id);
+                    }}
+                    aria-label={`Delete ${s.label}`}
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </MenuItem>
+            ))}
+          </Menu>
+        </>
       )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />

@@ -552,6 +552,28 @@ function buildCommandActions(deps: {
       keywords: "pin pinned floating sticky",
       run: () => update("alwaysOnTop", !settings.alwaysOnTop),
     },
+    // Tag actions — apply to current selection. Browser listens for
+    // skiff:tag-selection and routes the color through fileTags.
+    ...(["red", "orange", "yellow", "green", "blue", "purple", "gray"] as const).map(
+      (c) => ({
+        id: `tag.${c}`,
+        label: `Tag selection: ${c.charAt(0).toUpperCase() + c.slice(1)}`,
+        keywords: `color tag finder ${c}`,
+        run: () =>
+          window.dispatchEvent(
+            new CustomEvent("skiff:tag-selection", { detail: c }),
+          ),
+      }),
+    ),
+    {
+      id: "tag.clear",
+      label: "Tag selection: Clear",
+      keywords: "color tag finder remove",
+      run: () =>
+        window.dispatchEvent(
+          new CustomEvent("skiff:tag-selection", { detail: null }),
+        ),
+    },
     // View modes
     {
       id: "view.list",

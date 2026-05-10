@@ -258,6 +258,20 @@ export interface Settings {
    *  otherwise cover us. Synced via the new `window_set_always_on_top`
    *  Tauri command on every change. */
   alwaysOnTop: boolean;
+  /** User-saved searches: label + query + flags. Surfaces in a small
+   *  dropdown next to the toolbar's search field; clicking restores
+   *  the query + flags and runs the search. Distinct from
+   *  searchHistory which is auto-tracked + capped + label-less. */
+  savedSearches: SavedSearch[];
+}
+
+export interface SavedSearch {
+  id: string;
+  label: string;
+  query: string;
+  regex: boolean;
+  caseSensitive: boolean;
+  recursive: boolean;
 }
 
 export type DateFormat = "locale" | "iso" | "short" | "relative";
@@ -396,6 +410,7 @@ export const DEFAULTS: Settings = {
   recentPathsMax: 10,
   customFileKinds: {},
   alwaysOnTop: false,
+  savedSearches: [],
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";
