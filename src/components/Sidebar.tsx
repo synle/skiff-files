@@ -1029,6 +1029,16 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                           itemId: ws.id,
                           actions: [
                             {
+                              key: "append",
+                              label: "Append (add to current tabs)",
+                              onClick: () =>
+                                window.dispatchEvent(
+                                  new CustomEvent("skiff:append-workspace", {
+                                    detail: ws,
+                                  }),
+                                ),
+                            },
+                            {
                               key: "rename",
                               icon: <EditIcon fontSize="small" />,
                               label: "Rename…",

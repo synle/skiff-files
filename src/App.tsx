@@ -590,24 +590,40 @@ function buildCommandActions(deps: {
     },
     // Tab workspaces — restore replaces the current tab strip.
     // Confirm before firing since it's destructive.
-    ...settings.tabWorkspaces.map((ws) => ({
-      id: `workspace.${ws.id}`,
-      label: `Restore workspace: ${ws.label}`,
-      hint: `${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}`,
-      keywords: `workspace tabs restore ${ws.label}`,
-      run: () => {
-        const ok = window.confirm(
-          `Replace your current tabs with "${ws.label}" (${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"})?`,
-        );
-        if (!ok) return;
-        setPage("browser");
-        queueMicrotask(() =>
-          window.dispatchEvent(
-            new CustomEvent("skiff:restore-workspace", { detail: ws }),
-          ),
-        );
+    ...settings.tabWorkspaces.flatMap((ws) => [
+      {
+        id: `workspace.replace.${ws.id}`,
+        label: `Restore workspace: ${ws.label}`,
+        hint: `${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"} · replaces current`,
+        keywords: `workspace tabs restore replace ${ws.label}`,
+        run: () => {
+          const ok = window.confirm(
+            `Replace your current tabs with "${ws.label}" (${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"})?`,
+          );
+          if (!ok) return;
+          setPage("browser");
+          queueMicrotask(() =>
+            window.dispatchEvent(
+              new CustomEvent("skiff:restore-workspace", { detail: ws }),
+            ),
+          );
+        },
       },
-    })),
+      {
+        id: `workspace.append.${ws.id}`,
+        label: `Append workspace: ${ws.label}`,
+        hint: `${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"} · adds to current`,
+        keywords: `workspace tabs append additive ${ws.label}`,
+        run: () => {
+          setPage("browser");
+          queueMicrotask(() =>
+            window.dispatchEvent(
+              new CustomEvent("skiff:append-workspace", { detail: ws }),
+            ),
+          );
+        },
+      },
+    ]),
     // Saved selection groups — palette restoration. Browser listens
     // for the event, picks paths that exist in the current folder.
     ...settings.savedSelections.map((s) => ({

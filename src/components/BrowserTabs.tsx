@@ -184,14 +184,35 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       );
       setActiveId(ws.tabs[0].id);
     };
+    // Additive variant — adds workspace tabs to the current strip
+    // without replacing. Each restored tab gets a fresh id so it
+    // doesn't collide with an existing tab carrying the workspace's
+    // saved id (which would happen if the user is restoring the
+    // same workspace twice in a session).
+    const onAppendWorkspace = (e: Event) => {
+      const ws = (e as CustomEvent<{ tabs: SavedTab[] }>).detail;
+      if (!ws || !ws.tabs || ws.tabs.length === 0) return;
+      const fresh = ws.tabs.map((t) => ({
+        id: crypto.randomUUID(),
+        label: t.label || "Home",
+        initialPath: t.initialPath,
+        currentPath: t.initialPath,
+        pinned: t.pinned,
+        customLabel: t.customLabel,
+      }));
+      setTabs((prev) => [...prev, ...fresh]);
+      setActiveId(fresh[0].id);
+    };
     window.addEventListener("skiff:new-tab", onNewTab);
     window.addEventListener("skiff:restore-closed-tab", onRestoreTab);
     window.addEventListener("skiff:restore-workspace", onRestoreWorkspace);
+    window.addEventListener("skiff:append-workspace", onAppendWorkspace);
     return () => {
       window.removeEventListener(OPEN_IN_TAB_EVENT, onOpen);
       window.removeEventListener("skiff:new-tab", onNewTab);
       window.removeEventListener("skiff:restore-closed-tab", onRestoreTab);
       window.removeEventListener("skiff:restore-workspace", onRestoreWorkspace);
+      window.removeEventListener("skiff:append-workspace", onAppendWorkspace);
     };
     // addTab / restoreClosedTab close over `home` and the tabs +
     // activeId state; the deps are intentionally loose so the
@@ -905,6 +926,19 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         >
           Close tabs to the right
         </MenuItem>
+        {tabs.length > 1 && (
+          <MenuItem
+            onClick={() => {
+              setTabMenu(null);
+              const allPinned = tabs.every((t) => t.pinned);
+              setTabs((prev) =>
+                prev.map((t) => ({ ...t, pinned: !allPinned })),
+              );
+            }}
+          >
+            {tabs.every((t) => t.pinned) ? "Unpin all" : "Pin all"}
+          </MenuItem>
+        )}
         <Divider />
         <MenuItem
           onClick={() => {
