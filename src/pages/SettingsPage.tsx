@@ -290,6 +290,113 @@ function KeyRecorderDialog({
   );
 }
 
+/** Settings → Advanced widget for the per-extension icon-kind
+ *  override map. Adding "rs" → "code" makes Rust files render with
+ *  the code icon even though the Rust-side detection doesn't know
+ *  about them. Limited to a small preset of FileKind values that
+ *  IconForKind actually has icons for. */
+function CustomFileKindsEditor() {
+  const { settings, update } = useSettings();
+  const [extInput, setExtInput] = useState("");
+  const [kindInput, setKindInput] = useState("code");
+  const KINDS = [
+    "text",
+    "code",
+    "markdown",
+    "image",
+    "audio",
+    "video",
+    "archive",
+    "pdf",
+    "spreadsheet",
+    "document",
+    "binary",
+  ];
+  const entries = Object.entries(settings.customFileKinds);
+  const addOrReplace = () => {
+    const ext = extInput.trim().toLowerCase().replace(/^\./, "");
+    if (!ext) return;
+    update("customFileKinds", {
+      ...settings.customFileKinds,
+      [ext]: kindInput,
+    });
+    setExtInput("");
+  };
+  const remove = (ext: string) => {
+    const next = { ...settings.customFileKinds };
+    delete next[ext];
+    update("customFileKinds", next);
+  };
+  return (
+    <Box>
+      <Typography variant="subtitle2">Custom file-kind icons</Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+        Map an extension to a different icon kind. Useful when the
+        built-in detection treats your favorite extension as binary.
+      </Typography>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1, flexWrap: "wrap" }}>
+        <TextField
+          size="small"
+          placeholder="ext (e.g. rs)"
+          value={extInput}
+          onChange={(e) => setExtInput(e.target.value)}
+          sx={{ maxWidth: 120 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <Select
+            value={kindInput}
+            onChange={(e) => setKindInput(e.target.value)}
+          >
+            {KINDS.map((k) => (
+              <MenuItem key={k} value={k}>
+                {k}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Button size="small" variant="outlined" onClick={addOrReplace}>
+          Add / Replace
+        </Button>
+      </Box>
+      {entries.length === 0 ? (
+        <Typography variant="caption" color="text.secondary">
+          No custom mappings.
+        </Typography>
+      ) : (
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+          {entries.map(([ext, kind]) => (
+            <Box
+              key={ext}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                px: 1,
+                py: 0.25,
+              }}
+            >
+              <Typography variant="caption" sx={{ fontFamily: "monospace" }}>
+                .{ext} → {kind}
+              </Typography>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => remove(ext)}
+                sx={{ minWidth: "auto", px: 0.5 }}
+              >
+                ×
+              </Button>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 export default function SettingsPage() {
   console.log("[SettingsPage] rendering");
   const { settings, setSettings, update, reset } = useSettings();
@@ -936,6 +1043,7 @@ export default function SettingsPage() {
           title="Advanced"
           description="Reveal the on-disk settings file or wipe everything back to defaults."
         >
+          <CustomFileKindsEditor />
           <FormControl size="small" sx={{ maxWidth: 240 }}>
             <InputLabel id="log-level-label">Log level</InputLabel>
             <Select

@@ -1475,6 +1475,7 @@ export default function Browser({
           contextMenuPath={contextMenu?.entry.path ?? null}
           fileTags={settings.fileTags}
           dateFormat={settings.dateFormat}
+          customFileKinds={settings.customFileKinds}
           view={settings.folderViewMode[path] ?? settings.defaultView}
           path={path}
           onRename={async (entry, newName) => {

@@ -100,6 +100,10 @@ interface Props {
    *  values are TagColor enum strings. Optional — when omitted no
    *  tag dots render. */
   fileTags?: Record<string, string>;
+  /** Per-extension icon-kind override. Lowercase ext (no dot) →
+   *  FileKind. Empty / missing keys fall through to the entry's
+   *  underlying kind. */
+  customFileKinds?: Record<string, string>;
   /** Date format for the Modified column. Defaults to "locale".
    *  Optional so existing callers / tests continue to work without
    *  touching the prop. */
@@ -121,6 +125,20 @@ interface Props {
    *  cross-FS, etc.). When omitted, F2 falls through to whatever the
    *  parent's keyboard handler does. */
   onRename?: (entry: Entry, newName: string) => Promise<void>;
+}
+
+/** Resolve the icon-display kind for an entry: user override on the
+ *  extension wins over the underlying Entry.kind. Folders + symlinks
+ *  bypass the override since their kind isn't tied to an extension. */
+function resolveDisplayKind(
+  entry: Entry,
+  custom: Record<string, string>,
+): string {
+  if (entry.isDir || entry.isSymlink) return entry.kind;
+  const dot = entry.name.lastIndexOf(".");
+  if (dot < 1 || dot === entry.name.length - 1) return entry.kind;
+  const ext = entry.name.slice(dot + 1).toLowerCase();
+  return custom[ext] || entry.kind;
 }
 
 /** Sort entries either with folders-first (Finder default) or fully
@@ -435,6 +453,9 @@ interface FileGridViewProps {
   onRubberBand?: (paths: Set<string>, additive: boolean) => void;
   /** Date format used in the column-view metadata line. */
   dateFormat?: "locale" | "iso" | "short" | "relative";
+  /** Per-extension icon override, threaded down so the grid views
+   *  honor the same custom kinds as the list view. */
+  customFileKinds?: Record<string, string>;
 }
 
 function FileGridView(props: FileGridViewProps) {
@@ -463,6 +484,7 @@ function FileGridView(props: FileGridViewProps) {
     onCommitRename,
     onCancelRename,
     dateFormat = "locale",
+    customFileKinds = {},
   } = props;
 
   // Per-view sizing tuned to make the four grid modes visibly
@@ -1041,7 +1063,7 @@ function FileGridView(props: FileGridViewProps) {
                                 "& svg": { fontSize: iconSize - 4 },
                               }}
                             >
-                              <IconForKind kind={e.kind} />
+                              <IconForKind kind={resolveDisplayKind(e, customFileKinds) as typeof e.kind} />
                             </Box>
                           )}
                         </Box>
@@ -1136,6 +1158,7 @@ export default function FileList(props: Props) {
     onContextEmpty,
     contextMenuPath = null,
     fileTags = {},
+    customFileKinds = {},
     dateFormat = "locale",
     view = "list",
     path,
@@ -1653,6 +1676,7 @@ export default function FileList(props: Props) {
         showExtensions={showExtensions}
         highlightQuery={highlightQuery}
         dateFormat={dateFormat}
+        customFileKinds={customFileKinds}
         path={path}
         onRowClick={onRowClick}
         onRowMouseDown={onRowMouseDown}
@@ -1946,7 +1970,7 @@ export default function FileList(props: Props) {
                       }}
                       title="Click to open"
                     >
-                      <IconForKind kind={e.kind} />
+                      <IconForKind kind={resolveDisplayKind(e, customFileKinds) as typeof e.kind} />
                     </Box>
                     {renamingPath === e.path ? (
                       <Box sx={{ flex: 1 }}>

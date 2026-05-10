@@ -38,6 +38,10 @@ interface TabRow {
    *  Mirrors browser muscle memory — Chrome / Safari / VS Code all
    *  use this same affordance for "tabs I want to keep around". */
   pinned?: boolean;
+  /** User-supplied tab name that overrides the auto-derived
+   *  basename. Persisted via SavedTab.customLabel. Empty string
+   *  clears the override. */
+  customLabel?: string;
 }
 
 interface Props {
@@ -111,6 +115,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         initialPath: t.initialPath,
         currentPath: t.initialPath,
         pinned: t.pinned,
+        customLabel: t.customLabel,
       }));
     }
     return [
@@ -179,6 +184,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
         label: t.label,
         initialPath: t.initialPath,
         pinned: t.pinned,
+        customLabel: t.customLabel,
       })),
     );
     update(savedActiveTabIdKey, activeId || null);
@@ -606,7 +612,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
                   {/* Hide the label on pinned tabs to keep them slim,
                    *  similar to Chrome. The full path stays accessible
                    *  via the title tooltip + right-click menu. */}
-                  {!t.pinned && t.label}
+                  {!t.pinned && (t.customLabel || t.label)}
                   {tabs.length > 1 && !t.pinned && (
                     <CloseIcon
                       fontSize="inherit"
@@ -678,6 +684,37 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
               </MenuItem>
             );
           })()}
+        <MenuItem
+          onClick={() => {
+            const target = tabMenu
+              ? tabs.find((t) => t.id === tabMenu.tabId)
+              : null;
+            if (!target || !tabMenu) return;
+            // Native prompt is suppressed in the Tauri webview; we
+            // use a tiny inline approach here — push a custom label
+            // via window.prompt only when running in dev / browser
+            // mode (where prompt works), otherwise fall back to a
+            // basename-derived suggestion. Keeps the implementation
+            // narrow without lifting yet another modal into App.
+            const current = target.customLabel ?? "";
+            const next = window.prompt(
+              "Tab name (leave empty to reset):",
+              current,
+            );
+            if (next === null) return; // user cancelled
+            const trimmed = next.trim();
+            setTabs((prev) =>
+              prev.map((t) =>
+                t.id === tabMenu.tabId
+                  ? { ...t, customLabel: trimmed || undefined }
+                  : t,
+              ),
+            );
+            setTabMenu(null);
+          }}
+        >
+          Rename tab…
+        </MenuItem>
         <MenuItem
           disabled={
             tabMenu

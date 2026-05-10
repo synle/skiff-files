@@ -245,6 +245,14 @@ export interface Settings {
    *  Sidebar's Recent section always shows up to 5 entries from the
    *  head of the list regardless of the cap. */
   recentPathsMax: number;
+  /** Per-extension override of the icon kind. Keys are extensions
+   *  WITHOUT the leading dot (e.g. "rs", "tex"); values are FileKind
+   *  strings ("code" / "document" / "image" / etc.). The Rust-side
+   *  kind detection runs first; a matching override here replaces it
+   *  in the UI. Only the icon column reads the override — sort-by-
+   *  kind continues to use the underlying value to avoid resorting
+   *  the listing every time the user tweaks this map. */
+  customFileKinds: Record<string, string>;
 }
 
 export type DateFormat = "locale" | "iso" | "short" | "relative";
@@ -283,6 +291,11 @@ export interface SavedTab {
    *  is equivalent to false so existing settings.json files round-
    *  trip without migration. */
   pinned?: boolean;
+  /** User-supplied label that overrides the auto-derived basename.
+   *  Set via right-click → Rename tab… on a tab; cleared by saving
+   *  an empty string. Optional so existing settings.json round-trips
+   *  without migration. */
+  customLabel?: string;
 }
 
 /** Max tabs we restore. 20 is well past anyone's reasonable usage
@@ -376,6 +389,7 @@ export const DEFAULTS: Settings = {
   dateFormat: "locale",
   operationsDrawerExpanded: true,
   recentPathsMax: 10,
+  customFileKinds: {},
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";
