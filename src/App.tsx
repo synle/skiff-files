@@ -753,6 +753,24 @@ function buildCommandActions(deps: {
       },
     },
     {
+      id: "browser.refreshAll",
+      label: "Refresh all tabs",
+      keywords: "reload all tabs list_dir",
+      run: () => {
+        setPage("browser");
+        queueMicrotask(() =>
+          window.dispatchEvent(new CustomEvent("skiff:refresh-all")),
+        );
+      },
+    },
+    {
+      id: "sidebar.resetVisibility",
+      label: "Reset sidebar section visibility",
+      keywords: "sidebar sections show all defaults",
+      hint: "Re-show every hidden section",
+      run: () => update("sidebarSectionsVisible", {}),
+    },
+    {
       id: "browser.newFolder",
       label: "New folder",
       hint: "Cmd/Ctrl+Shift+N",

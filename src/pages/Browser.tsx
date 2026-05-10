@@ -540,6 +540,13 @@ export default function Browser({
       setSearchCaseSensitive(s.caseSensitive);
       setSearchRecursive(s.recursive);
     };
+    // Refresh-all is intentionally NOT gated on isActive — every
+    // Browser instance refreshes its own path. Useful when an
+    // external change happens across multiple tabs the watcher
+    // doesn't see (only the active tab's path is watched).
+    const onRefreshAll = () => {
+      if (path) void refresh(path);
+    };
     if (isActive) {
       window.addEventListener("skiff:refresh", onRefresh);
       window.addEventListener("skiff:new-folder", onNewFolder);
@@ -547,6 +554,7 @@ export default function Browser({
       window.addEventListener("skiff:restore-selection", onRestoreSelection);
       window.addEventListener("skiff:run-saved-search", onRunSavedSearch);
     }
+    window.addEventListener("skiff:refresh-all", onRefreshAll);
     return () => {
       window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
       window.removeEventListener("skiff:refresh", onRefresh);
@@ -554,6 +562,7 @@ export default function Browser({
       window.removeEventListener("skiff:tag-selection", onTagSelection);
       window.removeEventListener("skiff:restore-selection", onRestoreSelection);
       window.removeEventListener("skiff:run-saved-search", onRunSavedSearch);
+      window.removeEventListener("skiff:refresh-all", onRefreshAll);
     };
     // handleNewFolder is stable enough — re-binding on every render
     // would also be acceptable since these are window-level events.
