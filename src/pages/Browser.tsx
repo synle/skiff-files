@@ -397,8 +397,28 @@ export default function Browser({
       }
     };
     window.addEventListener(NAVIGATE_EVENT, onExternalNavigate);
-    return () => window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
-  }, [isActive]);
+    // Command-palette dispatched events — the active Browser
+    // executes the corresponding action so the palette doesn't
+    // need a direct ref into Browser state.
+    const onRefresh = () => {
+      if (path) void refresh(path);
+    };
+    const onNewFolder = () => {
+      void handleNewFolder();
+    };
+    if (isActive) {
+      window.addEventListener("skiff:refresh", onRefresh);
+      window.addEventListener("skiff:new-folder", onNewFolder);
+    }
+    return () => {
+      window.removeEventListener(NAVIGATE_EVENT, onExternalNavigate);
+      window.removeEventListener("skiff:refresh", onRefresh);
+      window.removeEventListener("skiff:new-folder", onNewFolder);
+    };
+    // handleNewFolder is stable enough — re-binding on every render
+    // would also be acceptable since these are window-level events.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, path, refresh]);
 
   // OS-level drag-and-drop. Tauri emits a unified event for enter / over
   // / drop / leave. On drop, we route each dropped path through

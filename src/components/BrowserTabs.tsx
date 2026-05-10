@@ -147,9 +147,21 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       if (path) addTab(path);
     };
     window.addEventListener(OPEN_IN_TAB_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_IN_TAB_EVENT, onOpen);
-    // addTab closes over `home`; the listener should pick up the
-    // freshest one across renders.
+    // Command-palette dispatched tab actions. We listen at the
+    // tab-strip level since this component owns the tab list — the
+    // active Browser doesn't have access to other tabs.
+    const onNewTab = () => addTab();
+    const onRestoreTab = () => restoreClosedTab();
+    window.addEventListener("skiff:new-tab", onNewTab);
+    window.addEventListener("skiff:restore-closed-tab", onRestoreTab);
+    return () => {
+      window.removeEventListener(OPEN_IN_TAB_EVENT, onOpen);
+      window.removeEventListener("skiff:new-tab", onNewTab);
+      window.removeEventListener("skiff:restore-closed-tab", onRestoreTab);
+    };
+    // addTab / restoreClosedTab close over `home` and the tabs +
+    // activeId state; the deps are intentionally loose so the
+    // listener picks up the freshest closures on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [home]);
 

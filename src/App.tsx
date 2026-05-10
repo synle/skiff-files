@@ -555,6 +555,69 @@ function buildCommandActions(deps: {
       hint: settings.density === "compact" ? "Current" : undefined,
       run: () => update("density", "compact"),
     },
+    // Browser actions — fan out via window CustomEvents so the
+    // palette doesn't need a direct ref to the active Browser.
+    {
+      id: "browser.refresh",
+      label: "Refresh current folder",
+      hint: "Cmd/Ctrl+R · F5",
+      keywords: "reload list_dir",
+      run: () => {
+        setPage("browser");
+        queueMicrotask(() =>
+          window.dispatchEvent(new CustomEvent("skiff:refresh")),
+        );
+      },
+    },
+    {
+      id: "browser.newFolder",
+      label: "New folder",
+      hint: "Cmd/Ctrl+Shift+N",
+      keywords: "mkdir create",
+      run: () => {
+        setPage("browser");
+        queueMicrotask(() =>
+          window.dispatchEvent(new CustomEvent("skiff:new-folder")),
+        );
+      },
+    },
+    {
+      id: "browser.newTab",
+      label: "New tab",
+      hint: "Cmd/Ctrl+T",
+      keywords: "tab",
+      run: () => {
+        setPage("browser");
+        queueMicrotask(() =>
+          window.dispatchEvent(new CustomEvent("skiff:new-tab")),
+        );
+      },
+    },
+    {
+      id: "browser.restoreClosedTab",
+      label: "Restore last closed tab",
+      hint: "Cmd/Ctrl+Shift+T",
+      keywords: "tab undo",
+      run: () => {
+        setPage("browser");
+        queueMicrotask(() =>
+          window.dispatchEvent(new CustomEvent("skiff:restore-closed-tab")),
+        );
+      },
+    },
+    {
+      id: "app.newWindow",
+      label: "Open new window",
+      hint: "Cmd/Ctrl+N",
+      keywords: "window",
+      run: () => {
+        // dynamic import keeps the module out of the palette's hot
+        // path render — only loads when the user actually triggers it.
+        void import("./api/fs").then(({ windowOpenNew }) =>
+          windowOpenNew().catch(() => {}),
+        );
+      },
+    },
     // User-curated paths land at the bottom — they're noisier than
     // the static actions, but the palette's fuzzy search lets users
     // type a snippet of the path and skip past everything else.
