@@ -1923,6 +1923,13 @@ pub fn sync_dedup(path: String) -> FsResult<DedupSummary> {
 /// Resolve a frontend path string into a (Backend, remote-path) pair.
 /// `sftp://<id>/<path>` routes through the connection registry; any
 /// other shape is treated as a local path.
+///
+/// `ftp://` is recognized but rejected with a clear error — the
+/// Skiffsync cross-engine doesn't have an FTP `Backend` variant
+/// yet (Phase 3b slice 4 work). Without this guard a drag-and-drop
+/// to an FTP host in the Sidebar would silently treat the URL as
+/// a local path and surface a confusing "no such file" error
+/// instead of telling the user the slice isn't shipped.
 fn resolve_backend(
     path: &str,
     fs_registry: &Registry,
@@ -1939,6 +1946,13 @@ fn resolve_backend(
         };
         let client = fs_registry.get_sftp(id)?;
         Ok((Backend::Sftp(client), remote_path.to_string()))
+    } else if path.starts_with("ftp://") {
+        Err(
+            "Skiffsync transfers to or from FTP aren't supported yet — \
+             use the Browser pane to copy individual files for now \
+             (Phase 3b slice 4)."
+                .to_string(),
+        )
     } else {
         Ok((Backend::Local, path.to_string()))
     }
