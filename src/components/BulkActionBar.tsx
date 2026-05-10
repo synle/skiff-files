@@ -8,6 +8,8 @@
 import {
   Box,
   Button,
+  Menu,
+  MenuItem,
   Typography,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -16,6 +18,10 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import ArchiveIcon from "@mui/icons-material/Archive";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
+import LocalOfferIcon from "@mui/icons-material/LocalOffer";
+import { useState } from "react";
+import { TAG_COLORS, tagColorHex, tagColorLabel } from "../util/tagColors";
+import type { TagColor } from "../state/settings";
 
 interface Props {
   count: number;
@@ -25,6 +31,9 @@ interface Props {
   onCompress?: () => void;
   onBulkRename?: () => void;
   onClear?: () => void;
+  /** Apply the picked tag (or `null` to clear) to the current
+   *  multi-selection. Drives the Tag popover's color strip. */
+  onSetTag?: (color: TagColor | null) => void;
 }
 
 export default function BulkActionBar({
@@ -35,7 +44,9 @@ export default function BulkActionBar({
   onCompress,
   onBulkRename,
   onClear,
+  onSetTag,
 }: Props) {
+  const [tagAnchor, setTagAnchor] = useState<HTMLElement | null>(null);
   if (count < 2) return null;
   return (
     <Box
@@ -91,6 +102,53 @@ export default function BulkActionBar({
         >
           Rename
         </Button>
+      )}
+      {onSetTag && (
+        <>
+          <Button
+            size="small"
+            startIcon={<LocalOfferIcon fontSize="small" />}
+            onClick={(e) => setTagAnchor(e.currentTarget)}
+          >
+            Tag
+          </Button>
+          <Menu
+            open={tagAnchor != null}
+            anchorEl={tagAnchor}
+            onClose={() => setTagAnchor(null)}
+            slotProps={{ list: { dense: true } }}
+          >
+            {TAG_COLORS.map((c) => (
+              <MenuItem
+                key={c}
+                onClick={() => {
+                  onSetTag(c);
+                  setTagAnchor(null);
+                }}
+                sx={{ display: "flex", gap: 1, alignItems: "center" }}
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    backgroundColor: tagColorHex(c),
+                  }}
+                />
+                {tagColorLabel(c)}
+              </MenuItem>
+            ))}
+            <MenuItem
+              onClick={() => {
+                onSetTag(null);
+                setTagAnchor(null);
+              }}
+            >
+              Clear tag
+            </MenuItem>
+          </Menu>
+        </>
       )}
       {onDelete && (
         <Button

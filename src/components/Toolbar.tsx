@@ -32,6 +32,8 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import SortIcon from "@mui/icons-material/Sort";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import DensityMediumIcon from "@mui/icons-material/DensityMedium";
+import DensitySmallIcon from "@mui/icons-material/DensitySmall";
 import type { ViewMode } from "../state/settings";
 import type { SortDir, SortKey } from "./FileList";
 
@@ -117,6 +119,11 @@ interface Props {
    *  don't have to wire it. */
   showHidden?: boolean;
   onShowHiddenToggle?: () => void;
+  /** Active density. When provided alongside `onDensityToggle`, the
+   *  toolbar renders a small icon button that flips between
+   *  comfortable + compact without a Settings round-trip. */
+  density?: "comfortable" | "compact";
+  onDensityToggle?: () => void;
   /** Whether the kind-filter chip row is currently shown. */
   kindFilterOpen?: boolean;
   /** Toggle handler for the kind-filter chip row. */
@@ -168,6 +175,8 @@ export default function Toolbar(props: Props) {
     onSearchCommit,
     showHidden,
     onShowHiddenToggle,
+    density,
+    onDensityToggle,
     kindFilterOpen,
     onKindFilterToggle,
     kindFilterActiveCount = 0,
@@ -569,6 +578,30 @@ export default function Toolbar(props: Props) {
         </Tooltip>
       </Box>
 
+      {/* Density toggle — flips between comfortable + compact. The
+       *  Settings → Appearance dropdown still owns the source of
+       *  truth; this button is a one-click toggle for power users. */}
+      {onDensityToggle && (
+        <Box sx={overflowOnlyBelowMd}>
+          <Tooltip
+            title={density === "compact" ? "Compact rows" : "Comfortable rows"}
+          >
+            <IconButton
+              size="small"
+              onClick={onDensityToggle}
+              aria-label="Toggle density"
+              aria-pressed={density === "compact"}
+            >
+              {density === "compact" ? (
+                <DensitySmallIcon fontSize="small" />
+              ) : (
+                <DensityMediumIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
+
       {/* Kind-filter chip row toggle. Badge shows count of active
        *  filter groups when the row is collapsed so the user notices
        *  a filter is active even with the chips hidden. */}
@@ -685,6 +718,18 @@ export default function Toolbar(props: Props) {
           >
             {previewOpen ? "Hide preview pane" : "Show preview pane"}
           </MenuItem>
+          {onDensityToggle && (
+            <MenuItem
+              onClick={() => {
+                onDensityToggle();
+                setOverflowAnchor(null);
+              }}
+            >
+              {density === "compact"
+                ? "Switch to comfortable rows"
+                : "Switch to compact rows"}
+            </MenuItem>
+          )}
           {onKindFilterToggle && (
             <MenuItem
               onClick={() => {

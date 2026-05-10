@@ -1449,6 +1449,13 @@ export default function Browser({
         }
         showHidden={settings.showHidden}
         onShowHiddenToggle={() => update("showHidden", !settings.showHidden)}
+        density={settings.density}
+        onDensityToggle={() =>
+          update(
+            "density",
+            settings.density === "compact" ? "comfortable" : "compact",
+          )
+        }
         kindFilterOpen={kindFilterOpen}
         onKindFilterToggle={() => setKindFilterOpen((o) => !o)}
         kindFilterActiveCount={
@@ -1524,6 +1531,22 @@ export default function Browser({
           setBulkRenameTargets(entries.filter((x) => set.has(x.path)));
         }}
         onClear={() => setSelectedPaths([])}
+        onSetTag={(color) => {
+          if (selectedPaths.length === 0) return;
+          const next = { ...settings.fileTags };
+          for (const p of selectedPaths) {
+            if (color === null) delete next[p];
+            else next[p] = color;
+          }
+          const keys = Object.keys(next);
+          if (keys.length > 200) {
+            const trimmed: typeof next = {};
+            for (const k of keys.slice(keys.length - 200)) trimmed[k] = next[k];
+            update("fileTags", trimmed);
+          } else {
+            update("fileTags", next);
+          }
+        }}
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
         <FileList
