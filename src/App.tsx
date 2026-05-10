@@ -624,6 +624,31 @@ function buildCommandActions(deps: {
         },
       },
     ]),
+    // Recent searches (auto-tracked) — top 5 from searchHistory.
+    // Dispatches the same skiff:run-saved-search event the named
+    // saved-searches use, with default flags (no regex, case
+    // insensitive, recursive off).
+    ...settings.searchHistory.slice(0, 5).map((q) => ({
+      id: `recentsearch.${q}`,
+      label: `Search: ${q}`,
+      hint: "Recent",
+      keywords: `recent search find ${q}`,
+      run: () => {
+        setPage("browser");
+        queueMicrotask(() =>
+          window.dispatchEvent(
+            new CustomEvent("skiff:run-saved-search", {
+              detail: {
+                query: q,
+                regex: false,
+                caseSensitive: false,
+                recursive: false,
+              },
+            }),
+          ),
+        );
+      },
+    })),
     // Saved sync-job templates — palette dispatches the saved id;
     // TransfersPage resolves and runs it via the existing handler.
     ...settings.savedSyncJobs.map((j) => ({
