@@ -7,17 +7,20 @@ import {
   Breadcrumbs,
   IconButton,
   Link,
+  Menu,
+  MenuItem,
   TextField,
   Tooltip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import HomeIcon from "@mui/icons-material/Home";
 import { useEffect, useRef, useState } from "react";
-import { fsCanonicalize } from "../api/fs";
+import { fsCanonicalize, fsRevealInOs } from "../api/fs";
 import { listDir } from "../api/client";
 import { pathSegments } from "../util/format";
 import { isRemote } from "../util/location";
 import { completePath, splitForCompletion } from "../util/autocomplete";
+import { OPEN_IN_TAB_EVENT } from "../App";
 
 interface Props {
   path: string;
@@ -34,6 +37,12 @@ interface Props {
 export default function PathBar({ path, onNavigate, onHome, focusRequest }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(path);
+  /** Per-segment right-click menu state. `null` = closed. */
+  const [segMenu, setSegMenu] = useState<{
+    x: number;
+    y: number;
+    segPath: string;
+  } | null>(null);
 
   // External "please focus me" pulses (Cmd/Ctrl+L from Browser). The
   // counter pattern means repeated presses re-fire even when we're
@@ -181,6 +190,17 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
                 key={seg.path}
                 component="button"
                 onClick={() => onNavigate(seg.path)}
+                onContextMenu={(e: React.MouseEvent) => {
+                  // Stop the parent Breadcrumbs handler (which copies
+                  // the full path) so the per-segment menu wins.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSegMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    segPath: seg.path,
+                  });
+                }}
                 underline="hover"
                 color="inherit"
                 // Hover surfaces the full path-up-to-here, useful when
@@ -204,6 +224,56 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
           <EditIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+
+      <Menu
+        open={segMenu != null}
+        onClose={() => setSegMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          segMenu ? { top: segMenu.y, left: segMenu.x } : undefined
+        }
+        slotProps={{ list: { dense: true } }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (segMenu) onNavigate(segMenu.segPath);
+            setSegMenu(null);
+          }}
+        >
+          Open
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (segMenu) {
+              window.dispatchEvent(
+                new CustomEvent(OPEN_IN_TAB_EVENT, { detail: segMenu.segPath }),
+              );
+            }
+            setSegMenu(null);
+          }}
+        >
+          Open in new tab
+        </MenuItem>
+        <MenuItem
+          disabled={!!segMenu && isRemote(segMenu.segPath)}
+          onClick={() => {
+            if (segMenu) void fsRevealInOs(segMenu.segPath).catch(() => {});
+            setSegMenu(null);
+          }}
+        >
+          Reveal in Finder/Explorer
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (segMenu && navigator?.clipboard) {
+              void navigator.clipboard.writeText(segMenu.segPath);
+            }
+            setSegMenu(null);
+          }}
+        >
+          Copy path
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }
