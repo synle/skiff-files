@@ -1348,6 +1348,18 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                           itemId: j.id,
                           actions: [
                             {
+                              key: "dryrun",
+                              label: "Run as dry-run",
+                              onClick: () => {
+                                onSwitchPage("transfers");
+                                window.dispatchEvent(
+                                  new CustomEvent("skiff:run-sync-job", {
+                                    detail: { id: j.id, dryRun: true },
+                                  }),
+                                );
+                              },
+                            },
+                            {
                               key: "rename",
                               icon: <EditIcon fontSize="small" />,
                               label: "Rename…",

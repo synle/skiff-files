@@ -649,26 +649,45 @@ function buildCommandActions(deps: {
         );
       },
     })),
-    // Saved sync-job templates — palette dispatches the saved id;
-    // TransfersPage resolves and runs it via the existing handler.
-    ...settings.savedSyncJobs.map((j) => ({
-      id: `syncjob.${j.id}`,
-      label: `Run sync job: ${j.label}`,
-      hint: `${j.src} → ${j.dest} · ${j.conflictPolicy}`,
-      keywords: `sync skiffsync transfer copy ${j.label}`,
-      run: () => {
-        const ok = window.confirm(
-          `Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`,
-        );
-        if (!ok) return;
-        setPage("transfers");
-        queueMicrotask(() =>
-          window.dispatchEvent(
-            new CustomEvent("skiff:run-sync-job", { detail: j.id }),
-          ),
-        );
+    // Saved sync-job templates — two palette actions per job: a
+    // real run (confirmed) and a dry-run (no confirm needed since
+    // dry-run writes nothing).
+    ...settings.savedSyncJobs.flatMap((j) => [
+      {
+        id: `syncjob.${j.id}`,
+        label: `Run sync job: ${j.label}`,
+        hint: `${j.src} → ${j.dest} · ${j.conflictPolicy}`,
+        keywords: `sync skiffsync transfer copy ${j.label}`,
+        run: () => {
+          const ok = window.confirm(
+            `Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`,
+          );
+          if (!ok) return;
+          setPage("transfers");
+          queueMicrotask(() =>
+            window.dispatchEvent(
+              new CustomEvent("skiff:run-sync-job", { detail: j.id }),
+            ),
+          );
+        },
       },
-    })),
+      {
+        id: `syncjob.dryrun.${j.id}`,
+        label: `Dry-run sync job: ${j.label}`,
+        hint: `${j.src} → ${j.dest} · writes nothing`,
+        keywords: `sync skiffsync dry-run preview ${j.label}`,
+        run: () => {
+          setPage("transfers");
+          queueMicrotask(() =>
+            window.dispatchEvent(
+              new CustomEvent("skiff:run-sync-job", {
+                detail: { id: j.id, dryRun: true },
+              }),
+            ),
+          );
+        },
+      },
+    ]),
     // Saved selection groups — palette restoration. Browser listens
     // for the event, picks paths that exist in the current folder.
     ...settings.savedSelections.map((s) => ({

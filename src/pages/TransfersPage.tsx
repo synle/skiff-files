@@ -229,24 +229,26 @@ export default function TransfersPage() {
     };
   }, []);
 
-  // Command-palette dispatched run — receives a saved-job id, runs
-  // the matching template via the same handler the in-page Run
-  // button uses. We resolve the job by id at dispatch time so a
-  // stale palette action (saved job already deleted) silently
-  // no-ops instead of running garbage.
+  // Command-palette dispatched run — receives either a bare saved-job
+  // id (legacy shape, pre-0.2.233) or {id, dryRun?} (new shape so
+  // callers can opt into dry-run without a separate event). We
+  // resolve the job by id at dispatch time so a stale palette action
+  // (saved job already deleted) silently no-ops.
   useEffect(() => {
     const onRun = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
+      const detail = (
+        e as CustomEvent<string | { id: string; dryRun?: boolean }>
+      ).detail;
+      const id = typeof detail === "string" ? detail : detail?.id;
+      const dryRun = typeof detail === "string" ? false : !!detail?.dryRun;
+      if (!id) return;
       const job = (settings.savedSyncJobs as SavedJob[]).find(
         (j) => j.id === id,
       );
-      if (job) void handleRunSavedJob(job);
+      if (job) void handleRunSavedJob(job, dryRun);
     };
     window.addEventListener("skiff:run-sync-job", onRun);
     return () => window.removeEventListener("skiff:run-sync-job", onRun);
-    // handleRunSavedJob closes over current settings/state; depend
-    // on the saved-jobs list so a fresh save is reflected on the
-    // next dispatch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.savedSyncJobs]);
 
@@ -367,7 +369,7 @@ export default function TransfersPage() {
   /** Fills the form with a saved job's values + starts it immediately.
    *  Skips the form-fill if the user just wants to inspect — that path
    *  is the click on the row itself. */
-  const handleRunSavedJob = async (j: SavedJob) => {
+  const handleRunSavedJob = async (j: SavedJob, dryRun = false) => {
     setSrc(j.src);
     setDest(j.dest);
     setPlanner(j.planner);
@@ -382,7 +384,7 @@ export default function TransfersPage() {
         maxSizeGb: j.maxSizeGb,
         lookbackDays: j.lookbackDays,
         conflictPolicy: j.conflictPolicy,
-        dryRun: false,
+        dryRun,
         // Saved jobs predate the bandwidth field; fall back to the
         // current Settings default rather than 0 so existing saves
         // honor the user's current cap.
