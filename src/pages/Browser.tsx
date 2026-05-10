@@ -22,6 +22,7 @@ import KindFilterBar, {
   entryMatchesFilter,
   type KindGroup,
 } from "../components/KindFilterBar";
+import type { TagColor } from "../state/settings";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
 import PreviewPane from "../components/PreviewPane";
@@ -123,6 +124,10 @@ export default function Browser({
   // group set isn't yet persisted (TODO: per-folder LRU like
   // folderViewMode).
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
+  // Tag filter: session-only for now. Per-folder persistence could
+  // join Settings.folderTagFilter on the same LRU pattern as
+  // folderKindFilter when there's enough demand.
+  const [tagFilter, setTagFilter] = useState<TagColor[]>([]);
   /** When set, the archive-viewer dialog is open against this path. */
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
     null,
@@ -1023,10 +1028,17 @@ export default function Browser({
     if (kindFilter.length > 0) {
       base = base.filter((e) => entryMatchesFilter(e.kind, kindFilter));
     }
+    if (tagFilter.length > 0) {
+      const tagSet = new Set(tagFilter);
+      base = base.filter((e) => {
+        const t = settings.fileTags[e.path];
+        return t != null && tagSet.has(t);
+      });
+    }
     if (!search) return base;
     const q = search.toLowerCase();
     return base.filter((e) => e.name.toLowerCase().includes(q));
-  }, [entries, search, searchRecursive, findResults, settings.hideSystemFiles, kindFilter]);
+  }, [entries, search, searchRecursive, findResults, settings.hideSystemFiles, kindFilter, tagFilter, settings.fileTags]);
 
   // Reset the query on every navigation — the new folder almost certainly
   // doesn't have files matching the previous folder's search.
@@ -1188,7 +1200,7 @@ export default function Browser({
         onShowHiddenToggle={() => update("showHidden", !settings.showHidden)}
         kindFilterOpen={kindFilterOpen}
         onKindFilterToggle={() => setKindFilterOpen((o) => !o)}
-        kindFilterActiveCount={kindFilter.length}
+        kindFilterActiveCount={kindFilter.length + tagFilter.length}
         searchHistory={settings.searchHistory}
         onSearchCommit={(q) => {
           // Push to head, dedup, cap at SEARCH_HISTORY_MAX (10). Most-
@@ -1209,6 +1221,8 @@ export default function Browser({
         <KindFilterBar
           active={kindFilter}
           onChange={setKindFilter}
+          activeTags={tagFilter}
+          onTagsChange={setTagFilter}
           onClose={() => setKindFilterOpen(false)}
         />
       )}

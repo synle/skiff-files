@@ -8,6 +8,8 @@
 import { Box, Chip, IconButton, Tooltip, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import type { FileKind } from "../api/fs";
+import type { TagColor } from "../state/settings";
+import { TAG_COLORS, tagColorHex, tagColorLabel } from "../util/tagColors";
 
 /** Display group → underlying FileKind set. Tighter than the raw
  *  FileKind because users think in everyday terms (Documents bundles
@@ -40,13 +42,32 @@ export type KindGroup =
 interface Props {
   active: KindGroup[];
   onChange: (next: KindGroup[]) => void;
+  /** Active tag colors. Empty array = no tag filter. */
+  activeTags?: TagColor[];
+  /** Setter for the tag filter. When omitted, the tag chip strip
+   *  doesn't render. */
+  onTagsChange?: (next: TagColor[]) => void;
   onClose?: () => void;
 }
 
-export default function KindFilterBar({ active, onChange, onClose }: Props) {
+export default function KindFilterBar({
+  active,
+  onChange,
+  activeTags = [],
+  onTagsChange,
+  onClose,
+}: Props) {
   const toggle = (id: KindGroup) => {
     onChange(
       active.includes(id) ? active.filter((x) => x !== id) : [...active, id],
+    );
+  };
+  const toggleTag = (c: TagColor) => {
+    if (!onTagsChange) return;
+    onTagsChange(
+      activeTags.includes(c)
+        ? activeTags.filter((x) => x !== c)
+        : [...activeTags, c],
     );
   };
   return (
@@ -87,6 +108,54 @@ export default function KindFilterBar({ active, onChange, onClose }: Props) {
           onClick={() => onChange([])}
           sx={{ ml: 1 }}
         />
+      )}
+      {onTagsChange && (
+        <>
+          <Box sx={{ width: 12 }} />
+          <Typography variant="caption" sx={{ color: "text.secondary", mr: 0.5 }}>
+            Tags:
+          </Typography>
+          {TAG_COLORS.map((c) => {
+            const isActive = activeTags.includes(c);
+            return (
+              <Tooltip key={c} title={tagColorLabel(c)}>
+                <Chip
+                  size="small"
+                  variant={isActive ? "filled" : "outlined"}
+                  onClick={() => toggleTag(c)}
+                  label=""
+                  sx={{
+                    cursor: "pointer",
+                    width: 24,
+                    "& .MuiChip-label": { display: "none" },
+                    backgroundColor: isActive
+                      ? tagColorHex(c)
+                      : "transparent",
+                    borderColor: tagColorHex(c),
+                    "&::before": {
+                      content: '""',
+                      display: "inline-block",
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      backgroundColor: tagColorHex(c),
+                      ml: 0.75,
+                    },
+                  }}
+                />
+              </Tooltip>
+            );
+          })}
+          {activeTags.length > 0 && (
+            <Chip
+              label="Clear tags"
+              size="small"
+              variant="outlined"
+              onClick={() => onTagsChange([])}
+              sx={{ ml: 0.5 }}
+            />
+          )}
+        </>
       )}
       <Box sx={{ flex: 1 }} />
       {onClose && (
