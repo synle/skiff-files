@@ -94,6 +94,29 @@ Four files; one per command family:
 
 Every command has a typed wrapper here, so command renames are a single-file refactor.
 
+### Cross-component coordination — window CustomEvents
+
+When one component needs to fire an action whose handler lives in another (Cmd+Shift+P palette → Browser refresh; Sidebar saved-search click → Browser search state), the dispatcher fires a `skiff:<verb>` window event with a detail payload, the receiver listens via `window.addEventListener`. Saves prop chains and keeps the dispatcher decoupled from the receiver's lifecycle.
+
+- Per-tab actions gated on `isActive` so only the foreground Browser handles `skiff:refresh`.
+- Cross-tab actions unghosted (`skiff:refresh-all`).
+- Payloads accept both bare strings (legacy) and `{id, ...}` objects (new) for back-compat — adding a flag like `dryRun` doesn't break callers.
+- Receivers: `Browser` (`skiff:refresh`, `skiff:new-folder`, `skiff:tag-selection`, `skiff:restore-selection`, `skiff:run-saved-search`, `skiff:refresh-all`); `BrowserTabs` (`skiff:new-tab`, `skiff:restore-closed-tab`, `skiff:restore-workspace`, `skiff:append-workspace`); `TransfersPage` (`skiff:run-sync-job`).
+
+Dispatch site: `App.tsx::buildCommandActions`.
+
+### Saved-data parity (workspaces / selections / searches / sync jobs / bookmarks)
+
+Every user-curated saved-data type ships with the same five surfaces — shipping any subset feels half-finished. When adding a new type, mirror this exactly:
+
+1. Persist in `Settings.<key>` (capped LRU; oldest entries dropped on overflow).
+2. **Sidebar section** — click-to-use, right-click rename / delete, drag-reorder via custom MIME (`application/x-skiff-<key>`), Sort A→Z when count ≥ 5, visibility toggle in Settings → Sidebar.
+3. **Cmd+Shift+P palette actions** (sometimes paired — workspaces have replace + append; sync jobs have run + dry-run).
+4. **Settings → Saved data** rename / delete management block.
+5. **Cross-component event** (`skiff:run-X`, `skiff:restore-X`) so the palette + sidebar share the same execution path.
+
+`Sidebar.tsx`'s Workspaces / Searches / Selections / Sync jobs / Bookmarks blocks are near-clones; `BulkActionBar` + the right-click context menus are the typical create surfaces.
+
 ---
 
 ## Rust (`src-tauri/src/`)
