@@ -35,7 +35,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import SidebarContextMenu, {
   type SidebarContextState,
 } from "./SidebarContextMenu";
-import type { Page } from "../App";
+import { OPEN_IN_TAB_EVENT, type Page } from "../App";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
 import {
@@ -1258,10 +1258,69 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         {isVisible("selections") && settings.savedSelections.length > 0 && (
           <>
             {renderSectionHeader("selections", "Selections")}
+            {!isCollapsed("selections") &&
+              settings.savedSelections.length >= 5 && (
+                <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
+                  <Tooltip title="Sort A→Z">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const sorted = [...settings.savedSelections].sort(
+                          (a, b) =>
+                            a.label.localeCompare(b.label, undefined, {
+                              sensitivity: "base",
+                              numeric: true,
+                            }),
+                        );
+                        update("savedSelections", sorted);
+                      }}
+                      aria-label="Sort selections A to Z"
+                    >
+                      <SortByAlphaIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
             {!isCollapsed("selections") && (
               <List dense disablePadding id="sidebar-section-selections">
                 {settings.savedSelections.map((s) => (
-                  <ListItem key={s.id} disablePadding>
+                  <ListItem
+                    key={s.id}
+                    disablePadding
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        "application/x-skiff-selection",
+                        s.id,
+                      );
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      if (
+                        e.dataTransfer.types.includes(
+                          "application/x-skiff-selection",
+                        )
+                      ) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }
+                    }}
+                    onDrop={(e) => {
+                      const sourceId = e.dataTransfer.getData(
+                        "application/x-skiff-selection",
+                      );
+                      if (!sourceId || sourceId === s.id) return;
+                      e.preventDefault();
+                      const list = settings.savedSelections;
+                      const fromIdx = list.findIndex((x) => x.id === sourceId);
+                      const toIdx = list.findIndex((x) => x.id === s.id);
+                      if (fromIdx < 0 || toIdx < 0) return;
+                      const next = [...list];
+                      const [moved] = next.splice(fromIdx, 1);
+                      next.splice(toIdx, 0, moved);
+                      update("savedSelections", next);
+                    }}
+                  >
                     <ListItemButton
                       onClick={() => {
                         // Switch to Browser then dispatch — same
@@ -1283,6 +1342,29 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                           section: "bookmarks",
                           itemId: s.id,
                           actions: [
+                            {
+                              key: "open-as-tabs",
+                              label: "Open paths as tabs",
+                              onClick: () => {
+                                // Each path becomes a new tab. Skip
+                                // sftp:// paths that aren't real
+                                // browseable folders without an
+                                // active connection. We treat
+                                // PARENT folders for files (so the
+                                // user lands at the file's parent
+                                // and can see context).
+                                for (const p of s.paths) {
+                                  // OPEN_IN_TAB_EVENT seeds a new
+                                  // tab at the dispatched path.
+                                  // BrowserTabs listens.
+                                  window.dispatchEvent(
+                                    new CustomEvent(OPEN_IN_TAB_EVENT, {
+                                      detail: p,
+                                    }),
+                                  );
+                                }
+                              },
+                            },
                             {
                               key: "rename",
                               icon: <EditIcon fontSize="small" />,
