@@ -46,7 +46,7 @@ import {
 } from "../api/sync";
 import { startSync } from "../api/client";
 import { formatBytes } from "../util/format";
-import { useSettings } from "../state/settings";
+import { useSettings, type SavedSyncJob } from "../state/settings";
 
 /** UI-side per-job aggregate, blending JobInfo with the latest progress
  *  payload + the final summary if the job finished. We track this map
@@ -58,43 +58,25 @@ interface JobUiState {
   error?: string;
 }
 
-/** A saved job template — what was on the form when the user clicked
- *  Save. Stored as a list in localStorage. The label defaults to
- *  `<src> → <dest>` but is editable. We never persist mid-flight job
- *  state here — only the inputs needed to re-create the run. */
-interface SavedJob {
-  id: string;
-  label: string;
-  planner: "local" | "repo";
-  src: string;
-  dest: string;
-  maxSizeGb: number;
-  lookbackDays: number;
+/** Local alias kept for legacy code paths. The canonical type lives
+ *  on `Settings.savedSyncJobs` from 0.2.228 onward; we narrow the
+ *  `conflictPolicy` field back to the typed enum here since the
+ *  Settings copy stores it as a plain string for forward-compat. */
+type SavedJob = Omit<SavedSyncJob, "conflictPolicy"> & {
   conflictPolicy: ConflictPolicy;
-  /** Optional — pre-bandwidth-cap saved jobs (older than 0.2.51) won't
-   *  have this; the runner falls back to the current settings default. */
-  bandwidthKbps?: number;
-  /** Optional — added in 0.2.53. Pre-existing saves fall back to the
-   *  current settings default at run time. */
-  verifyAfterCopy?: boolean;
-}
+};
 
-const SAVED_JOBS_KEY = "skiff-files.savedJobs.v1";
+/** Legacy localStorage key — read once at mount to migrate any
+ *  existing saves into Settings. After migration the key is left in
+ *  place (read-only) so a downgrade still surfaces them. */
+const LEGACY_SAVED_JOBS_KEY = "skiff-files.savedJobs.v1";
 
-function loadSavedJobs(): SavedJob[] {
+function readLegacySavedJobs(): SavedSyncJob[] {
   try {
-    const raw = localStorage.getItem(SAVED_JOBS_KEY);
-    return raw ? (JSON.parse(raw) as SavedJob[]) : [];
+    const raw = localStorage.getItem(LEGACY_SAVED_JOBS_KEY);
+    return raw ? (JSON.parse(raw) as SavedSyncJob[]) : [];
   } catch {
     return [];
-  }
-}
-
-function saveSavedJobs(jobs: SavedJob[]): void {
-  try {
-    localStorage.setItem(SAVED_JOBS_KEY, JSON.stringify(jobs));
-  } catch {
-    /* private mode — silently drop */
   }
 }
 
@@ -109,7 +91,7 @@ export default function TransfersPage() {
   // configured defaults flow through. Saved-job templates carry their
   // own policy + caps and don't read from this — they're independent
   // of changes the user makes after saving.
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const [src, setSrc] = useState("");
   const [dest, setDest] = useState("");
   const [maxSizeGb, setMaxSizeGb] = useState(settings.syncDefaultMaxSizeGb);
@@ -137,12 +119,29 @@ export default function TransfersPage() {
   const [dedupResult, setDedupResult] = useState<DedupSummary | null>(null);
 
   // Saved jobs (templates) — persisted as a list of named configs in
-  // localStorage. Saving does not start the job; clicking Run on a
+  // settings.json. Saving does not start the job; clicking Run on a
   // saved entry fills the form with its values and starts immediately.
-  const [savedJobs, setSavedJobs] = useState<SavedJob[]>(() => loadSavedJobs());
+  const savedJobs = settings.savedSyncJobs as SavedJob[];
+  const setSavedJobs = (
+    arg: SavedJob[] | ((prev: SavedJob[]) => SavedJob[]),
+  ) => {
+    const next =
+      typeof arg === "function"
+        ? (arg as (prev: SavedJob[]) => SavedJob[])(
+            settings.savedSyncJobs as SavedJob[],
+          )
+        : arg;
+    update("savedSyncJobs", next as unknown as SavedSyncJob[]);
+  };
+  // One-shot migration from the pre-0.2.228 localStorage key. If
+  // settings has none and localStorage has some, copy them over; the
+  // legacy key stays read-only as a safety net for downgrades.
   useEffect(() => {
-    saveSavedJobs(savedJobs);
-  }, [savedJobs]);
+    if (settings.savedSyncJobs.length > 0) return;
+    const legacy = readLegacySavedJobs();
+    if (legacy.length > 0) update("savedSyncJobs", legacy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mounted = useRef(true);
   // Per-job rolling sample buffers for the ETA tracker. Lives outside

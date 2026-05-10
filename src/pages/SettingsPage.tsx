@@ -410,7 +410,11 @@ function SavedDataEditor() {
   const { settings, update } = useSettings();
 
   const renameItem = <
-    K extends "tabWorkspaces" | "savedSelections" | "savedSearches",
+    K extends
+      | "tabWorkspaces"
+      | "savedSelections"
+      | "savedSearches"
+      | "savedSyncJobs",
   >(
     key: K,
     id: string,
@@ -429,7 +433,11 @@ function SavedDataEditor() {
     );
   };
   const deleteItem = <
-    K extends "tabWorkspaces" | "savedSelections" | "savedSearches",
+    K extends
+      | "tabWorkspaces"
+      | "savedSelections"
+      | "savedSearches"
+      | "savedSyncJobs",
   >(
     key: K,
     id: string,
@@ -531,6 +539,17 @@ function SavedDataEditor() {
           return sel
             ? `${sel.paths.length} path${sel.paths.length === 1 ? "" : "s"}`
             : "";
+        }}
+      />
+      <Block
+        title={`Saved sync-job templates (${settings.savedSyncJobs.length})`}
+        items={settings.savedSyncJobs}
+        onRename={(id, current) => renameItem("savedSyncJobs", id, current)}
+        onDelete={(id, label) => deleteItem("savedSyncJobs", id, label)}
+        secondary={(it) => {
+          const j = settings.savedSyncJobs.find((x) => x.id === it.id);
+          if (!j) return "";
+          return `${j.src} → ${j.dest} · ${j.conflictPolicy}`;
         }}
       />
       <Block

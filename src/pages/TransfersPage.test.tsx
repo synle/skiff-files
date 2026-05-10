@@ -126,9 +126,13 @@ describe("TransfersPage", () => {
       expect(screen.getByText("Saved templates")).toBeInTheDocument();
       expect(screen.getByText("/a → /b")).toBeInTheDocument();
     });
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.savedJobs.v1") ?? "[]",
+    // 0.2.228 migrated savedJobs from localStorage to settings.json
+    // (Settings.savedSyncJobs). The settings store also persists to
+    // localStorage as a hot cache; we read that to assert the save.
+    const settingsRaw = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
     );
+    const stored = settingsRaw.savedSyncJobs ?? [];
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ src: "/a", dest: "/b" });
   });

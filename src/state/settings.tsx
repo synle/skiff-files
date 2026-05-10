@@ -284,6 +284,28 @@ export interface Settings {
    *  needs these 5 tabs, project B needs these 4"). Capped at 20
    *  workspaces; oldest entries dropped on overflow. */
   tabWorkspaces: TabWorkspace[];
+  /** Saved Skiffsync job templates. Migrated from localStorage in
+   *  0.2.228; previously stored under `skiff-files.savedJobs.v1`. */
+  savedSyncJobs: SavedSyncJob[];
+}
+
+/** Saved Skiffsync job template. The label defaults to `<src> → <dest>`
+ *  but is editable from Settings → Saved data. */
+export interface SavedSyncJob {
+  id: string;
+  label: string;
+  planner: "local" | "repo";
+  src: string;
+  dest: string;
+  maxSizeGb: number;
+  lookbackDays: number;
+  conflictPolicy: string;
+  /** Optional — pre-0.2.51 saves don't have this; runner falls
+   *  back to the current Settings default. */
+  bandwidthKbps?: number;
+  /** Optional — pre-0.2.53 saves don't have this; runner falls
+   *  back to the current Settings default. */
+  verifyAfterCopy?: boolean;
 }
 
 export interface TabWorkspace {
@@ -456,6 +478,7 @@ export const DEFAULTS: Settings = {
   savedSearches: [],
   savedSelections: [],
   tabWorkspaces: [],
+  savedSyncJobs: [],
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";
