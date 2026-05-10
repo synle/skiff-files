@@ -29,6 +29,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import { useEffect, useState } from "react";
 import {
+  connCreateFtp,
   connCreateSftp,
   connDisconnect,
   connKnownHostsList,
@@ -133,7 +134,14 @@ export default function ConnectionsPage() {
    *  between SFTP (full programmatic control via russh) and SMB
    *  (OS-native mount handler). FTP slot reserved for Phase 3 —
    *  hidden until that lands. */
-  const [protocol, setProtocol] = useState<"sftp" | "smb">("sftp");
+  const [protocol, setProtocol] = useState<"sftp" | "smb" | "ftp">("sftp");
+  // FTP-specific form state. Defaults match the anonymous-FTP
+  // convention from `src-tauri/src/fs/ftp.rs` so a user can just
+  // type a host and click Connect against a public mirror.
+  const [ftpHost, setFtpHost] = useState("");
+  const [ftpPort, setFtpPort] = useState(21);
+  const [ftpUser, setFtpUser] = useState("anonymous");
+  const [ftpPassword, setFtpPassword] = useState("anonymous@");
 
   // Form state — kept local so Add Connection doesn't dirty the rest of
   // the app's state.
@@ -404,7 +412,7 @@ export default function ConnectionsPage() {
               size="small"
               value={protocol}
               onChange={(e) => {
-                setProtocol(e.target.value as "sftp" | "smb");
+                setProtocol(e.target.value as "sftp" | "smb" | "ftp");
                 setError(null);
                 setTestResult(null);
               }}
@@ -412,10 +420,83 @@ export default function ConnectionsPage() {
               aria-label="Protocol"
             >
               <MenuItem value="sftp">SFTP / SSH</MenuItem>
+              <MenuItem value="ftp">FTP (plain)</MenuItem>
               <MenuItem value="smb">SMB / Samba</MenuItem>
             </Select>
           </Stack>
-          {protocol === "smb" ? (
+          {protocol === "ftp" ? (
+            <Stack spacing={2}>
+              <Typography variant="caption" color="text.secondary">
+                Plain FTP — works against public mirrors (kernel.org,
+                ftp.gnu.org, etc.) and authenticated servers. The
+                default user / password are the anonymous-FTP
+                convention. FTPS isn't supported yet; use SFTP if
+                you need encryption.
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="Host"
+                  size="small"
+                  value={ftpHost}
+                  onChange={(e) => setFtpHost(e.target.value)}
+                  placeholder="ftp.gnu.org"
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Port"
+                  size="small"
+                  type="number"
+                  value={ftpPort}
+                  onChange={(e) =>
+                    setFtpPort(Number(e.target.value) || 21)
+                  }
+                  sx={{ width: 100 }}
+                />
+              </Stack>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="User"
+                  size="small"
+                  value={ftpUser}
+                  onChange={(e) => setFtpUser(e.target.value)}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Password"
+                  size="small"
+                  type="password"
+                  value={ftpPassword}
+                  onChange={(e) => setFtpPassword(e.target.value)}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="contained"
+                  disabled={busy || !ftpHost.trim()}
+                  onClick={async () => {
+                    setError(null);
+                    setBusy(true);
+                    try {
+                      await connCreateFtp({
+                        host: ftpHost.trim(),
+                        port: ftpPort,
+                        user: ftpUser.trim() || undefined,
+                        password: ftpPassword || undefined,
+                      });
+                      void refreshLive();
+                    } catch (e) {
+                      setError(String(e));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Connect
+                </Button>
+              </Stack>
+            </Stack>
+          ) : protocol === "smb" ? (
             <Stack spacing={2}>
               <Typography variant="caption" color="text.secondary">
                 Mounts a Samba / SMB share via the OS native handler

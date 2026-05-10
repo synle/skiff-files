@@ -3,7 +3,7 @@
 // Tauri command we hit so a future refactor can't silently revert
 // to loading raw bytes.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
 import GalleryThumb from "./GalleryThumb";
 

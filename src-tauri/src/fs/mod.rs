@@ -2,6 +2,7 @@
 //! SFTP backend in [`sftp`]. The two share `Entry` / `FileKind` / `DirSummary`
 //! types so the frontend treats them interchangeably.
 
+pub mod ftp;
 pub mod icons;
 pub mod known_hosts;
 pub mod local;

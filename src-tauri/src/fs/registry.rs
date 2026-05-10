@@ -8,6 +8,7 @@
 //! `Arc`. The clients themselves are concurrency-safe so they live behind
 //! `Arc`s and are pulled out under the lock.
 
+use crate::fs::ftp::FtpClient;
 use crate::fs::sftp::SftpClient;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -20,6 +21,7 @@ use uuid::Uuid;
 /// `crate::commands`.
 pub enum Connection {
     Sftp(Arc<SftpClient>),
+    Ftp(Arc<FtpClient>),
 }
 
 /// What the frontend lists in the sidebar / Connections page. Identifying
@@ -36,6 +38,7 @@ pub struct ConnectionInfo {
 #[serde(rename_all = "camelCase")]
 pub enum ConnectionKind {
     Sftp,
+    Ftp,
 }
 
 #[derive(Clone)]
@@ -109,6 +112,20 @@ impl Registry {
     pub fn get_sftp(&self, id: &str) -> Result<Arc<SftpClient>, String> {
         match self.get(id).as_deref() {
             Some(Connection::Sftp(client)) => Ok(client.clone()),
+            Some(Connection::Ftp(_)) => Err(format!(
+                "connection {id} is FTP, not SFTP"
+            )),
+            None => Err(format!("connection not found: {id}")),
+        }
+    }
+
+    /// Lookup helper that unwraps to the FTP client variant.
+    pub fn get_ftp(&self, id: &str) -> Result<Arc<FtpClient>, String> {
+        match self.get(id).as_deref() {
+            Some(Connection::Ftp(client)) => Ok(client.clone()),
+            Some(Connection::Sftp(_)) => Err(format!(
+                "connection {id} is SFTP, not FTP"
+            )),
             None => Err(format!("connection not found: {id}")),
         }
     }

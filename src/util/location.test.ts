@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { formatLocation, formatSftp, isRemote, parseLocation } from "./location";
+import {
+  formatFtp,
+  formatLocation,
+  formatSftp,
+  isRemote,
+  parseLocation,
+} from "./location";
 
 describe("parseLocation", () => {
   it("treats a POSIX path as local", () => {
@@ -33,6 +39,31 @@ describe("parseLocation", () => {
       remotePath: "/",
     });
   });
+
+  it("parses an ftp scheme with a path", () => {
+    expect(parseLocation("ftp://mirror/pub/linux")).toEqual({
+      backend: { kind: "ftp", connectionId: "mirror" },
+      remotePath: "/pub/linux",
+    });
+  });
+
+  it("parses an ftp scheme with no path as the remote root", () => {
+    expect(parseLocation("ftp://m/")).toEqual({
+      backend: { kind: "ftp", connectionId: "m" },
+      remotePath: "/",
+    });
+    expect(parseLocation("ftp://m")).toEqual({
+      backend: { kind: "ftp", connectionId: "m" },
+      remotePath: "/",
+    });
+  });
+});
+
+describe("formatFtp", () => {
+  it("normalizes leading slash", () => {
+    expect(formatFtp("m", "pub/x")).toBe("ftp://m/pub/x");
+    expect(formatFtp("m", "/pub/x")).toBe("ftp://m/pub/x");
+  });
 });
 
 describe("formatSftp", () => {
@@ -52,11 +83,17 @@ describe("formatLocation", () => {
     const orig = "sftp://abc/home/x";
     expect(formatLocation(parseLocation(orig))).toBe(orig);
   });
+
+  it("round-trips ftp", () => {
+    const orig = "ftp://mirror/pub/linux";
+    expect(formatLocation(parseLocation(orig))).toBe(orig);
+  });
 });
 
 describe("isRemote", () => {
-  it("detects sftp paths", () => {
+  it("detects sftp + ftp paths", () => {
     expect(isRemote("sftp://abc/")).toBe(true);
+    expect(isRemote("ftp://m/")).toBe(true);
     expect(isRemote("/Users")).toBe(false);
     expect(isRemote("C:\\")).toBe(false);
     expect(isRemote("")).toBe(false);

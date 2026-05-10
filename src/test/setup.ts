@@ -44,6 +44,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "fs_find") return [];
     if (cmd === "conn_list") return [];
     if (cmd === "conn_create_sftp") return "test-conn-id";
+    if (cmd === "conn_create_ftp") return "test-ftp-id";
     if (cmd === "conn_disconnect") return null;
     if (cmd === "ssh_config_hosts") return [];
     if (cmd === "conn_mkdir") return null;

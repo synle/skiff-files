@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { DirSummary, Entry, ListOptions } from "./fs";
 
 /** Mirror of `crate::fs::registry::ConnectionKind`. */
-export type ConnectionKind = "sftp";
+export type ConnectionKind = "sftp" | "ftp";
 
 /** Mirror of `crate::fs::registry::ConnectionInfo`. */
 export interface ConnectionInfo {
@@ -44,6 +44,20 @@ export interface SftpConfig {
 
 export const connCreateSftp = (config: SftpConfig): Promise<string> =>
   invoke<string>("conn_create_sftp", { config });
+
+/** Mirror of `crate::fs::ftp::FtpConfig`. Phase 3a (0.2.246) ships
+ *  plain FTP only — FTPS toggle lands later. `user` / `password`
+ *  default to the anonymous-FTP convention so the form can leave
+ *  them blank for public mirrors. */
+export interface FtpConfig {
+  host: string;
+  port?: number;
+  user?: string;
+  password?: string;
+}
+
+export const connCreateFtp = (config: FtpConfig): Promise<string> =>
+  invoke<string>("conn_create_ftp", { config });
 
 export const connDisconnect = (id: string): Promise<void> =>
   invoke<void>("conn_disconnect", { id });

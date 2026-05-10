@@ -137,7 +137,7 @@ The Phase 1 page already follows this approach (Appearance / Default View / Adva
 | 1 — Core local file explorer | ✅ shipped | Browse / mkdir / rename / remove / copy; virtualized list; light/dark/system theme; settings page |
 | 1.5 — Preview pane | ✅ shipped | Image / text / markdown / folder summary at first slice; PDF (0.2.58); audio + video (0.2.38); hex preview for binaries (0.2.202) |
 | 2 — Connection abstraction & SFTP | ✅ shipped | `russh` + `russh-sftp` backend, registry as Tauri State, Connections page, sidebar live-host list, `sftp://` scheme + scheme-aware path utils, ssh-config import (0.2.12), known-hosts TOFU (0.2.76), SFTP write side (0.1.10), ssh-agent auth (0.2.85), streaming SHA-256 (0.2.102) |
-| 3 — FTP/FTPS + SMB | partial | SMB / Samba via OS-native handler (0.2.141); **FTP / FTPS still pending** (in-app `suppaftp` slice deferred). Real SFTP integration tests still need a docker harness. |
+| 3 — FTP/FTPS + SMB | partial | Plain FTP shipped 0.2.246 (`suppaftp` backend, anonymous + user/password, list/stat/read). SMB / Samba via OS-native handler (0.2.141). Still pending: FTPS, FTP write ops, in-app SMB, docker-based integration tests. |
 | 4 — Skiffsync (cpsync-inspired) | ✅ shipped | 4a local-to-local: skip-if-unchanged + conflict policies (skip/overwrite/keepBoth) + dry-run + cancel + max-size guard + per-file events. 4b smart-batch policies (overwriteOlder / replaceSmaller / replaceIfSizeDifferent / renameTarget / renameOlderTarget), cross-protocol src/dest, interactive TeraCopy modal w/ apply-to-all, pause/resume, `cpstamp` / `dedup` / `cprepo` modes, saved-job templates persisted to settings.json |
 | 5 — NTFS mount support | deferred | Not started — optional, behind cargo feature flag |
 | 6 — Polish, performance, distribution | partial | Most polish items shipped under 0.2.x (see below). Bundle-size budget audit, i18n scaffold, auto-updates, crash reporting still open. |
@@ -276,9 +276,12 @@ Goal: introduce the remote-FS abstraction; ship SSH/SFTP as the first remote.
 
 ## Phase 3 — FTP & SMB/Samba
 
-⏳ **Partial.** SMB / Samba is reachable today via the OS-native handler shortcut (0.2.141) — the in-app `pavao` slice and the full FTP / FTPS path are still pending. Docker-based integration tests for SFTP land here too.
+⏳ **Partial.** Phase 3a — plain FTP — shipped 0.2.246. SMB / Samba is reachable today via the OS-native handler shortcut (0.2.141). Phase 3b is FTPS + FTP write ops + in-app SMB + docker-based integration tests.
 
-- [ ] **FTP / FTPS**: `suppaftp` with `async-tls`; passive mode default; explicit + implicit TLS
+- [x] **FTP plain** *(shipped 0.2.246)*: `suppaftp` + passive mode, anonymous + user/password, list / stat / read text/base64. `ftp://<id>/<path>` scheme; Connections page form picker; `Connection::Ftp` registry variant.
+- [ ] **FTPS** (explicit + implicit TLS): suppaftp's `secure` feature, needs rustls/native-tls.
+- [ ] **FTP write ops**: mkdir / rename / remove / upload — write-path parity with SFTP.
+- [ ] **FTP / FTPS legacy line item** below: `suppaftp` with `async-tls`; passive mode default; explicit + implicit TLS
 - [ ] **SMB**: `pavao` (pure-Rust SMB2/3) — works without OS-level mounts and without admin rights on Windows
 - [ ] Auth UX: anonymous toggle for FTP, workgroup/domain field for SMB
 - [ ] Path translation: SMB shares as virtual roots (`smb://host/share/...`)

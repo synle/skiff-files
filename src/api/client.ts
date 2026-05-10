@@ -28,18 +28,24 @@ import {
   connRename,
   connStat,
 } from "./conn";
-import { formatSftp, isRemote, parseLocation } from "../util/location";
+import { formatFtp, formatSftp, isRemote, parseLocation } from "../util/location";
 import {
   syncStartCross,
   syncStartLocal,
   type JobOptions,
 } from "./sync";
 
-/** Re-shape a remote Entry so its `path` field is the full sftp:// form
- *  rather than the bare server-side path. Required because the rest of
- *  the app consumes Entry.path as the destination of "open this entry". */
-function reshapeRemote(e: Entry, connectionId: string): Entry {
-  return { ...e, path: formatSftp(connectionId, e.path) };
+/** Re-shape a remote Entry so its `path` field is the full
+ *  `<scheme>://<id>/...` form rather than the bare server-side
+ *  path. Required because the rest of the app consumes
+ *  Entry.path as the destination of "open this entry". */
+function reshapeRemote(
+  e: Entry,
+  connectionId: string,
+  scheme: "sftp" | "ftp",
+): Entry {
+  const formatter = scheme === "ftp" ? formatFtp : formatSftp;
+  return { ...e, path: formatter(connectionId, e.path) };
 }
 
 /** Backend-agnostic directory listing. */
@@ -48,10 +54,11 @@ export async function listDir(
   options?: ListOptions,
 ): Promise<Entry[]> {
   const loc = parseLocation(path);
-  if (loc.backend.kind === "sftp") {
+  if (loc.backend.kind !== "local") {
     const id = loc.backend.connectionId;
+    const kind = loc.backend.kind;
     const list = await connListDir(id, loc.remotePath, options);
-    return list.map((e) => reshapeRemote(e, id));
+    return list.map((e) => reshapeRemote(e, id, kind));
   }
   return fsListDir(path, options);
 }
@@ -59,9 +66,9 @@ export async function listDir(
 /** Backend-agnostic stat. */
 export async function stat(path: string): Promise<Entry> {
   const loc = parseLocation(path);
-  if (loc.backend.kind === "sftp") {
+  if (loc.backend.kind !== "local") {
     const id = loc.backend.connectionId;
-    return reshapeRemote(await connStat(id, loc.remotePath), id);
+    return reshapeRemote(await connStat(id, loc.remotePath), id, loc.backend.kind);
   }
   return fsStat(path);
 }
@@ -69,7 +76,7 @@ export async function stat(path: string): Promise<Entry> {
 /** Backend-agnostic text preview. */
 export async function readText(path: string): Promise<string> {
   const loc = parseLocation(path);
-  if (loc.backend.kind === "sftp") {
+  if (loc.backend.kind !== "local") {
     return connReadText(loc.backend.connectionId, loc.remotePath);
   }
   return fsReadText(path);
@@ -78,7 +85,7 @@ export async function readText(path: string): Promise<string> {
 /** Backend-agnostic base64 read. */
 export async function readBase64(path: string): Promise<string> {
   const loc = parseLocation(path);
-  if (loc.backend.kind === "sftp") {
+  if (loc.backend.kind !== "local") {
     return connReadBase64(loc.backend.connectionId, loc.remotePath);
   }
   return fsReadBase64(path);

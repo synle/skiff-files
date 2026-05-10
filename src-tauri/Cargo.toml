@@ -30,6 +30,12 @@ fs4 = "0.13"
 russh = "0.45"
 russh-sftp = "2"
 russh-keys = "0.45"
+# Plain FTP client (no FTPS yet — would need the `secure` feature
+# + rustls/native-tls; deferred until we get docker-based
+# integration tests up). Anonymous + user/pass auth are enough to
+# browse the public FTP mirrors that drove this protocol's
+# original include in TODO.md.
+suppaftp = "8"
 uuid = { version = "1", features = ["v4"] }
 kamadak-exif = "0.6"
 # Image decode + re-encode for `fs_image_rotate`. We pin

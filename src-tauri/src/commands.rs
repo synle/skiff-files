@@ -6,6 +6,7 @@
 //! `lib.rs` stays a one-liner per command — easier to scan and reorder.
 
 use crate::fs::local::{self, DirSummary};
+use crate::fs::ftp::{FtpClient, FtpConfig};
 use crate::fs::registry::{Connection, ConnectionInfo, ConnectionKind, Registry};
 use crate::fs::sftp::{SftpClient, SftpConfig};
 use crate::fs::ssh_config::{load_ssh_config_hosts, SshConfigHost};
@@ -1458,6 +1459,32 @@ pub async fn conn_create_sftp(
     Ok(id)
 }
 
+/// Open a new plain-FTP connection. Anonymous login (the default
+/// user / password values) is the common case for browsing public
+/// mirrors; the form on the Connections page exposes user /
+/// password fields for authenticated drops. FTPS isn't supported
+/// yet (Phase 3b).
+#[tauri::command]
+pub async fn conn_create_ftp(
+    config: FtpConfig,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<String> {
+    let label = if config.user == "anonymous" {
+        format!("{}:{}", config.host, config.port)
+    } else {
+        format!("{}@{}:{}", config.user, config.host, config.port)
+    };
+    let client = FtpClient::connect(config).await?;
+    let id = registry.insert(
+        ConnectionKind::Ftp,
+        label,
+        // FtpClient::connect already wraps in Arc<>, but
+        // Connection::Ftp stores its own Arc — unwrap and rewrap.
+        Connection::Ftp(client),
+    );
+    Ok(id)
+}
+
 /// Resolve the known-hosts file path under `app_data_dir()`. Mirrors
 /// `settings_path` but for SFTP host-key pinning state.
 fn known_hosts_path(app: &tauri::AppHandle) -> FsResult<std::path::PathBuf> {
@@ -1546,10 +1573,12 @@ pub async fn conn_list_dir(
     options: Option<ListOptions>,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<Vec<Entry>> {
-    let client = registry.get_sftp(&id)?;
-    client
-        .list_dir(&path, options.unwrap_or_default())
-        .await
+    let opts = options.unwrap_or_default();
+    match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => client.list_dir(&path, opts).await,
+        Some(Connection::Ftp(client)) => client.list_dir(&path, opts).await,
+        None => Err(format!("connection not found: {id}")),
+    }
 }
 
 #[tauri::command]
@@ -1558,8 +1587,11 @@ pub async fn conn_stat(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<Entry> {
-    let client = registry.get_sftp(&id)?;
-    client.stat(&path).await
+    match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => client.stat(&path).await,
+        Some(Connection::Ftp(client)) => client.stat(&path).await,
+        None => Err(format!("connection not found: {id}")),
+    }
 }
 
 #[tauri::command]
@@ -1568,8 +1600,15 @@ pub async fn conn_read_text(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<String> {
-    let client = registry.get_sftp(&id)?;
-    client.read_text(&path, TEXT_PREVIEW_MAX_BYTES).await
+    match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => {
+            client.read_text(&path, TEXT_PREVIEW_MAX_BYTES).await
+        }
+        Some(Connection::Ftp(client)) => {
+            client.read_text(&path, TEXT_PREVIEW_MAX_BYTES).await
+        }
+        None => Err(format!("connection not found: {id}")),
+    }
 }
 
 #[tauri::command]
@@ -1578,8 +1617,15 @@ pub async fn conn_read_base64(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<String> {
-    let client = registry.get_sftp(&id)?;
-    client.read_base64(&path, IMAGE_PREVIEW_MAX_BYTES).await
+    match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => {
+            client.read_base64(&path, IMAGE_PREVIEW_MAX_BYTES).await
+        }
+        Some(Connection::Ftp(client)) => {
+            client.read_base64(&path, IMAGE_PREVIEW_MAX_BYTES).await
+        }
+        None => Err(format!("connection not found: {id}")),
+    }
 }
 
 #[tauri::command]
