@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- App icon for Skiff Files.
+       Design: a manila-tab folder (in cool neutral slate) with a
+       small sailing-skiff motif on the front. The palette is four
+       flat colors picked to read on both light and dark dock /
+       taskbar backgrounds — no warm accents that would clash with
+       a Mojave-blue or Catalina-graphite system theme. -->
+
+  <!-- Folder back + tab. The tab sits top-left and uses smooth
+       quadratic curves at the corner where the tab meets the
+       body so the silhouette stays clean at 32×32. Slate-600. -->
+  <path fill="#4B5563" d="
+    M 112 200
+    H 408 Q 432 200 432 224
+    V 256 Q 432 280 456 280
+    H 912 Q 936 280 936 304
+    V 912 Q 936 936 912 936
+    H 112 Q  88 936  88 912
+    V 224 Q  88 200 112 200 Z
+  "/>
+
+  <!-- Folder front. Rounded rect that sits on top of the back +
+       tab so the user reads "tab pokes up above the body". The
+       8 px gap between back-top (y=280) and front-top (y=320)
+       creates a thin strip of darker back, the implied "edge"
+       of the folder. Slate-500. -->
+  <rect x="88" y="320" width="848" height="616" rx="24" ry="24" fill="#6B7280"/>
+
+  <!-- Skiff motif on the folder front. Three flat shapes:
+       mast (vertical bar), sail (triangle to right of mast),
+       hull (trapezoid). Dark slate + off-white so the boat
+       reads against the slate-500 folder face. -->
+  <rect x="412" y="436" width="16" height="312" fill="#1F2937"/>
+  <path fill="#F8FAFC" d="M 432 456 L 432 736 L 728 736 Z"/>
+  <path fill="#1F2937" d="M 304 744 L 720 744 L 664 816 L 360 816 Z"/>
+</svg>
