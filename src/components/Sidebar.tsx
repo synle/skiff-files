@@ -21,6 +21,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import HubIcon from "@mui/icons-material/Hub";
+import CloudIcon from "@mui/icons-material/Cloud";
 import StorageIcon from "@mui/icons-material/Storage";
 import UsbIcon from "@mui/icons-material/Usb";
 import CircleIcon from "@mui/icons-material/Circle";
@@ -1754,11 +1755,22 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
           </List>
         ) : (
           <List dense disablePadding>
-            {connections.map((c) => (
+            {connections.map((c) => {
+              // After 0.2.246 we have multiple remote kinds — pick
+              // the address-bar scheme + the kind-specific icon
+              // here instead of hardcoding `sftp://`. The kind label
+              // is uppercased so it reads as a protocol tag (FTP /
+              // SFTP) in the connection's tooltip.
+              const scheme = c.kind === "ftp" ? "ftp" : "sftp";
+              const kindLabel = c.kind.toUpperCase();
+              const tooltip = `${kindLabel} · ${c.label}`;
+              const KindIcon = c.kind === "ftp" ? CloudIcon : HubIcon;
+              return (
               <ListItem key={c.id} disablePadding>
+                <Tooltip title={tooltip} placement="right">
                 <ListItemButton
                   onClick={() =>
-                    onNavigate(`sftp://${c.id}/`)
+                    onNavigate(`${scheme}://${c.id}/`)
                   }
                   // Drag-drop target: dropping a Skiff selection here
                   // starts a Skiffsync job from the dragged paths to a
@@ -1786,7 +1798,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                       // Nest each entry under <dest>/<basename>.
                       const segs = p.split(/[\\/]/).filter(Boolean);
                       const base = segs.at(-1) ?? p;
-                      const target = `sftp://${c.id}${remoteDest.endsWith("/") ? remoteDest : remoteDest + "/"}${base}`;
+                      const target = `${scheme}://${c.id}${remoteDest.endsWith("/") ? remoteDest : remoteDest + "/"}${base}`;
                       void startSync(p, target, {
                         maxSizeGb: 100,
                         conflictPolicy: "skip",
@@ -1795,18 +1807,18 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                       });
                     }
                   }}
-                  aria-label={`Browse ${c.label}`}
+                  aria-label={`Browse ${kindLabel} ${c.label}`}
                 >
                   <ListItemIcon sx={{ minWidth: 32 }}>
                     {settings.sidebarShowStatusDots ? (
-                      <Tooltip title="Connected">
+                      <Tooltip title={`${kindLabel} connected`}>
                         <CircleIcon
-                          aria-label="Connection status: connected"
+                          aria-label={`${kindLabel} status: connected`}
                           sx={{ fontSize: 10, color: "success.main" }}
                         />
                       </Tooltip>
                     ) : (
-                      <HubIcon fontSize="small" />
+                      <KindIcon fontSize="small" />
                     )}
                   </ListItemIcon>
                   <ListItemText
@@ -1816,8 +1828,10 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     }}
                   />
                 </ListItemButton>
+                </Tooltip>
               </ListItem>
-            ))}
+              );
+            })}
             <ListItem disablePadding>
               <ListItemButton onClick={() => onSwitchPage("connections")}>
                 <ListItemIcon sx={{ minWidth: 32 }}>
