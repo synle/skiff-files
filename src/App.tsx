@@ -624,6 +624,26 @@ function buildCommandActions(deps: {
         },
       },
     ]),
+    // Saved sync-job templates — palette dispatches the saved id;
+    // TransfersPage resolves and runs it via the existing handler.
+    ...settings.savedSyncJobs.map((j) => ({
+      id: `syncjob.${j.id}`,
+      label: `Run sync job: ${j.label}`,
+      hint: `${j.src} → ${j.dest} · ${j.conflictPolicy}`,
+      keywords: `sync skiffsync transfer copy ${j.label}`,
+      run: () => {
+        const ok = window.confirm(
+          `Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`,
+        );
+        if (!ok) return;
+        setPage("transfers");
+        queueMicrotask(() =>
+          window.dispatchEvent(
+            new CustomEvent("skiff:run-sync-job", { detail: j.id }),
+          ),
+        );
+      },
+    })),
     // Saved selection groups — palette restoration. Browser listens
     // for the event, picks paths that exist in the current folder.
     ...settings.savedSelections.map((s) => ({

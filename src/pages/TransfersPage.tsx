@@ -229,6 +229,27 @@ export default function TransfersPage() {
     };
   }, []);
 
+  // Command-palette dispatched run — receives a saved-job id, runs
+  // the matching template via the same handler the in-page Run
+  // button uses. We resolve the job by id at dispatch time so a
+  // stale palette action (saved job already deleted) silently
+  // no-ops instead of running garbage.
+  useEffect(() => {
+    const onRun = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      const job = (settings.savedSyncJobs as SavedJob[]).find(
+        (j) => j.id === id,
+      );
+      if (job) void handleRunSavedJob(job);
+    };
+    window.addEventListener("skiff:run-sync-job", onRun);
+    return () => window.removeEventListener("skiff:run-sync-job", onRun);
+    // handleRunSavedJob closes over current settings/state; depend
+    // on the saved-jobs list so a fresh save is reflected on the
+    // next dispatch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.savedSyncJobs]);
+
   const handleStart = async () => {
     setError(null);
     setBusy(true);
