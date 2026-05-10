@@ -210,6 +210,93 @@ impl FtpClient {
         Ok(B64.encode(bytes))
     }
 
+    /// Recursive `mkdir -p`. FTP's `MKD` only creates a single level,
+    /// so we walk the path components and ignore "already exists"
+    /// failures the same way SFTP does. Most servers respond
+    /// `550 File exists` for that case — we sniff on the substring
+    /// rather than parse the FTP reply code because servers vary.
+    pub async fn mkdir(&self, path: &str) -> FsResult<()> {
+        let path = path.to_string();
+        let mut stream = self.stream.lock().await;
+        tokio::task::block_in_place(|| -> FsResult<()> {
+            // Walk components, building the prefix one segment at a
+            // time. We treat any failure that mentions "exists" /
+            // "550" as a non-error so this stays idempotent.
+            let mut acc = String::new();
+            for seg in path.split('/').filter(|s| !s.is_empty()) {
+                if !acc.ends_with('/') {
+                    acc.push('/');
+                }
+                acc.push_str(seg);
+                if let Err(e) = stream.mkdir(&acc) {
+                    let msg = e.to_string().to_lowercase();
+                    if !msg.contains("exist") && !msg.contains("550") {
+                        return Err(format!("mkdir({acc}): {e}"));
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Rename / same-server move via FTP's `RNFR` + `RNTO`. suppaftp
+    /// exposes this as a single `rename` call — works for both files
+    /// and directories on servers that honor the standard. Same-FS
+    /// moves only; cross-server moves go through Skiffsync.
+    pub async fn rename(&self, from: &str, to: &str) -> FsResult<()> {
+        let from = from.to_string();
+        let to = to.to_string();
+        let mut stream = self.stream.lock().await;
+        tokio::task::block_in_place(|| {
+            stream
+                .rename(&from, &to)
+                .map_err(|e| format!("rename({from} -> {to}): {e}"))
+        })
+    }
+
+    /// Remove a file (DELE) or directory (RMD). We stat the path
+    /// first to pick the right command since FTP has separate verbs.
+    /// Directory removal is non-recursive — we walk the listing
+    /// ourselves to mirror SFTP's behavior. There's no server-side
+    /// trash; this is a permanent delete and the frontend should
+    /// confirm before invoking.
+    pub async fn remove(&self, path: &str) -> FsResult<()> {
+        // The recursion happens at the application layer, not inside
+        // the locked stream, so each iteration grabs + releases the
+        // mutex. Cheap enough — directory trees are usually shallow.
+        let entry = self.stat(path).await?;
+        if entry.is_dir {
+            // Walk children + recurse before removing the parent.
+            let kids = self
+                .list_dir(
+                    path,
+                    ListOptions {
+                        show_hidden: true,
+                    },
+                )
+                .await?;
+            for child in kids {
+                Box::pin(self.remove(&child.path)).await?;
+            }
+            let path = path.to_string();
+            let mut stream = self.stream.lock().await;
+            tokio::task::block_in_place(|| {
+                stream
+                    .rmdir(&path)
+                    .map_err(|e| format!("rmdir({path}): {e}"))
+            })?;
+        } else {
+            let path = path.to_string();
+            let mut stream = self.stream.lock().await;
+            tokio::task::block_in_place(|| {
+                stream
+                    .rm(&path)
+                    .map_err(|e| format!("rm({path}): {e}"))
+            })?;
+        }
+        Ok(())
+    }
+
     /// Internal: pull `max_bytes` into memory. FTP's `retr` returns
     /// an opaque cursor — we drain it bytewise + cap at the limit
     /// (truncate rather than error, mirrors SFTP text-preview

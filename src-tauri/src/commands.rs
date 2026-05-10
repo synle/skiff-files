@@ -1645,8 +1645,11 @@ pub async fn conn_mkdir(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<()> {
-    let client = registry.get_sftp(&id)?;
-    client.mkdir(&path).await
+    match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => client.mkdir(&path).await,
+        Some(Connection::Ftp(client)) => client.mkdir(&path).await,
+        None => Err(format!("connection not found: {id}")),
+    }
 }
 
 /// Remote rename / same-FS move.
@@ -1657,8 +1660,11 @@ pub async fn conn_rename(
     to: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<()> {
-    let client = registry.get_sftp(&id)?;
-    client.rename(&from, &to).await
+    match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => client.rename(&from, &to).await,
+        Some(Connection::Ftp(client)) => client.rename(&from, &to).await,
+        None => Err(format!("connection not found: {id}")),
+    }
 }
 
 /// Remote remove. Recursive for directories. There's no "send to trash"
@@ -1670,8 +1676,11 @@ pub async fn conn_remove(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<()> {
-    let client = registry.get_sftp(&id)?;
-    client.remove(&path).await
+    match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => client.remove(&path).await,
+        Some(Connection::Ftp(client)) => client.remove(&path).await,
+        None => Err(format!("connection not found: {id}")),
+    }
 }
 
 // ---------- Sync commands (Phase 4a) ----------
