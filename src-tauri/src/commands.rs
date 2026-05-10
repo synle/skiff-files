@@ -1221,12 +1221,22 @@ const FIND_MAX_SECS: u64 = 10;
 /// _recycleBin) are skipped — the typical "find under home" use case
 /// rarely wants matches there.
 #[tauri::command]
-pub fn fs_find(path: String, query: String) -> FsResult<Vec<Entry>> {
+pub fn fs_find(
+    path: String,
+    query: String,
+    // Match the query as a JS-flavored regex. Defaults to false so
+    // existing callers (pre-0.2.202) keep their substring behavior.
+    regex: Option<bool>,
+    // Case-sensitive substring / regex match. Defaults to false.
+    case_sensitive: Option<bool>,
+) -> FsResult<Vec<Entry>> {
     local::find(
         Path::new(&path),
         &query,
         FIND_MAX_RESULTS,
         FIND_MAX_SECS,
+        regex.unwrap_or(false),
+        case_sensitive.unwrap_or(false),
     )
 }
 

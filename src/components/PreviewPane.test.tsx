@@ -98,11 +98,13 @@ describe("PreviewPane", () => {
     });
   });
 
-  it("shows 'no inline preview' for binary kinds", () => {
+  it("kicks the hex preview for binary kinds", () => {
+    // 0.2.202 swapped the "no inline preview" message for an actual
+    // hex dump body. Initial render shows the loading hint until
+    // readBase64 resolves; the test just asserts we entered the
+    // hex-body code path rather than the fallthrough message.
     r({ selected: blob });
-    expect(
-      screen.getByText(/No inline preview for this kind/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Loading hex preview/i)).toBeInTheDocument();
   });
 
   it("cancels in-flight loads when selection changes", async () => {

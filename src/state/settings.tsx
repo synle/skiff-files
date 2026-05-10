@@ -110,6 +110,10 @@ export interface Settings {
    *  active. Same FOLDER_VIEW_MAX cap so settings.json stays bounded.
    *  Values match the KindGroup enum from KindFilterBar. */
   folderKindFilter: Record<string, string[]>;
+  /** Per-folder active tag-filter colors. Empty array (or missing
+   *  key) = no tag filter. Values are TagColor strings. Same LRU
+   *  bound as folderKindFilter. */
+  folderTagFilter: Record<string, string[]>;
   /** Default conflict policy for new sync jobs. The Transfers form
    *  reads this on mount; saved-job templates always carry their
    *  own policy and ignore this. */
@@ -310,6 +314,7 @@ export const DEFAULTS: Settings = {
   defaultSortDir: "asc",
   folderSort: {},
   folderKindFilter: {},
+  folderTagFilter: {},
   syncDefaultConflictPolicy: "skip",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,

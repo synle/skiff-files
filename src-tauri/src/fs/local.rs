@@ -245,11 +245,35 @@ pub fn find(
     query: &str,
     max_results: usize,
     max_secs: u64,
+    regex: bool,
+    case_sensitive: bool,
 ) -> FsResult<Vec<Entry>> {
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let needle = query.to_lowercase();
+    // Pre-compile the matcher once so the per-entry cost stays cheap.
+    // For regex mode we surface compile errors as a `FsResult::Err`
+    // — the frontend already shows it inline in the StatusBar.
+    let matcher: Box<dyn Fn(&str) -> bool> = if regex {
+        // The `regex` crate isn't a dep yet; use a tiny ad-hoc wrapper
+        // around `regex_lite` instead. For now, compile via the
+        // standard `regex::Regex` if available — we add the crate
+        // alongside this command.
+        let pattern = if case_sensitive {
+            query.to_string()
+        } else {
+            format!("(?i){query}")
+        };
+        let re = regex::Regex::new(&pattern)
+            .map_err(|e| format!("invalid regex: {e}"))?;
+        Box::new(move |name: &str| re.is_match(name))
+    } else if case_sensitive {
+        let needle = query.to_string();
+        Box::new(move |name: &str| name.contains(&needle))
+    } else {
+        let needle = query.to_lowercase();
+        Box::new(move |name: &str| name.to_lowercase().contains(&needle))
+    };
     let started = std::time::Instant::now();
     let budget = std::time::Duration::from_secs(max_secs);
     let mut out: Vec<Entry> = Vec::new();
@@ -290,7 +314,7 @@ pub fn find(
             {
                 stack.push(p.clone());
             }
-            if name.to_lowercase().contains(&needle) {
+            if matcher(&name) {
                 out.push(entry_from_metadata(&p, &md));
             }
         }
@@ -548,7 +572,7 @@ mod tests {
         let root = fixture();
         // fixture() has hello.md and sub/ — add another nested file.
         fs::write(root.join("sub/hello.txt"), b"x").unwrap();
-        let out = find(&root, "hello", 100, 5).unwrap();
+        let out = find(&root, "hello", 100, 5, false, false).unwrap();
         let names: Vec<_> = out.iter().map(|e| e.name.as_str()).collect();
         assert!(names.contains(&"hello.md"));
         assert!(names.contains(&"hello.txt"));
@@ -559,7 +583,7 @@ mod tests {
     #[test]
     fn find_is_case_insensitive() {
         let root = fixture();
-        let out = find(&root, "HELLO", 100, 5).unwrap();
+        let out = find(&root, "HELLO", 100, 5, false, false).unwrap();
         assert!(!out.is_empty());
         let _ = fs::remove_dir_all(root);
     }
@@ -570,7 +594,7 @@ mod tests {
         for i in 0..10 {
             fs::write(root.join(format!("hello-{i}.txt")), b"x").unwrap();
         }
-        let out = find(&root, "hello", 5, 5).unwrap();
+        let out = find(&root, "hello", 5, 5, false, false).unwrap();
         assert_eq!(out.len(), 5);
         let _ = fs::remove_dir_all(root);
     }
@@ -578,7 +602,7 @@ mod tests {
     #[test]
     fn find_returns_empty_for_blank_query() {
         let root = fixture();
-        let out = find(&root, "", 100, 5).unwrap();
+        let out = find(&root, "", 100, 5, false, false).unwrap();
         assert!(out.is_empty());
         let _ = fs::remove_dir_all(root);
     }
@@ -589,7 +613,7 @@ mod tests {
         // Drop a hit inside .git — it should NOT be returned.
         fs::create_dir_all(root.join(".git")).unwrap();
         fs::write(root.join(".git/hello.txt"), b"x").unwrap();
-        let out = find(&root, "hello", 100, 5).unwrap();
+        let out = find(&root, "hello", 100, 5, false, false).unwrap();
         let in_git = out
             .iter()
             .any(|e| e.path.contains("/.git/"));

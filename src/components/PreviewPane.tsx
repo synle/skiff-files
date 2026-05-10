@@ -415,6 +415,105 @@ function TextBody({ entry }: { entry: Entry }) {
   );
 }
 
+/** Hex-dump body for unknown / binary kinds up to ~32 KB. Renders
+ *  in the classic offset / 16-byte-row / ASCII-side layout that hex
+ *  editors use, so the user can spot file magic ("PK\x03\x04" for
+ *  zip, "%PDF" for PDF, etc.) without leaving the app.
+ *
+ *  Larger files render only the first 32 KB with a notice — that's
+ *  enough to identify a format, and avoids ballooning a preview tab
+ *  with a half-megabyte string. */
+function HexBody({ entry }: { entry: Entry }) {
+  const [bytes, setBytes] = useState<Uint8Array | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState(false);
+  const HEX_LIMIT = 32 * 1024;
+
+  useEffect(() => {
+    let cancelled = false;
+    setBytes(null);
+    setError(null);
+    setTruncated(false);
+    readBase64(entry.path)
+      .then((b64) => {
+        if (cancelled) return;
+        // atob → Uint8Array. We deliberately don't go through TextEncoder
+        // since the bytes are arbitrary, not text. Capped at HEX_LIMIT
+        // so a 16 MB image being mis-categorized doesn't blow up the
+        // render.
+        const raw = atob(b64);
+        const total = raw.length;
+        const len = Math.min(total, HEX_LIMIT);
+        const arr = new Uint8Array(len);
+        for (let i = 0; i < len; i++) arr[i] = raw.charCodeAt(i);
+        setBytes(arr);
+        setTruncated(total > HEX_LIMIT);
+      })
+      .catch((e) => !cancelled && setError(String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.path]);
+
+  if (error) {
+    return (
+      <Typography variant="caption" color="error">
+        {error}
+      </Typography>
+    );
+  }
+  if (!bytes) {
+    return (
+      <Typography variant="caption" color="text.secondary">
+        Loading hex preview…
+      </Typography>
+    );
+  }
+  // Build the dump as a single string — joining once is cheaper than
+  // mapping per-row to elements at the few-hundred-row scale this
+  // body operates at.
+  const lines: string[] = [];
+  const COLS = 16;
+  for (let off = 0; off < bytes.length; off += COLS) {
+    const slice = bytes.subarray(off, off + COLS);
+    const hex = Array.from(slice)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(" ")
+      .padEnd(COLS * 3 - 1, " ");
+    const ascii = Array.from(slice)
+      .map((b) => (b >= 0x20 && b <= 0x7e ? String.fromCharCode(b) : "."))
+      .join("");
+    const offHex = off.toString(16).padStart(8, "0");
+    lines.push(`${offHex}  ${hex}  ${ascii}`);
+  }
+  return (
+    <Box>
+      <Box
+        component="pre"
+        className="skiff-selectable"
+        sx={{
+          m: 0,
+          p: 1,
+          maxHeight: 360,
+          overflow: "auto",
+          bgcolor: "action.hover",
+          borderRadius: 1,
+          fontSize: "0.7rem",
+          fontFamily: "monospace",
+          lineHeight: 1.4,
+        }}
+      >
+        {lines.join("\n")}
+      </Box>
+      {truncated && (
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+          Showing first {HEX_LIMIT.toLocaleString()} bytes
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 /** Folder summary body — recursive count + total size. */
 function FolderBody({ entry }: { entry: Entry }) {
   const [summary, setSummary] = useState<DirSummary | null>(null);
@@ -492,6 +591,12 @@ function Body({
     entry.kind === "code"
   ) {
     return <TextBody entry={entry} />;
+  }
+  // Hex dump for unrecognized binary content — handy for spotting
+  // file magic ("PK\x03\x04" zip, "%PDF" PDF, "\x7FELF" ELF) when
+  // the extension is wrong or missing.
+  if (entry.kind === "binary" || entry.kind === "unknown") {
+    return <HexBody entry={entry} />;
   }
   return (
     <Typography variant="caption" color="text.secondary">

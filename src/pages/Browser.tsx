@@ -124,10 +124,6 @@ export default function Browser({
   // group set isn't yet persisted (TODO: per-folder LRU like
   // folderViewMode).
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
-  // Tag filter: session-only for now. Per-folder persistence could
-  // join Settings.folderTagFilter on the same LRU pattern as
-  // folderKindFilter when there's enough demand.
-  const [tagFilter, setTagFilter] = useState<TagColor[]>([]);
   /** When set, the archive-viewer dialog is open against this path. */
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
     null,
@@ -247,6 +243,34 @@ export default function Browser({
       }
     },
     [path, settings.folderKindFilter, update],
+  );
+
+  // Per-folder tag filter — same LRU shape as folderKindFilter. The
+  // tag chip strip writes through the setter, which trims overflow
+  // entries when the per-folder map exceeds 200 keys.
+  const tagFilter = useMemo<TagColor[]>(() => {
+    if (!path) return [];
+    return (settings.folderTagFilter[path] ?? []) as TagColor[];
+  }, [path, settings.folderTagFilter]);
+  const setTagFilter = useCallback(
+    (next: TagColor[]) => {
+      if (!path) return;
+      const map = { ...settings.folderTagFilter };
+      if (next.length === 0) {
+        delete map[path];
+      } else {
+        map[path] = next;
+      }
+      const keys = Object.keys(map);
+      if (keys.length > 200) {
+        const trimmed: typeof map = {};
+        for (const k of keys.slice(keys.length - 200)) trimmed[k] = map[k];
+        update("folderTagFilter", trimmed);
+      } else {
+        update("folderTagFilter", map);
+      }
+    },
+    [path, settings.folderTagFilter, update],
   );
 
   // Resolve home dir + start path on mount. We tolerate the initial call
@@ -1112,15 +1136,34 @@ export default function Browser({
     }
     let cancelled = false;
     const timer = setTimeout(() => {
-      void fsFind(path, search)
-        .then((rs) => !cancelled && setFindResults(rs))
-        .catch((e) => !cancelled && setError(String(e)));
+      void fsFind(path, search, {
+        regex: searchRegex,
+        caseSensitive: searchCaseSensitive,
+      })
+        .then((rs) => {
+          if (cancelled) return;
+          setFindResults(rs);
+          // A previously-bad regex becomes good — clear the error.
+          if (searchError) setSearchError(null);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          // Regex compile errors come back as `Err(String)` from Rust;
+          // surface inline rather than the global error banner.
+          const msg = String(e);
+          if (msg.includes("invalid regex")) {
+            setSearchError(msg);
+            setFindResults([]);
+          } else {
+            setError(msg);
+          }
+        });
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [search, searchRecursive, path]);
+  }, [search, searchRecursive, searchRegex, searchCaseSensitive, path, searchError]);
 
   /** Aggregate stats over the multi-selection. Memoized so a 100k-entry
    *  folder doesn't re-walk on every keystroke. */
