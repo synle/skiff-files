@@ -30,6 +30,7 @@ import {
 } from "../api/sync";
 import { computeEta, pushSample, type EtaSample } from "../util/etaTracker";
 import ProgressWidget from "./ProgressWidget";
+import { useSettings } from "../state/settings";
 
 interface JobUiState {
   info: JobInfo;
@@ -38,8 +39,11 @@ interface JobUiState {
 }
 
 export default function OperationsDrawer() {
+  const { settings, update } = useSettings();
   const [jobs, setJobs] = useState<Record<string, JobUiState>>({});
-  const [expanded, setExpanded] = useState(true);
+  const expanded = settings.operationsDrawerExpanded;
+  const setExpanded = (next: boolean) =>
+    update("operationsDrawerExpanded", next);
   /** When true, the drawer is hidden until a new job starts. Used by
    *  the user pressing the × — we don't unsubscribe from events
    *  because that'd break the "drawer reappears on next job" UX. */
@@ -150,7 +154,7 @@ export default function OperationsDrawer() {
         <Tooltip title={expanded ? "Collapse" : "Expand"}>
           <IconButton
             size="small"
-            onClick={() => setExpanded((x) => !x)}
+            onClick={() => setExpanded(!expanded)}
             aria-label={expanded ? "Collapse operations drawer" : "Expand operations drawer"}
           >
             {expanded ? (

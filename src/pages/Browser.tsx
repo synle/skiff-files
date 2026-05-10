@@ -608,13 +608,31 @@ export default function Browser({
         setPreviewOpen((o) => !o);
         return;
       }
-      if (!(e.metaKey || e.ctrlKey)) return;
-      const k = e.key.toLowerCase();
-      if (k === "l" && !e.shiftKey) {
+      if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "browser.focusPathBar",
+            "cmd+l",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
         // Browser muscle memory: Cmd/Ctrl+L = jump to address bar.
         e.preventDefault();
         setPathBarFocusRequest((c) => c + 1);
-      } else if (k === "d" && !e.shiftKey) {
+        return;
+      }
+      if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "browser.bookmarkCurrent",
+            "cmd+d",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
         // Browser muscle memory: Cmd/Ctrl+D = bookmark current page.
         // No-op when the current path is already bookmarked.
         if (!path) return;
@@ -626,7 +644,11 @@ export default function Browser({
           ...settings.bookmarks,
           { id: crypto.randomUUID(), label, path },
         ]);
-      } else if (k === "v" && !e.shiftKey) {
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "v" && !e.shiftKey) {
         // Cmd/Ctrl+V = paste files from the file clipboard into the
         // current folder. Each path becomes a Skiffsync src; the
         // engine handles cross-protocol cleanly. On `cut`, source

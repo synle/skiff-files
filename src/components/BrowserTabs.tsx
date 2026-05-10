@@ -23,6 +23,7 @@ import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import Browser from "../pages/Browser";
 import { useSettings } from "../state/settings";
+import { activeCombo, matchesCombo } from "../util/keybindings";
 import { OPEN_IN_TAB_EVENT } from "../App";
 
 interface TabRow {
@@ -269,27 +270,50 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
   // in the path bar doesn't close the tab.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) {
         return;
       }
-      const k = e.key.toLowerCase();
-      if (k === "t" && e.shiftKey) {
-        // Cmd/Ctrl+Shift+T → restore the most-recently-closed tab.
-        // Browser convention.
+      // Tab actions go through the rebindable framework. Restore-tab
+      // is checked first since its combo (Cmd+Shift+T) is a strict
+      // superset of the new-tab combo (Cmd+T).
+      if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "tabs.restoreClosedTab",
+            "cmd+shift+t",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
         e.preventDefault();
         restoreClosedTab();
         return;
-      } else if (k === "t") {
+      }
+      if (
+        matchesCombo(
+          e,
+          activeCombo("tabs.newTab", "cmd+t", settings.shortcutOverrides),
+        )
+      ) {
         e.preventDefault();
         addTab();
         return;
-      } else if (k === "w") {
+      }
+      if (
+        matchesCombo(
+          e,
+          activeCombo("tabs.closeTab", "cmd+w", settings.shortcutOverrides),
+        )
+      ) {
         e.preventDefault();
         closeTab(activeId);
-      } else if (/^[1-9]$/.test(e.key)) {
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (/^[1-9]$/.test(e.key)) {
         const idx = Number(e.key) - 1;
         if (tabs[idx]) {
           e.preventDefault();

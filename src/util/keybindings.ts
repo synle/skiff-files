@@ -20,8 +20,11 @@ export function keyEventToCombo(e: KeyboardEvent): string | null {
     return null;
   }
   const parts: string[] = [];
-  if (e.metaKey) parts.push("cmd");
-  if (e.ctrlKey) parts.push("ctrl");
+  // Treat Cmd (macOS metaKey) and Ctrl (Windows / Linux) as one
+  // platform-neutral "primary" modifier emitted as "cmd". Bindings
+  // stay portable: a binding configured on macOS as Cmd+K matches
+  // a Ctrl+K press on Linux without per-platform branching.
+  if (e.metaKey || e.ctrlKey) parts.push("cmd");
   if (e.altKey) parts.push("alt");
   if (e.shiftKey) parts.push("shift");
   // Normalize key. Use e.code for symbol keys when available so the
@@ -52,12 +55,21 @@ function normalizeKey(key: string, code: string): string {
 }
 
 /** Test if a KeyboardEvent matches a stored combo. Empty / null
- *  `combo` always returns false (the binding is disabled). */
+ *  `combo` always returns false (the binding is disabled). The
+ *  stored combo is normalized so "ctrl+x" and "cmd+x" are
+ *  equivalent — see `keyEventToCombo` for the rationale. */
 export function matchesCombo(e: KeyboardEvent, combo: string | null | undefined): boolean {
   if (!combo) return false;
   const eventCombo = keyEventToCombo(e);
   if (!eventCombo) return false;
-  return eventCombo === combo.toLowerCase();
+  return eventCombo === normalizeCombo(combo);
+}
+
+/** Normalize a stored combo: lowercase + collapse `ctrl+` into the
+ *  platform-neutral `cmd+` so historical settings (or user input
+ *  that types Ctrl on a Mac out of habit) match cleanly. */
+function normalizeCombo(combo: string): string {
+  return combo.toLowerCase().replace(/\bctrl\+/g, "cmd+");
 }
 
 /** Pretty-printed display form for a combo. Capitalizes modifiers

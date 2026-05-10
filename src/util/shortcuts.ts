@@ -103,7 +103,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         actionId: "browser.refresh",
         defaultCombo: "cmd+r",
       },
-      { keys: "Cmd / Ctrl + L", description: "Edit path (focus path bar)" },
+      {
+        keys: "Cmd / Ctrl + L",
+        description: "Edit path (focus path bar)",
+        actionId: "browser.focusPathBar",
+        defaultCombo: "cmd+l",
+      },
       {
         keys: "Cmd / Ctrl + K",
         description: "Quick-jump (bookmarks + recent)",
@@ -128,7 +133,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         actionId: "browser.newFolder",
         defaultCombo: "cmd+shift+n",
       },
-      { keys: "Cmd / Ctrl + D", description: "Bookmark current folder" },
+      {
+        keys: "Cmd / Ctrl + D",
+        description: "Bookmark current folder",
+        actionId: "browser.bookmarkCurrent",
+        defaultCombo: "cmd+d",
+      },
       {
         keys: "F2",
         description: "Rename selected entry",
@@ -148,10 +158,30 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Tabs",
     items: [
-      { keys: "Cmd / Ctrl + T", description: "New tab" },
-      { keys: "Cmd / Ctrl + W", description: "Close active tab" },
-      { keys: "Cmd / Ctrl + Shift + T", description: "Restore last closed tab" },
-      { keys: "Cmd / Ctrl + N", description: "Open new window" },
+      {
+        keys: "Cmd / Ctrl + T",
+        description: "New tab",
+        actionId: "tabs.newTab",
+        defaultCombo: "cmd+t",
+      },
+      {
+        keys: "Cmd / Ctrl + W",
+        description: "Close active tab",
+        actionId: "tabs.closeTab",
+        defaultCombo: "cmd+w",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + T",
+        description: "Restore last closed tab",
+        actionId: "tabs.restoreClosedTab",
+        defaultCombo: "cmd+shift+t",
+      },
+      {
+        keys: "Cmd / Ctrl + N",
+        description: "Open new window",
+        actionId: "app.newWindow",
+        defaultCombo: "cmd+n",
+      },
       { keys: "Cmd / Ctrl + 1…9", description: "Switch to nth tab" },
       { keys: "Cmd / Ctrl + Shift + [ / ]", description: "Switch to previous / next tab" },
       { keys: "Cmd / Ctrl + Shift + ← / →", description: "Move active tab left / right" },

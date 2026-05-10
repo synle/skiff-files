@@ -57,21 +57,30 @@ export default function App() {
   // Both skip when an input is focused so they don't hijack typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      // Modifier guard intentionally near-but-not-at-the-top: any
+      // future rebindable action whose default is modifier-less
+      // would need to live above this line.
+      if (!(e.metaKey || e.ctrlKey) && !e.shiftKey) return;
       const k = e.key.toLowerCase();
-      if (k === "n" && !e.shiftKey) {
-        // Cmd/Ctrl+N opens a new top-level window. Multi-window
-        // support: each spawned window is a fresh React tree
-        // pointing at the same settings.json on disk; settings sync
-        // across windows via the `settings:changed` Tauri event.
+      if (
+        matchesCombo(
+          e,
+          activeCombo("app.newWindow", "cmd+n", settings.shortcutOverrides),
+        )
+      ) {
+        // Multi-window support: each spawned window is a fresh React
+        // tree pointing at the same settings.json on disk; settings
+        // sync across windows via the `settings:changed` Tauri event.
         e.preventDefault();
         void windowOpenNew().catch(() => {
           /* running outside Tauri / browser dev — silent fallback */
         });
-      } else if (
+        return;
+      }
+      if (
         matchesCombo(
           e,
           activeCombo("app.quickJump", "cmd+k", settings.shortcutOverrides),

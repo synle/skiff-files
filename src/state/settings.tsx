@@ -236,6 +236,11 @@ export interface Settings {
    *  - "short": YYYY-MM-DD HH:mm (compact)
    *  - "relative": "5m ago" / "3h ago" / "2d ago" — human-friendly */
   dateFormat: DateFormat;
+  /** Whether the bottom-right OperationsDrawer renders expanded
+   *  (showing each in-flight job's progress widget) or collapsed
+   *  to just the header. Persists so a user who collapses the
+   *  drawer doesn't have it re-expand on every new job. */
+  operationsDrawerExpanded: boolean;
 }
 
 export type DateFormat = "locale" | "iso" | "short" | "relative";
@@ -365,6 +370,7 @@ export const DEFAULTS: Settings = {
   shortcutOverrides: {},
   fileTags: {},
   dateFormat: "locale",
+  operationsDrawerExpanded: true,
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";
