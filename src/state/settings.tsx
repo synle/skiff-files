@@ -279,6 +279,22 @@ export interface Settings {
    *  is selected; missing paths are silently dropped. Capped at 50
    *  entries; oldest insertion-order entries dropped on overflow. */
   savedSelections: SavedSelection[];
+  /** Named tab workspaces — labeled snapshots of the tab strip
+   *  saved on demand. Useful for context switching ("project A
+   *  needs these 5 tabs, project B needs these 4"). Capped at 20
+   *  workspaces; oldest entries dropped on overflow. */
+  tabWorkspaces: TabWorkspace[];
+}
+
+export interface TabWorkspace {
+  id: string;
+  label: string;
+  /** ms-since-epoch wall-clock save time. Surfaces in the palette
+   *  hint so users can tell stale workspaces apart. */
+  savedAt: number;
+  /** Snapshot of the tab strip at save time (uses the same shape
+   *  as `savedTabs`). */
+  tabs: SavedTab[];
 }
 
 export interface SavedSelection {
@@ -439,6 +455,7 @@ export const DEFAULTS: Settings = {
   alwaysOnTop: false,
   savedSearches: [],
   savedSelections: [],
+  tabWorkspaces: [],
 };
 
 const STORAGE_KEY = "skiff-files.settings.v1";

@@ -9,6 +9,7 @@
 // opened, used for the tab strip.
 import {
   Box,
+  Divider,
   IconButton,
   Menu,
   MenuItem,
@@ -28,7 +29,7 @@ import {
   type SyntheticEvent,
 } from "react";
 import Browser from "../pages/Browser";
-import { useSettings } from "../state/settings";
+import { useSettings, type SavedTab } from "../state/settings";
 import { activeCombo, matchesCombo } from "../util/keybindings";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import { OPEN_IN_TAB_EVENT } from "../App";
@@ -165,12 +166,32 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
     // active Browser doesn't have access to other tabs.
     const onNewTab = () => addTab();
     const onRestoreTab = () => restoreClosedTab();
+    // Restore a saved workspace — replaces the current tab strip
+    // with the saved set. The palette confirms before dispatching
+    // so the destructive replace doesn't fire on a stray click.
+    const onRestoreWorkspace = (e: Event) => {
+      const ws = (e as CustomEvent<{ tabs: SavedTab[] }>).detail;
+      if (!ws || !ws.tabs || ws.tabs.length === 0) return;
+      setTabs(
+        ws.tabs.map((t) => ({
+          id: t.id,
+          label: t.label || "Home",
+          initialPath: t.initialPath,
+          currentPath: t.initialPath,
+          pinned: t.pinned,
+          customLabel: t.customLabel,
+        })),
+      );
+      setActiveId(ws.tabs[0].id);
+    };
     window.addEventListener("skiff:new-tab", onNewTab);
     window.addEventListener("skiff:restore-closed-tab", onRestoreTab);
+    window.addEventListener("skiff:restore-workspace", onRestoreWorkspace);
     return () => {
       window.removeEventListener(OPEN_IN_TAB_EVENT, onOpen);
       window.removeEventListener("skiff:new-tab", onNewTab);
       window.removeEventListener("skiff:restore-closed-tab", onRestoreTab);
+      window.removeEventListener("skiff:restore-workspace", onRestoreWorkspace);
     };
     // addTab / restoreClosedTab close over `home` and the tabs +
     // activeId state; the deps are intentionally loose so the
@@ -838,6 +859,38 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           }}
         >
           Close tabs to the right
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            setTabMenu(null);
+            const label = window.prompt(
+              `Save ${tabs.length} tab${tabs.length === 1 ? "" : "s"} as workspace:`,
+              "",
+            );
+            if (!label || !label.trim()) return;
+            const snapshot = tabs.slice(0, 20).map((t) => ({
+              id: t.id,
+              label: t.label,
+              initialPath: t.currentPath || t.initialPath,
+              pinned: t.pinned,
+              customLabel: t.customLabel,
+            }));
+            const next = [
+              ...settings.tabWorkspaces,
+              {
+                id: crypto.randomUUID(),
+                label: label.trim(),
+                savedAt: Date.now(),
+                tabs: snapshot,
+              },
+            ];
+            // Cap at 20; drop oldest by insertion order.
+            if (next.length > 20) next.splice(0, next.length - 20);
+            update("tabWorkspaces", next);
+          }}
+        >
+          Save all tabs as workspace…
         </MenuItem>
       </Menu>
 
