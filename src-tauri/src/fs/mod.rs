@@ -8,6 +8,7 @@ pub mod known_hosts;
 pub mod local;
 pub mod registry;
 pub mod sftp;
+pub mod smb;
 pub mod ssh_config;
 pub mod thumbnail;
 pub mod types;

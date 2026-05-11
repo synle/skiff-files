@@ -5,14 +5,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
-  Button,
   CircularProgress,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
   Snackbar,
-  Typography,
 } from "@mui/material";
 import ContentPasteIcon from "@mui/icons-material/ContentPaste";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
@@ -346,24 +344,6 @@ export default function Browser({
   const refresh = useCallback(
     async (target: string) => {
       if (!target) return;
-      // SMB short-circuit: no first-class Rust backend yet — hand off
-      // to the OS-native handler (Finder / Explorer mounts the share,
-      // prompts for credentials, and shows it in its own pane).
-      // Render an explanatory placeholder instead of letting the
-      // request reach list_dir and surface a confusing "No such file"
-      // error. The fsOpenWithDefault call is fire-and-forget; if it
-      // fails we still keep the placeholder so the user knows where
-      // they are.
-      if (target.startsWith("smb://")) {
-        setEntries([]);
-        setError(null);
-        setIsRefreshing(false);
-        void fsOpenWithDefault(target).catch(() => {
-          /* OS handler missing — the placeholder UI offers a manual
-             retry button so the user isn't stuck. */
-        });
-        return;
-      }
       setIsRefreshing(true);
       try {
         const list = await clientListDir(target, {
@@ -1665,59 +1645,6 @@ export default function Browser({
         }}
       />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-        {path?.startsWith("smb://") ? (
-          // SMB placeholder. There's no first-class SMB backend yet,
-          // so we hand the URL to the OS (mount + open in the
-          // native file manager). This card explains where the user
-          // is + offers a one-click retry in case the OS dispatch
-          // missed (e.g. user dismissed Finder's auth prompt).
-          <Box
-            sx={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 1,
-              p: 4,
-              textAlign: "center",
-            }}
-          >
-            <Typography variant="h6">SMB share opened in your file manager</Typography>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ maxWidth: 480 }}
-            >
-              Skiff Files hands <code>{path}</code> to the OS handler so the
-              share mounts through Finder / Explorer's native auth flow.
-              Once mounted, the share shows up under <strong>Devices</strong>
-              in the sidebar and you can browse it from there with the full
-              Skiff toolbox.
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  if (path)
-                    void fsOpenWithDefault(path).catch((err) =>
-                      setError(String(err)),
-                    );
-                }}
-              >
-                Open in Finder again
-              </Button>
-              <Button
-                variant="text"
-                size="small"
-                onClick={() => home && navigate(home)}
-              >
-                Back to home
-              </Button>
-            </Box>
-          </Box>
-        ) : (
         <FileList
           entries={visibleEntries}
           sortKey={sortKey}
@@ -1788,8 +1715,7 @@ export default function Browser({
             }
           }}
         />
-        )}
-        {!path?.startsWith("smb://") && effectivePreviewOpen && (
+        {effectivePreviewOpen && (
           <PreviewPane
             selected={primarySelected}
             width={settings.previewWidth}

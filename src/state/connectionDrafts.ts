@@ -7,6 +7,7 @@
 
 const SFTP_STORAGE_KEY = "skiff-files.connections.v1";
 const FTP_STORAGE_KEY = "skiff-files.connections.ftp.v1";
+const SMB_STORAGE_KEY = "skiff-files.connections.smb.v1";
 
 /** SFTP / SSH saved config. Mirrors what ConnectionsPage's New
  *  Connection form collects. Private-key passphrase + password live
@@ -31,6 +32,20 @@ export interface FtpDraft {
   host: string;
   port: number;
   user: string;
+}
+
+/** SMB / Samba saved config (Phase 3c, 0.2.265). `share` is required
+ *  — SMB connections bind a single share at connect time. `domain`
+ *  is empty for home / NAS shares; corporate AD setups need it set
+ *  to the AD domain. Passwords are never persisted. */
+export interface SmbDraft {
+  id: string;
+  label: string;
+  host: string;
+  port: number;
+  share: string;
+  user: string;
+  domain: string;
 }
 
 function loadJson<T>(key: string): T[] {
@@ -60,6 +75,10 @@ export const loadFtpDrafts = (): FtpDraft[] =>
   loadJson<FtpDraft>(FTP_STORAGE_KEY);
 export const saveFtpDrafts = (drafts: FtpDraft[]): void =>
   saveJson(FTP_STORAGE_KEY, drafts);
+export const loadSmbDrafts = (): SmbDraft[] =>
+  loadJson<SmbDraft>(SMB_STORAGE_KEY);
+export const saveSmbDrafts = (drafts: SmbDraft[]): void =>
+  saveJson(SMB_STORAGE_KEY, drafts);
 
 /** Case-insensitive host match. Port match is optional — when the
  *  caller doesn't provide a port (raw `ftp://host` typing), every
@@ -88,5 +107,13 @@ export function matchFtpDraftsForHost(
   host: string,
   port: number | null,
 ): FtpDraft[] {
+  return drafts.filter((d) => matchesHost(d.host, d.port, host, port));
+}
+
+export function matchSmbDraftsForHost(
+  drafts: SmbDraft[],
+  host: string,
+  port: number | null,
+): SmbDraft[] {
   return drafts.filter((d) => matchesHost(d.host, d.port, host, port));
 }

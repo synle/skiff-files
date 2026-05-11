@@ -10,6 +10,7 @@
 
 use crate::fs::ftp::FtpClient;
 use crate::fs::sftp::SftpClient;
+use crate::fs::smb::SmbConnection;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -22,6 +23,7 @@ use uuid::Uuid;
 pub enum Connection {
     Sftp(Arc<SftpClient>),
     Ftp(Arc<FtpClient>),
+    Smb(Arc<SmbConnection>),
 }
 
 /// What the frontend lists in the sidebar / Connections page. Identifying
@@ -39,6 +41,7 @@ pub struct ConnectionInfo {
 pub enum ConnectionKind {
     Sftp,
     Ftp,
+    Smb,
 }
 
 #[derive(Clone)]
@@ -115,6 +118,9 @@ impl Registry {
             Some(Connection::Ftp(_)) => Err(format!(
                 "connection {id} is FTP, not SFTP"
             )),
+            Some(Connection::Smb(_)) => Err(format!(
+                "connection {id} is SMB, not SFTP"
+            )),
             None => Err(format!("connection not found: {id}")),
         }
     }
@@ -125,6 +131,23 @@ impl Registry {
             Some(Connection::Ftp(client)) => Ok(client.clone()),
             Some(Connection::Sftp(_)) => Err(format!(
                 "connection {id} is SFTP, not FTP"
+            )),
+            Some(Connection::Smb(_)) => Err(format!(
+                "connection {id} is SMB, not FTP"
+            )),
+            None => Err(format!("connection not found: {id}")),
+        }
+    }
+
+    /// Lookup helper that unwraps to the SMB connection variant.
+    pub fn get_smb(&self, id: &str) -> Result<Arc<SmbConnection>, String> {
+        match self.get(id).as_deref() {
+            Some(Connection::Smb(client)) => Ok(client.clone()),
+            Some(Connection::Sftp(_)) => Err(format!(
+                "connection {id} is SFTP, not SMB"
+            )),
+            Some(Connection::Ftp(_)) => Err(format!(
+                "connection {id} is FTP, not SMB"
             )),
             None => Err(format!("connection not found: {id}")),
         }

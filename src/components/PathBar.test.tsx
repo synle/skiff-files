@@ -66,24 +66,30 @@ describe("PathBar", () => {
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
-  // smb:// is special-cased in commit(): no in-app navigation,
-  // instead fire fsOpenWithDefault so the OS handler (Finder /
-  // Explorer) mounts the share through its native auth flow.
-  // Pre-0.2.262 the path fell through to list_dir(smb://...) and
-  // surfaced a misleading "No such file or directory" error.
-  it("committing an smb:// path routes to the OS handler, not in-app nav", async () => {
-    const fsModule = await import("../api/fs");
-    const fsOpenWithDefault = vi.mocked(fsModule.fsOpenWithDefault);
-    fsOpenWithDefault.mockClear();
+  // smb:// (and sftp:// / ftp:// host-form URLs) now flow through
+  // RemoteConnectDialog via the skiff:connect-to-remote window
+  // CustomEvent. The OS handoff from 0.2.262 was retired in 0.2.265
+  // when the native pavao-free `smb2` backend landed. The dialog
+  // resolves the URL to a `<scheme>://<uuid>/...` form and Browser
+  // navigates from there.
+  it("committing an smb:// path dispatches skiff:connect-to-remote", async () => {
+    const listener = vi.fn();
+    window.addEventListener("skiff:connect-to-remote", listener);
     const { onNavigate } = renderBar({ path: "/Users/syle" });
     fireEvent.click(screen.getByLabelText("Edit path"));
     const input = screen.getByRole("textbox") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "smb://192.168.1.1" } });
+    fireEvent.change(input, { target: { value: "smb://192.168.1.1/share" } });
     fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
-    // Flush the microtask + the await inside commit().
     await Promise.resolve();
     await Promise.resolve();
-    expect(fsOpenWithDefault).toHaveBeenCalledWith("smb://192.168.1.1");
+    expect(listener).toHaveBeenCalled();
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail).toMatchObject({
+      scheme: "smb",
+      host: "192.168.1.1",
+      remotePath: "/share",
+    });
     expect(onNavigate).not.toHaveBeenCalled();
+    window.removeEventListener("skiff:connect-to-remote", listener);
   });
 });

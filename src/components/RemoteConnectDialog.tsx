@@ -38,21 +38,25 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
-import { connCreateFtp, connCreateSftp } from "../api/conn";
+import { connCreateFtp, connCreateSftp, connCreateSmb } from "../api/conn";
 import {
   loadFtpDrafts,
   loadSftpDrafts,
+  loadSmbDrafts,
   matchFtpDraftsForHost,
   matchSftpDraftsForHost,
+  matchSmbDraftsForHost,
   saveFtpDrafts,
   saveSftpDrafts,
+  saveSmbDrafts,
   type FtpDraft,
   type SftpDraft,
+  type SmbDraft,
 } from "../state/connectionDrafts";
 
 export interface RemoteConnectRequest {
-  /** "sftp" or "ftp" — picked from the URL prefix. */
-  scheme: "sftp" | "ftp";
+  /** "sftp", "ftp", or "smb" — picked from the URL prefix. */
+  scheme: "sftp" | "ftp" | "smb";
   /** Hostname / IP the user typed. */
   host: string;
   /** Port from the URL, or null when omitted (defaults: sftp=22,
@@ -82,7 +86,7 @@ export default function RemoteConnectDialog({
   onClose,
   onConnected,
 }: Props) {
-  const [scheme, setScheme] = useState<"sftp" | "ftp">("ftp");
+  const [scheme, setScheme] = useState<"sftp" | "ftp" | "smb">("ftp");
   const [host, setHost] = useState("");
   const [port, setPort] = useState(21);
   const [user, setUser] = useState("");
@@ -90,6 +94,10 @@ export default function RemoteConnectDialog({
   const [authMode, setAuthMode] = useState<SftpAuth>("password");
   const [privateKeyPath, setPrivateKeyPath] = useState("");
   const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState("");
+  // SMB-specific extras (share + AD domain). Set from a saved draft
+  // on Use-click or directly from the form.
+  const [smbShare, setSmbShare] = useState("");
+  const [smbDomain, setSmbDomain] = useState("");
   const [saveDraft, setSaveDraft] = useState(false);
   /** Tracks which saved draft (if any) is pre-filling the form, so
    *  switching back to "new" is a single click and the "Save for
@@ -102,19 +110,40 @@ export default function RemoteConnectDialog({
   // another window (multi-window settings sync).
   const [sftpDrafts, setSftpDrafts] = useState<SftpDraft[]>([]);
   const [ftpDrafts, setFtpDrafts] = useState<FtpDraft[]>([]);
+  const [smbDrafts, setSmbDrafts] = useState<SmbDraft[]>([]);
 
   useEffect(() => {
     if (!open || !request) return;
     setSftpDrafts(loadSftpDrafts());
     setFtpDrafts(loadFtpDrafts());
+    setSmbDrafts(loadSmbDrafts());
     setScheme(request.scheme);
     setHost(request.host);
-    setPort(request.port ?? (request.scheme === "sftp" ? 22 : 21));
+    setPort(
+      request.port ??
+        (request.scheme === "sftp"
+          ? 22
+          : request.scheme === "smb"
+            ? 445
+            : 21),
+    );
     setUser(request.user ?? (request.scheme === "ftp" ? "anonymous" : ""));
     setPassword(request.scheme === "ftp" ? "anonymous@" : "");
     setAuthMode("password");
     setPrivateKeyPath("");
     setPrivateKeyPassphrase("");
+    // SMB-specific: try to pre-fill share from the typed remote
+    // path's first segment (`smb://host/share/...`). Strip the leading
+    // slash + take the first chunk. Empty stays empty so the field
+    // is editable.
+    if (request.scheme === "smb" && request.remotePath) {
+      const trimmed = request.remotePath.replace(/^\/+/, "");
+      const firstSlash = trimmed.indexOf("/");
+      setSmbShare(firstSlash >= 0 ? trimmed.slice(0, firstSlash) : trimmed);
+    } else {
+      setSmbShare("");
+    }
+    setSmbDomain("");
     setSaveDraft(false);
     setSelectedDraftId(null);
     setError(null);
@@ -125,21 +154,31 @@ export default function RemoteConnectDialog({
     if (!request) return [] as Array<
       | { kind: "sftp"; draft: SftpDraft }
       | { kind: "ftp"; draft: FtpDraft }
+      | { kind: "smb"; draft: SmbDraft }
     >;
-    const sftp = matchSftpDraftsForHost(sftpDrafts, request.host, request.port);
-    const ftp = matchFtpDraftsForHost(ftpDrafts, request.host, request.port);
     // Only surface drafts matching the URL's scheme — typing `ftp://`
     // shouldn't suggest SSH credentials and vice-versa.
     if (request.scheme === "sftp") {
+      const sftp = matchSftpDraftsForHost(
+        sftpDrafts,
+        request.host,
+        request.port,
+      );
       return sftp.map((d) => ({ kind: "sftp" as const, draft: d }));
     }
+    if (request.scheme === "smb") {
+      const smb = matchSmbDraftsForHost(smbDrafts, request.host, request.port);
+      return smb.map((d) => ({ kind: "smb" as const, draft: d }));
+    }
+    const ftp = matchFtpDraftsForHost(ftpDrafts, request.host, request.port);
     return ftp.map((d) => ({ kind: "ftp" as const, draft: d }));
-  }, [request, sftpDrafts, ftpDrafts]);
+  }, [request, sftpDrafts, ftpDrafts, smbDrafts]);
 
   const applyDraft = (
     entry:
       | { kind: "sftp"; draft: SftpDraft }
-      | { kind: "ftp"; draft: FtpDraft },
+      | { kind: "ftp"; draft: FtpDraft }
+      | { kind: "smb"; draft: SmbDraft },
   ) => {
     setScheme(entry.kind);
     setHost(entry.draft.host);
@@ -152,6 +191,11 @@ export default function RemoteConnectDialog({
       setPrivateKeyPath(entry.draft.privateKeyPath ?? "");
       setPassword("");
       setPrivateKeyPassphrase("");
+    } else if (entry.kind === "smb") {
+      setSmbShare(entry.draft.share);
+      setSmbDomain(entry.draft.domain);
+      setAuthMode("password");
+      setPassword(""); // user fills in real password
     } else {
       setAuthMode("password");
       setPassword(""); // user fills in real password (or "anonymous@" stays empty)
@@ -191,6 +235,31 @@ export default function RemoteConnectDialog({
           saveSftpDrafts(merged);
           setSftpDrafts(merged);
         }
+      } else if (scheme === "smb") {
+        uuid = await connCreateSmb({
+          host,
+          port,
+          share: smbShare,
+          user,
+          password,
+          domain: smbDomain || undefined,
+        });
+        if (saveDraft && selectedDraftId == null) {
+          const next: SmbDraft = {
+            id: `smb-${Date.now()}`,
+            label: smbDomain
+              ? `${smbDomain}\\${user}@${host}:${port}/${smbShare}`
+              : `${user || "guest"}@${host}:${port}/${smbShare}`,
+            host,
+            port,
+            share: smbShare,
+            user,
+            domain: smbDomain,
+          };
+          const merged = [...smbDrafts, next];
+          saveSmbDrafts(merged);
+          setSmbDrafts(merged);
+        }
       } else {
         uuid = await connCreateFtp({
           host,
@@ -214,9 +283,19 @@ export default function RemoteConnectDialog({
           setFtpDrafts(merged);
         }
       }
-      onConnected(
-        `${scheme}://${uuid}${request.remotePath || "/"}`,
-      );
+      // For SMB the share is bound to the connection, so the URL's
+      // share segment is dropped from the canonical path (everything
+      // after `smb://<uuid>/` is now share-relative). For SFTP/FTP
+      // the full remotePath survives as-is.
+      let tail: string;
+      if (scheme === "smb") {
+        const trimmed = (request.remotePath || "/").replace(/^\/+/, "");
+        const slash = trimmed.indexOf("/");
+        tail = slash >= 0 ? `/${trimmed.slice(slash + 1)}` : "/";
+      } else {
+        tail = request.remotePath || "/";
+      }
+      onConnected(`${scheme}://${uuid}${tail}`);
       onClose();
     } catch (e) {
       setError(String(e));
@@ -295,15 +374,21 @@ export default function RemoteConnectDialog({
                 label="Protocol"
                 value={scheme}
                 onChange={(e) => {
-                  const v = e.target.value as "sftp" | "ftp";
+                  const v = e.target.value as "sftp" | "ftp" | "smb";
                   setScheme(v);
-                  // Update default port when scheme flips.
-                  if (v === "sftp" && port === 21) setPort(22);
-                  if (v === "ftp" && port === 22) setPort(21);
+                  // Update default port when scheme flips. Only nudge
+                  // the port when the current value matches one of
+                  // the other defaults — preserves an explicitly-typed
+                  // port (e.g. 2121) when the user re-picks the
+                  // protocol.
+                  if (v === "sftp" && (port === 21 || port === 445)) setPort(22);
+                  if (v === "ftp" && (port === 22 || port === 445)) setPort(21);
+                  if (v === "smb" && (port === 21 || port === 22)) setPort(445);
                 }}
               >
                 <MenuItem value="sftp">SFTP / SSH</MenuItem>
                 <MenuItem value="ftp">FTP (plain)</MenuItem>
+                <MenuItem value="smb">SMB / Samba</MenuItem>
               </Select>
             </FormControl>
             <TextField
@@ -334,6 +419,29 @@ export default function RemoteConnectDialog({
                 : undefined
             }
           />
+
+          {scheme === "smb" && (
+            <>
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  size="small"
+                  label="Share"
+                  value={smbShare}
+                  onChange={(e) => setSmbShare(e.target.value)}
+                  helperText='e.g. "Documents", "shared", "Public"'
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Domain (optional)"
+                  value={smbDomain}
+                  onChange={(e) => setSmbDomain(e.target.value)}
+                  helperText="AD domain; leave empty for home / NAS"
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+            </>
+          )}
 
           {scheme === "sftp" ? (
             <>
@@ -405,7 +513,11 @@ export default function RemoteConnectDialog({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              helperText="Leave as 'anonymous@' for public FTP mirrors."
+              helperText={
+                scheme === "ftp"
+                  ? "Leave as 'anonymous@' for public FTP mirrors."
+                  : "Required for SMB. Never persisted."
+              }
             />
           )}
 

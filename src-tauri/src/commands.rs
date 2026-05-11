@@ -1485,6 +1485,38 @@ pub async fn conn_create_ftp(
     Ok(id)
 }
 
+/// Open a new SMB / Samba connection. One share per slot — calling
+/// `conn_create_smb` for the same host with a different share spins
+/// up a second slot. Mirrors the SFTP / FTP shape so the frontend
+/// can treat all three remote backends uniformly.
+#[tauri::command]
+pub async fn conn_create_smb(
+    config: crate::fs::smb::SmbConfig,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<String> {
+    let label = if config.domain.is_empty() {
+        format!(
+            "{}@{}:{}/{}",
+            if config.user.is_empty() { "guest" } else { &config.user },
+            config.host,
+            config.port,
+            config.share
+        )
+    } else {
+        format!(
+            "{}\\{}@{}:{}/{}",
+            config.domain, config.user, config.host, config.port, config.share
+        )
+    };
+    let client = crate::fs::smb::SmbConnection::connect(config).await?;
+    let id = registry.insert(
+        ConnectionKind::Smb,
+        label,
+        Connection::Smb(client),
+    );
+    Ok(id)
+}
+
 /// Resolve the known-hosts file path under `app_data_dir()`. Mirrors
 /// `settings_path` but for SFTP host-key pinning state.
 fn known_hosts_path(app: &tauri::AppHandle) -> FsResult<std::path::PathBuf> {
@@ -1577,6 +1609,7 @@ pub async fn conn_list_dir(
     match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.list_dir(&path, opts).await,
         Some(Connection::Ftp(client)) => client.list_dir(&path, opts).await,
+        Some(Connection::Smb(client)) => client.list_dir(&path, opts).await,
         None => Err(format!("connection not found: {id}")),
     }
 }
@@ -1590,6 +1623,7 @@ pub async fn conn_stat(
     match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.stat(&path).await,
         Some(Connection::Ftp(client)) => client.stat(&path).await,
+        Some(Connection::Smb(client)) => client.stat(&path).await,
         None => Err(format!("connection not found: {id}")),
     }
 }
@@ -1607,6 +1641,9 @@ pub async fn conn_read_text(
         Some(Connection::Ftp(client)) => {
             client.read_text(&path, TEXT_PREVIEW_MAX_BYTES).await
         }
+        Some(Connection::Smb(client)) => {
+            client.read_text(&path, TEXT_PREVIEW_MAX_BYTES).await
+        }
         None => Err(format!("connection not found: {id}")),
     }
 }
@@ -1622,6 +1659,9 @@ pub async fn conn_read_base64(
             client.read_base64(&path, IMAGE_PREVIEW_MAX_BYTES).await
         }
         Some(Connection::Ftp(client)) => {
+            client.read_base64(&path, IMAGE_PREVIEW_MAX_BYTES).await
+        }
+        Some(Connection::Smb(client)) => {
             client.read_base64(&path, IMAGE_PREVIEW_MAX_BYTES).await
         }
         None => Err(format!("connection not found: {id}")),
@@ -1648,6 +1688,7 @@ pub async fn conn_mkdir(
     match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.mkdir(&path).await,
         Some(Connection::Ftp(client)) => client.mkdir(&path).await,
+        Some(Connection::Smb(client)) => client.mkdir(&path).await,
         None => Err(format!("connection not found: {id}")),
     }
 }
@@ -1663,6 +1704,7 @@ pub async fn conn_rename(
     match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.rename(&from, &to).await,
         Some(Connection::Ftp(client)) => client.rename(&from, &to).await,
+        Some(Connection::Smb(client)) => client.rename(&from, &to).await,
         None => Err(format!("connection not found: {id}")),
     }
 }
@@ -1679,6 +1721,7 @@ pub async fn conn_remove(
     match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.remove(&path).await,
         Some(Connection::Ftp(client)) => client.remove(&path).await,
+        Some(Connection::Smb(client)) => client.remove(&path).await,
         None => Err(format!("connection not found: {id}")),
     }
 }

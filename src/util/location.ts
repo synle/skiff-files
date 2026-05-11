@@ -9,6 +9,13 @@
 // the docker harness.
 
 export type Backend =
+  // FYI – SMB joined in 0.2.265 alongside SFTP/FTP. SMB connections
+  // bind a single share at create time, so the connectionId encodes
+  // (host, port, user, share) and the remotePath is share-relative.
+  | { kind: "smb"; connectionId: string }
+//
+// (the existing variants follow — kept as one union for grep-ability)
+//
   | { kind: "local" }
   | { kind: "sftp"; connectionId: string }
   | { kind: "ftp"; connectionId: string };
@@ -22,6 +29,7 @@ export interface Location {
 
 const SFTP_PREFIX = "sftp://";
 const FTP_PREFIX = "ftp://";
+const SMB_PREFIX = "smb://";
 
 /**
  * Parse a location string. A leading `sftp://` / `ftp://` switches to
@@ -47,6 +55,13 @@ export function parseLocation(path: string): Location {
     const { id, remote } = splitRemote(path, FTP_PREFIX);
     return {
       backend: { kind: "ftp", connectionId: id },
+      remotePath: remote,
+    };
+  }
+  if (path.startsWith(SMB_PREFIX)) {
+    const { id, remote } = splitRemote(path, SMB_PREFIX);
+    return {
+      backend: { kind: "smb", connectionId: id },
       remotePath: remote,
     };
   }
@@ -79,6 +94,12 @@ export function formatFtp(connectionId: string, remotePath: string): string {
   return `${FTP_PREFIX}${connectionId}${norm}`;
 }
 
+/** Build the address-bar form of an SMB location. */
+export function formatSmb(connectionId: string, remotePath: string): string {
+  const norm = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
+  return `${SMB_PREFIX}${connectionId}${norm}`;
+}
+
 /** Serialize any location back to the address-bar form. */
 export function formatLocation(loc: Location): string {
   if (loc.backend.kind === "sftp") {
@@ -87,19 +108,21 @@ export function formatLocation(loc: Location): string {
   if (loc.backend.kind === "ftp") {
     return formatFtp(loc.backend.connectionId, loc.remotePath);
   }
+  if (loc.backend.kind === "smb") {
+    return formatSmb(loc.backend.connectionId, loc.remotePath);
+  }
   return loc.remotePath;
 }
 
 /** True iff the location targets a remote backend. Convenience for
- *  toggling UI affordances (e.g. disabling tilde-expansion). SMB is
- *  included even though there's no first-class Rust backend yet —
- *  the address bar / browser route smb:// paths to the OS handler,
- *  and the rest of the app should treat them as remote (skip disk
- *  space, hide local-only context-menu actions, …). */
+ *  toggling UI affordances (e.g. disabling tilde-expansion). SMB
+ *  was added as a real backend in 0.2.265 (smb2 crate, pure-Rust);
+ *  same uniform remote semantics as SFTP and FTP from this point
+ *  forward. */
 export function isRemote(path: string): boolean {
   return (
     path.startsWith(SFTP_PREFIX) ||
     path.startsWith(FTP_PREFIX) ||
-    path.startsWith("smb://")
+    path.startsWith(SMB_PREFIX)
   );
 }

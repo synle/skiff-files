@@ -36,6 +36,12 @@ russh-keys = "0.45"
 # browse the public FTP mirrors that drove this protocol's
 # original include in TODO.md.
 suppaftp = "8"
+# Pure-Rust SMB 2/3 client (Phase 3c). Replaces the OS-handler
+# handoff from 0.2.262 with a real in-app backend. Pure-Rust deps
+# only (aes / hmac / sha2 / tokio) — keeps the "ship one binary"
+# guarantee in CLAUDE.md. Compare with `pavao` which FFI-wraps
+# libsmbclient and would need Samba installed on every target OS.
+smb2 = "0.8"
 uuid = { version = "1", features = ["v4"] }
 kamadak-exif = "0.6"
 # Image decode + re-encode for `fs_image_rotate`. We pin

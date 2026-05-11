@@ -28,7 +28,13 @@ import {
   connRename,
   connStat,
 } from "./conn";
-import { formatFtp, formatSftp, isRemote, parseLocation } from "../util/location";
+import {
+  formatFtp,
+  formatSftp,
+  formatSmb,
+  isRemote,
+  parseLocation,
+} from "../util/location";
 import {
   syncStartCross,
   syncStartLocal,
@@ -42,9 +48,10 @@ import {
 function reshapeRemote(
   e: Entry,
   connectionId: string,
-  scheme: "sftp" | "ftp",
+  scheme: "sftp" | "ftp" | "smb",
 ): Entry {
-  const formatter = scheme === "ftp" ? formatFtp : formatSftp;
+  const formatter =
+    scheme === "ftp" ? formatFtp : scheme === "smb" ? formatSmb : formatSftp;
   return { ...e, path: formatter(connectionId, e.path) };
 }
 

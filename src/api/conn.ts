@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { DirSummary, Entry, ListOptions } from "./fs";
 
 /** Mirror of `crate::fs::registry::ConnectionKind`. */
-export type ConnectionKind = "sftp" | "ftp";
+export type ConnectionKind = "sftp" | "ftp" | "smb";
 
 /** Mirror of `crate::fs::registry::ConnectionInfo`. */
 export interface ConnectionInfo {
@@ -58,6 +58,22 @@ export interface FtpConfig {
 
 export const connCreateFtp = (config: FtpConfig): Promise<string> =>
   invoke<string>("conn_create_ftp", { config });
+
+/** Mirror of `crate::fs::smb::SmbConfig` (0.2.265 Phase 3c).
+ *  Per-share connection — opening a second share on the same host
+ *  is a second `connCreateSmb` call. `domain` is optional; leave
+ *  empty for home / NAS shares. */
+export interface SmbConfig {
+  host: string;
+  port?: number;
+  share: string;
+  user: string;
+  password: string;
+  domain?: string;
+}
+
+export const connCreateSmb = (config: SmbConfig): Promise<string> =>
+  invoke<string>("conn_create_smb", { config });
 
 export const connDisconnect = (id: string): Promise<void> =>
   invoke<void>("conn_disconnect", { id });

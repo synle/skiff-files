@@ -12,7 +12,7 @@ pub mod fs;
 pub mod sync;
 
 use commands::{
-    conn_create_ftp, conn_create_sftp, conn_dir_summary, conn_disconnect, conn_hash_sha256,
+    conn_create_ftp, conn_create_sftp, conn_create_smb, conn_dir_summary, conn_disconnect, conn_hash_sha256,
     conn_known_hosts_list, conn_known_hosts_remove, conn_list, conn_list_dir, conn_mkdir,
     conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, crash_logs_count,
     crash_logs_dir, fs_archive_extract_one,
@@ -130,6 +130,7 @@ pub fn run() {
             // connections
             conn_create_sftp,
             conn_create_ftp,
+            conn_create_smb,
             conn_disconnect,
             conn_list,
             conn_list_dir,

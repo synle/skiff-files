@@ -144,7 +144,7 @@ export async function resolveRemoteUrl(path: string): Promise<string> {
  *  is already canonical (UUID form) or isn't a remote URL we want
  *  the dialog to handle. */
 export interface ParsedRemoteUrl {
-  scheme: "sftp" | "ftp";
+  scheme: "sftp" | "ftp" | "smb";
   host: string;
   port: number | null;
   user?: string;
@@ -155,9 +155,9 @@ export interface ParsedRemoteUrl {
  *
  *  Returns `null` when the id-or-host segment is UUID-shaped (the
  *  URL is already canonical and PathBar should navigate directly) —
- *  or when the URL isn't `sftp://` / `ftp://`. */
+ *  or when the URL isn't `sftp://` / `ftp://` / `smb://`. */
 export function parseRemoteUrl(path: string): ParsedRemoteUrl | null {
-  let scheme: "sftp" | "ftp";
+  let scheme: "sftp" | "ftp" | "smb";
   let prefix: string;
   if (path.startsWith("ftp://")) {
     scheme = "ftp";
@@ -165,6 +165,9 @@ export function parseRemoteUrl(path: string): ParsedRemoteUrl | null {
   } else if (path.startsWith("sftp://")) {
     scheme = "sftp";
     prefix = "sftp://";
+  } else if (path.startsWith("smb://")) {
+    scheme = "smb";
+    prefix = "smb://";
   } else {
     return null;
   }
