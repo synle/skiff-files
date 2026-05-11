@@ -232,34 +232,47 @@ impl SmbConnection {
     }
 
     /// Remove a file or directory. For directories, walks the tree
-    /// and removes children first — mirrors the FTP backend's
-    /// behavior. No server-side trash; callers should confirm.
+    /// and removes children first.
+    ///
+    /// We skip the initial `stat()` discriminator (which `FtpClient`
+    /// uses) because the dperson/samba server in the integration
+    /// stack drops the SMB session between a recent read + a stat
+    /// on a fresh file — landing us in `Disconnected from server`.
+    /// Calling `delete_file` first and falling back to the directory
+    /// path only on a "is-a-directory"-shaped error keeps the
+    /// happy-path single-round-trip + sidesteps the session drop.
     pub async fn remove(&self, path: &str) -> FsResult<()> {
-        let entry = self.stat(path).await?;
-        if entry.is_dir {
-            let kids = self
-                .list_dir(path, ListOptions { show_hidden: true })
-                .await?;
-            for child in kids {
-                Box::pin(self.remove(&child.path)).await?;
+        let rel = strip_leading_slash(path);
+        // First try as a file.
+        let file_err = {
+            let mut g = self.inner.lock().await;
+            let Inner { client, tree } = &mut *g;
+            match client.delete_file(tree, rel).await {
+                Ok(()) => return Ok(()),
+                Err(e) => e.to_string(),
             }
-            let rel = strip_leading_slash(path);
-            let mut g = self.inner.lock().await;
-            let Inner { client, tree } = &mut *g;
-            client
-                .delete_directory(tree, rel)
-                .await
-                .map_err(|e| format!("rmdir({path}): {e}"))?;
-        } else {
-            let rel = strip_leading_slash(path);
-            let mut g = self.inner.lock().await;
-            let Inner { client, tree } = &mut *g;
-            client
-                .delete_file(tree, rel)
-                .await
-                .map_err(|e| format!("delete({path}): {e}"))?;
+        };
+        // Heuristic: anything that looks like "directory" or "not a
+        // file" routes through the recursive directory path.
+        // Everything else surfaces as a hard error.
+        let lower = file_err.to_lowercase();
+        let looks_like_dir =
+            lower.contains("directory") || lower.contains("file_is_a_directory");
+        if !looks_like_dir {
+            return Err(format!("delete({path}): {file_err}"));
         }
-        Ok(())
+        let kids = self
+            .list_dir(path, ListOptions { show_hidden: true })
+            .await?;
+        for child in kids {
+            Box::pin(self.remove(&child.path)).await?;
+        }
+        let mut g = self.inner.lock().await;
+        let Inner { client, tree } = &mut *g;
+        client
+            .delete_directory(tree, rel)
+            .await
+            .map_err(|e| format!("rmdir({path}): {e}"))
     }
 
     /// Upload `bytes` to `path`. Overwrites whatever's at the path.

@@ -120,7 +120,11 @@ async fn connect_smb() -> Arc<SmbConnection> {
 /// servers in the compose file map them to the same writable
 /// directory, so cross-mode tests share a namespace.
 
-#[tokio::test]
+// All tests run on a multi-threaded runtime so `block_in_place`
+// inside the FTP / SFTP clients (suppaftp + russh-sftp use sync
+// methods we wrap that way) works without panicking. The default
+// `#[tokio::test]` is current_thread which doesn't allow it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn sftp_basic_roundtrip() {
     gate!();
     let c = connect_sftp().await;
@@ -144,7 +148,7 @@ async fn sftp_basic_roundtrip() {
     c.remove(&renamed).await.unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn ftp_basic_roundtrip() {
     gate!();
     let c = connect_ftp().await;
@@ -163,7 +167,7 @@ async fn ftp_basic_roundtrip() {
     c.remove(&renamed).await.unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn smb_basic_roundtrip() {
     gate!();
     let c = connect_smb().await;
@@ -189,7 +193,7 @@ async fn smb_basic_roundtrip() {
 // it's verifying the three backends can interoperate at all so a future
 // regression in any of them surfaces here, not in production.
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cross_mode_sftp_to_smb() {
     gate!();
     let src = connect_sftp().await;
@@ -209,7 +213,7 @@ async fn cross_mode_sftp_to_smb() {
     dst.remove(dst_path).await.unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cross_mode_ftp_to_smb() {
     gate!();
     let src = connect_ftp().await;
@@ -226,7 +230,7 @@ async fn cross_mode_ftp_to_smb() {
     dst.remove(dst_path).await.unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cross_mode_smb_to_sftp() {
     gate!();
     let src = connect_smb().await;
