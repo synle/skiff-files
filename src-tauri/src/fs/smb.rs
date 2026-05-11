@@ -262,6 +262,21 @@ impl SmbConnection {
         Ok(())
     }
 
+    /// Upload `bytes` to `path`. Overwrites whatever's at the path.
+    /// `smb2::write_file` is fully async; we keep the same single-flight
+    /// mutex discipline as the read path so the SmbClient + Tree
+    /// pair never gets re-entered.
+    pub async fn write_bytes(&self, path: &str, bytes: &[u8]) -> FsResult<()> {
+        let rel = strip_leading_slash(path);
+        let mut g = self.inner.lock().await;
+        let Inner { client, tree } = &mut *g;
+        client
+            .write_file(tree, rel, bytes)
+            .await
+            .map(|_n| ())
+            .map_err(|e| format!("write({path}): {e}"))
+    }
+
     async fn read_bytes_capped(&self, path: &str, max_bytes: u64) -> FsResult<Vec<u8>> {
         let rel = strip_leading_slash(path);
         let mut g = self.inner.lock().await;

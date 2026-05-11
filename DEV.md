@@ -55,6 +55,12 @@ npm run test:watch       # watch mode while iterating
 # Rust tests
 cd src-tauri && cargo test
 
+# Remote-backend integration suite (SFTP / FTP / SMB against a
+# Docker-compose stack — see "Remote backends in Docker" below).
+# Without SKIFF_INTEGRATION=1 every case is skipped, so this is
+# safe to run anywhere.
+SKIFF_INTEGRATION=1 cargo test --test remote_integration
+
 # Production frontend build (just the bundle, not the desktop wrapper)
 npm run build
 
@@ -165,7 +171,49 @@ The tag push triggers `.github/workflows/release-official.yml`:
 - **Frontend tests use jsdom**, which doesn't lay things out. The `@tanstack/react-virtual` virtualizer needs a coaxed `getBoundingClientRect`; see the shim in `FileList.test.tsx` and `App.test.tsx`. Copy it for any test that mounts a Browser.
 - **Tauri APIs are mocked** in `src/test/setup.ts`. When you add a new `invoke` command, add its mock there or your tests will see `null`.
 - **Rust unit tests** that touch the filesystem use a `uniq()` helper to generate per-test temp dirs (sequence + nanos) so parallel test runs don't collide.
-- **SFTP integration tests** are not currently exercised in CI — the docker harness lands in Phase 3. The Rust-side SFTP tests cover the parts that don't need a server (config parsing, attribute-to-Entry mapping).
+- **SFTP / FTP / SMB integration tests** run against the docker-compose stack in [`docker/docker-compose.yml`](docker/docker-compose.yml). Gated on `SKIFF_INTEGRATION=1` so a `cargo test` without docker still passes. CI runs the suite in [`.github/workflows/integration.yml`](.github/workflows/integration.yml). See "Remote backends in Docker" below for the full setup.
+
+---
+
+## Remote backends in Docker
+
+The compose stack spins up three real servers bound to 127.0.0.1 — useful for debugging a tricky `list_dir` regression without standing up a NAS, and required by the `cargo test --test remote_integration` suite.
+
+```bash
+# Bring the stack up (detached). Ports + creds in docker/docker-compose.yml.
+docker compose -f docker/docker-compose.yml up -d
+
+# Sanity-check
+docker compose -f docker/docker-compose.yml ps
+
+# Connect from the app: in the address bar
+#   sftp://127.0.0.1:2222     → user testuser, password skiffpass
+#   ftp://127.0.0.1:2121      → user testuser, password skiffpass
+#   smb://127.0.0.1:1445      → user testuser, password skiffpass, share "testshare"
+# RemoteConnectDialog will prompt for the password the first time.
+
+# Run the integration suite (each test reconnects with retries so a
+# cold-start stack is fine).
+SKIFF_INTEGRATION=1 cd src-tauri && cargo test --test remote_integration -- --test-threads=1
+
+# Tear down + drop the volumes (resets state for the next run).
+docker compose -f docker/docker-compose.yml down -v
+```
+
+What the suite covers today:
+
+- **Per-backend round-trip** (write → list → read → rename → delete) for SFTP, FTP, SMB.
+- **Cross-backend transfers** (SFTP→SMB, FTP→SMB, SMB→SFTP) — read from source, write to destination, verify bytes match. Same primitive `Skiffsync` uses; this catches breakage in any backend's read or write path.
+
+Things deliberately not covered yet (room to grow): Skiffsync's resume / progress logic, FTP-over-TLS (FTPS), SMB Kerberos auth, large-file streaming, the JS-layer copy/cut/paste UX (those need Playwright or similar — out of scope for this slice).
+
+If a test fails locally, dump container logs first — most flakes are docker-startup races:
+
+```bash
+docker logs skiff-sftp
+docker logs skiff-ftp
+docker logs skiff-smb
+```
 
 ---
 

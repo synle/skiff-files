@@ -1,0 +1,69 @@
+# Remote-backend test harness — spins up an SFTP, an FTP, and an SMB
+# server bound to known localhost ports so the integration suite (and
+# manual debugging sessions) hit real protocol implementations rather
+# than mocks. Used by `cargo test --test remote_integration` when
+# `SKIFF_INTEGRATION=1` is set, and by `.github/workflows/integration.yml`.
+#
+# Spin up:    docker compose -f docker/docker-compose.yml up -d
+# Tear down:  docker compose -f docker/docker-compose.yml down -v
+#
+# Credentials are deliberately weak ("skiffpass") and the boxes only
+# bind to 127.0.0.1 — never expose this stack to a public network.
+# DUMMY values per CLAUDE.md secrets policy (real-looking creds like
+# "hunter2" get baked into Vitest coverage HTML by name).
+
+services:
+  # SFTP / SSH. linuxserver/openssh-server is preferred over atmoz/sftp
+  # because it ships with a real shell + supports modern KEX defaults
+  # russh expects out of the box.
+  skiff-sftp:
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: skiff-sftp
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "UTC"
+      USER_NAME: "testuser"
+      USER_PASSWORD: "skiffpass"
+      PASSWORD_ACCESS: "true"
+      SUDO_ACCESS: "false"
+    ports:
+      - "127.0.0.1:2222:2222"
+    volumes:
+      - skiff-sftp-home:/config
+
+  # Plain FTP. delfer/alpine-ftp-server is small (~20 MB) and ships a
+  # working passive-mode config out of the box.
+  skiff-ftp:
+    image: delfer/alpine-ftp-server:latest
+    container_name: skiff-ftp
+    environment:
+      USERS: "testuser|skiffpass|/home/testuser|1000"
+      ADDRESS: "127.0.0.1"
+      MIN_PORT: "21000"
+      MAX_PORT: "21009"
+    ports:
+      - "127.0.0.1:2121:21"
+      - "127.0.0.1:21000-21009:21000-21009"
+    volumes:
+      - skiff-ftp-home:/home/testuser
+
+  # SMB 2/3 — dperson/samba is the most-used Samba image with simple
+  # `-s` share definitions. The single share `testshare` writes to a
+  # tmpfs-style volume; smb2 client connects as `testuser`.
+  skiff-smb:
+    image: dperson/samba:latest
+    container_name: skiff-smb
+    command: >
+      -u "testuser;skiffpass"
+      -s "testshare;/share;yes;no;no;testuser;testuser"
+      -p
+    ports:
+      - "127.0.0.1:1445:445"
+    volumes:
+      - skiff-smb-share:/share
+
+volumes:
+  skiff-sftp-home:
+  skiff-ftp-home:
+  skiff-smb-share:

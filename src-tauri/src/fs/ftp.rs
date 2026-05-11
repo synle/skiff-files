@@ -297,6 +297,23 @@ impl FtpClient {
         Ok(())
     }
 
+    /// Upload `bytes` to `path`. Used by integration tests + the
+    /// future write-path commands. suppaftp's `put_file` takes a
+    /// `Read`-able source; we hand it a `Cursor` over the byte
+    /// slice. Overwrites whatever's at `path`.
+    pub async fn write_bytes(&self, path: &str, bytes: &[u8]) -> FsResult<()> {
+        let path = path.to_string();
+        let bytes = bytes.to_vec();
+        let mut stream = self.stream.lock().await;
+        tokio::task::block_in_place(|| {
+            let mut cursor = std::io::Cursor::new(&bytes);
+            stream
+                .put_file(&path, &mut cursor)
+                .map(|_n| ())
+                .map_err(|e| format!("put({path}): {e}"))
+        })
+    }
+
     /// Internal: pull `max_bytes` into memory. FTP's `retr` returns
     /// an opaque cursor — we drain it bytewise + cap at the limit
     /// (truncate rather than error, mirrors SFTP text-preview
