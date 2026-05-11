@@ -7,7 +7,11 @@
 //     connections + auto-creates new ones. We mock the conn API so
 //     the test stays a unit test, not an integration test.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { __testing__, resolveRemoteUrl } from "./remoteResolve";
+import {
+  __testing__,
+  parseRemoteUrl,
+  resolveRemoteUrl,
+} from "./remoteResolve";
 
 vi.mock("../api/conn", () => ({
   connCreateFtp: vi.fn(async () => "deadbeef-0000-0000-0000-aaaaaaaaaaaa"),
@@ -197,5 +201,47 @@ describe("resolveRemoteUrl", () => {
     expect(out).toBe(
       "ftp://deadbeef-0000-0000-0000-aaaaaaaaaaaa/",
     );
+  });
+});
+
+// parseRemoteUrl is the entry point PathBar uses to decide whether to
+// open RemoteConnectDialog. It returns null for canonical URLs (skip
+// the dialog) or a typed request shape (open the dialog).
+describe("parseRemoteUrl", () => {
+  it("returns null for local paths", () => {
+    expect(parseRemoteUrl("/Users/syle/git")).toBeNull();
+  });
+
+  it("returns null for already-canonical UUID URLs", () => {
+    expect(
+      parseRemoteUrl("ftp://550e8400-e29b-41d4-a716-446655440000/pub"),
+    ).toBeNull();
+    expect(
+      parseRemoteUrl("sftp://550e8400-e29b-41d4-a716-446655440000/home"),
+    ).toBeNull();
+  });
+
+  it("parses ftp://host (no port → null, lets matcher fuzz any port)", () => {
+    expect(parseRemoteUrl("ftp://ftp.example.com/pub")).toEqual({
+      scheme: "ftp",
+      host: "ftp.example.com",
+      port: null,
+      user: undefined,
+      remotePath: "/pub",
+    });
+  });
+
+  it("parses sftp://user@host:2222 with explicit port", () => {
+    expect(parseRemoteUrl("sftp://alice@example.com:2222/home/alice")).toEqual({
+      scheme: "sftp",
+      host: "example.com",
+      port: 2222,
+      user: "alice",
+      remotePath: "/home/alice",
+    });
+  });
+
+  it("defaults remotePath to '/' when none typed", () => {
+    expect(parseRemoteUrl("ftp://192.168.1.1")?.remotePath).toBe("/");
   });
 });

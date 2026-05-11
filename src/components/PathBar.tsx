@@ -16,7 +16,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import HomeIcon from "@mui/icons-material/Home";
 import { useEffect, useRef, useState } from "react";
 import { fsCanonicalize, fsOpenWithDefault, fsRevealInOs } from "../api/fs";
-import { resolveRemoteUrl } from "../util/remoteResolve";
+import { parseRemoteUrl } from "../util/remoteResolve";
 import { listDir } from "../api/client";
 import { pathSegments } from "../util/format";
 import { isRemote } from "../util/location";
@@ -105,22 +105,24 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
     // Remote paths are already absolute — there's no `~` expansion in
     // `sftp://` and we don't have a remote canonicalize endpoint yet.
     if (isRemote(target)) {
-      // FTP: if the part after `ftp://` is a hostname instead of a
-      // registered connection UUID, transparently spin up an
-      // anonymous-FTP connection and rewrite the URL to its UUID
-      // form. SFTP isn't auto-resolved (no anonymous mode + need a
-      // password prompt) — typed sftp:// still requires a saved
-      // connection. resolveRemoteUrl is a no-op when the URL is
-      // already canonical.
-      try {
-        const resolved = await resolveRemoteUrl(target);
-        onNavigate(resolved);
-      } catch {
-        // Connection failure (server unreachable, auth, …) — fall
-        // back to the raw URL so list_dir surfaces the real
-        // error in the FileList instead of silently swallowing it.
-        onNavigate(target);
+      // FTP/SFTP host-form URLs (e.g. `ftp://192.168.1.1/pub`,
+      // `sftp://example.com:2222/`) need to be resolved against the
+      // saved-drafts list — and possibly prompt the user for
+      // credentials — before we can navigate to a canonical
+      // `<scheme>://<uuid>/...` URL. `parseRemoteUrl` returns the
+      // shape `RemoteConnectDialog` consumes; Browser listens on
+      // window for the event and opens the dialog. UUID-shaped URLs
+      // (parseRemoteUrl returns null for them) skip the dialog and
+      // navigate directly.
+      const req = parseRemoteUrl(target);
+      if (req) {
+        setEditing(false);
+        window.dispatchEvent(
+          new CustomEvent("skiff:connect-to-remote", { detail: req }),
+        );
+        return;
       }
+      onNavigate(target);
       setEditing(false);
       return;
     }

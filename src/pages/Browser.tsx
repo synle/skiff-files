@@ -29,6 +29,9 @@ import KindFilterBar, {
 import type { TagColor } from "../state/settings";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
+import RemoteConnectDialog, {
+  type RemoteConnectRequest,
+} from "../components/RemoteConnectDialog";
 import PreviewPane from "../components/PreviewPane";
 import {
   fsDiskSpace,
@@ -132,6 +135,13 @@ export default function Browser({
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
     null,
   );
+  /** Address-bar resolver dialog (0.2.264). PathBar dispatches
+   *  `skiff:connect-to-remote` when the user types a host-form
+   *  remote URL — we open RemoteConnectDialog with the parsed
+   *  request, then navigate to the canonical `<scheme>://<uuid>/...`
+   *  URL the dialog resolves to. */
+  const [remoteConnectReq, setRemoteConnectReq] =
+    useState<RemoteConnectRequest | null>(null);
   /** Transient toast surfaced while a non-Skiffsync operation (delete /
    *  paste / extract / compress) is in flight. The Operations drawer
    *  already covers Skiffsync; this picks up the synchronous flows
@@ -375,6 +385,21 @@ export default function Browser({
   useEffect(() => {
     if (path) void refresh(path);
   }, [path, refresh]);
+
+  // Address-bar resolver: open RemoteConnectDialog when PathBar
+  // dispatches a host-form URL. Only the active tab handles the
+  // event (multiple tabs would race to open duplicate dialogs and
+  // navigate the wrong one).
+  useEffect(() => {
+    if (!isActive) return;
+    const onConnect = (e: Event) => {
+      const detail = (e as CustomEvent<RemoteConnectRequest>).detail;
+      if (detail) setRemoteConnectReq(detail);
+    };
+    window.addEventListener("skiff:connect-to-remote", onConnect);
+    return () =>
+      window.removeEventListener("skiff:connect-to-remote", onConnect);
+  }, [isActive]);
 
   // Fetch disk space for the current path. Skipped for sftp:// paths
   // since fs4 only knows about local filesystems; the StatusBar hides
@@ -2110,6 +2135,18 @@ export default function Browser({
         onClose={() => setArchiveViewerPath(null)}
         onExtracted={() => {
           if (path) void refresh(path);
+        }}
+      />
+      <RemoteConnectDialog
+        open={!!remoteConnectReq}
+        request={remoteConnectReq}
+        onClose={() => setRemoteConnectReq(null)}
+        onConnected={(canonicalUrl) => {
+          // Dialog already cleared its own state; just navigate.
+          // navigate() handles the back/forward stack + triggers a
+          // refresh(canonicalUrl) which dispatches to the now-
+          // registered connection.
+          navigate(canonicalUrl);
         }}
       />
       <Snackbar

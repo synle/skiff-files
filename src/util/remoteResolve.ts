@@ -140,6 +140,55 @@ export async function resolveRemoteUrl(path: string): Promise<string> {
   return `${FTP_PREFIX}${newId}${rest}`;
 }
 
+/** Parsed shape for the address-bar resolver. `null` means the URL
+ *  is already canonical (UUID form) or isn't a remote URL we want
+ *  the dialog to handle. */
+export interface ParsedRemoteUrl {
+  scheme: "sftp" | "ftp";
+  host: string;
+  port: number | null;
+  user?: string;
+  remotePath: string;
+}
+
+/** Split a typed remote URL into `RemoteConnectDialog` inputs.
+ *
+ *  Returns `null` when the id-or-host segment is UUID-shaped (the
+ *  URL is already canonical and PathBar should navigate directly) —
+ *  or when the URL isn't `sftp://` / `ftp://`. */
+export function parseRemoteUrl(path: string): ParsedRemoteUrl | null {
+  let scheme: "sftp" | "ftp";
+  let prefix: string;
+  if (path.startsWith("ftp://")) {
+    scheme = "ftp";
+    prefix = "ftp://";
+  } else if (path.startsWith("sftp://")) {
+    scheme = "sftp";
+    prefix = "sftp://";
+  } else {
+    return null;
+  }
+  const after = path.slice(prefix.length);
+  const slash = after.indexOf("/");
+  const idOrHost = slash >= 0 ? after.slice(0, slash) : after;
+  const remotePath = slash >= 0 ? after.slice(slash) : "/";
+  // Already canonical — caller skips the dialog.
+  if (UUID_RE.test(idOrHost)) return null;
+  const parsed = parseHostish(idOrHost);
+  if (!parsed) return null;
+  // For host-form URLs we keep `port` as-typed (null when omitted) so
+  // the matcher can fuzzy-match against any saved port on the same
+  // host. The dialog supplies the scheme-default when it opens.
+  const hadExplicitPort = /:\d+(\/|$)/.test(idOrHost);
+  return {
+    scheme,
+    host: parsed.host,
+    port: hadExplicitPort ? parsed.port : null,
+    user: parsed.user || undefined,
+    remotePath,
+  };
+}
+
 // Test-only export. Vitest uses `vi.importActual` so module-internal
 // helpers stay private at runtime but the test can still target the
 // parser directly.
