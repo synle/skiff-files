@@ -1,7 +1,11 @@
-// Contextual action bar that appears between the Toolbar and the
-// FileList when 2+ rows are selected. Mirrors the right-click menu
-// for users who don't muscle-memory Cmd-click + right-click flows;
-// keeps the Toolbar uncluttered when nothing's selected.
+// Always-visible action bar that sits between the Toolbar and the
+// FileList. The left cluster (New folder / New file) is always shown
+// so the bar height stays stable as the selection grows / shrinks
+// (an earlier "X selected ... CLEAR" prefix caused jumpy reflow
+// when toggling selection). Selection-scoped actions appear on the
+// right only when 2+ rows are selected — single-select keeps the
+// right-click menu as its primary surface, the multi-select cluster
+// here is purely for discoverability of the bulk verbs.
 //
 // All actions are also keyboard-accessible; this surface is purely
 // for discoverability.
@@ -10,28 +14,29 @@ import {
   Button,
   Menu,
   MenuItem,
-  Typography,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ArchiveIcon from "@mui/icons-material/Archive";
 import EditIcon from "@mui/icons-material/Edit";
-import CloseIcon from "@mui/icons-material/Close";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import SaveIcon from "@mui/icons-material/Save";
+import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
+import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import { useState } from "react";
 import { TAG_COLORS, tagColorHex, tagColorLabel } from "../util/tagColors";
 import type { TagColor } from "../state/settings";
 
 interface Props {
   count: number;
+  onNewFolder?: () => void;
+  onNewFile?: () => void;
   onCopy?: () => void;
   onCut?: () => void;
   onDelete?: () => void;
   onCompress?: () => void;
   onBulkRename?: () => void;
-  onClear?: () => void;
   /** Apply the picked tag (or `null` to clear) to the current
    *  multi-selection. Drives the Tag popover's color strip. */
   onSetTag?: (color: TagColor | null) => void;
@@ -42,17 +47,18 @@ interface Props {
 
 export default function BulkActionBar({
   count,
+  onNewFolder,
+  onNewFile,
   onCopy,
   onCut,
   onDelete,
   onCompress,
   onBulkRename,
-  onClear,
   onSetTag,
   onSaveSelectionGroup,
 }: Props) {
   const [tagAnchor, setTagAnchor] = useState<HTMLElement | null>(null);
-  if (count < 2) return null;
+  const hasMultiSelection = count >= 2;
   return (
     <Box
       sx={{
@@ -69,10 +75,26 @@ export default function BulkActionBar({
             : "rgba(25, 118, 210, 0.06)",
       }}
     >
-      <Typography variant="body2" sx={{ flex: 1, color: "text.secondary" }}>
-        {count} selected
-      </Typography>
-      {onCopy && (
+      {onNewFolder && (
+        <Button
+          size="small"
+          startIcon={<CreateNewFolderIcon fontSize="small" />}
+          onClick={onNewFolder}
+        >
+          New folder
+        </Button>
+      )}
+      {onNewFile && (
+        <Button
+          size="small"
+          startIcon={<NoteAddIcon fontSize="small" />}
+          onClick={onNewFile}
+        >
+          New file
+        </Button>
+      )}
+      <Box sx={{ flex: 1 }} />
+      {hasMultiSelection && onCopy && (
         <Button
           size="small"
           startIcon={<ContentCopyIcon fontSize="small" />}
@@ -81,7 +103,7 @@ export default function BulkActionBar({
           Copy
         </Button>
       )}
-      {onCut && (
+      {hasMultiSelection && onCut && (
         <Button
           size="small"
           startIcon={<ContentCutIcon fontSize="small" />}
@@ -90,7 +112,7 @@ export default function BulkActionBar({
           Cut
         </Button>
       )}
-      {onCompress && (
+      {hasMultiSelection && onCompress && (
         <Button
           size="small"
           startIcon={<ArchiveIcon fontSize="small" />}
@@ -99,7 +121,7 @@ export default function BulkActionBar({
           Compress
         </Button>
       )}
-      {onBulkRename && (
+      {hasMultiSelection && onBulkRename && (
         <Button
           size="small"
           startIcon={<EditIcon fontSize="small" />}
@@ -108,7 +130,7 @@ export default function BulkActionBar({
           Rename
         </Button>
       )}
-      {onSaveSelectionGroup && (
+      {hasMultiSelection && onSaveSelectionGroup && (
         <Button
           size="small"
           startIcon={<SaveIcon fontSize="small" />}
@@ -117,7 +139,7 @@ export default function BulkActionBar({
           Save group
         </Button>
       )}
-      {onSetTag && (
+      {hasMultiSelection && onSetTag && (
         <>
           <Button
             size="small"
@@ -164,7 +186,7 @@ export default function BulkActionBar({
           </Menu>
         </>
       )}
-      {onDelete && (
+      {hasMultiSelection && onDelete && (
         <Button
           size="small"
           color="error"
@@ -172,16 +194,6 @@ export default function BulkActionBar({
           onClick={onDelete}
         >
           Delete
-        </Button>
-      )}
-      {onClear && (
-        <Button
-          size="small"
-          color="inherit"
-          startIcon={<CloseIcon fontSize="small" />}
-          onClick={onClear}
-        >
-          Clear
         </Button>
       )}
     </Box>

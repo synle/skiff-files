@@ -253,4 +253,24 @@ describe("FileList", () => {
     const last = onSelectionChange.mock.calls.at(-1)?.[0];
     expect(last ?? []).toHaveLength(0);
   });
+
+  it("list-view header select-all checkbox selects every row", () => {
+    const onSelectionChange = vi.fn();
+    renderList({ onSelectionChange });
+    const selectAll = screen.getByRole("checkbox", { name: "Select all" });
+    fireEvent.click(selectAll);
+    const last = onSelectionChange.mock.calls.at(-1)?.[0] as string[];
+    expect(last).toHaveLength(ENTRIES.length);
+    expect(new Set(last)).toEqual(new Set(ENTRIES.map((e) => e.path)));
+  });
+
+  it("list-view header select-all toggles off when everything is selected", () => {
+    const onSelectionChange = vi.fn();
+    renderList({ onSelectionChange });
+    const selectAll = screen.getByRole("checkbox", { name: "Select all" });
+    fireEvent.click(selectAll); // select all
+    fireEvent.click(selectAll); // unselect all
+    const last = onSelectionChange.mock.calls.at(-1)?.[0] as string[];
+    expect(last ?? []).toHaveLength(0);
+  });
 });

@@ -1536,6 +1536,8 @@ export default function Browser({
       )}
       <BulkActionBar
         count={selectedPaths.length}
+        onNewFolder={() => void handleNewFolder()}
+        onNewFile={() => void handleNewFile()}
         onCopy={() => setFileClipboard(selectedPaths, "copy")}
         onCut={() => setFileClipboard(selectedPaths, "cut")}
         onDelete={() => {
@@ -1576,7 +1578,6 @@ export default function Browser({
           const set = new Set(selectedPaths);
           setBulkRenameTargets(entries.filter((x) => set.has(x.path)));
         }}
-        onClear={() => setSelectedPaths([])}
         onSetTag={(color) => {
           if (selectedPaths.length === 0) return;
           const next = { ...settings.fileTags };

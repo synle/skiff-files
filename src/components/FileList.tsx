@@ -1733,7 +1733,36 @@ export default function FileList(props: Props) {
           borderColor: "divider",
         }}
       >
-        <Box sx={{ width: 36 }} />
+        <Box
+          sx={{
+            width: 36,
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          {/* Select-all checkbox mirrors the Cmd+A keyboard path so
+              mouse-only users have an equivalent affordance. Tri-
+              state: empty when nothing is selected, indeterminate
+              when partially selected, checked when every visible row
+              is selected. */}
+          <Checkbox
+            size="small"
+            checked={sorted.length > 0 && selected.size >= sorted.length}
+            indeterminate={
+              selected.size > 0 && selected.size < sorted.length
+            }
+            disabled={sorted.length === 0}
+            onChange={() => {
+              if (selected.size >= sorted.length) {
+                setSelected(new Set());
+              } else {
+                setSelected(new Set(sorted.map((s) => s.path)));
+              }
+            }}
+            slotProps={{ input: { "aria-label": "Select all" } }}
+            sx={{ p: 0.25 }}
+          />
+        </Box>
         <HeaderCell
           label="Name"
           active={sortKey === "name"}
