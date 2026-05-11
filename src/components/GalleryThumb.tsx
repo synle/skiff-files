@@ -69,12 +69,21 @@ interface Props {
    *  fallback icon. */
   kind: FileKind;
   /** Pixel size of the rendered thumbnail. Same value used for icon
-   *  fallback so the layout doesn't shift between states. */
+   *  fallback so the layout doesn't shift between states. Also the
+   *  resolution we ask the Rust cache to decode at — the rendered
+   *  box may stretch larger via CSS (`fill`) but the underlying
+   *  pixels are sized to `size` so the cache stays compact. */
   size: number;
   /** Skip the network round-trip — used by the parent when the path
    *  is remote (sftp://) since the local fs_read_base64 can't reach
    *  it. */
   remote?: boolean;
+  /** When true, the rendered box stretches to fill its parent
+   *  (`width: 100%, height: 100%`) and the image uses
+   *  `object-fit: cover` so it edge-to-edges the cell rather than
+   *  letterboxing. The fallback kind-icon stays centered. Default
+   *  false → fixed `size × size` box (original behavior). */
+  fill?: boolean;
 }
 
 export default function GalleryThumb({
@@ -82,6 +91,7 @@ export default function GalleryThumb({
   kind,
   size,
   remote = false,
+  fill = false,
 }: Props) {
   const isImage = kind === "image";
   const skipFetch = !isImage || remote;
@@ -120,8 +130,10 @@ export default function GalleryThumb({
   }, [path, size, skipFetch]);
 
   // Fallback path: render the kind icon (folder / image-without-thumb /
-  // remote / errored). Same dimensions as the loaded thumbnail so
-  // the layout doesn't shift when a load resolves.
+  // remote / errored). When `fill` is true the box stretches to its
+  // parent and the icon stays centered at `size`; otherwise it's the
+  // legacy fixed `size × size` box so the layout doesn't shift when
+  // a load resolves.
   if (skipFetch || errored || !dataUrl) {
     return (
       <Box
@@ -129,8 +141,8 @@ export default function GalleryThumb({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: size,
-          height: size,
+          width: fill ? "100%" : size,
+          height: fill ? "100%" : size,
           flexShrink: 0,
           "& svg": { fontSize: size - 4 },
         }}
@@ -143,8 +155,8 @@ export default function GalleryThumb({
   return (
     <Box
       sx={{
-        width: size,
-        height: size,
+        width: fill ? "100%" : size,
+        height: fill ? "100%" : size,
         flexShrink: 0,
         display: "flex",
         alignItems: "center",
@@ -159,13 +171,17 @@ export default function GalleryThumb({
         alt=""
         loading="lazy"
         decoding="async"
-        // object-fit: contain preserves aspect; the cell's bgcolor
-        // hint shows for non-square images so the thumbnail reads
-        // as a thumbnail, not a stretched rectangle.
+        // fill=true → `cover` edges the image to the box so the cell
+        // reads as a proper thumbnail without empty padding. fill=false
+        // → `contain` preserves aspect inside a fixed box (the legacy
+        // shape used by surfaces that mix thumbs with icons of the
+        // same size, like the preview pane).
         style={{
+          width: fill ? "100%" : undefined,
+          height: fill ? "100%" : undefined,
           maxWidth: "100%",
           maxHeight: "100%",
-          objectFit: "contain",
+          objectFit: fill ? "cover" : "contain",
         }}
         onError={() => setErrored(true)}
       />

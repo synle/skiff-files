@@ -500,7 +500,12 @@ function FileGridView(props: FileGridViewProps) {
   //             so it's obviously a metadata-forward layout
   const cellWidth = view === "tile" ? 80 : view === "gallery" ? 160 : 240;
   const cellHeight = view === "tile" ? 88 : view === "gallery" ? 150 : 56;
-  const iconSize = view === "tile" ? 32 : view === "gallery" ? 72 : 28;
+  // Gallery icons used to be 72 px in a 160 px cell — visibly small
+  // and the cached thumbnail blurred when the new `fill` mode
+  // stretched it edge-to-edge. Decode at 128 so the upsample headroom
+  // covers the full cell width (and ~2× retina). Tile + column stay
+  // unchanged.
+  const iconSize = view === "tile" ? 32 : view === "gallery" ? 128 : 28;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -1036,8 +1041,25 @@ function FileGridView(props: FileGridViewProps) {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            flexShrink: 0,
+                            // Gallery's thumb container stretches to
+                            // fill the cell's remaining vertical
+                            // space so image thumbnails read as
+                            // proper card art rather than tiny
+                            // letterboxed previews. Tile / column
+                            // keep the fixed-icon shape — they're
+                            // metadata-forward and a giant icon
+                            // would dominate the row.
+                            ...(view === "gallery"
+                              ? {
+                                  flex: 1,
+                                  width: "100%",
+                                  minHeight: 0,
+                                  alignSelf: "stretch",
+                                }
+                              : { flexShrink: 0 }),
                             cursor: "pointer",
+                            overflow: "hidden",
+                            borderRadius: view === "gallery" ? 1 : 0,
                           }}
                           title="Click to open"
                         >
@@ -1054,6 +1076,7 @@ function FileGridView(props: FileGridViewProps) {
                               kind={e.kind}
                               size={iconSize}
                               remote={e.path.startsWith("sftp://")}
+                              fill
                             />
                           ) : (
                             <Box
