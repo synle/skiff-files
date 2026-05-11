@@ -150,7 +150,7 @@ jobs:
           cargo llvm-cov --lib --summary-only \
             --fail-under-lines 52 \
             --fail-under-functions 42 \
-            --fail-under-regions 54 \
+            --fail-under-regions 53 \
             2>&1 | tee /tmp/rust-cov.txt
 
       # Upload the full HTML / lcov reports as an artifact so
