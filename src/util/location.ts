@@ -91,7 +91,15 @@ export function formatLocation(loc: Location): string {
 }
 
 /** True iff the location targets a remote backend. Convenience for
- *  toggling UI affordances (e.g. disabling tilde-expansion). */
+ *  toggling UI affordances (e.g. disabling tilde-expansion). SMB is
+ *  included even though there's no first-class Rust backend yet —
+ *  the address bar / browser route smb:// paths to the OS handler,
+ *  and the rest of the app should treat them as remote (skip disk
+ *  space, hide local-only context-menu actions, …). */
 export function isRemote(path: string): boolean {
-  return path.startsWith(SFTP_PREFIX) || path.startsWith(FTP_PREFIX);
+  return (
+    path.startsWith(SFTP_PREFIX) ||
+    path.startsWith(FTP_PREFIX) ||
+    path.startsWith("smb://")
+  );
 }

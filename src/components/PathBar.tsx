@@ -15,7 +15,7 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import HomeIcon from "@mui/icons-material/Home";
 import { useEffect, useRef, useState } from "react";
-import { fsCanonicalize, fsRevealInOs } from "../api/fs";
+import { fsCanonicalize, fsOpenWithDefault, fsRevealInOs } from "../api/fs";
 import { listDir } from "../api/client";
 import { pathSegments } from "../util/format";
 import { isRemote } from "../util/location";
@@ -79,6 +79,26 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
     const target = draft.trim();
     if (!target) {
       setEditing(false);
+      return;
+    }
+    // SMB / Samba: there's no first-class Rust backend yet, so route
+    // smb:// paths to the OS native handler instead of letting the
+    // in-app pipeline try `list_dir(smb://...)` and surface a
+    // confusing "No such file or directory" error. macOS Finder /
+    // Windows Explorer register smb:// — they prompt for credentials,
+    // mount the share, and open it in their own file manager. The
+    // PathBar reverts to its previous value so the user doesn't see
+    // a broken state in the bar after the OS takes over.
+    if (target.startsWith("smb://")) {
+      setEditing(false);
+      setDraft(path); // revert the input back to the existing path
+      try {
+        await fsOpenWithDefault(target);
+      } catch {
+        // Best effort — the OS handler dispatch is fire-and-forget;
+        // a user-friendly explanation lives in the address bar's
+        // tooltip + the SMB share saved-list UI.
+      }
       return;
     }
     // Remote paths are already absolute — there's no `~` expansion in
