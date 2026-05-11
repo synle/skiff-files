@@ -46,6 +46,86 @@ import { SUPPORTED_LOCALES, type LocaleCode } from "../i18n";
 const LOCALE_LABELS: Record<LocaleCode, string> = {
   en: "English",
 };
+
+/** Hex slots a palette preset fills in. Mirrors `CustomPalette` from
+ *  `state/settings`; declared inline here so the preset table doesn't
+ *  need to import the type just for literal values. */
+interface PalettePreset {
+  id: string;
+  label: string;
+  primaryMain: string;
+  backgroundDefault: string;
+  backgroundPaper: string;
+  textPrimary: string;
+  textSecondary: string;
+}
+
+/** Light-mode palette presets, surfaced as one-click chips next to the
+ *  "Light mode" label in Settings → Custom palette. Click → fill the
+ *  light-mode palette only (dark stays put). Editable via the color
+ *  swatches below — the presets are just convenient starting points. */
+const LIGHT_PRESETS: PalettePreset[] = [
+  {
+    id: "solarized-light",
+    label: "Solarized Light",
+    primaryMain: "#268bd2",
+    backgroundDefault: "#fdf6e3",
+    backgroundPaper: "#eee8d5",
+    textPrimary: "#586e75",
+    textSecondary: "#657b83",
+  },
+  {
+    id: "github-light",
+    label: "GitHub Light",
+    primaryMain: "#0969da",
+    backgroundDefault: "#ffffff",
+    backgroundPaper: "#f6f8fa",
+    textPrimary: "#1f2328",
+    textSecondary: "#656d76",
+  },
+  {
+    id: "atom-one-light",
+    label: "Atom One Light",
+    primaryMain: "#4078f2",
+    backgroundDefault: "#fafafa",
+    backgroundPaper: "#f0f0f0",
+    textPrimary: "#383a42",
+    textSecondary: "#696c77",
+  },
+];
+
+/** Dark-mode palette presets, mirrors LIGHT_PRESETS. The three carry
+ *  over from the prior single-button design (which set both modes at
+ *  once). */
+const DARK_PRESETS: PalettePreset[] = [
+  {
+    id: "solarized-dark",
+    label: "Solarized Dark",
+    primaryMain: "#268bd2",
+    backgroundDefault: "#002b36",
+    backgroundPaper: "#073642",
+    textPrimary: "#93a1a1",
+    textSecondary: "#839496",
+  },
+  {
+    id: "dracula",
+    label: "Dracula",
+    primaryMain: "#bd93f9",
+    backgroundDefault: "#282a36",
+    backgroundPaper: "#383a59",
+    textPrimary: "#f8f8f2",
+    textSecondary: "#bfbfbf",
+  },
+  {
+    id: "nord",
+    label: "Nord",
+    primaryMain: "#88c0d0",
+    backgroundDefault: "#2e3440",
+    backgroundPaper: "#3b4252",
+    textPrimary: "#eceff4",
+    textSecondary: "#d8dee9",
+  },
+];
 import { fsOpenWithDefault, fsRevealInOs, getAppVersion } from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
 import {
@@ -914,149 +994,136 @@ export default function SettingsPage() {
           <Divider sx={{ my: 1 }} />
           <Typography variant="subtitle2">Custom palette</Typography>
           <Typography variant="caption" color="text.secondary">
-            Override the built-in light / dark palettes. Leave a slot empty
-            to inherit the default for that color.
+            Pick a preset per mode, or fine-tune individual slots below.
+            Leave a swatch on the default to inherit the built-in color.
           </Typography>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.useCustomTheme}
-                onChange={(e) => update("useCustomTheme", e.target.checked)}
-              />
-            }
-            label="Use my custom palette"
-          />
 
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => {
-                update("customLightPalette", {
-                  primaryMain: "#268bd2",
-                  backgroundDefault: "#fdf6e3",
-                  backgroundPaper: "#eee8d5",
-                  textPrimary: "#586e75",
-                  textSecondary: "#657b83",
-                });
-                update("customDarkPalette", {
-                  primaryMain: "#268bd2",
-                  backgroundDefault: "#002b36",
-                  backgroundPaper: "#073642",
-                  textPrimary: "#93a1a1",
-                  textSecondary: "#839496",
-                });
-                update("useCustomTheme", true);
-              }}
-            >
-              Solarized
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => {
-                update("customDarkPalette", {
-                  primaryMain: "#bd93f9",
-                  backgroundDefault: "#282a36",
-                  backgroundPaper: "#383a59",
-                  textPrimary: "#f8f8f2",
-                  textSecondary: "#bfbfbf",
-                });
-                update("customLightPalette", {
-                  primaryMain: "#bd93f9",
-                  backgroundDefault: "#f8f8f2",
-                  backgroundPaper: "#ffffff",
-                  textPrimary: "#282a36",
-                  textSecondary: "#44475a",
-                });
-                update("useCustomTheme", true);
-              }}
-            >
-              Dracula
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => {
-                update("customDarkPalette", {
-                  primaryMain: "#88c0d0",
-                  backgroundDefault: "#2e3440",
-                  backgroundPaper: "#3b4252",
-                  textPrimary: "#eceff4",
-                  textSecondary: "#d8dee9",
-                });
-                update("customLightPalette", {
-                  primaryMain: "#5e81ac",
-                  backgroundDefault: "#eceff4",
-                  backgroundPaper: "#e5e9f0",
-                  textPrimary: "#2e3440",
-                  textSecondary: "#3b4252",
-                });
-                update("useCustomTheme", true);
-              }}
-            >
-              Nord
-            </Button>
-            <Button
-              size="small"
-              variant="text"
-              onClick={() => {
-                update("customLightPalette", {
-                  primaryMain: "",
-                  backgroundDefault: "",
-                  backgroundPaper: "",
-                  textPrimary: "",
-                  textSecondary: "",
-                });
-                update("customDarkPalette", {
-                  primaryMain: "",
-                  backgroundDefault: "",
-                  backgroundPaper: "",
-                  textPrimary: "",
-                  textSecondary: "",
-                });
-              }}
-            >
-              Reset palette
-            </Button>
-          </Box>
-
-          {(["customLightPalette", "customDarkPalette"] as const).map((key) => (
-            <Box key={key}>
-              <Typography variant="body2" sx={{ mb: 0.5 }}>
-                {key === "customLightPalette" ? "Light mode" : "Dark mode"}
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                {(
-                  [
-                    ["primaryMain", "Primary"],
-                    ["backgroundDefault", "Background"],
-                    ["backgroundPaper", "Paper"],
-                    ["textPrimary", "Text"],
-                    ["textSecondary", "Text dim"],
-                  ] as const
-                ).map(([slot, label]) => {
-                  const value = settings[key][slot] || "";
-                  return (
-                    <Box key={slot} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <input
-                        type="color"
-                        value={value || "#000000"}
-                        onChange={(e) =>
-                          update(key, {
-                            ...settings[key],
-                            [slot]: e.target.value,
-                          })
-                        }
-                        style={{ width: 32, height: 32, padding: 0, border: "none", background: "none" }}
-                      />
-                      <Typography variant="caption">{label}</Typography>
-                    </Box>
-                  );
-                })}
+          {(
+            [
+              ["customLightPalette", "Light mode", LIGHT_PRESETS],
+              ["customDarkPalette", "Dark mode", DARK_PRESETS],
+            ] as const
+          ).map(([key, label, presets]) => {
+            const palette = settings[key];
+            // A preset is "active" when every slot in the saved palette
+            // matches the preset's hex. This lets us highlight the chip
+            // the user picked even after a reload.
+            const isEmpty =
+              !palette.primaryMain &&
+              !palette.backgroundDefault &&
+              !palette.backgroundPaper &&
+              !palette.textPrimary &&
+              !palette.textSecondary;
+            const activePresetId = presets.find(
+              (p) =>
+                palette.primaryMain.toLowerCase() === p.primaryMain.toLowerCase() &&
+                palette.backgroundDefault.toLowerCase() ===
+                  p.backgroundDefault.toLowerCase() &&
+                palette.backgroundPaper.toLowerCase() ===
+                  p.backgroundPaper.toLowerCase() &&
+                palette.textPrimary.toLowerCase() === p.textPrimary.toLowerCase() &&
+                palette.textSecondary.toLowerCase() ===
+                  p.textSecondary.toLowerCase(),
+            )?.id;
+            return (
+              <Box key={key}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    flexWrap: "wrap",
+                    mb: 0.75,
+                  }}
+                >
+                  <Typography variant="body2" sx={{ minWidth: 80 }}>
+                    {label}
+                  </Typography>
+                  {/* "Default" chip clears this mode's palette so the
+                      built-in slots win. Replaces the old global
+                      Reset palette button (which always nuked both
+                      modes at once). */}
+                  <Button
+                    size="small"
+                    variant={isEmpty ? "contained" : "outlined"}
+                    onClick={() =>
+                      update(key, {
+                        primaryMain: "",
+                        backgroundDefault: "",
+                        backgroundPaper: "",
+                        textPrimary: "",
+                        textSecondary: "",
+                      })
+                    }
+                  >
+                    Default
+                  </Button>
+                  {presets.map((p) => (
+                    <Button
+                      key={p.id}
+                      size="small"
+                      variant={
+                        activePresetId === p.id ? "contained" : "outlined"
+                      }
+                      onClick={() => {
+                        update(key, {
+                          primaryMain: p.primaryMain,
+                          backgroundDefault: p.backgroundDefault,
+                          backgroundPaper: p.backgroundPaper,
+                          textPrimary: p.textPrimary,
+                          textSecondary: p.textSecondary,
+                        });
+                        // Selecting a preset implies the user wants the
+                        // custom palette on; switch off the toggle was
+                        // a useless click before reaching the chips.
+                        update("useCustomTheme", true);
+                      }}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </Box>
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                  {(
+                    [
+                      ["primaryMain", "Primary"],
+                      ["backgroundDefault", "Background"],
+                      ["backgroundPaper", "Paper"],
+                      ["textPrimary", "Text"],
+                      ["textSecondary", "Text dim"],
+                    ] as const
+                  ).map(([slot, slotLabel]) => {
+                    const value = palette[slot] || "";
+                    return (
+                      <Box
+                        key={slot}
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        <input
+                          type="color"
+                          value={value || "#000000"}
+                          onChange={(e) =>
+                            update(key, {
+                              ...palette,
+                              [slot]: e.target.value,
+                            })
+                          }
+                          style={{
+                            width: 32,
+                            height: 32,
+                            padding: 0,
+                            border: "none",
+                            background: "none",
+                          }}
+                        />
+                        <Typography variant="caption">{slotLabel}</Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
-            </Box>
-          ))}
+            );
+          })}
         </Section>
 
         <Divider />
