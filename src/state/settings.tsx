@@ -288,6 +288,14 @@ export interface Settings {
    *  otherwise cover us. Synced via the new `window_set_always_on_top`
    *  Tauri command on every change. */
   alwaysOnTop: boolean;
+  /** Multiplier applied to every view mode's base cell / row size.
+   *  1.0 = built-in defaults; clamped to [0.5, 2.0] in the UI. List
+   *  view scales row height; tile / gallery / column scale cell
+   *  width + height + icon size proportionally. Drives the zoom
+   *  cluster in the StatusBar. Stored as a single global value
+   *  (not per-view) — view-distinctness is preserved because the
+   *  base sizes still differ across modes. */
+  viewZoom: number;
   /** User-saved searches: label + query + flags. Surfaces in a small
    *  dropdown next to the toolbar's search field; clicking restores
    *  the query + flags and runs the search. Distinct from
@@ -531,6 +539,7 @@ export const DEFAULTS: Settings = {
   customFileKinds: {},
   hideColumns: { size: false, modified: false, kind: false },
   alwaysOnTop: false,
+  viewZoom: 1,
   savedSearches: [],
   savedSelections: [],
   tabWorkspaces: [],

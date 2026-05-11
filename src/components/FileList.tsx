@@ -72,6 +72,10 @@ interface Props {
    *  cursor. */
   onContext?: (entry: Entry, x: number, y: number) => void;
   density: Density;
+  /** Global view-zoom multiplier from `Settings.viewZoom`. Scales
+   *  every view mode's base cell / row dimensions and icon size.
+   *  1.0 = built-in defaults; clamped upstream to [0.5, 2.0]. */
+  zoom?: number;
   showExtensions: ShowExtensions;
   /** When true (default), folders sort above files regardless of the
    *  active sort key. When false, folders and files intermix purely
@@ -459,6 +463,8 @@ interface FileGridViewProps {
   /** Per-extension icon override, threaded down so the grid views
    *  honor the same custom kinds as the list view. */
   customFileKinds?: Record<string, string>;
+  /** Global view-zoom multiplier — scales cell + icon dimensions. */
+  zoom?: number;
 }
 
 function FileGridView(props: FileGridViewProps) {
@@ -498,14 +504,25 @@ function FileGridView(props: FileGridViewProps) {
   //             "tile in a frame" even without a thumbnail
   //   column = wide 240 px cell, icon + name + bold size/mtime line
   //             so it's obviously a metadata-forward layout
-  const cellWidth = view === "tile" ? 80 : view === "gallery" ? 160 : 240;
-  const cellHeight = view === "tile" ? 88 : view === "gallery" ? 150 : 56;
+  // Base sizes for each view mode. The `zoom` multiplier from
+  // `Settings.viewZoom` scales them uniformly (cellWidth × cellHeight
+  // × iconSize) — every view stays visually distinct because the
+  // base ratios remain the same at any zoom. Math.round keeps the
+  // virtualizer's integer cell math stable; Math.max guards a
+  // pathological zoom (e.g. a corrupt settings.json) from collapsing
+  // the grid to 0-px cells.
+  const baseCellWidth = view === "tile" ? 80 : view === "gallery" ? 160 : 240;
+  const baseCellHeight = view === "tile" ? 88 : view === "gallery" ? 150 : 56;
   // Gallery icons used to be 72 px in a 160 px cell — visibly small
   // and the cached thumbnail blurred when the new `fill` mode
   // stretched it edge-to-edge. Decode at 128 so the upsample headroom
   // covers the full cell width (and ~2× retina). Tile + column stay
   // unchanged.
-  const iconSize = view === "tile" ? 32 : view === "gallery" ? 128 : 28;
+  const baseIconSize = view === "tile" ? 32 : view === "gallery" ? 128 : 28;
+  const z = Math.max(0.25, props.zoom ?? 1);
+  const cellWidth = Math.max(24, Math.round(baseCellWidth * z));
+  const cellHeight = Math.max(24, Math.round(baseCellHeight * z));
+  const iconSize = Math.max(16, Math.round(baseIconSize * z));
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -1186,6 +1203,7 @@ export default function FileList(props: Props) {
     onSelectionChange,
     onContext,
     density,
+    zoom = 1,
     showExtensions,
     isActive = true,
     groupFoldersFirst = true,
@@ -1690,8 +1708,12 @@ export default function FileList(props: Props) {
   }, [focusedIdx, sorted]);
 
   // Row height is the dominant perf knob — keep both densities in sync with
-  // the inner row Box height below.
-  const rowH = density === "compact" ? 24 : 32;
+  // the inner row Box height below. `zoom` scales the row height in
+  // list view so users can shrink / enlarge rows without leaving the
+  // mode (density is the coarse knob; zoom is the fine one).
+  const zoomFactor = Math.max(0.25, zoom);
+  const baseRowH = density === "compact" ? 24 : 32;
+  const rowH = Math.max(16, Math.round(baseRowH * zoomFactor));
 
   const rowVirtualizer = useVirtualizer({
     count: sorted.length,
@@ -1878,6 +1900,7 @@ export default function FileList(props: Props) {
         highlightQuery={highlightQuery}
         dateFormat={dateFormat}
         customFileKinds={customFileKinds}
+        zoom={zoom}
         path={path}
         onRowClick={onRowClick}
         onRowMouseDown={onRowMouseDown}

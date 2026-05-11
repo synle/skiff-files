@@ -95,4 +95,80 @@ describe("StatusBar", () => {
     });
     expect(screen.queryByLabelText("Dismiss error")).not.toBeInTheDocument();
   });
+
+  // Zoom cluster (0.2.260) — surfaces at the right edge when viewZoom
+  // + onZoomStep are provided. Bare-minimum tests pin the readout,
+  // step semantics, reset on readout click, and the clamp-disabled
+  // visuals at the floor / ceiling.
+  it("renders the zoom readout as a rounded percent", () => {
+    r({
+      totalEntries: 1,
+      selectedEntries: 0,
+      selectedSize: 0,
+      viewZoom: 1.25,
+      onZoomStep: vi.fn(),
+      onZoomReset: vi.fn(),
+    });
+    expect(screen.getByText("125%")).toBeInTheDocument();
+  });
+
+  it("zoom buttons fire onZoomStep with -1 / +1", () => {
+    const onZoomStep = vi.fn();
+    r({
+      totalEntries: 1,
+      selectedEntries: 0,
+      selectedSize: 0,
+      viewZoom: 1,
+      onZoomStep,
+      onZoomReset: vi.fn(),
+    });
+    fireEvent.click(screen.getByLabelText("Zoom out"));
+    expect(onZoomStep).toHaveBeenLastCalledWith(-1);
+    fireEvent.click(screen.getByLabelText("Zoom in"));
+    expect(onZoomStep).toHaveBeenLastCalledWith(1);
+  });
+
+  it("clicking the readout fires onZoomReset", () => {
+    const onZoomReset = vi.fn();
+    r({
+      totalEntries: 1,
+      selectedEntries: 0,
+      selectedSize: 0,
+      viewZoom: 1.5,
+      onZoomStep: vi.fn(),
+      onZoomReset,
+    });
+    fireEvent.click(screen.getByText("150%"));
+    expect(onZoomReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables Zoom out at the floor (50 %)", () => {
+    r({
+      totalEntries: 1,
+      selectedEntries: 0,
+      selectedSize: 0,
+      viewZoom: 0.5,
+      onZoomStep: vi.fn(),
+    });
+    expect(screen.getByLabelText("Zoom out")).toBeDisabled();
+    expect(screen.getByLabelText("Zoom in")).not.toBeDisabled();
+  });
+
+  it("disables Zoom in at the ceiling (200 %)", () => {
+    r({
+      totalEntries: 1,
+      selectedEntries: 0,
+      selectedSize: 0,
+      viewZoom: 2,
+      onZoomStep: vi.fn(),
+    });
+    expect(screen.getByLabelText("Zoom in")).toBeDisabled();
+    expect(screen.getByLabelText("Zoom out")).not.toBeDisabled();
+  });
+
+  it("omits the zoom cluster when viewZoom is not supplied", () => {
+    r({ totalEntries: 1, selectedEntries: 0, selectedSize: 0 });
+    expect(screen.queryByLabelText("Zoom in")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Zoom out")).not.toBeInTheDocument();
+  });
 });

@@ -1658,6 +1658,7 @@ export default function Browser({
           onContext={(entry, x, y) => setContextMenu({ entry, x, y })}
           isActive={isActive}
           density={settings.density}
+        zoom={settings.viewZoom}
           showExtensions={settings.showExtensions}
           groupFoldersFirst={settings.groupFoldersFirst}
           highlightQuery={search}
@@ -1748,6 +1749,19 @@ export default function Browser({
             ? 0
             : Math.max(0, entries.length - visibleEntries.length)
         }
+        viewZoom={settings.viewZoom}
+        onZoomStep={(delta) => {
+          // 25 % steps clamped to [0.5, 2.0]. Step-based rather than a
+          // continuous slider so the % readout stays at round values
+          // (50 / 75 / 100 / 125 / 150 / 175 / 200) — easier to reason
+          // about and matches Finder's icon-size discrete stops.
+          const next = Math.min(
+            2,
+            Math.max(0.5, (settings.viewZoom ?? 1) + delta * 0.25),
+          );
+          update("viewZoom", Math.round(next * 100) / 100);
+        }}
+        onZoomReset={() => update("viewZoom", 1)}
       />}
       <Menu
         open={emptyMenu !== null}

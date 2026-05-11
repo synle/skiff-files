@@ -1,7 +1,9 @@
 // Bottom status strip — selection count + total size. Free-space / transfer
 // status get added when the Skiffsync engine lands in Phase 4.
-import { Box, IconButton, Typography } from "@mui/material";
+import { Box, IconButton, Tooltip, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import RemoveIcon from "@mui/icons-material/Remove";
+import AddIcon from "@mui/icons-material/Add";
 import { formatBytes } from "../util/format";
 
 interface Props {
@@ -45,6 +47,17 @@ interface Props {
    *  search) is currently dropping from the listing. Surfaces as
    *  "(N hidden)" so users notice they're seeing a subset. */
   hiddenByFilter?: number;
+  /** Global view-zoom multiplier (1.0 = 100 %). When provided,
+   *  surfaces the zoom cluster at the right edge: `−` / readout /
+   *  `+`. Clicking the readout resets to 100 %. Omit to hide the
+   *  cluster (tests, alternate surfaces). */
+  viewZoom?: number;
+  /** Bump the zoom by one step (−1 or +1). Implementation lives
+   *  upstream so the clamp / step size stay in one place. */
+  onZoomStep?: (delta: -1 | 1) => void;
+  /** Reset zoom to the built-in default (1.0). Fires on readout
+   *  click. */
+  onZoomReset?: () => void;
 }
 
 export default function StatusBar({
@@ -63,6 +76,9 @@ export default function StatusBar({
   selectedName = null,
   taggedCount = 0,
   hiddenByFilter = 0,
+  viewZoom,
+  onZoomStep,
+  onZoomReset,
 }: Props) {
   // Errors take precedence — a directory listing error matters more than the
   // empty-selection summary it would otherwise render alongside.
@@ -146,6 +162,62 @@ export default function StatusBar({
           · {clipboardHint.count} item{clipboardHint.count === 1 ? "" : "s"}{" "}
           ready to {clipboardHint.op === "cut" ? "move" : "paste"}
         </Typography>
+      )}
+      {/* Push the zoom cluster to the right edge. Spacer Box rather
+          than `marginLeft: auto` on the cluster so the gap behavior
+          stays consistent with the other status pills. */}
+      {viewZoom != null && onZoomStep && (
+        <>
+          <Box sx={{ flex: 1 }} />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
+            <Tooltip title="Zoom out (smaller cells / rows)">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => onZoomStep(-1)}
+                  aria-label="Zoom out"
+                  // Disable at the floor so users don't bottom-out
+                  // silently. The clamp lives upstream; this is just
+                  // the visual hint.
+                  disabled={viewZoom <= 0.5}
+                  sx={{ p: 0.25 }}
+                >
+                  <RemoveIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Reset zoom to 100 %">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                onClick={onZoomReset}
+                sx={{
+                  cursor: onZoomReset ? "pointer" : "default",
+                  minWidth: 36,
+                  textAlign: "center",
+                  userSelect: "none",
+                }}
+                role={onZoomReset ? "button" : undefined}
+                aria-label={onZoomReset ? "Reset zoom" : undefined}
+              >
+                {Math.round(viewZoom * 100)}%
+              </Typography>
+            </Tooltip>
+            <Tooltip title="Zoom in (larger cells / rows)">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => onZoomStep(1)}
+                  aria-label="Zoom in"
+                  disabled={viewZoom >= 2}
+                  sx={{ p: 0.25 }}
+                >
+                  <AddIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        </>
       )}
     </Box>
   );

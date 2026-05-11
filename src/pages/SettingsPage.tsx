@@ -1157,7 +1157,7 @@ export default function SettingsPage() {
 
         <Section
           title="Default view"
-          description="Used for folders without a saved per-folder preference."
+          description="Used for folders without a saved per-folder preference. Each folder otherwise remembers its own view mode, sort key, and sort direction independently — use “Apply to all folders” below to reset every per-folder override and force the global default everywhere."
         >
           <FormControl size="small" sx={{ maxWidth: 240 }}>
             <InputLabel id="view-mode-label">View mode</InputLabel>
@@ -1310,6 +1310,50 @@ export default function SettingsPage() {
               <MenuItem value="always">Always show</MenuItem>
             </Select>
           </FormControl>
+
+          {/* "Apply to all folders" — wipes every per-folder override
+              for view mode + sort, forcing the global defaults set
+              above to take effect everywhere. Same intent as Finder's
+              "Use as Defaults" button at the bottom of the View
+              Options panel. The count makes the destructive scope
+              explicit so users don't trigger it expecting only a
+              future-folders preference flip. */}
+          {(() => {
+            const folderViewCount = Object.keys(
+              settings.folderViewMode ?? {},
+            ).length;
+            const folderSortCount = Object.keys(
+              settings.folderSort ?? {},
+            ).length;
+            const total = folderViewCount + folderSortCount;
+            return (
+              <Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={total === 0}
+                  onClick={() => {
+                    update("folderViewMode", {});
+                    update("folderSort", {});
+                  }}
+                >
+                  {total === 0
+                    ? "No per-folder overrides to reset"
+                    : `Apply default to all folders (clears ${folderViewCount} view + ${folderSortCount} sort override${total === 1 ? "" : "s"})`}
+                </Button>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 0.5, display: "block" }}
+                >
+                  Mirrors Finder's “Use as Defaults”. New folders always
+                  start with the global defaults above; this only
+                  matters when you've changed view / sort in one or
+                  more specific folders since.
+                </Typography>
+              </Box>
+            );
+          })()}
         </Section>
 
         <Divider />
