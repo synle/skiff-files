@@ -64,6 +64,13 @@ pub struct SmbConnection {
     /// Cached share name so we can produce nicer error messages
     /// without re-locking the mutex.
     share_name: String,
+    /// Stored at connect time so we can re-establish the session
+    /// transparently when the server drops it mid-idle. The
+    /// integration suite hit this on dperson/samba between
+    /// cross-backend ops; it surfaces in production any time
+    /// the user pauses long enough for the server's idle-timeout
+    /// to fire.
+    cfg: SmbConfig,
 }
 
 struct Inner {
@@ -96,21 +103,89 @@ impl SmbConnection {
             .map_err(|e| format!("connect_share({}): {e}", cfg.share))?;
         Ok(Arc::new(Self {
             inner: Mutex::new(Inner { client, tree }),
-            share_name: cfg.share,
+            share_name: cfg.share.clone(),
+            cfg,
         }))
     }
+
+    /// Re-establish the SMB session in place. Called transparently
+    /// by `with_session_retry` after a disconnect; safe to invoke
+    /// multiple times (each call drops the previous client + tree
+    /// before replacing them). Returns the new lock guard so the
+    /// caller can immediately re-run the op without releasing the
+    /// mutex (and racing another caller into another retry loop).
+    async fn reconnect_inner(
+        &self,
+        slot: &mut Inner,
+    ) -> Result<(), String> {
+        let addr = format!("{}:{}", self.cfg.host, self.cfg.port);
+        let config = ClientConfig {
+            addr: addr.clone(),
+            timeout: Duration::from_secs(10),
+            username: self.cfg.user.clone(),
+            password: self.cfg.password.clone(),
+            domain: self.cfg.domain.clone(),
+            auto_reconnect: false,
+            compression: true,
+            dfs_enabled: true,
+            dfs_target_overrides: Default::default(),
+        };
+        let mut client = SmbClient::connect(config)
+            .await
+            .map_err(|e| format!("reconnect({addr}): {e}"))?;
+        let tree = client
+            .connect_share(&self.cfg.share)
+            .await
+            .map_err(|e| format!("reconnect_share({}): {e}", self.cfg.share))?;
+        slot.client = client;
+        slot.tree = tree;
+        Ok(())
+    }
+}
+
+/// Substring sniff for the disconnect error class. smb2 returns
+/// strings like "Disconnected from server" / "connection reset" /
+/// "broken pipe" depending on where in the protocol stack the
+/// drop happens. Lower-case match keeps the test cheap and covers
+/// every variant we've seen.
+fn looks_like_disconnect(msg: &str) -> bool {
+    let lower = msg.to_lowercase();
+    lower.contains("disconnect")
+        || lower.contains("connection reset")
+        || lower.contains("broken pipe")
+        || lower.contains("connection closed")
+}
+
+impl SmbConnection {
 
     /// List a directory under the bound share. `path` is a
     /// share-relative POSIX-style path; `smb2` normalizes the
     /// forward-slash → backslash mapping internally.
     pub async fn list_dir(&self, path: &str, opts: ListOptions) -> FsResult<Vec<Entry>> {
         let rel = strip_leading_slash(path);
-        let mut g = self.inner.lock().await;
-        let Inner { client, tree } = &mut *g;
-        let entries = client
-            .list_directory(tree, rel)
-            .await
-            .map_err(|e| format!("list_directory({}/{path}): {e}", self.share_name))?;
+        // Single-attempt lock + retry on disconnect. Same shape in
+        // every public op below.
+        let entries = {
+            let mut g = self.inner.lock().await;
+            let first = {
+                let Inner { client, tree } = &mut *g;
+                client.list_directory(tree, rel).await.map_err(|e| e.to_string())
+            };
+            match first {
+                Ok(v) => v,
+                Err(ref e) if looks_like_disconnect(e) => {
+                    self.reconnect_inner(&mut *g).await?;
+                    let Inner { client, tree } = &mut *g;
+                    client
+                        .list_directory(tree, rel)
+                        .await
+                        .map_err(|e| format!("list_directory({}/{path}): {e}", self.share_name))?
+                }
+                Err(e) => {
+                    return Err(format!("list_directory({}/{path}): {e}", self.share_name));
+                }
+            }
+        };
         let mut out = Vec::with_capacity(entries.len());
         for e in entries {
             if e.name == "." || e.name == ".." {
@@ -152,12 +227,25 @@ impl SmbConnection {
 
     pub async fn stat(&self, path: &str) -> FsResult<Entry> {
         let rel = strip_leading_slash(path);
-        let mut g = self.inner.lock().await;
-        let Inner { client, tree } = &mut *g;
-        let info = client
-            .stat(tree, rel)
-            .await
-            .map_err(|e| format!("stat({}/{path}): {e}", self.share_name))?;
+        let info = {
+            let mut g = self.inner.lock().await;
+            let first = {
+                let Inner { client, tree } = &mut *g;
+                client.stat(tree, rel).await.map_err(|e| e.to_string())
+            };
+            match first {
+                Ok(v) => v,
+                Err(ref e) if looks_like_disconnect(e) => {
+                    self.reconnect_inner(&mut *g).await?;
+                    let Inner { client, tree } = &mut *g;
+                    client
+                        .stat(tree, rel)
+                        .await
+                        .map_err(|e| format!("stat({}/{path}): {e}", self.share_name))?
+                }
+                Err(e) => return Err(format!("stat({}/{path}): {e}", self.share_name)),
+            }
+        };
         let name = path_basename(path);
         Ok(Entry {
             name: name.clone(),
@@ -224,11 +312,22 @@ impl SmbConnection {
         let from_rel = strip_leading_slash(from);
         let to_rel = strip_leading_slash(to);
         let mut g = self.inner.lock().await;
-        let Inner { client, tree } = &mut *g;
-        client
-            .rename(tree, from_rel, to_rel)
-            .await
-            .map_err(|e| format!("rename({} -> {}): {e}", from, to))
+        let first = {
+            let Inner { client, tree } = &mut *g;
+            client.rename(tree, from_rel, to_rel).await.map_err(|e| e.to_string())
+        };
+        match first {
+            Ok(()) => Ok(()),
+            Err(ref e) if looks_like_disconnect(e) => {
+                self.reconnect_inner(&mut *g).await?;
+                let Inner { client, tree } = &mut *g;
+                client
+                    .rename(tree, from_rel, to_rel)
+                    .await
+                    .map_err(|e| format!("rename({} -> {}): {e}", from, to))
+            }
+            Err(e) => Err(format!("rename({} -> {}): {e}", from, to)),
+        }
     }
 
     /// Remove a file or directory. For directories, walks the tree
@@ -243,13 +342,27 @@ impl SmbConnection {
     /// happy-path single-round-trip + sidesteps the session drop.
     pub async fn remove(&self, path: &str) -> FsResult<()> {
         let rel = strip_leading_slash(path);
-        // First try as a file.
+        // First try as a file (with the standard reconnect+retry on
+        // disconnect). Anything that looks like "is a directory"
+        // routes to the recursive-directory path below.
         let file_err = {
             let mut g = self.inner.lock().await;
-            let Inner { client, tree } = &mut *g;
-            match client.delete_file(tree, rel).await {
+            let first = {
+                let Inner { client, tree } = &mut *g;
+                client.delete_file(tree, rel).await.map_err(|e| e.to_string())
+            };
+            let second = match first {
                 Ok(()) => return Ok(()),
-                Err(e) => e.to_string(),
+                Err(ref e) if looks_like_disconnect(e) => {
+                    self.reconnect_inner(&mut *g).await?;
+                    let Inner { client, tree } = &mut *g;
+                    client.delete_file(tree, rel).await.map_err(|e| e.to_string())
+                }
+                Err(e) => Err(e),
+            };
+            match second {
+                Ok(()) => return Ok(()),
+                Err(e) => e,
             }
         };
         // Heuristic: anything that looks like "directory" or "not a
@@ -282,22 +395,44 @@ impl SmbConnection {
     pub async fn write_bytes(&self, path: &str, bytes: &[u8]) -> FsResult<()> {
         let rel = strip_leading_slash(path);
         let mut g = self.inner.lock().await;
-        let Inner { client, tree } = &mut *g;
-        client
-            .write_file(tree, rel, bytes)
-            .await
-            .map(|_n| ())
-            .map_err(|e| format!("write({path}): {e}"))
+        let first = {
+            let Inner { client, tree } = &mut *g;
+            client.write_file(tree, rel, bytes).await.map_err(|e| e.to_string())
+        };
+        match first {
+            Ok(_n) => Ok(()),
+            Err(ref e) if looks_like_disconnect(e) => {
+                self.reconnect_inner(&mut *g).await?;
+                let Inner { client, tree } = &mut *g;
+                client
+                    .write_file(tree, rel, bytes)
+                    .await
+                    .map(|_n| ())
+                    .map_err(|e| format!("write({path}): {e}"))
+            }
+            Err(e) => Err(format!("write({path}): {e}")),
+        }
     }
 
     async fn read_bytes_capped(&self, path: &str, max_bytes: u64) -> FsResult<Vec<u8>> {
         let rel = strip_leading_slash(path);
         let mut g = self.inner.lock().await;
-        let Inner { client, tree } = &mut *g;
-        let mut data = client
-            .read_file(tree, rel)
-            .await
-            .map_err(|e| format!("read({path}): {e}"))?;
+        let first = {
+            let Inner { client, tree } = &mut *g;
+            client.read_file(tree, rel).await.map_err(|e| e.to_string())
+        };
+        let mut data = match first {
+            Ok(v) => v,
+            Err(ref e) if looks_like_disconnect(e) => {
+                self.reconnect_inner(&mut *g).await?;
+                let Inner { client, tree } = &mut *g;
+                client
+                    .read_file(tree, rel)
+                    .await
+                    .map_err(|e| format!("read({path}): {e}"))?
+            }
+            Err(e) => return Err(format!("read({path}): {e}")),
+        };
         if data.len() as u64 > max_bytes {
             data.truncate(max_bytes as usize);
         }
