@@ -60,11 +60,17 @@ interface PalettePreset {
   textSecondary: string;
 }
 
-/** Light-mode palette presets, surfaced as one-click chips next to the
- *  "Light mode" label in Settings → Custom palette. Click → fill the
- *  light-mode palette only (dark stays put). Editable via the color
- *  swatches below — the presets are just convenient starting points. */
-const LIGHT_PRESETS: PalettePreset[] = [
+/** Palette presets, surfaced as a single dropdown per mode in
+ *  Settings → Custom palette. Every preset is selectable for either
+ *  the light-mode or dark-mode slot — the user can mix freely (e.g.
+ *  Dracula for both modes, or Solarized Light at night). Picking a
+ *  preset fills only the chosen mode's palette; the other mode stays
+ *  put. Editable via the color swatches below — the presets are just
+ *  convenient starting points. High Contrast Light / Dark are
+ *  derived from the WCAG-tier "Sy Light" / "Sy Dark" palettes:
+ *  pure-white / pure-black surfaces, max-contrast text, strong
+ *  primary blue. */
+const PRESETS: PalettePreset[] = [
   {
     id: "solarized-light",
     label: "Solarized Light",
@@ -92,12 +98,15 @@ const LIGHT_PRESETS: PalettePreset[] = [
     textPrimary: "#383a42",
     textSecondary: "#696c77",
   },
-];
-
-/** Dark-mode palette presets, mirrors LIGHT_PRESETS. The three carry
- *  over from the prior single-button design (which set both modes at
- *  once). */
-const DARK_PRESETS: PalettePreset[] = [
+  {
+    id: "high-contrast-light",
+    label: "High Contrast Light",
+    primaryMain: "#0033b3",
+    backgroundDefault: "#ffffff",
+    backgroundPaper: "#eaeaea",
+    textPrimary: "#000000",
+    textSecondary: "#595959",
+  },
   {
     id: "solarized-dark",
     label: "Solarized Dark",
@@ -124,6 +133,15 @@ const DARK_PRESETS: PalettePreset[] = [
     backgroundPaper: "#3b4252",
     textPrimary: "#eceff4",
     textSecondary: "#d8dee9",
+  },
+  {
+    id: "high-contrast-dark",
+    label: "High Contrast Dark",
+    primaryMain: "#4fc1ff",
+    backgroundDefault: "#000000",
+    backgroundPaper: "#1e1e1e",
+    textPrimary: "#ffffff",
+    textSecondary: "#858585",
   },
 ];
 import { fsOpenWithDefault, fsRevealInOs, getAppVersion } from "../api/fs";
@@ -1000,21 +1018,23 @@ export default function SettingsPage() {
 
           {(
             [
-              ["customLightPalette", "Light mode", LIGHT_PRESETS],
-              ["customDarkPalette", "Dark mode", DARK_PRESETS],
+              ["customLightPalette", "Light mode", "light-preset-label"],
+              ["customDarkPalette", "Dark mode", "dark-preset-label"],
             ] as const
-          ).map(([key, label, presets]) => {
+          ).map(([key, label, labelId]) => {
             const palette = settings[key];
             // A preset is "active" when every slot in the saved palette
-            // matches the preset's hex. This lets us highlight the chip
-            // the user picked even after a reload.
+            // matches the preset's hex. This lets us select the dropdown
+            // option the user picked even after a reload. Empty palette =
+            // "Default" (inherit built-in). Any partial / hand-edited
+            // palette shows as "Custom".
             const isEmpty =
               !palette.primaryMain &&
               !palette.backgroundDefault &&
               !palette.backgroundPaper &&
               !palette.textPrimary &&
               !palette.textSecondary;
-            const activePresetId = presets.find(
+            const activePresetId = PRESETS.find(
               (p) =>
                 palette.primaryMain.toLowerCase() === p.primaryMain.toLowerCase() &&
                 palette.backgroundDefault.toLowerCase() ===
@@ -1025,6 +1045,9 @@ export default function SettingsPage() {
                 palette.textSecondary.toLowerCase() ===
                   p.textSecondary.toLowerCase(),
             )?.id;
+            const selectValue = isEmpty
+              ? "__default__"
+              : (activePresetId ?? "__custom__");
             return (
               <Box key={key}>
                 <Box
@@ -1036,36 +1059,31 @@ export default function SettingsPage() {
                     mb: 0.75,
                   }}
                 >
-                  <Typography variant="body2" sx={{ minWidth: 80 }}>
+                  <Typography variant="body2" sx={{ minWidth: 80 }} id={labelId}>
                     {label}
                   </Typography>
-                  {/* "Default" chip clears this mode's palette so the
-                      built-in slots win. Replaces the old global
-                      Reset palette button (which always nuked both
-                      modes at once). */}
-                  <Button
-                    size="small"
-                    variant={isEmpty ? "contained" : "outlined"}
-                    onClick={() =>
-                      update(key, {
-                        primaryMain: "",
-                        backgroundDefault: "",
-                        backgroundPaper: "",
-                        textPrimary: "",
-                        textSecondary: "",
-                      })
-                    }
-                  >
-                    Default
-                  </Button>
-                  {presets.map((p) => (
-                    <Button
-                      key={p.id}
-                      size="small"
-                      variant={
-                        activePresetId === p.id ? "contained" : "outlined"
-                      }
-                      onClick={() => {
+                  <FormControl size="small" sx={{ minWidth: 220 }}>
+                    <Select
+                      aria-labelledby={labelId}
+                      value={selectValue}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "__default__") {
+                          // Default clears this mode's palette so the
+                          // built-in slots win. Replaces the old global
+                          // Reset palette button.
+                          update(key, {
+                            primaryMain: "",
+                            backgroundDefault: "",
+                            backgroundPaper: "",
+                            textPrimary: "",
+                            textSecondary: "",
+                          });
+                          return;
+                        }
+                        if (v === "__custom__") return; // read-only marker
+                        const p = PRESETS.find((x) => x.id === v);
+                        if (!p) return;
                         update(key, {
                           primaryMain: p.primaryMain,
                           backgroundDefault: p.backgroundDefault,
@@ -1074,14 +1092,23 @@ export default function SettingsPage() {
                           textSecondary: p.textSecondary,
                         });
                         // Selecting a preset implies the user wants the
-                        // custom palette on; switch off the toggle was
-                        // a useless click before reaching the chips.
+                        // custom palette on; the previous explicit
+                        // toggle was a useless click before reaching
+                        // the dropdown.
                         update("useCustomTheme", true);
                       }}
                     >
-                      {p.label}
-                    </Button>
-                  ))}
+                      <MenuItem value="__default__">Default</MenuItem>
+                      {selectValue === "__custom__" && (
+                        <MenuItem value="__custom__">Custom</MenuItem>
+                      )}
+                      {PRESETS.map((p) => (
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </Box>
                 <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                   {(

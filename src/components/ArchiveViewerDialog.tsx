@@ -17,6 +17,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -123,16 +124,16 @@ export default function ArchiveViewerDialog({
         )}
         {entries && (
           <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 2 }}>
-            <input
-              type="text"
+            {/* MUI TextField (not a raw <input>) so the filter box
+                picks up the theme palette — the previous bare input
+                rendered with the browser default white background in
+                dark mode, which clashed with the dialog surface. */}
+            <TextField
+              size="small"
+              fullWidth
               placeholder="Filter…"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              style={{
-                padding: "4px 8px",
-                width: "100%",
-                fontSize: "0.875rem",
-              }}
             />
             <Typography variant="caption" color="text.secondary">
               {filtered?.length ?? 0} of {entries.length}
