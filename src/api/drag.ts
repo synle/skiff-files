@@ -13,12 +13,19 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 interface DragOptions {
   /** "move" / "copy" / "link". Default "copy". */
   mode?: "move" | "copy" | "link";
+  /** Fires when the OS drag completes — either the user dropped the
+   *  files on a target (`Dropped`) or canceled (`Cancel`). Critical
+   *  for clearing the "drag source" cell-dim styling: the OS drag
+   *  swallows the browser's `dragend` event entirely on macOS, so
+   *  this is the only reliable end-of-drag signal. Without it the
+   *  source cell stays at the 0.4 drag opacity forever after a drop
+   *  on whitespace / outside-window. Fired exactly once per drag,
+   *  regardless of result. */
+  onEnd?: () => void;
 }
 
 /** Drag callback payload. The plugin reports drop / cancel + cursor
- *  position when the drag completes. We don't currently surface this
- *  to consumers — they typically just fire-and-forget — but the
- *  Channel must be wired or the command never resolves. */
+ *  position when the drag completes. */
 interface DragCallback {
   result: "Dropped" | "Cancel";
   cursorPos: { x: number; y: number };
@@ -26,8 +33,10 @@ interface DragCallback {
 
 /** Initiate a native OS drag with the given file paths. Resolves
  *  once the drag begins (NOT when it ends — Tauri returns from the
- *  underlying NSDragSession / DoDragDrop call early). The callback
- *  channel fires when the user drops the items.
+ *  underlying NSDragSession / DoDragDrop call early). Pass `onEnd`
+ *  to learn when the user releases the drag; the plugin's
+ *  Channel fires Dropped / Cancel and we surface either as a
+ *  single `onEnd()` call.
  *
  *  No-op / silent failure when the plugin isn't available (test
  *  environments, browser dev mode). */
@@ -37,6 +46,18 @@ export async function startNativeDrag(
 ): Promise<void> {
   if (files.length === 0) return;
   const channel = new Channel<DragCallback>();
+  if (options.onEnd) {
+    // Drop OR Cancel both end the drag — the caller usually just
+    // wants to clear local state either way. Guard against double-
+    // fire defensively (the plugin only emits once per drag, but
+    // the callback isn't structured to be idempotent).
+    let fired = false;
+    channel.onmessage = () => {
+      if (fired) return;
+      fired = true;
+      options.onEnd?.();
+    };
+  }
   // 1×1 transparent PNG as a data URL (the plugin's Base64Image
   // deserializer requires the `data:image/png;base64,` prefix). The
   // OS picks an appropriate drag preview from the dragged file paths
@@ -54,5 +75,9 @@ export async function startNativeDrag(
     });
   } catch {
     /* plugin not registered (tests / browser-mode) — silent fallback */
+    // Best-effort: still notify the caller so they can clear the
+    // drag-source styling. Without this the cell stays dim when the
+    // plugin isn't registered.
+    options.onEnd?.();
   }
 }

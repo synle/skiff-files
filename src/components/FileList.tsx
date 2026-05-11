@@ -952,7 +952,17 @@ function FileGridView(props: FileGridViewProps) {
                             (p) => !p.startsWith("sftp://"),
                           );
                           if (localPaths.length > 0) {
-                            void startNativeDrag(localPaths).catch(() => {});
+                            // onEnd is the only reliable
+                            // end-of-drag signal once the OS drag
+                            // takes over — HTML5 dragend gets
+                            // swallowed. Clear the dim styling here
+                            // so dropping on whitespace doesn't
+                            // leave the cell stuck at 0.4 opacity.
+                            void startNativeDrag(localPaths, {
+                              onEnd: () => onDraggingChange(new Set()),
+                            }).catch(() => {
+                              onDraggingChange(new Set());
+                            });
                           }
                         }}
                         onDragEnd={() => onDraggingChange(new Set())}
@@ -2123,8 +2133,16 @@ export default function FileList(props: Props) {
                       (p) => !p.startsWith("sftp://"),
                     );
                     if (localPaths.length > 0) {
-                      void startNativeDrag(localPaths).catch(() => {
+                      // onEnd is the only reliable end-of-drag
+                      // signal once the OS drag takes over — HTML5
+                      // dragend gets swallowed. Clear the dim
+                      // styling here so dropping on whitespace
+                      // doesn't leave the cell stuck at 0.4 opacity.
+                      void startNativeDrag(localPaths, {
+                        onEnd: () => setDraggingPaths(new Set()),
+                      }).catch(() => {
                         /* plugin not available — in-app drag still works */
+                        setDraggingPaths(new Set());
                       });
                     }
                   }}
