@@ -1538,6 +1538,9 @@ export default function Browser({
         count={selectedPaths.length}
         onNewFolder={() => void handleNewFolder()}
         onNewFile={() => void handleNewFile()}
+        onClearSelection={() =>
+          window.dispatchEvent(new CustomEvent("skiff:clear-selection"))
+        }
         onCopy={() => setFileClipboard(selectedPaths, "copy")}
         onCut={() => setFileClipboard(selectedPaths, "cut")}
         onDelete={() => {

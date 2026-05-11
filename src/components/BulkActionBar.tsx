@@ -24,6 +24,7 @@ import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import SaveIcon from "@mui/icons-material/Save";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import NoteAddIcon from "@mui/icons-material/NoteAdd";
+import ClearIcon from "@mui/icons-material/Clear";
 import { useState } from "react";
 import { TAG_COLORS, tagColorHex, tagColorLabel } from "../util/tagColors";
 import type { TagColor } from "../state/settings";
@@ -32,6 +33,11 @@ interface Props {
   count: number;
   onNewFolder?: () => void;
   onNewFile?: () => void;
+  /** Clear the current multi-selection. Surfaces a Clear button
+   *  next to New file whenever 1+ rows are picked. Re-added in
+   *  0.2.256 after 0.2.253 dropped it — outside-row click is still
+   *  a clear path, but a discoverable button is friendlier. */
+  onClearSelection?: () => void;
   onCopy?: () => void;
   onCut?: () => void;
   onDelete?: () => void;
@@ -45,10 +51,19 @@ interface Props {
   onSaveSelectionGroup?: () => void;
 }
 
+/** Per-button sx tightening the icon → label gap. The default
+ *  MUI startIcon margin is 8px which eats horizontal space we
+ *  need for the full button row (especially with Clear back in
+ *  the mix). */
+const TIGHT_ICON_SX = {
+  "& .MuiButton-startIcon": { mr: 0.5 /* 4px */ },
+};
+
 export default function BulkActionBar({
   count,
   onNewFolder,
   onNewFile,
+  onClearSelection,
   onCopy,
   onCut,
   onDelete,
@@ -59,6 +74,7 @@ export default function BulkActionBar({
 }: Props) {
   const [tagAnchor, setTagAnchor] = useState<HTMLElement | null>(null);
   const hasMultiSelection = count >= 2;
+  const hasSelection = count >= 1;
   return (
     <Box
       sx={{
@@ -80,6 +96,7 @@ export default function BulkActionBar({
           size="small"
           startIcon={<CreateNewFolderIcon fontSize="small" />}
           onClick={onNewFolder}
+          sx={TIGHT_ICON_SX}
         >
           New folder
         </Button>
@@ -89,8 +106,19 @@ export default function BulkActionBar({
           size="small"
           startIcon={<NoteAddIcon fontSize="small" />}
           onClick={onNewFile}
+          sx={TIGHT_ICON_SX}
         >
           New file
+        </Button>
+      )}
+      {hasSelection && onClearSelection && (
+        <Button
+          size="small"
+          startIcon={<ClearIcon fontSize="small" />}
+          onClick={onClearSelection}
+          sx={TIGHT_ICON_SX}
+        >
+          Clear
         </Button>
       )}
       <Box sx={{ flex: 1 }} />
@@ -99,6 +127,7 @@ export default function BulkActionBar({
           size="small"
           startIcon={<ContentCopyIcon fontSize="small" />}
           onClick={onCopy}
+          sx={TIGHT_ICON_SX}
         >
           Copy
         </Button>
@@ -108,6 +137,7 @@ export default function BulkActionBar({
           size="small"
           startIcon={<ContentCutIcon fontSize="small" />}
           onClick={onCut}
+          sx={TIGHT_ICON_SX}
         >
           Cut
         </Button>
@@ -117,6 +147,7 @@ export default function BulkActionBar({
           size="small"
           startIcon={<ArchiveIcon fontSize="small" />}
           onClick={onCompress}
+          sx={TIGHT_ICON_SX}
         >
           Compress
         </Button>
@@ -126,6 +157,7 @@ export default function BulkActionBar({
           size="small"
           startIcon={<EditIcon fontSize="small" />}
           onClick={onBulkRename}
+          sx={TIGHT_ICON_SX}
         >
           Rename
         </Button>
@@ -135,6 +167,7 @@ export default function BulkActionBar({
           size="small"
           startIcon={<SaveIcon fontSize="small" />}
           onClick={onSaveSelectionGroup}
+          sx={TIGHT_ICON_SX}
         >
           Save group
         </Button>
@@ -145,6 +178,7 @@ export default function BulkActionBar({
             size="small"
             startIcon={<LocalOfferIcon fontSize="small" />}
             onClick={(e) => setTagAnchor(e.currentTarget)}
+            sx={TIGHT_ICON_SX}
           >
             Tag
           </Button>
@@ -192,6 +226,7 @@ export default function BulkActionBar({
           color="error"
           startIcon={<DeleteIcon fontSize="small" />}
           onClick={onDelete}
+          sx={TIGHT_ICON_SX}
         >
           Delete
         </Button>

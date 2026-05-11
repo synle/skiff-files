@@ -1318,6 +1318,24 @@ export default function FileList(props: Props) {
   const [dragOverIdx, setDragOverIdx] = useState<number>(-1);
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // ── List-view rubber-band selection ──
+  // Mirrors the FileGridView rubber-band: drag a rectangle from
+  // whitespace in the scroll container to select rows whose vertical
+  // band overlaps. Rows are full-width, so hit-testing reduces to
+  // a 1D [top, bottom] overlap against `idx * rowH`. State lives in
+  // a ref for the hot mousemove path; the rendered Box only needs
+  // the current rect for the visible overlay.
+  const listDragRef = useRef<{
+    startX: number;
+    startY: number;
+    additive: boolean;
+    baseSelection: Set<string>;
+  } | null>(null);
+  const [listDragRect, setListDragRect] = useState<
+    | { left: number; top: number; width: number; height: number }
+    | null
+  >(null);
+
   // Path-change detector. Lets us distinguish navigation (reset
   // selection — stale paths from a previous folder are nonsense) from
   // a refresh-in-place (preserve the user's selection wherever the
@@ -1391,6 +1409,18 @@ export default function FileList(props: Props) {
   useEffect(() => {
     onSelectionChange?.(Array.from(selected));
   }, [selected, onSelectionChange]);
+
+  // External "clear selection" signal (Browser.tsx dispatches this
+  // when the user hits the Clear button in BulkActionBar). Lives on
+  // a window event because FileList owns the selection state but
+  // the trigger surface (BulkActionBar) is a sibling under Browser
+  // — same window-CustomEvent pattern as skiff:refresh-all,
+  // skiff:restore-selection, etc.
+  useEffect(() => {
+    const onClear = () => setSelected(new Set());
+    window.addEventListener("skiff:clear-selection", onClear);
+    return () => window.removeEventListener("skiff:clear-selection", onClear);
+  }, []);
 
   // Keyboard navigation. Active only on the foreground tab and only
   // when no input is focused (so typing in the path bar / search box
@@ -1612,6 +1642,115 @@ export default function FileList(props: Props) {
     overscan: 12,
   });
 
+  // List rubber-band: install global mousemove / mouseup while a
+  // drag is active. Same shape as FileGridView's rubber-band — the
+  // commentary on edge auto-scroll, clamping, and window-level
+  // listeners (so a release outside the container still tears the
+  // rect down) applies here too. Hit-testing collapses to y-axis
+  // overlap against `idx * rowH ± rowH` because rows are full-width.
+  useEffect(() => {
+    if (!listDragRect || view !== "list") return;
+    let lastClientY = 0;
+    let rafId = 0;
+    const SCROLL_EDGE_PX = 30;
+    const SCROLL_SPEED_PX = 12;
+    const tick = () => {
+      const el = parentRef.current;
+      if (el && listDragRef.current) {
+        const r = el.getBoundingClientRect();
+        if (lastClientY > r.bottom - SCROLL_EDGE_PX) {
+          const t = Math.min(
+            1,
+            (lastClientY - (r.bottom - SCROLL_EDGE_PX)) / SCROLL_EDGE_PX,
+          );
+          el.scrollTop += SCROLL_SPEED_PX * t;
+        } else if (lastClientY < r.top + SCROLL_EDGE_PX) {
+          const t = Math.min(
+            1,
+            (r.top + SCROLL_EDGE_PX - lastClientY) / SCROLL_EDGE_PX,
+          );
+          el.scrollTop -= SCROLL_SPEED_PX * t;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    const onMove = (e: MouseEvent) => {
+      lastClientY = e.clientY;
+      if (!listDragRef.current) return;
+      const el = parentRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const clampedX = Math.max(r.left, Math.min(r.right, e.clientX));
+      const clampedY = Math.max(r.top, Math.min(r.bottom, e.clientY));
+      const localX = clampedX - r.left + el.scrollLeft;
+      const localY = clampedY - r.top + el.scrollTop;
+      const left = Math.min(listDragRef.current.startX, localX);
+      const top = Math.min(listDragRef.current.startY, localY);
+      const right = Math.max(listDragRef.current.startX, localX);
+      const bottom = Math.max(listDragRef.current.startY, localY);
+      const width = right - left;
+      const height = bottom - top;
+      setListDragRect({ left, top, width, height });
+      if (width < 4 && height < 4) return;
+      // Y-only hit test: include every row whose [rowTop, rowBottom]
+      // overlaps the rectangle's [top, bottom].
+      const firstIdx = Math.max(0, Math.floor(top / rowH));
+      const lastIdx = Math.min(sorted.length - 1, Math.floor(bottom / rowH));
+      const hit = new Set<string>();
+      for (let i = firstIdx; i <= lastIdx; i++) {
+        hit.add(sorted[i].path);
+      }
+      if (listDragRef.current.additive) {
+        const merged = new Set(listDragRef.current.baseSelection);
+        for (const p of hit) merged.add(p);
+        setSelected(merged);
+      } else {
+        setSelected(hit);
+      }
+    };
+    const onUp = (e: MouseEvent) => {
+      if (!listDragRef.current) {
+        setListDragRect(null);
+        return;
+      }
+      const el = parentRef.current;
+      const r = el?.getBoundingClientRect();
+      const clampedX = r
+        ? Math.max(r.left, Math.min(r.right, e.clientX))
+        : e.clientX;
+      const clampedY = r
+        ? Math.max(r.top, Math.min(r.bottom, e.clientY))
+        : e.clientY;
+      const localX = el && r ? clampedX - r.left + el.scrollLeft : 0;
+      const localY = el && r ? clampedY - r.top + el.scrollTop : 0;
+      const right = Math.max(listDragRef.current.startX, localX);
+      const left = Math.min(listDragRef.current.startX, localX);
+      const bottom = Math.max(listDragRef.current.startY, localY);
+      const top = Math.min(listDragRef.current.startY, localY);
+      const isClick = right - left < 4 && bottom - top < 4;
+      if (isClick && !listDragRef.current.additive) {
+        setSelected(new Set());
+      }
+      listDragRef.current = null;
+      setListDragRect(null);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    const onCancel = () => {
+      listDragRef.current = null;
+      setListDragRect(null);
+    };
+    window.addEventListener("blur", onCancel);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("blur", onCancel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listDragRect != null, view, rowH, sorted]);
+
   const toggleSel = (path: string, additive: boolean) => {
     setSelected((prev) => {
       const next = new Set(additive ? prev : []);
@@ -1815,7 +1954,47 @@ export default function FileList(props: Props) {
           evt.preventDefault();
           onContextEmpty(evt.clientX, evt.clientY);
         }}
-        sx={{ flex: 1, overflow: "auto", minHeight: 0 }}
+        onMouseDown={(evt) => {
+          // Rubber-band starts only on left button + clicks on the
+          // container's whitespace (NOT on a row). Row clicks go
+          // through the existing selection / drag path.
+          if (evt.button !== 0) return;
+          const target = evt.target as HTMLElement;
+          if (target.closest('[data-testid="file-row"]')) return;
+          // Skip the checkbox / inputs / buttons inside row cells —
+          // covered by the row test above, but defensive for any
+          // future non-row interactive content inside parentRef.
+          if (target.closest("input, button, a")) return;
+          const el = parentRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          if (
+            evt.clientX < r.left ||
+            evt.clientX > r.right ||
+            evt.clientY < r.top ||
+            evt.clientY > r.bottom
+          ) {
+            return;
+          }
+          const localX = evt.clientX - r.left + el.scrollLeft;
+          const localY = evt.clientY - r.top + el.scrollTop;
+          listDragRef.current = {
+            startX: localX,
+            startY: localY,
+            additive: evt.metaKey || evt.ctrlKey || evt.shiftKey,
+            baseSelection: new Set(selected),
+          };
+          setListDragRect({ left: localX, top: localY, width: 0, height: 0 });
+          evt.preventDefault();
+        }}
+        sx={{
+          flex: 1,
+          overflow: "auto",
+          minHeight: 0,
+          // Disable text selection during drag so the rubber-band
+          // doesn't double-up with browser text-select.
+          userSelect: listDragRect ? "none" : undefined,
+        }}
       >
         {sorted.length === 0 ? (
           <Typography
@@ -1833,6 +2012,30 @@ export default function FileList(props: Props) {
               width: "100%",
             }}
           >
+            {/* Rubber-band selection rectangle for list view. Lives
+                inside the scroll-tracking inner Box so it scrolls
+                with the rows. Coords are already in container-local
+                space (set by the mousedown / mousemove handlers). */}
+            {listDragRect &&
+              (listDragRect.width > 1 || listDragRect.height > 1) && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: listDragRect.left,
+                    top: listDragRect.top,
+                    width: listDragRect.width,
+                    height: listDragRect.height,
+                    bgcolor: (theme) =>
+                      `${theme.palette.primary.main}1f` /* 12% alpha */,
+                    border: 1,
+                    borderColor: "primary.main",
+                    borderStyle: "solid",
+                    pointerEvents: "none",
+                    zIndex: 2,
+                    borderRadius: 0.5,
+                  }}
+                />
+              )}
             {rowVirtualizer.getVirtualItems().map((vi) => {
               const e = sorted[vi.index];
               const isSel = selected.has(e.path);
@@ -1980,7 +2183,37 @@ export default function FileList(props: Props) {
                       checked={isSel}
                       onChange={(evt) => {
                         evt.stopPropagation();
+                        // Industry-standard shift+click on the
+                        // checkbox: select every row between the
+                        // anchor (focusedIdx) and the clicked row.
+                        // Without this branch the checkbox flow only
+                        // toggles one row at a time — surprising for
+                        // users coming from Finder / Windows
+                        // Explorer / Outlook where the checkbox is
+                        // a primary range-select surface.
+                        const native = evt.nativeEvent as MouseEvent;
+                        if (
+                          native.shiftKey &&
+                          focusedIdx >= 0 &&
+                          vi.index >= 0 &&
+                          focusedIdx !== vi.index
+                        ) {
+                          const lo = Math.min(focusedIdx, vi.index);
+                          const hi = Math.max(focusedIdx, vi.index);
+                          const range = sorted
+                            .slice(lo, hi + 1)
+                            .map((s) => s.path);
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            for (const p of range) next.add(p);
+                            return next;
+                          });
+                          return;
+                        }
                         toggleSel(e.path, true);
+                        // Update the anchor so the next shift+click
+                        // ranges from this row.
+                        setFocusedIdx(vi.index);
                       }}
                       onClick={(evt) => evt.stopPropagation()}
                       slotProps={{

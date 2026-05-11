@@ -16,6 +16,7 @@ function r(props: Partial<Parameters<typeof BulkActionBar>[0]>) {
     count: 0,
     onNewFolder: vi.fn(),
     onNewFile: vi.fn(),
+    onClearSelection: vi.fn(),
     onCopy: vi.fn(),
     onCut: vi.fn(),
     onDelete: vi.fn(),
@@ -71,12 +72,31 @@ describe("BulkActionBar", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
-  it("does not render the legacy 'X selected' label or Clear button", () => {
-    // 0.2.253 dropped both — the count lives in the status bar and
-    // clicking outside clears the selection.
+  it("does not render the legacy 'X selected' label", () => {
+    // 0.2.253 dropped the inline count label — that data lives in
+    // the status bar so the bar height stays stable as selection
+    // grows / shrinks. The Clear button came back in 0.2.256, but
+    // the label stays out.
     r({ count: 5 });
     expect(screen.queryByText(/selected/i)).toBeNull();
+  });
+
+  it("renders the Clear button once a selection exists", () => {
+    // 0.2.256 re-added the Clear button next to New file. Visible
+    // for any non-empty selection (single + multi).
+    r({ count: 1 });
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+  });
+
+  it("hides the Clear button when nothing is selected", () => {
+    r({ count: 0 });
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+
+  it("Clear click fires onClearSelection", () => {
+    const props = r({ count: 3 });
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(props.onClearSelection).toHaveBeenCalledTimes(1);
   });
 
   it("New folder click fires onNewFolder", () => {
