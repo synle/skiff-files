@@ -1445,6 +1445,31 @@ export default function FileList(props: Props) {
     return () => window.removeEventListener("skiff:clear-selection", onClear);
   }, []);
 
+  // Drag-source dim safety net. The cell's HTML5 `onDragEnd` is the
+  // primary cleanup path, but when `startNativeDrag` hands the drag
+  // off to the OS (tauri-plugin-drag for local paths so Finder /
+  // Desktop accept the drop) the browser's dragend never fires — and
+  // the source cell sits at 0.4 opacity forever (visible as a greyed
+  // -out folder after dropping on whitespace). Listening at the
+  // window level for the eventual mouseup catches every code path
+  // (OS drag complete, HTML5 drop, user releases over a no-drop
+  // target). Idempotent — clearing an already-empty Set is a no-op.
+  useEffect(() => {
+    if (draggingPaths.size === 0) return;
+    const clear = () => setDraggingPaths(new Set());
+    // mouseup catches the OS-drag-complete case. dragend is the
+    // standard path. blur defends against the user Cmd-Tabbing away
+    // mid-drag (some platforms swallow dragend in that scenario).
+    window.addEventListener("mouseup", clear);
+    window.addEventListener("dragend", clear);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("mouseup", clear);
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("blur", clear);
+    };
+  }, [draggingPaths]);
+
   // Keyboard navigation. Active only on the foreground tab and only
   // when no input is focused (so typing in the path bar / search box
   // doesn't jump rows). The handler operates on `sorted` so arrow
