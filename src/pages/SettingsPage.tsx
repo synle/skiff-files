@@ -22,6 +22,10 @@ import {
 } from "@mui/material";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ViewListIcon from "@mui/icons-material/ViewList";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
+import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
+import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import { useEffect, useState } from "react";
 import {
   appDataDir,
@@ -1169,10 +1173,35 @@ export default function SettingsPage() {
                 update("defaultView", e.target.value as typeof settings.defaultView)
               }
             >
-              <MenuItem value="list">List</MenuItem>
-              <MenuItem value="tile">Tile</MenuItem>
-              <MenuItem value="gallery">Gallery</MenuItem>
-              <MenuItem value="column">Column</MenuItem>
+              {/* Same four icons the Toolbar's view-mode toggle uses
+                  (ViewListIcon / ViewModuleIcon / ViewCarouselIcon /
+                  ViewColumnIcon) so the Settings dropdown reads as a
+                  cousin of the inline toggle, not a parallel surface
+                  with different visuals. */}
+              <MenuItem value="list">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <ViewListIcon fontSize="small" />
+                  List
+                </Box>
+              </MenuItem>
+              <MenuItem value="tile">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <ViewModuleIcon fontSize="small" />
+                  Tile
+                </Box>
+              </MenuItem>
+              <MenuItem value="gallery">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <ViewCarouselIcon fontSize="small" />
+                  Gallery
+                </Box>
+              </MenuItem>
+              <MenuItem value="column">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <ViewColumnIcon fontSize="small" />
+                  Column
+                </Box>
+              </MenuItem>
             </Select>
           </FormControl>
 
@@ -1210,11 +1239,47 @@ export default function SettingsPage() {
                   )
                 }
               >
-                <MenuItem value="asc">Ascending</MenuItem>
-                <MenuItem value="desc">Descending</MenuItem>
+                {/* Same up / down arrow icons the FileList header
+                    column uses to mark the active sort direction, so
+                    the Settings picker reads as the same affordance
+                    rather than a parallel surface. */}
+                <MenuItem value="asc">
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ArrowUpwardIcon fontSize="small" />
+                    Ascending
+                  </Box>
+                </MenuItem>
+                <MenuItem value="desc">
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ArrowDownwardIcon fontSize="small" />
+                    Descending
+                  </Box>
+                </MenuItem>
               </Select>
             </FormControl>
           </Stack>
+
+          {/* Default zoom — same global zoom Settings.viewZoom that
+              the status-bar +/- cluster mutates. Surfacing it here as
+              a dropdown is the discoverable surface; the status bar
+              is the one-click adjustment. Steps match the StatusBar
+              clamp (50 / 75 / 100 / 125 / 150 / 175 / 200). */}
+          <FormControl size="small" sx={{ maxWidth: 240 }}>
+            <InputLabel id="default-zoom-label">Default zoom</InputLabel>
+            <Select
+              labelId="default-zoom-label"
+              label="Default zoom"
+              value={String(settings.viewZoom ?? 1)}
+              onChange={(e) => update("viewZoom", Number(e.target.value))}
+            >
+              {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((z) => (
+                <MenuItem key={z} value={String(z)}>
+                  {Math.round(z * 100)}%
+                  {z === 1 ? " (default)" : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <FormControlLabel
             control={

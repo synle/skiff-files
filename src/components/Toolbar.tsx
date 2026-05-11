@@ -822,18 +822,30 @@ export default function Toolbar(props: Props) {
         onChange={(_, v: ViewMode | null) => v && onViewChange(v)}
         aria-label="View mode"
       >
-        <ToggleButton value="list" aria-label="List view">
-          <ViewListIcon fontSize="small" />
-        </ToggleButton>
-        <ToggleButton value="tile" aria-label="Tile view">
-          <ViewModuleIcon fontSize="small" />
-        </ToggleButton>
-        <ToggleButton value="gallery" aria-label="Gallery view">
-          <ViewCarouselIcon fontSize="small" />
-        </ToggleButton>
-        <ToggleButton value="column" aria-label="Column view">
-          <ViewColumnIcon fontSize="small" />
-        </ToggleButton>
+        {/* Tooltips per button — the four icons aren't universally
+            self-evident (especially Gallery vs Tile) and the rest of
+            the toolbar's icon buttons all have hover hints, so this
+            kept reading as the lone gap. */}
+        <Tooltip title="List view — rows with size / modified / kind columns">
+          <ToggleButton value="list" aria-label="List view">
+            <ViewListIcon fontSize="small" />
+          </ToggleButton>
+        </Tooltip>
+        <Tooltip title="Tile view — compact icon grid">
+          <ToggleButton value="tile" aria-label="Tile view">
+            <ViewModuleIcon fontSize="small" />
+          </ToggleButton>
+        </Tooltip>
+        <Tooltip title="Gallery view — large image thumbnails">
+          <ToggleButton value="gallery" aria-label="Gallery view">
+            <ViewCarouselIcon fontSize="small" />
+          </ToggleButton>
+        </Tooltip>
+        <Tooltip title="Column view — wide cells with metadata">
+          <ToggleButton value="column" aria-label="Column view">
+            <ViewColumnIcon fontSize="small" />
+          </ToggleButton>
+        </Tooltip>
       </ToggleButtonGroup>
     </Box>
   );
