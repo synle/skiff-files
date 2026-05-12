@@ -36,11 +36,11 @@ function r() {
 }
 
 describe("ConnectionsPage — extras", () => {
-  it("Protocol field renders SFTP option by default", () => {
+  it("renders the Add-connection button (replaces the legacy inline form)", () => {
     r();
-    // Confirm the protocol picker is anchored to SFTP on first paint.
-    const protocol = screen.getByLabelText("Protocol");
-    expect(protocol).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Add connection/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders the active-connections heading", () => {

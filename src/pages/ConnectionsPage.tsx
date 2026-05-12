@@ -15,11 +15,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  MenuItem,
   Paper,
-  Select,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -33,19 +30,13 @@ import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import { useEffect, useState } from "react";
 import {
-  connCreateFtp,
-  connCreateSftp,
   connDisconnect,
   connKnownHostsList,
   connKnownHostsRemove,
   connList,
-  sshConfigHosts,
   type ConnectionInfo,
   type KnownHostEntry,
-  type SftpConfig,
-  type SshConfigHost,
 } from "../api/conn";
-import { fsOpenWithDefault } from "../api/fs";
 import {
   loadSmbDrafts,
   saveSmbDrafts,
@@ -107,7 +98,6 @@ export default function ConnectionsPage() {
   const [smbDrafts, setSmbDrafts] = useState<SmbDraft[]>(() => loadSmbDrafts());
   const [live, setLive] = useState<ConnectionInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   /** Drives the unified Add-connection modal (the same
    *  RemoteConnectDialog the address bar uses). `null` = closed;
    *  any non-null value opens the dialog seeded with that request.
@@ -134,37 +124,6 @@ export default function ConnectionsPage() {
       setAddRequest(null);
     }
   };
-  /** Which protocol the new-connection form is targeting. The
-   *  dropdown sits at the top of the form so the user can flip
-   *  between SFTP (full programmatic control via russh) and SMB
-   *  (OS-native mount handler). FTP slot reserved for Phase 3 —
-   *  hidden until that lands. */
-  const [protocol, setProtocol] = useState<"sftp" | "smb" | "ftp">("sftp");
-  // FTP-specific form state. Defaults match the anonymous-FTP
-  // convention from `src-tauri/src/fs/ftp.rs` so a user can just
-  // type a host and click Connect against a public mirror.
-  const [ftpHost, setFtpHost] = useState("");
-  const [ftpPort, setFtpPort] = useState(21);
-  const [ftpUser, setFtpUser] = useState("anonymous");
-  const [ftpPassword, setFtpPassword] = useState("anonymous@");
-
-  // Form state — kept local so Add Connection doesn't dirty the rest of
-  // the app's state.
-  const [host, setHost] = useState("");
-  const [port, setPort] = useState(22);
-  const [user, setUser] = useState("");
-  const [authMode, setAuthMode] = useState<
-    "password" | "privateKey" | "agent"
-  >("password");
-  const [password, setPassword] = useState("");
-  const [privateKeyPath, setPrivateKeyPath] = useState("");
-  const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState("");
-
-  // SMB form state.
-  const [smbServer, setSmbServer] = useState("");
-  const [smbShare, setSmbShare] = useState("");
-  const [smbUser, setSmbUser] = useState("");
-
   useEffect(() => {
     saveDrafts(drafts);
   }, [drafts]);
@@ -173,46 +132,6 @@ export default function ConnectionsPage() {
     saveSmbDrafts(smbDrafts);
   }, [smbDrafts]);
 
-  /** Hand the SMB URL to the OS native handler. macOS Finder and
-   *  Windows Explorer both register smb:// as a system handler — they
-   *  prompt for credentials, mount the share (e.g. /Volumes/<share>
-   *  on macOS), and open it in their own file manager. Skiff Files
-   *  picks up the mount automatically via the Devices section's
-   *  fs_mounts polling. Linux relies on GVFS / KIO support. */
-  const handleMountSmb = async (
-    d: { host: string; share: string; user: string },
-    label: string,
-  ) => {
-    setError(null);
-    setBusy(true);
-    try {
-      await fsOpenWithDefault(smbUrl(d));
-      // Save / refresh the draft for next time. Port + domain take
-      // the SMB defaults — this form only collects host/share/user
-      // because the OS-mount handler doesn't need more.
-      setSmbDrafts((prev) => [
-        ...prev.filter((x) => x.label !== label),
-        {
-          id: crypto.randomUUID(),
-          label,
-          host: d.host,
-          port: 445,
-          share: d.share,
-          user: d.user,
-          domain: "",
-        },
-      ]);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /** Imported entries from `~/.ssh/config`. Loaded once on mount; the
-   *  user shouldn't expect mid-session changes to surface without a
-   *  refresh. */
-  const [sshHosts, setSshHosts] = useState<SshConfigHost[]>([]);
   /** TOFU-pinned host fingerprints. Refreshed alongside the live
    *  connection list so deleting + reconnecting picks up changes. */
   const [knownHosts, setKnownHosts] = useState<KnownHostEntry[]>([]);
@@ -223,11 +142,6 @@ export default function ConnectionsPage() {
   };
   useEffect(() => {
     refreshKnownHosts();
-  }, []);
-  useEffect(() => {
-    sshConfigHosts()
-      .then(setSshHosts)
-      .catch(() => setSshHosts([]));
   }, []);
 
   // Refresh the live-connection list once on mount and after every
@@ -245,94 +159,6 @@ export default function ConnectionsPage() {
   useEffect(() => {
     void refreshLive();
   }, []);
-
-  /** True after a successful test, false after failure, null for idle.
-   *  Drives a small inline message under the form so the user sees
-   *  whether their settings actually work without having to keep the
-   *  connection open or check the live list. */
-  const [testResult, setTestResult] = useState<
-    { ok: boolean; message: string } | null
-  >(null);
-
-  /** Establish + immediately tear down a connection just to verify
-   *  host/port/auth work. Useful before saving a draft you don't
-   *  want to actually start browsing. */
-  const handleTest = async () => {
-    setError(null);
-    setTestResult(null);
-    setBusy(true);
-    const config: SftpConfig = {
-      host,
-      port,
-      user,
-      password: authMode === "password" ? password : undefined,
-      privateKeyPath: authMode === "privateKey" ? privateKeyPath : undefined,
-      privateKeyPassphrase:
-        authMode === "privateKey" && privateKeyPassphrase
-          ? privateKeyPassphrase
-          : undefined,
-      useAgent: authMode === "agent",
-    };
-    try {
-      const id = await connCreateSftp(config);
-      // Tear down immediately — the goal is verification, not browsing.
-      try {
-        await connDisconnect(id);
-      } catch {
-        /* best-effort — leaking a connection is recoverable via
-           "Disconnect all" in the live list */
-      }
-      setTestResult({ ok: true, message: `Connected to ${host}:${port} as ${user}.` });
-    } catch (e) {
-      setTestResult({ ok: false, message: String(e) });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleConnect = async () => {
-    setError(null);
-    setBusy(true);
-    const config: SftpConfig = {
-      host,
-      port,
-      user,
-      password: authMode === "password" ? password : undefined,
-      privateKeyPath: authMode === "privateKey" ? privateKeyPath : undefined,
-      privateKeyPassphrase:
-        authMode === "privateKey" && privateKeyPassphrase
-          ? privateKeyPassphrase
-          : undefined,
-      useAgent: authMode === "agent",
-    };
-    try {
-      await connCreateSftp(config);
-      // Save this as a draft for next time (without secrets).
-      const label = `${user}@${host}:${port}`;
-      const draft: SftpDraft = {
-        id: crypto.randomUUID(),
-        label,
-        host,
-        port,
-        user,
-        authMode,
-        privateKeyPath:
-          authMode === "privateKey" ? privateKeyPath : undefined,
-      };
-      setDrafts((d) => [
-        ...d.filter((x) => x.label !== label),
-        draft,
-      ]);
-      // Clear secrets from the form — leave host/user so the user can connect again.
-      setPassword("");
-      setPrivateKeyPassphrase("");
-      void refreshLive();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const handleDisconnect = async (id: string) => {
     try {
@@ -439,339 +265,6 @@ export default function ConnectionsPage() {
       )}
 
       <Stack spacing={4}>
-        {/* ============================================================
-            TODO(cleanup-inline-form): DELETE THIS ENTIRE <Paper> BLOCK
-            ============================================================
-            The page now uses RemoteConnectDialog (mounted at the bottom)
-            for adding any remote backend (SFTP / FTP / SMB). The inline
-            form below — Protocol Select + SFTP / FTP / SMB sub-forms,
-            handleTest / handleConnect / handleMountSmb (the OS-handoff
-            variant) — is dead UI: hidden via `display: none` ONLY so the
-            handler references (handleConnect, handleTest, the SftpConfig
-            type, connCreateSftp/connCreateFtp imports, the
-            host/port/user/password/authMode/privateKeyPath/
-            privateKeyPassphrase state vars, all four ftp-prefixed and
-            three smb-prefixed form state vars, testResult state, and
-            the protocol Select) stay live and TypeScript stays clean.
-
-            Cleanup pass — delete in one PR:
-              1. Remove the Paper block below (everything until its
-                 matching </Paper> right before "Saved SMB shares").
-              2. Remove the now-unused state declarations at the top of
-                 the component: protocol/setProtocol, host/port/user/
-                 password/authMode/privateKeyPath/privateKeyPassphrase,
-                 the four ftpHost / ftpPort / ftpUser / ftpPassword
-                 vars, the three smbServer / smbShare / smbUser vars,
-                 and testResult/setTestResult.
-              3. Remove handleConnect, handleTest. handleMountSmb stays
-                 — Saved SMB shares list (below this Paper) still calls
-                 it for the OS-handoff "mount in OS" affordance, which
-                 we keep as a complement to the native SMB connect.
-              4. Remove the connCreateSftp, connCreateFtp, SftpConfig
-                 imports from "../api/conn". connDisconnect / connList /
-                 connKnownHostsList / connKnownHostsRemove /
-                 sshConfigHosts stay (used by Active connections + the
-                 Known hosts list further down).
-              5. Remove the `setAddOpen` helper's blank-SFTP seed if we
-                 add a protocol-picker to the modal opener UX in the
-                 same pass; otherwise leave it.
-            ============================================================ */}
-        <Paper variant="outlined" sx={{ p: 2, display: "none" }}>
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ alignItems: "center", mb: 2 }}
-          >
-            <Typography variant="h6">New connection</Typography>
-            {/* Protocol dropdown — sits at the top of the form so the
-             *  user picks the transport before filling anything in.
-             *  Switching also resets the form so credentials don't
-             *  bleed across protocols (the SMB form has different
-             *  fields). */}
-            <Select
-              size="small"
-              value={protocol}
-              onChange={(e) => {
-                setProtocol(e.target.value as "sftp" | "smb" | "ftp");
-                setError(null);
-                setTestResult(null);
-              }}
-              sx={{ minWidth: 200 }}
-              aria-label="Protocol"
-            >
-              <MenuItem value="sftp">SFTP / SSH</MenuItem>
-              <MenuItem value="ftp">FTP (plain)</MenuItem>
-              <MenuItem value="smb">SMB / Samba</MenuItem>
-            </Select>
-          </Stack>
-          {protocol === "ftp" ? (
-            <Stack spacing={2}>
-              <Typography variant="caption" color="text.secondary">
-                Plain FTP — works against public mirrors (kernel.org,
-                ftp.gnu.org, etc.) and authenticated servers. The
-                default user / password are the anonymous-FTP
-                convention. FTPS isn't supported yet; use SFTP if
-                you need encryption.
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="Host"
-                  size="small"
-                  value={ftpHost}
-                  onChange={(e) => setFtpHost(e.target.value)}
-                  placeholder="ftp.gnu.org"
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  label="Port"
-                  size="small"
-                  type="number"
-                  value={ftpPort}
-                  onChange={(e) =>
-                    setFtpPort(Number(e.target.value) || 21)
-                  }
-                  sx={{ width: 100 }}
-                />
-              </Stack>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="User"
-                  size="small"
-                  value={ftpUser}
-                  onChange={(e) => setFtpUser(e.target.value)}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  label="Password"
-                  size="small"
-                  type="password"
-                  value={ftpPassword}
-                  onChange={(e) => setFtpPassword(e.target.value)}
-                  sx={{ flex: 1 }}
-                />
-              </Stack>
-              <Stack direction="row" spacing={1}>
-                <Button
-                  variant="contained"
-                  disabled={busy || !ftpHost.trim()}
-                  onClick={async () => {
-                    setError(null);
-                    setBusy(true);
-                    try {
-                      await connCreateFtp({
-                        host: ftpHost.trim(),
-                        port: ftpPort,
-                        user: ftpUser.trim() || undefined,
-                        password: ftpPassword || undefined,
-                      });
-                      void refreshLive();
-                    } catch (e) {
-                      setError(String(e));
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  Connect
-                </Button>
-              </Stack>
-            </Stack>
-          ) : protocol === "smb" ? (
-            <Stack spacing={2}>
-              <Typography variant="caption" color="text.secondary">
-                Mounts a Samba / SMB share via the OS native handler
-                (Finder on macOS, Explorer on Windows, GVFS on Linux).
-                The system prompts for credentials and the share
-                appears under the Devices section once mounted.
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="Server"
-                  size="small"
-                  value={smbServer}
-                  onChange={(e) => setSmbServer(e.target.value)}
-                  placeholder="nas.local or 192.168.1.10"
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  label="Share"
-                  size="small"
-                  value={smbShare}
-                  onChange={(e) => setSmbShare(e.target.value)}
-                  placeholder="(empty = pick from list)"
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  label="User (optional)"
-                  size="small"
-                  value={smbUser}
-                  onChange={(e) => setSmbUser(e.target.value)}
-                  sx={{ flex: 1 }}
-                />
-              </Stack>
-              {smbServer && (
-                <Typography variant="caption" color="text.secondary">
-                  Will open: <code>{smbUrl({ host: smbServer, share: smbShare, user: smbUser })}</code>
-                </Typography>
-              )}
-              <Stack direction="row" spacing={1}>
-                <Button
-                  variant="contained"
-                  disabled={busy || !smbServer.trim()}
-                  onClick={() =>
-                    void handleMountSmb(
-                      {
-                        host: smbServer.trim(),
-                        share: smbShare.trim(),
-                        user: smbUser.trim(),
-                      },
-                      `${smbUser ? `${smbUser}@` : ""}${smbServer}${smbShare ? `/${smbShare}` : ""}`,
-                    )
-                  }
-                >
-                  Mount in OS
-                </Button>
-              </Stack>
-            </Stack>
-          ) : (
-          <Stack spacing={2}>
-            {sshHosts.length > 0 && (
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                <Typography variant="caption" color="text.secondary">
-                  Import from <code>~/.ssh/config</code>:
-                </Typography>
-                <Select
-                  size="small"
-                  displayEmpty
-                  value=""
-                  onChange={(e) => {
-                    const name = e.target.value as string;
-                    const h = sshHosts.find((x) => x.name === name);
-                    if (!h) return;
-                    setHost(h.hostName ?? h.name);
-                    if (h.user) setUser(h.user);
-                    if (h.port) setPort(h.port);
-                    if (h.identityFile) {
-                      setAuthMode("privateKey");
-                      setPrivateKeyPath(h.identityFile);
-                    }
-                  }}
-                  sx={{ minWidth: 200 }}
-                  aria-label="Import host from ssh config"
-                >
-                  <MenuItem value="" disabled>
-                    Pick a host…
-                  </MenuItem>
-                  {sshHosts.map((h) => (
-                    <MenuItem key={h.name} value={h.name}>
-                      {h.name}
-                      {h.hostName ? ` (${h.hostName})` : ""}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </Stack>
-            )}
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Host"
-                size="small"
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                sx={{ flex: 1 }}
-              />
-              <TextField
-                label="Port"
-                size="small"
-                type="number"
-                value={port}
-                onChange={(e) => setPort(Number(e.target.value) || 22)}
-                sx={{ width: 100 }}
-              />
-              <TextField
-                label="User"
-                size="small"
-                value={user}
-                onChange={(e) => setUser(e.target.value)}
-                sx={{ flex: 1 }}
-              />
-            </Stack>
-
-            <Select
-              size="small"
-              value={authMode}
-              onChange={(e) =>
-                setAuthMode(
-                  e.target.value as "password" | "privateKey" | "agent",
-                )
-              }
-              sx={{ maxWidth: 240 }}
-            >
-              <MenuItem value="password">Password</MenuItem>
-              <MenuItem value="privateKey">Private key</MenuItem>
-              <MenuItem value="agent">ssh-agent</MenuItem>
-            </Select>
-
-            {authMode === "agent" ? (
-              <Typography variant="caption" color="text.secondary">
-                Reads identities from <code>$SSH_AUTH_SOCK</code>. Make sure
-                your agent is running and has loaded the key for this host
-                (<code>ssh-add -l</code> to verify).
-              </Typography>
-            ) : authMode === "password" ? (
-              <TextField
-                label="Password"
-                size="small"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            ) : (
-              <Stack spacing={2}>
-                <TextField
-                  label="Private key path"
-                  size="small"
-                  value={privateKeyPath}
-                  onChange={(e) => setPrivateKeyPath(e.target.value)}
-                  helperText="Absolute path to an OpenSSH private key file."
-                />
-                <TextField
-                  label="Passphrase (optional)"
-                  size="small"
-                  type="password"
-                  value={privateKeyPassphrase}
-                  onChange={(e) => setPrivateKeyPassphrase(e.target.value)}
-                />
-              </Stack>
-            )}
-
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="contained"
-                disabled={busy || !host || !user}
-                onClick={() => void handleConnect()}
-              >
-                {busy ? "Connecting…" : "Connect"}
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={busy || !host || !user}
-                onClick={() => void handleTest()}
-              >
-                Test
-              </Button>
-            </Stack>
-            {testResult && (
-              <Alert
-                severity={testResult.ok ? "success" : "error"}
-                onClose={() => setTestResult(null)}
-                sx={{ mt: 1 }}
-              >
-                {testResult.message}
-              </Alert>
-            )}
-          </Stack>
-          )}
-        </Paper>
 
         {/* Saved SMB connections. Clicking the chain icon opens the
          *  unified RemoteConnectDialog pre-filled with the draft's
@@ -839,7 +332,6 @@ export default function ConnectionsPage() {
                               })
                             }
                             aria-label={`Open ${d.label}`}
-                            disabled={busy}
                           >
                             <LinkIcon fontSize="small" />
                           </IconButton>

@@ -8,13 +8,6 @@ import { invoke } from "@tauri-apps/api/core";
 const theme = createTheme();
 const mocked = vi.mocked(invoke);
 
-// Fake test password — extracted to a const so the value is
-// (a) obviously fictional and (b) doesn't get embedded by name in
-// the published Vitest coverage HTML reports. The previous inline
-// "hunter2" looked enough like a real value to read as suspicious
-// when the coverage artifact rendered the source.
-const DUMMY_PASSWORD = "x".repeat(8);
-
 /** Reset mock call history AND implementation so a previous test's
  *  mockImplementation override doesn't bleed in. We re-apply the
  *  default-mock subset this file's tests need. */
@@ -25,7 +18,6 @@ beforeEach(() => {
     if (cmd === "fs_list_dir") return [];
     if (cmd === "ssh_config_hosts") return [];
     if (cmd === "conn_list") return [];
-    if (cmd === "conn_create_sftp") return "test-conn-id";
     if (cmd === "conn_disconnect") return null;
     if (cmd === "conn_known_hosts_list") return [];
     if (cmd === "conn_known_hosts_remove") return null;
@@ -46,60 +38,20 @@ function r() {
 }
 
 describe("ConnectionsPage", () => {
-  it("renders the new-connection form", () => {
+  it("renders the page heading + Add-connection button", () => {
     r();
-    expect(screen.getByLabelText(/Host/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/User/)).toBeInTheDocument();
-    expect(screen.getByText("Connect")).toBeInTheDocument();
+    expect(screen.getByText("Manage Connections")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Add connection/i }),
+    ).toBeInTheDocument();
   });
 
-  it("disables Connect until host + user are filled", () => {
+  it("opens the unified RemoteConnectDialog when Add connection is clicked", () => {
     r();
-    const btn = screen.getByText("Connect");
-    expect(btn).toBeDisabled();
-
-    fireEvent.change(screen.getByLabelText(/Host/), {
-      target: { value: "example.com" },
-    });
-    fireEvent.change(screen.getByLabelText(/User/), {
-      target: { value: "alice" },
-    });
-    expect(btn).not.toBeDisabled();
-  });
-
-  it("invokes conn_create_sftp on Connect and saves a draft", async () => {
-    r();
-    fireEvent.change(screen.getByLabelText(/Host/), {
-      target: { value: "example.com" },
-    });
-    fireEvent.change(screen.getByLabelText(/User/), {
-      target: { value: "alice" },
-    });
-    fireEvent.change(screen.getByLabelText(/Password/), {
-      target: { value: DUMMY_PASSWORD },
-    });
-    fireEvent.click(screen.getByText("Connect"));
-
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith(
-        "conn_create_sftp",
-        expect.objectContaining({
-          config: expect.objectContaining({
-            host: "example.com",
-            user: "alice",
-            password: DUMMY_PASSWORD,
-          }),
-        }),
-      );
-    });
-
-    // Draft persisted (no password!).
-    const drafts = JSON.parse(
-      localStorage.getItem("skiff-files.connections.sftp.v1") ?? "[]",
-    );
-    expect(drafts).toHaveLength(1);
-    expect(drafts[0].host).toBe("example.com");
-    expect(drafts[0]).not.toHaveProperty("password");
+    fireEvent.click(screen.getByRole("button", { name: /Add connection/i }));
+    // RemoteConnectDialog renders its own protocol picker. We just
+    // assert the dialog showed up by finding its role.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("shows the empty-state message when no live connections exist", async () => {
@@ -109,9 +61,9 @@ describe("ConnectionsPage", () => {
     });
   });
 
-  it("ssh-config import dropdown appears when ~/.ssh/config has hosts", async () => {
-    // Override the default mock to return one parsed host.
-    const mocked = vi.mocked(invoke);
+  it("does not render the legacy inline ssh-config import dropdown", async () => {
+    // ssh-config import now lives in RemoteConnectDialog; the page
+    // itself no longer reads ~/.ssh/config.
     mocked.mockImplementation(async (cmd) => {
       if (cmd === "ssh_config_hosts") {
         return [
@@ -129,22 +81,8 @@ describe("ConnectionsPage", () => {
       return null;
     });
     r();
-    // Wait for the dropdown to render once `sshConfigHosts()` resolves
-    // and the empty-array guard becomes truthy.
     await waitFor(() => {
-      expect(
-        screen.getByLabelText("Import host from ssh config"),
-      ).toBeInTheDocument();
-    });
-    // The label text "Import from `~/.ssh/config`:" is present too,
-    // proving the section rendered.
-    expect(screen.getByText(/Import from/)).toBeInTheDocument();
-  });
-
-  it("hides the ssh-config dropdown when there are no parseable hosts", async () => {
-    r(); // default mock returns [] for ssh_config_hosts
-    await waitFor(() => {
-      expect(screen.getByText(/Active connections/)).toBeInTheDocument();
+      expect(screen.getByText("Manage Connections")).toBeInTheDocument();
     });
     expect(
       screen.queryByLabelText("Import host from ssh config"),
