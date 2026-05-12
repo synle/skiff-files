@@ -36,7 +36,6 @@ import {
   fsFind,
   fsCompressZip,
   fsCopyRecursive,
-  fsCreateEmptyFile,
   fsExtractZip,
   fsHomeDir,
   fsOpenInTerminal,
@@ -49,9 +48,11 @@ import {
   type Entry,
 } from "../api/fs";
 import {
+  createEmptyFile as clientCreateEmptyFile,
   listDir as clientListDir,
   mkdir as clientMkdir,
   rename as clientRename,
+  stat as clientStat,
   removeOrTrashMany,
   fsTrashRestore,
   permanentlyDeleteMany,
@@ -454,9 +455,22 @@ export default function Browser({
 
   // Bubble path changes up to the tab strip so the tab label tracks
   // the active path.
+  //
+  // The dep array is intentionally `[path]` only — `onPathChange`
+  // is captured through a ref so a parent passing an inline arrow
+  // (BrowserTabs wraps `updateLabel` per-tab to bind the id) doesn't
+  // trigger this effect on every render. The same pattern in
+  // `[path, onPathChange]` deps caused "Maximum update depth
+  // exceeded" because each call here updates parent state, which
+  // re-renders BrowserTabs, which produces a new inline arrow, which
+  // re-fires the effect.
+  const onPathChangeRef = useRef(onPathChange);
   useEffect(() => {
-    if (path) onPathChange?.(path);
-  }, [path, onPathChange]);
+    onPathChangeRef.current = onPathChange;
+  });
+  useEffect(() => {
+    if (path) onPathChangeRef.current?.(path);
+  }, [path]);
 
   // Track navigation history globally — surfaces in the sidebar's
   // Recent section. We dedup against the head: arriving at the same
@@ -1132,14 +1146,31 @@ export default function Browser({
     if (!path) return;
     const isCut = clipboard.operation === "cut";
     const remoteCutPaths: string[] = [];
+    // DEBUG(paste-smb): trace inputs so we can see exactly what
+    // Skiffsync is being asked to do. Remove once SMB paste is
+    // verified end-to-end.
+    console.log("[paste] start", {
+      op: clipboard.operation,
+      count: clipboard.paths.length,
+      destFolder: path,
+      sampleSrc: clipboard.paths[0],
+    });
     for (const src of clipboard.paths) {
       try {
-        const meta = await fsStat(src);
+        // Backend-agnostic stat — `fsStat` is local-only and would
+        // throw `CanonicalizePath` on `smb://…` / `sftp://…` sources,
+        // killing the per-item try/catch and silently skipping every
+        // remote-source paste (the "75 items ready to move" status
+        // bar would never change because removeOrTrashMany only
+        // touches paths that successfully synced).
+        const meta = await clientStat(src);
         const dest = meta.isDir ? `${path}/${meta.name}` : path;
-        await startSync(src, dest, {
+        console.log("[paste] startSync call", { src, dest, isDir: meta.isDir });
+        const jobId = await startSync(src, dest, {
           maxSizeGb: 100,
           conflictPolicy: settings.syncDefaultConflictPolicy,
         });
+        console.log("[paste] startSync ok", { src, jobId });
         if (isCut) {
           // Defer deletion to the run-loop after sync starts —
           // sync_start_* returns once the job is queued, the actual
@@ -1149,6 +1180,7 @@ export default function Browser({
           remoteCutPaths.push(src);
         }
       } catch (e) {
+        console.error("[paste] startSync failed", { src, error: String(e) });
         setError(String(e));
       }
     }
@@ -1176,10 +1208,11 @@ export default function Browser({
    *  validation; `handleCreateEntry` runs on submit. */
   const handleNewFile = () => {
     if (!path) return;
-    if (path.startsWith("sftp://")) {
-      setError("Creating files on remote hosts isn't supported yet.");
-      return;
-    }
+    // SFTP / FTP / SMB are all supported via clientCreateEmptyFile
+    // (Tauri-side conn_create_empty_file). The pre-0.2.265 gate
+    // here explicitly blocked sftp because no remote path existed
+    // at all; now every connection-backed kind routes through the
+    // appropriate write_bytes equivalent.
     const existing = new Set(entries.map((e) => e.name));
     let suggestion = "untitled.txt";
     let n = 2;
@@ -1208,12 +1241,26 @@ export default function Browser({
   const handleCreateEntry = async (name: string) => {
     if (!path || !newEntryDialog) return;
     const target = `${path}/${name}`;
-    if (newEntryDialog.kind === "folder") {
-      await clientMkdir(target);
-    } else {
-      await fsCreateEmptyFile(target);
+    const kind = newEntryDialog.kind;
+    console.log("[create-entry] start", { kind, target });
+    try {
+      if (kind === "folder") {
+        await clientMkdir(target);
+      } else {
+        // Backend-agnostic. Was `fsCreateEmptyFile` which is local-
+        // only; calling it with an `smb://…` target silently failed
+        // (no try/catch on the path) and the dialog dismissed
+        // without surfacing the error. Now we route through
+        // clientCreateEmptyFile (SFTP/FTP/SMB-aware) and surface
+        // any error in the page-level snackbar.
+        await clientCreateEmptyFile(target);
+      }
+      console.log("[create-entry] ok", { kind, target });
+      await refresh(path);
+    } catch (e) {
+      console.error("[create-entry] failed", { kind, target, error: String(e) });
+      setError(`Failed to create ${kind}: ${e}`);
     }
-    await refresh(path);
   };
 
   const totals = useMemo(() => {
@@ -1563,6 +1610,16 @@ export default function Browser({
         count={selectedPaths.length}
         onNewFolder={() => void handleNewFolder()}
         onNewFile={() => void handleNewFile()}
+        // Surface the file clipboard's pending-paste count as a
+        // first-class action-bar button so users don't have to
+        // right-click an empty area to discover it. `clipboardSnap`
+        // is the mirror state Browser keeps in sync with the
+        // util/fileClipboard module.
+        pasteCount={clipboardSnap?.paths.length ?? 0}
+        onPaste={() => {
+          const cb = getFileClipboard();
+          if (cb) void handlePaste(cb);
+        }}
         onClearSelection={() =>
           window.dispatchEvent(new CustomEvent("skiff:clear-selection"))
         }

@@ -1747,7 +1747,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   <HubIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText
-                  primary="Add connection…"
+                  primary="Manage connections…"
                   slotProps={{ primary: { variant: "body2" } }}
                 />
               </ListItemButton>
@@ -1759,9 +1759,17 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               // After 0.2.246 we have multiple remote kinds — pick
               // the address-bar scheme + the kind-specific icon
               // here instead of hardcoding `sftp://`. The kind label
-              // is uppercased so it reads as a protocol tag (FTP /
-              // SFTP) in the connection's tooltip.
-              const scheme = c.kind === "ftp" ? "ftp" : "sftp";
+              // is uppercased so it reads as a protocol tag in the
+              // connection's tooltip.
+              //
+              // 0.2.265 added SMB. The previous ternary defaulted to
+              // "sftp" for any non-FTP kind, which silently routed
+              // SMB navigation to `sftp://<smb-uuid>/` and broke
+              // every downstream resolve_backend call (the SMB
+              // connection-id wasn't in the SFTP registry). Pick
+              // the scheme explicitly per kind.
+              const scheme =
+                c.kind === "ftp" ? "ftp" : c.kind === "smb" ? "smb" : "sftp";
               const kindLabel = c.kind.toUpperCase();
               const tooltip = `${kindLabel} · ${c.label}`;
               const KindIcon = c.kind === "ftp" ? CloudIcon : HubIcon;
@@ -1769,9 +1777,19 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               <ListItem key={c.id} disablePadding>
                 <Tooltip title={tooltip} placement="right">
                 <ListItemButton
-                  onClick={() =>
-                    onNavigate(`${scheme}://${c.id}/`)
-                  }
+                  onClick={() => {
+                    // Always switch to the browser page before
+                    // navigating — when the user is on Settings /
+                    // Transfers / Manage Connections, `onNavigate`
+                    // alone updates the (hidden) Browser tab's path
+                    // but leaves the visible page on the current
+                    // non-browser route. The user then has to click
+                    // the host a second time before the page itself
+                    // flips. Fire both calls so a single click is
+                    // sufficient regardless of which page is active.
+                    onSwitchPage("browser");
+                    onNavigate(`${scheme}://${c.id}/`);
+                  }}
                   // Drag-drop target: dropping a Skiff selection here
                   // starts a Skiffsync job from the dragged paths to a
                   // user-prompted destination on the remote. Uses the

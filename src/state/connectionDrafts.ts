@@ -75,20 +75,57 @@ export const loadFtpDrafts = (): FtpDraft[] =>
   loadJson<FtpDraft>(FTP_STORAGE_KEY);
 export const saveFtpDrafts = (drafts: FtpDraft[]): void =>
   saveJson(FTP_STORAGE_KEY, drafts);
-export const loadSmbDrafts = (): SmbDraft[] =>
-  loadJson<SmbDraft>(SMB_STORAGE_KEY);
+/** Loads SMB drafts with on-read migration. The same storage key was
+ *  previously written by ConnectionsPage's older `{ server, share, user }`
+ *  shape (no port/host/domain); reading that into the canonical
+ *  `{ host, port, ... }` shape would leave `host` undefined and crash
+ *  `matchesHost` in the address-bar resolver. Fill missing fields with
+ *  reasonable defaults so both code paths coexist with whatever
+ *  localStorage already holds. Drafts that lack any usable host are
+ *  dropped — they're unrecoverable. */
+export const loadSmbDrafts = (): SmbDraft[] => {
+  // Cast through `unknown` because the persisted shape predates the
+  // current type — `loadJson<SmbDraft>` would type-coerce but not
+  // guarantee field presence.
+  const raw = loadJson<Record<string, unknown>>(SMB_STORAGE_KEY);
+  return raw
+    .map((d) => ({
+      id: typeof d.id === "string" ? d.id : `smb-${Date.now()}-${Math.random()}`,
+      label: typeof d.label === "string" ? d.label : "",
+      host:
+        typeof d.host === "string"
+          ? d.host
+          : typeof d.server === "string"
+            ? d.server
+            : "",
+      port: typeof d.port === "number" ? d.port : 445,
+      share: typeof d.share === "string" ? d.share : "",
+      user: typeof d.user === "string" ? d.user : "",
+      domain: typeof d.domain === "string" ? d.domain : "",
+    }))
+    .filter((d) => d.host !== "");
+};
 export const saveSmbDrafts = (drafts: SmbDraft[]): void =>
   saveJson(SMB_STORAGE_KEY, drafts);
 
 /** Case-insensitive host match. Port match is optional — when the
  *  caller doesn't provide a port (raw `ftp://host` typing), every
- *  port on the same host counts; when they do, only that port. */
+ *  port on the same host counts; when they do, only that port.
+ *
+ *  Defensive: a draft persisted by an older code path may have
+ *  arrived with `host` undefined (different schema on the same
+ *  storage key). Drop it from matches rather than crashing the
+ *  whole React tree on `.toLowerCase()` of undefined. `loadSmbDrafts`
+ *  now filters these out on read, but the guard stays as a
+ *  belt-and-braces — other draft sources (ftp/sftp) write through
+ *  loadJson without migration. */
 function matchesHost(
   draftHost: string,
   draftPort: number,
   host: string,
   port: number | null,
 ): boolean {
+  if (!draftHost || !host) return false;
   if (draftHost.toLowerCase() !== host.toLowerCase()) return false;
   if (port == null) return true;
   return draftPort === port;

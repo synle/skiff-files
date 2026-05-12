@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
+import ContentPasteIcon from "@mui/icons-material/ContentPaste";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ArchiveIcon from "@mui/icons-material/Archive";
 import EditIcon from "@mui/icons-material/Edit";
@@ -33,6 +34,14 @@ interface Props {
   count: number;
   onNewFolder?: () => void;
   onNewFile?: () => void;
+  /** When set, the action bar renders a leading "Paste N items"
+   *  button. Mirrors the right-click empty-area menu option but
+   *  surfaces it in the always-visible action bar so the
+   *  clipboard-with-pending-items state is discoverable without
+   *  the user having to right-click. Hide by leaving undefined or
+   *  passing 0. */
+  pasteCount?: number;
+  onPaste?: () => void;
   /** Clear the current multi-selection. Surfaces a Clear button
    *  next to New file whenever 1+ rows are picked. Re-added in
    *  0.2.256 after 0.2.253 dropped it — outside-row click is still
@@ -63,6 +72,8 @@ export default function BulkActionBar({
   count,
   onNewFolder,
   onNewFile,
+  pasteCount,
+  onPaste,
   onClearSelection,
   onCopy,
   onCut,
@@ -91,6 +102,23 @@ export default function BulkActionBar({
             : "rgba(25, 118, 210, 0.06)",
       }}
     >
+      {/* Paste goes FIRST so it's the leftmost affordance whenever
+          there's a non-empty file clipboard. Mirrors the right-click
+          empty-area menu item's wording so the two surfaces stay
+          recognizable as the same action. Hidden when the clipboard
+          is empty so it doesn't take up bar real estate during
+          normal browsing. */}
+      {pasteCount != null && pasteCount > 0 && onPaste && (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<ContentPasteIcon fontSize="small" />}
+          onClick={onPaste}
+          sx={TIGHT_ICON_SX}
+        >
+          Paste {pasteCount} item{pasteCount === 1 ? "" : "s"}
+        </Button>
+      )}
       {onNewFolder && (
         <Button
           size="small"

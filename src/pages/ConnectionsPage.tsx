@@ -20,8 +20,12 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -42,55 +46,30 @@ import {
   type SshConfigHost,
 } from "../api/conn";
 import { fsOpenWithDefault } from "../api/fs";
+import {
+  loadSmbDrafts,
+  saveSmbDrafts,
+  type SmbDraft,
+} from "../state/connectionDrafts";
+import RemoteConnectDialog, {
+  type RemoteConnectRequest,
+} from "../components/RemoteConnectDialog";
 
 const STORAGE_KEY = "skiff-files.connections.sftp.v1";
-const SMB_STORAGE_KEY = "skiff-files.connections.smb.v1";
-
-/** SMB / Samba share draft. Routed through the OS-native mount handler
- *  (Finder on macOS, Explorer on Windows, GVFS on Linux) via
- *  `fs_open_with_default("smb://server/share")`. The OS handles auth
- *  prompts + mounting; once mounted the user browses the share via
- *  the local fs (e.g. /Volumes/share on macOS). A first-class Rust SMB
- *  client lives behind a Phase 3 commit; this MVP gets users productive
- *  on existing Samba shares without waiting on that work. */
-interface SmbDraft {
-  id: string;
-  label: string;
-  /** Hostname or IP (no scheme — that's added on connect). */
-  server: string;
-  /** Share name. Empty = browse server's share list. */
-  share: string;
-  /** Optional username for the URL (smb://user@server/share). The OS
-   *  prompts for password — we never store SMB credentials in
-   *  settings.json. */
-  user?: string;
-}
-
-function loadSmbDrafts(): SmbDraft[] {
-  try {
-    const raw = localStorage.getItem(SMB_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as SmbDraft[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveSmbDrafts(drafts: SmbDraft[]): void {
-  try {
-    localStorage.setItem(SMB_STORAGE_KEY, JSON.stringify(drafts));
-  } catch {
-    /* private mode — silently drop */
-  }
-}
 
 /** Build the SMB URL the OS-native handler accepts. macOS / Linux
  *  use forward slashes; Windows accepts the same scheme via Edge's
  *  webview but typically wants UNC `\\server\share` — `start
- *  smb://...` works on Windows too in practice. */
-function smbUrl(d: { server: string; share: string; user?: string }): string {
+ *  smb://...` works on Windows too in practice.
+ *
+ *  Pulls the host from `host` (the canonical field shared with
+ *  RemoteConnectDialog). The pre-0.2.265 schema stored the same
+ *  value under `server`; `loadSmbDrafts` migrates that on read so
+ *  this builder doesn't need to fall back. */
+function smbUrl(d: { host: string; share: string; user: string }): string {
   const userPart = d.user ? `${encodeURIComponent(d.user)}@` : "";
   const sharePart = d.share ? `/${encodeURIComponent(d.share)}` : "";
-  return `smb://${userPart}${d.server}${sharePart}`;
+  return `smb://${userPart}${d.host}${sharePart}`;
 }
 
 /** Saved (not necessarily live) draft. Kept on the client so users don't
@@ -129,6 +108,32 @@ export default function ConnectionsPage() {
   const [live, setLive] = useState<ConnectionInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Drives the unified Add-connection modal (the same
+   *  RemoteConnectDialog the address bar uses). `null` = closed;
+   *  any non-null value opens the dialog seeded with that request.
+   *  Sharing one dialog between the address-bar flow and this page
+   *  guarantees both entry points stay visually consistent — adding
+   *  a new field for a backend means editing one component, not two. */
+  const [addRequest, setAddRequest] = useState<RemoteConnectRequest | null>(
+    null,
+  );
+  const addOpen = addRequest !== null;
+  const setAddOpen = (v: boolean) => {
+    if (v) {
+      // Seed a blank SFTP request — the user picks protocol inside
+      // the dialog via its Protocol Select. Empty host/null port lets
+      // the dialog start with all fields editable instead of pre-
+      // filled from a typed URL.
+      setAddRequest({
+        scheme: "sftp",
+        host: "",
+        port: null,
+        remotePath: "/",
+      });
+    } else {
+      setAddRequest(null);
+    }
+  };
   /** Which protocol the new-connection form is targeting. The
    *  dropdown sits at the top of the form so the user can flip
    *  between SFTP (full programmatic control via russh) and SMB
@@ -175,22 +180,26 @@ export default function ConnectionsPage() {
    *  picks up the mount automatically via the Devices section's
    *  fs_mounts polling. Linux relies on GVFS / KIO support. */
   const handleMountSmb = async (
-    d: { server: string; share: string; user?: string },
+    d: { host: string; share: string; user: string },
     label: string,
   ) => {
     setError(null);
     setBusy(true);
     try {
       await fsOpenWithDefault(smbUrl(d));
-      // Save / refresh the draft for next time.
+      // Save / refresh the draft for next time. Port + domain take
+      // the SMB defaults — this form only collects host/share/user
+      // because the OS-mount handler doesn't need more.
       setSmbDrafts((prev) => [
         ...prev.filter((x) => x.label !== label),
         {
           id: crypto.randomUUID(),
           label,
-          server: d.server,
+          host: d.host,
+          port: 445,
           share: d.share,
           user: d.user,
+          domain: "",
         },
       ]);
     } catch (e) {
@@ -338,6 +347,29 @@ export default function ConnectionsPage() {
     setDrafts((d) => d.filter((x) => x.id !== id));
   };
 
+  /** Reorder a draft within its list by `delta` slots (negative = up,
+   *  positive = down). No-op if the move would leave the array. The
+   *  arrow buttons disable themselves at the ends, but this guards
+   *  against keyboard shortcuts or future programmatic callers. */
+  function moveBy<T extends { id: string }>(
+    list: T[],
+    id: string,
+    delta: number,
+  ): T[] {
+    const i = list.findIndex((x) => x.id === id);
+    if (i < 0) return list;
+    const j = i + delta;
+    if (j < 0 || j >= list.length) return list;
+    const next = list.slice();
+    const [item] = next.splice(i, 1);
+    next.splice(j, 0, item);
+    return next;
+  }
+  const moveSmbDraft = (id: string, delta: number) =>
+    setSmbDrafts((prev) => moveBy(prev, id, delta));
+  const moveSftpDraft = (id: string, delta: number) =>
+    setDrafts((prev) => moveBy(prev, id, delta));
+
   /** Clone a draft as a new entry the user can edit independently —
    *  useful for "I want a 'staging' variant of my 'production' setup
    *  without retyping host/user". The label gets a " (copy)" suffix
@@ -374,19 +406,30 @@ export default function ConnectionsPage() {
     });
   };
 
-  const loadDraft = (d: SftpDraft) => {
-    setHost(d.host);
-    setPort(d.port);
-    setUser(d.user);
-    setAuthMode(d.authMode);
-    setPrivateKeyPath(d.privateKeyPath ?? "");
-  };
+  // loadDraft removed — clicking a Saved SFTP row now seeds the
+  // unified RemoteConnectDialog via setAddRequest instead of writing
+  // to the hidden inline form's state. The TODO cleanup pass will
+  // also drop host/port/user/authMode/privateKeyPath state entirely.
 
   return (
     <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
       <Box sx={{ maxWidth: 760, mx: "auto" }}>
-      <Typography variant="h4" gutterBottom>
-        Connections
+      <Stack direction="row" sx={{ alignItems: "center", mb: 1 }}>
+        <Typography variant="h4" sx={{ flex: 1 }}>
+          Manage Connections
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setAddOpen(true)}
+        >
+          Add connection
+        </Button>
+      </Stack>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Open SFTP, FTP, and SMB connections. The Add connection button
+        opens the same dialog used by the address bar — one place to
+        configure every remote backend.
       </Typography>
 
       {error && (
@@ -396,7 +439,44 @@ export default function ConnectionsPage() {
       )}
 
       <Stack spacing={4}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        {/* ============================================================
+            TODO(cleanup-inline-form): DELETE THIS ENTIRE <Paper> BLOCK
+            ============================================================
+            The page now uses RemoteConnectDialog (mounted at the bottom)
+            for adding any remote backend (SFTP / FTP / SMB). The inline
+            form below — Protocol Select + SFTP / FTP / SMB sub-forms,
+            handleTest / handleConnect / handleMountSmb (the OS-handoff
+            variant) — is dead UI: hidden via `display: none` ONLY so the
+            handler references (handleConnect, handleTest, the SftpConfig
+            type, connCreateSftp/connCreateFtp imports, the
+            host/port/user/password/authMode/privateKeyPath/
+            privateKeyPassphrase state vars, all four ftp-prefixed and
+            three smb-prefixed form state vars, testResult state, and
+            the protocol Select) stay live and TypeScript stays clean.
+
+            Cleanup pass — delete in one PR:
+              1. Remove the Paper block below (everything until its
+                 matching </Paper> right before "Saved SMB shares").
+              2. Remove the now-unused state declarations at the top of
+                 the component: protocol/setProtocol, host/port/user/
+                 password/authMode/privateKeyPath/privateKeyPassphrase,
+                 the four ftpHost / ftpPort / ftpUser / ftpPassword
+                 vars, the three smbServer / smbShare / smbUser vars,
+                 and testResult/setTestResult.
+              3. Remove handleConnect, handleTest. handleMountSmb stays
+                 — Saved SMB shares list (below this Paper) still calls
+                 it for the OS-handoff "mount in OS" affordance, which
+                 we keep as a complement to the native SMB connect.
+              4. Remove the connCreateSftp, connCreateFtp, SftpConfig
+                 imports from "../api/conn". connDisconnect / connList /
+                 connKnownHostsList / connKnownHostsRemove /
+                 sshConfigHosts stay (used by Active connections + the
+                 Known hosts list further down).
+              5. Remove the `setAddOpen` helper's blank-SFTP seed if we
+                 add a protocol-picker to the modal opener UX in the
+                 same pass; otherwise leave it.
+            ============================================================ */}
+        <Paper variant="outlined" sx={{ p: 2, display: "none" }}>
           <Stack
             direction="row"
             spacing={2}
@@ -531,7 +611,7 @@ export default function ConnectionsPage() {
               </Stack>
               {smbServer && (
                 <Typography variant="caption" color="text.secondary">
-                  Will open: <code>{smbUrl({ server: smbServer, share: smbShare, user: smbUser || undefined })}</code>
+                  Will open: <code>{smbUrl({ host: smbServer, share: smbShare, user: smbUser })}</code>
                 </Typography>
               )}
               <Stack direction="row" spacing={1}>
@@ -541,9 +621,9 @@ export default function ConnectionsPage() {
                   onClick={() =>
                     void handleMountSmb(
                       {
-                        server: smbServer.trim(),
+                        host: smbServer.trim(),
                         share: smbShare.trim(),
-                        user: smbUser.trim() || undefined,
+                        user: smbUser.trim(),
                       },
                       `${smbUser ? `${smbUser}@` : ""}${smbServer}${smbShare ? `/${smbShare}` : ""}`,
                     )
@@ -693,55 +773,98 @@ export default function ConnectionsPage() {
           )}
         </Paper>
 
-        {/* Saved SMB shares — quick-mount list mirroring the SFTP
-         *  drafts UX. We don't persist credentials; the OS prompt
-         *  handles auth on each mount. */}
+        {/* Saved SMB connections. Clicking the chain icon opens the
+         *  unified RemoteConnectDialog pre-filled with the draft's
+         *  host/port/user/share — same modal used by Add Connection
+         *  and the address bar. Up/down arrows let the user reorder
+         *  so the most-used share floats to the top. */}
         {smbDrafts.length > 0 && (
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>
-              Saved SMB shares
+              Saved SMB connections
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Click the link icon to open the connect dialog pre-filled.
+              Passwords are never saved.
             </Typography>
             <List dense>
-              {smbDrafts.map((d) => (
+              {smbDrafts.map((d, i) => (
                 <ListItem
                   key={d.id}
                   secondaryAction={
                     <Stack direction="row" spacing={0.5}>
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          void handleMountSmb(
-                            {
-                              server: d.server,
-                              share: d.share,
-                              user: d.user,
-                            },
-                            d.label,
-                          )
-                        }
-                        aria-label={`Mount ${d.label}`}
-                        disabled={busy}
-                      >
-                        <LinkIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          setSmbDrafts((prev) =>
-                            prev.filter((x) => x.id !== d.id),
-                          )
-                        }
-                        aria-label={`Delete ${d.label}`}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      <Tooltip title="Move up">
+                        <span>
+                          <IconButton
+                            size="small"
+                            disabled={i === 0}
+                            onClick={() => moveSmbDraft(d.id, -1)}
+                            aria-label={`Move ${d.label} up`}
+                          >
+                            <ArrowUpwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Move down">
+                        <span>
+                          <IconButton
+                            size="small"
+                            disabled={i === smbDrafts.length - 1}
+                            onClick={() => moveSmbDraft(d.id, 1)}
+                            aria-label={`Move ${d.label} down`}
+                          >
+                            <ArrowDownwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Open connect dialog">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              // Open the unified Connect dialog pre-seeded
+                              // with this draft's host / port / user /
+                              // share. The dialog's open-effect picks the
+                              // share off `remotePath` (leading slash +
+                              // name) and surfaces this same draft in the
+                              // matches list. Password is the only field
+                              // the user still has to type — we never
+                              // persist creds.
+                              setAddRequest({
+                                scheme: "smb",
+                                host: d.host,
+                                port: d.port,
+                                user: d.user,
+                                remotePath: d.share ? `/${d.share}` : "/",
+                              })
+                            }
+                            aria-label={`Open ${d.label}`}
+                            disabled={busy}
+                          >
+                            <LinkIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Delete saved connection">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            setSmbDrafts((prev) =>
+                              prev.filter((x) => x.id !== d.id),
+                            )
+                          }
+                          aria-label={`Delete ${d.label}`}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Stack>
                   }
                 >
                   <ListItemText
                     primary={d.label}
                     secondary={smbUrl({
-                      server: d.server,
+                      host: d.host,
                       share: d.share,
                       user: d.user,
                     })}
@@ -792,18 +915,26 @@ export default function ConnectionsPage() {
                 <ListItem
                   key={c.id}
                   secondaryAction={
-                    <IconButton
-                      edge="end"
-                      onClick={() => void handleDisconnect(c.id)}
-                      aria-label={`Disconnect ${c.label}`}
-                    >
-                      <LinkOffIcon />
-                    </IconButton>
+                    <Tooltip title="Disconnect">
+                      <IconButton
+                        edge="end"
+                        onClick={() => void handleDisconnect(c.id)}
+                        aria-label={`Disconnect ${c.label}`}
+                      >
+                        <LinkOffIcon />
+                      </IconButton>
+                    </Tooltip>
                   }
                 >
                   <LinkIcon fontSize="small" sx={{ mr: 1 }} />
                   <ListItemText
                     primary={c.label}
+                    // Render secondary as a <span> so the Chip's <div>
+                    // root doesn't get nested inside a <p> (MUI's
+                    // default Typography component for the secondary
+                    // slot) — that's invalid HTML and React 19 will
+                    // hydrate-error it.
+                    slotProps={{ secondary: { component: "span" } }}
                     secondary={
                       <Chip size="small" label={c.kind.toUpperCase()} />
                     }
@@ -818,10 +949,11 @@ export default function ConnectionsPage() {
 
         <Box>
           <Typography variant="h6" gutterBottom>
-            Saved drafts
+            Saved SFTP connections
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Quick-fill the form above. Passwords are never saved.
+            Click the row to open the connect dialog pre-filled.
+            Passwords are never saved.
           </Typography>
           {drafts.length === 0 ? (
             <Typography variant="body2" color="text.disabled">
@@ -829,50 +961,97 @@ export default function ConnectionsPage() {
             </Typography>
           ) : (
             <List dense>
-              {drafts.map((d) => (
+              {drafts.map((d, i) => (
                 <ListItem
                   key={d.id}
                   secondaryAction={
                     <Stack direction="row" spacing={0.5}>
-                      <IconButton
-                        edge="end"
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRenameDraft(d.id);
-                        }}
-                        aria-label={`Rename ${d.label}`}
-                        title="Rename label"
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        edge="end"
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDuplicateDraft(d.id);
-                        }}
-                        aria-label={`Duplicate ${d.label}`}
-                        title="Duplicate"
-                      >
-                        <ContentCopyIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        edge="end"
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteDraft(d.id);
-                        }}
-                        aria-label={`Delete ${d.label}`}
-                        title="Delete"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      <Tooltip title="Move up">
+                        <span>
+                          <IconButton
+                            edge="end"
+                            size="small"
+                            disabled={i === 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveSftpDraft(d.id, -1);
+                            }}
+                            aria-label={`Move ${d.label} up`}
+                          >
+                            <ArrowUpwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Move down">
+                        <span>
+                          <IconButton
+                            edge="end"
+                            size="small"
+                            disabled={i === drafts.length - 1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveSftpDraft(d.id, 1);
+                            }}
+                            aria-label={`Move ${d.label} down`}
+                          >
+                            <ArrowDownwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Rename label">
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRenameDraft(d.id);
+                          }}
+                          aria-label={`Rename ${d.label}`}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Duplicate">
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateDraft(d.id);
+                          }}
+                          aria-label={`Duplicate ${d.label}`}
+                        >
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete saved connection">
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDraft(d.id);
+                          }}
+                          aria-label={`Delete ${d.label}`}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Stack>
                   }
-                  onClick={() => loadDraft(d)}
+                  onClick={() =>
+                    // Open the unified dialog seeded with this draft's
+                    // host/port/user — same modal as Add Connection and
+                    // the address bar. The dialog's match-list will
+                    // surface this draft for one-click selection.
+                    setAddRequest({
+                      scheme: "sftp",
+                      host: d.host,
+                      port: d.port,
+                      user: d.user,
+                      remotePath: "/",
+                    })
+                  }
                   sx={{ cursor: "pointer" }}
                 >
                   <ListItemText
@@ -948,6 +1127,22 @@ export default function ConnectionsPage() {
         </Box>
       </Stack>
       </Box>
+      <RemoteConnectDialog
+        open={addOpen}
+        request={addRequest}
+        onClose={() => setAddOpen(false)}
+        onConnected={() => {
+          // Dialog saved a draft (if user opted in) + opened the
+          // live connection. Refresh both lists so the new entries
+          // appear without a tab reload, then close.
+          setAddOpen(false);
+          void refreshLive();
+          // Re-read drafts from localStorage — RemoteConnectDialog
+          // owns the persistence; this page is just a consumer.
+          setDrafts(loadDrafts());
+          setSmbDrafts(loadSmbDrafts());
+        }}
+      />
     </Box>
   );
 }

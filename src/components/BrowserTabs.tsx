@@ -22,6 +22,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -537,14 +538,20 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
   };
 
   /** Updates a tab's label after the inner Browser navigates. Lifted
-   *  here so the tab strip stays in sync with the active path. */
-  const updateLabel = (id: string, path: string) => {
+   *  here so the tab strip stays in sync with the active path.
+   *
+   *  Memoized — Browser receives this as `onPathChange` and lists it
+   *  in a useEffect dep array; without a stable identity the effect
+   *  re-fires every render, calls setState here, triggers another
+   *  render, and loops until React aborts with
+   *  "Maximum update depth exceeded". */
+  const updateLabel = useCallback((id: string, path: string) => {
     setTabs((prev) =>
       prev.map((t) =>
         t.id === id ? { ...t, label: labelFor(path), currentPath: path } : t,
       ),
     );
-  };
+  }, []);
 
   // Active sync job count — reflected in the window title so users
   // see "(2) Skiff Files" in the OS taskbar / dock when transfers
