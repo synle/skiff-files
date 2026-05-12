@@ -43,6 +43,14 @@ export interface ProgressWidgetProps {
   dense?: boolean;
   /** Error to surface inline (red) — e.g. job failed mid-flight. */
   error?: string | null;
+  /** Terminal state — the job already finished (done / cancelled /
+   *  failed). When true the bar renders solid at 100% (no
+   *  indeterminate stripe animation) and the bottom line skips the
+   *  "0 of 0 files" placeholder. Without this prop an already-done
+   *  SMB job that emitted no per-file progress events would still
+   *  show the animated indeterminate stripe, making it look like
+   *  it's still running. */
+  done?: boolean;
 }
 
 export default function ProgressWidget({
@@ -60,14 +68,18 @@ export default function ProgressWidget({
   onCancel,
   dense,
   error,
+  done,
 }: ProgressWidgetProps) {
   const pct =
     bytesTotal != null && bytesTotal > 0 && bytesDone != null
       ? Math.min(100, Math.round((bytesDone / bytesTotal) * 100))
       : null;
 
-  const showBar = pct != null;
-  const indeterminate = !showBar;
+  // Terminal jobs draw a solid full bar regardless of whether
+  // progress events arrived. Otherwise fall back to the byte-based
+  // pct, and only show the indeterminate stripe when we have no
+  // data at all AND the job isn't finished.
+  const indeterminate = !done && pct == null;
 
   // ETA / completion-time line. Show "Calculating…" while the window
   // is priming so the user knows the placeholder is not the real value.
@@ -125,7 +137,7 @@ export default function ProgressWidget({
 
       <LinearProgress
         variant={indeterminate ? "indeterminate" : "determinate"}
-        value={pct ?? 0}
+        value={done ? 100 : (pct ?? 0)}
         sx={{ height: dense ? 4 : 6, borderRadius: 1 }}
       />
 
@@ -133,7 +145,13 @@ export default function ProgressWidget({
         sx={{ mt: 0.5, color: "text.secondary", display: "flex", gap: 2 }}
       >
         <Typography variant="caption" sx={{ flexShrink: 0 }}>
-          {filesDone} of {filesTotal} files
+          {/* Suppress "0 of 0 files" placeholder when the job already
+              finished — the TransfersPage shows the summary line
+              ("N copied, M skipped …") right below this widget for
+              done jobs, so this counter line is just noise. */}
+          {done && filesTotal === 0
+            ? "Finished"
+            : `${filesDone} of ${filesTotal} files`}
           {bytesTotal != null && bytesTotal > 0 && bytesDone != null
             ? ` · ${formatBytes(bytesDone)} of ${formatBytes(bytesTotal)}`
             : ""}

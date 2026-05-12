@@ -36,7 +36,6 @@ import {
   fsFind,
   fsCompressZip,
   fsCopyRecursive,
-  fsCreateEmptyFile,
   fsExtractZip,
   fsHomeDir,
   fsOpenInTerminal,
@@ -49,9 +48,11 @@ import {
   type Entry,
 } from "../api/fs";
 import {
+  createEmptyFile as clientCreateEmptyFile,
   listDir as clientListDir,
   mkdir as clientMkdir,
   rename as clientRename,
+  stat as clientStat,
   removeOrTrashMany,
   fsTrashRestore,
   permanentlyDeleteMany,
@@ -88,6 +89,14 @@ interface Props {
    *  Global window listeners (drag-drop, Delete, Cmd/Ctrl+F, sidebar
    *  navigate event) skip themselves so only the visible tab acts. */
   isActive?: boolean;
+  /** Two-pane mode: true iff this Browser sits inside the focused
+   *  pane. Distinct from `isActive` (which only flips with tab
+   *  switching). The NAVIGATE_EVENT listener checks this so a
+   *  sidebar Home click only navigates the focused pane — clicking
+   *  rows / using keyboard shortcuts inside the non-focused pane
+   *  still works, only window-level "go here" events are gated.
+   *  Defaults to true so single-pane callers keep their behavior. */
+  isPaneFocused?: boolean;
   /** Fires when the active path changes (navigation, back, forward,
    *  sidebar drop). Tab strip uses it to keep tab labels in sync. */
   onPathChange?: (path: string) => void;
@@ -106,6 +115,7 @@ interface History {
 export default function Browser({
   initialPath,
   isActive = true,
+  isPaneFocused = true,
   onPathChange,
 }: Props) {
   const { settings, update } = useSettings();
@@ -454,9 +464,22 @@ export default function Browser({
 
   // Bubble path changes up to the tab strip so the tab label tracks
   // the active path.
+  //
+  // The dep array is intentionally `[path]` only — `onPathChange`
+  // is captured through a ref so a parent passing an inline arrow
+  // (BrowserTabs wraps `updateLabel` per-tab to bind the id) doesn't
+  // trigger this effect on every render. The same pattern in
+  // `[path, onPathChange]` deps caused "Maximum update depth
+  // exceeded" because each call here updates parent state, which
+  // re-renders BrowserTabs, which produces a new inline arrow, which
+  // re-fires the effect.
+  const onPathChangeRef = useRef(onPathChange);
   useEffect(() => {
-    if (path) onPathChange?.(path);
-  }, [path, onPathChange]);
+    onPathChangeRef.current = onPathChange;
+  });
+  useEffect(() => {
+    if (path) onPathChangeRef.current?.(path);
+  }, [path]);
 
   // Track navigation history globally — surfaces in the sidebar's
   // Recent section. We dedup against the head: arriving at the same
@@ -487,16 +510,39 @@ export default function Browser({
   // Listen for sidebar-driven navigations. Decoupling via a window event keeps
   // the Sidebar from needing a reference to setHistory. Only the active tab
   // responds — otherwise N tabs would all jump on a single sidebar click.
+  //
+  // Two-pane mode adds a second gate: the dispatched detail carries
+  // `pane` ("main" | "right"); a Browser only acts when its pane
+  // matches. Without this, a sidebar Home click navigates both
+  // panes simultaneously — exactly the bug image #67 showed.
+  // Legacy callers may still dispatch a raw-string detail (pre-
+  // two-pane code path); treat those as pane-agnostic.
   useEffect(() => {
     if (!isActive) return;
     const onExternalNavigate = (e: Event) => {
-      const detail = (e as CustomEvent<string>).detail;
-      if (detail) {
-        setHistory((h) => {
-          if (detail === h.back[h.back.length - 1]) return h;
-          return { back: [...h.back, detail], forward: [] };
-        });
+      const raw = (e as CustomEvent<unknown>).detail;
+      // Accept both shapes: legacy bare-string path, and the new
+      // `{ path, pane }` object dispatches from App.tsx / palette.
+      let target: string | null = null;
+      let targetPane: "main" | "right" | null = null;
+      if (typeof raw === "string") {
+        target = raw;
+      } else if (raw && typeof raw === "object") {
+        const obj = raw as { path?: unknown; pane?: unknown };
+        if (typeof obj.path === "string") target = obj.path;
+        if (obj.pane === "main" || obj.pane === "right")
+          targetPane = obj.pane;
       }
+      if (!target) return;
+      // If the event names a target pane and this Browser isn't in
+      // the focused pane, ignore — the other pane's Browser will
+      // pick it up. Single-pane mode passes isPaneFocused=true so
+      // it always handles dispatches.
+      if (targetPane && !isPaneFocused) return;
+      setHistory((h) => {
+        if (target === h.back[h.back.length - 1]) return h;
+        return { back: [...h.back, target!], forward: [] };
+      });
     };
     window.addEventListener(NAVIGATE_EVENT, onExternalNavigate);
     // Command-palette dispatched events — the active Browser
@@ -591,8 +637,13 @@ export default function Browser({
     };
     // handleNewFolder is stable enough — re-binding on every render
     // would also be acceptable since these are window-level events.
+    // isPaneFocused is in the deps so the listener re-binds when the
+    // user clicks between panes (so the new closure captures the new
+    // value of isPaneFocused). Without it, focusing the right pane
+    // wouldn't take effect for the NAVIGATE_EVENT gate until some
+    // other dep changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, path, refresh, entries]);
+  }, [isActive, isPaneFocused, path, refresh, entries]);
 
   // OS-level drag-and-drop. Tauri emits a unified event for enter / over
   // / drop / leave. On drop, we route each dropped path through
@@ -1132,14 +1183,31 @@ export default function Browser({
     if (!path) return;
     const isCut = clipboard.operation === "cut";
     const remoteCutPaths: string[] = [];
+    // DEBUG(paste-smb): trace inputs so we can see exactly what
+    // Skiffsync is being asked to do. Remove once SMB paste is
+    // verified end-to-end.
+    console.log("[paste] start", {
+      op: clipboard.operation,
+      count: clipboard.paths.length,
+      destFolder: path,
+      sampleSrc: clipboard.paths[0],
+    });
     for (const src of clipboard.paths) {
       try {
-        const meta = await fsStat(src);
+        // Backend-agnostic stat — `fsStat` is local-only and would
+        // throw `CanonicalizePath` on `smb://…` / `sftp://…` sources,
+        // killing the per-item try/catch and silently skipping every
+        // remote-source paste (the "75 items ready to move" status
+        // bar would never change because removeOrTrashMany only
+        // touches paths that successfully synced).
+        const meta = await clientStat(src);
         const dest = meta.isDir ? `${path}/${meta.name}` : path;
-        await startSync(src, dest, {
+        console.log("[paste] startSync call", { src, dest, isDir: meta.isDir });
+        const jobId = await startSync(src, dest, {
           maxSizeGb: 100,
           conflictPolicy: settings.syncDefaultConflictPolicy,
         });
+        console.log("[paste] startSync ok", { src, jobId });
         if (isCut) {
           // Defer deletion to the run-loop after sync starts —
           // sync_start_* returns once the job is queued, the actual
@@ -1149,6 +1217,7 @@ export default function Browser({
           remoteCutPaths.push(src);
         }
       } catch (e) {
+        console.error("[paste] startSync failed", { src, error: String(e) });
         setError(String(e));
       }
     }
@@ -1176,10 +1245,11 @@ export default function Browser({
    *  validation; `handleCreateEntry` runs on submit. */
   const handleNewFile = () => {
     if (!path) return;
-    if (path.startsWith("sftp://")) {
-      setError("Creating files on remote hosts isn't supported yet.");
-      return;
-    }
+    // SFTP / FTP / SMB are all supported via clientCreateEmptyFile
+    // (Tauri-side conn_create_empty_file). The pre-0.2.265 gate
+    // here explicitly blocked sftp because no remote path existed
+    // at all; now every connection-backed kind routes through the
+    // appropriate write_bytes equivalent.
     const existing = new Set(entries.map((e) => e.name));
     let suggestion = "untitled.txt";
     let n = 2;
@@ -1208,12 +1278,26 @@ export default function Browser({
   const handleCreateEntry = async (name: string) => {
     if (!path || !newEntryDialog) return;
     const target = `${path}/${name}`;
-    if (newEntryDialog.kind === "folder") {
-      await clientMkdir(target);
-    } else {
-      await fsCreateEmptyFile(target);
+    const kind = newEntryDialog.kind;
+    console.log("[create-entry] start", { kind, target });
+    try {
+      if (kind === "folder") {
+        await clientMkdir(target);
+      } else {
+        // Backend-agnostic. Was `fsCreateEmptyFile` which is local-
+        // only; calling it with an `smb://…` target silently failed
+        // (no try/catch on the path) and the dialog dismissed
+        // without surfacing the error. Now we route through
+        // clientCreateEmptyFile (SFTP/FTP/SMB-aware) and surface
+        // any error in the page-level snackbar.
+        await clientCreateEmptyFile(target);
+      }
+      console.log("[create-entry] ok", { kind, target });
+      await refresh(path);
+    } catch (e) {
+      console.error("[create-entry] failed", { kind, target, error: String(e) });
+      setError(`Failed to create ${kind}: ${e}`);
     }
-    await refresh(path);
   };
 
   const totals = useMemo(() => {
@@ -1561,8 +1645,23 @@ export default function Browser({
       )}
       <BulkActionBar
         count={selectedPaths.length}
+        // Two-pane mode halves the bar's horizontal real estate, so
+        // its text+icon buttons start to wrap / overlap. Flip to
+        // icon-only + tooltips when settings say twoPaneMode is on.
+        // Single-pane keeps the original text-bearing layout.
+        dense={settings.twoPaneMode}
         onNewFolder={() => void handleNewFolder()}
         onNewFile={() => void handleNewFile()}
+        // Surface the file clipboard's pending-paste count as a
+        // first-class action-bar button so users don't have to
+        // right-click an empty area to discover it. `clipboardSnap`
+        // is the mirror state Browser keeps in sync with the
+        // util/fileClipboard module.
+        pasteCount={clipboardSnap?.paths.length ?? 0}
+        onPaste={() => {
+          const cb = getFileClipboard();
+          if (cb) void handlePaste(cb);
+        }}
         onClearSelection={() =>
           window.dispatchEvent(new CustomEvent("skiff:clear-selection"))
         }

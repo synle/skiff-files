@@ -8,11 +8,14 @@
 //! pick them up — `Backend::Ftp(...)`, `Backend::Smb(...)` slot in.
 
 use crate::fs::sftp::SftpClient;
+use crate::fs::smb::SmbConnection;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::UNIX_EPOCH;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 /// What the backend reports for a single path. Shared shape regardless
 /// of protocol so the cross-engine's conflict-resolution + skip-if-
@@ -25,13 +28,21 @@ pub struct PathMeta {
     pub is_symlink: bool,
 }
 
-/// Backend handle. The `Sftp` variant carries the registry's
-/// `Arc<SftpClient>` so the cross-engine doesn't have to thread the
+/// Backend handle. The `Sftp` / `Smb` variants carry the registry's
+/// `Arc<...>` so the cross-engine doesn't have to thread the
 /// connection registry through every call.
 #[derive(Clone)]
 pub enum Backend {
     Local,
     Sftp(Arc<SftpClient>),
+    /// SMB / Samba sink (0.2.26x). Wires in via `resolve_backend`'s
+    /// `smb://<uuid>/<path>` parser in `commands.rs`. The smb2 0.8
+    /// crate doesn't expose async streaming primitives — reads pull
+    /// the full file into memory, writes buffer until shutdown and
+    /// then flush via `client.write_bytes`. Adequate for the typical
+    /// file-explorer workload (<100 MB per file); larger files
+    /// should migrate to `write_file_streamed` once that lands here.
+    Smb(Arc<SmbConnection>),
 }
 
 impl Backend {
@@ -72,6 +83,19 @@ impl Backend {
                 // TODO(0.2.x): typed SFTP errors.
                 Err(_) => Ok(None),
             },
+            Backend::Smb(client) => match client.stat(path).await {
+                Ok(entry) => Ok(Some(PathMeta {
+                    size: entry.size,
+                    mtime: entry.mtime,
+                    is_dir: entry.is_dir,
+                    is_symlink: entry.is_symlink,
+                })),
+                // Same flattened-error caveat as SFTP — `stat` against
+                // a missing path returns Err("STATUS_OBJECT_NAME_NOT_
+                // FOUND" or similar). Treat all errors as "no existing
+                // dest" so the conflict checker just copies through.
+                Err(_) => Ok(None),
+            },
         }
     }
 
@@ -102,6 +126,17 @@ impl Backend {
                 B64.decode(b64)
                     .map_err(|e| format!("decode base64({path}): {e}"))
             }
+            Backend::Smb(client) => {
+                // Same base64 round-trip the SMB module exposes — the
+                // alternative (calling smb2 client.read_file directly)
+                // would need to crack open the mutex from outside the
+                // SmbConnection abstraction.
+                use base64::engine::general_purpose::STANDARD as B64;
+                use base64::Engine as _;
+                let b64 = client.read_base64(path, max_bytes).await?;
+                B64.decode(b64)
+                    .map_err(|e| format!("decode base64({path}): {e}"))
+            }
         }
     }
 
@@ -125,6 +160,17 @@ impl Backend {
                 }
                 client.write_full(path, data).await
             }
+            Backend::Smb(client) => {
+                // Same parent-dir-first rule as SFTP — the SMB server
+                // returns STATUS_OBJECT_PATH_NOT_FOUND on writes into a
+                // missing intermediate directory.
+                if let Some(parent) = parent_posix(path) {
+                    if !parent.is_empty() {
+                        client.mkdir(&parent).await?;
+                    }
+                }
+                client.write_bytes(path, data).await
+            }
         }
     }
 
@@ -134,6 +180,11 @@ impl Backend {
             Backend::Local => std::fs::create_dir_all(path)
                 .map_err(|e| format!("mkdir_p({path}): {e}")),
             Backend::Sftp(client) => client.mkdir(path).await,
+            // `SmbConnection::mkdir` already walks parents internally —
+            // it's idempotent against existing directories. Same
+            // shape as the SFTP path so the cross-engine doesn't need
+            // a special case.
+            Backend::Smb(client) => client.mkdir(path).await,
         }
     }
 
@@ -144,6 +195,7 @@ impl Backend {
             Backend::Local => std::fs::rename(from, to)
                 .map_err(|e| format!("rename({from} -> {to}): {e}")),
             Backend::Sftp(client) => client.rename(from, to).await,
+            Backend::Smb(client) => client.rename(from, to).await,
         }
     }
 
@@ -243,6 +295,22 @@ impl Backend {
                 let f = client.open_read(path).await?;
                 Ok(Box::pin(f))
             }
+            Backend::Smb(client) => {
+                // smb2 0.8 doesn't expose an async streaming reader —
+                // the only file-read primitive is `read_file` which
+                // returns the whole payload as `Vec<u8>`. Pull the
+                // bytes eagerly and hand back a Cursor-shaped
+                // `AsyncRead` so `tokio::io::copy` works unchanged.
+                // OK for typical sizes; revisit when we copy multi-GB
+                // files through SMB.
+                let data = client.read_base64(path, u64::MAX).await?;
+                use base64::engine::general_purpose::STANDARD as B64;
+                use base64::Engine as _;
+                let bytes = B64
+                    .decode(data)
+                    .map_err(|e| format!("decode base64({path}): {e}"))?;
+                Ok(Box::pin(SmbReader { buf: bytes, pos: 0 }))
+            }
         }
     }
 
@@ -264,6 +332,119 @@ impl Backend {
                 let f = client.open_write(path).await?;
                 Ok(Box::pin(f))
             }
+            Backend::Smb(client) => {
+                // smb2 0.8 doesn't expose AsyncWrite either —
+                // `write_file` takes the entire payload. Buffer
+                // every `poll_write` into RAM, flush via
+                // `write_bytes` on `poll_shutdown`. The cross-engine
+                // already calls shutdown right after copy_file
+                // finishes, so the flush lands deterministically.
+                Ok(Box::pin(SmbWriter {
+                    client: client.clone(),
+                    path: path.to_string(),
+                    buf: Vec::new(),
+                    write_future: None,
+                }))
+            }
+        }
+    }
+}
+
+/// Vec-backed reader used by `Backend::Smb::open_read`. Lives here
+/// (not in `fs/smb.rs`) so it stays scoped to the cross-engine — the
+/// SmbConnection API itself is whole-file-bytes; the adapter is only
+/// needed when feeding `tokio::io::copy`.
+struct SmbReader {
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl AsyncRead for SmbReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        dst: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let me = self.get_mut();
+        let remaining = me.buf.len() - me.pos;
+        let n = std::cmp::min(dst.remaining(), remaining);
+        if n == 0 {
+            return Poll::Ready(Ok(()));
+        }
+        dst.put_slice(&me.buf[me.pos..me.pos + n]);
+        me.pos += n;
+        Poll::Ready(Ok(()))
+    }
+}
+
+/// Buffered writer that accumulates every `poll_write` into a Vec
+/// then flushes the whole payload via `SmbConnection::write_bytes`
+/// on `poll_shutdown`. Tokio's `AsyncWriteExt::shutdown` is what the
+/// cross-engine's `copy_file` calls after the read-loop completes,
+/// so this is when the actual SMB write happens.
+struct SmbWriter {
+    client: Arc<SmbConnection>,
+    path: String,
+    buf: Vec<u8>,
+    /// In-flight write_bytes call. Stored across poll_shutdown
+    /// invocations so a Poll::Pending → re-poll keeps the same
+    /// future alive (otherwise we'd start a new write on every
+    /// re-poll and race ourselves).
+    write_future:
+        Option<Pin<Box<dyn Future<Output = Result<(), String>> + Send>>>,
+}
+
+impl AsyncWrite for SmbWriter {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        data: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let me = self.get_mut();
+        me.buf.extend_from_slice(data);
+        Poll::Ready(Ok(data.len()))
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        // Flush is a no-op until shutdown — we hold the payload in
+        // RAM and only send it once we know we're done writing.
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        if self.write_future.is_none() {
+            // DEBUG(paste-smb): flush kicks off here. Buffer size is
+            // the total bytes that came in through poll_write — the
+            // entire source file payload at this point.
+            eprintln!(
+                "[SmbWriter] shutdown -> write_bytes path={:?} bytes={}",
+                self.path,
+                self.buf.len()
+            );
+            let client = self.client.clone();
+            let path = self.path.clone();
+            let buf = std::mem::take(&mut self.buf);
+            self.write_future = Some(Box::pin(async move {
+                let r = client.write_bytes(&path, &buf).await;
+                eprintln!(
+                    "[SmbWriter] write_bytes result path={:?} ok={}",
+                    path,
+                    r.is_ok()
+                );
+                r
+            }));
+        }
+        let fut = self.write_future.as_mut().expect("set above");
+        match fut.as_mut().poll(cx) {
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::other(e))),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -326,6 +507,7 @@ pub async fn walk_files(
     match backend {
         Backend::Local => walk_local(Path::new(root)),
         Backend::Sftp(client) => walk_sftp(client, root).await,
+        Backend::Smb(client) => walk_smb(client, root).await,
     }
 }
 
@@ -384,6 +566,17 @@ async fn walk_sftp(
     // walker via a new public method on SftpClient. For Phase 0.2.0 we
     // re-use list_dir + manual recursion instead, since adding a new
     // public method to SftpClient ripples across more files.
+    //
+    // Single-file short-circuit (same shape as `walk_local` /
+    // `walk_smb`): without this, calling walk_sftp on a file path
+    // returns an empty list (list_dir on a non-directory is empty),
+    // the planner finds 0 files, and the copy silently no-ops —
+    // which is what broke paste from a remote source.
+    if let Ok(entry) = client.stat(root).await {
+        if !entry.is_dir {
+            return Ok(vec![(root.to_string(), entry.size, entry.mtime)]);
+        }
+    }
     let mut out = Vec::new();
     let mut stack: Vec<String> = vec![root.to_string()];
     use crate::fs::types::ListOptions;
@@ -408,6 +601,64 @@ async fn walk_sftp(
             }
         }
     }
+    Ok(out)
+}
+
+async fn walk_smb(
+    client: &Arc<SmbConnection>,
+    root: &str,
+) -> Result<Vec<(String, u64, Option<i64>)>, String> {
+    // DFS over list_dir, accumulating files. SmbConnection::list_dir
+    // returns paths relative to the share root (the connection was
+    // bound to a single share at connect time); the cross-engine
+    // treats those as absolute since the backend identity already
+    // encodes the share.
+    //
+    // Single-file short-circuit: paste iterates per-clipboard-entry,
+    // so each call lands here with `root` pointing at one file.
+    // Calling list_dir on a non-directory returns empty, the planner
+    // sees zero files, and the copy silently no-ops. Mirror
+    // `walk_local`'s pattern — stat the root first; if it's a file,
+    // return a single-element list. Same fix lives in `walk_sftp` so
+    // single-file paste works there too.
+    eprintln!("[walk_smb] enter root={:?}", root);
+    if let Ok(entry) = client.stat(root).await {
+        if !entry.is_dir {
+            eprintln!("[walk_smb] root is a file, returning single entry");
+            return Ok(vec![(root.to_string(), entry.size, entry.mtime)]);
+        }
+    }
+    let mut out = Vec::new();
+    let mut stack: Vec<String> = vec![root.to_string()];
+    use crate::fs::types::ListOptions;
+    while let Some(dir) = stack.pop() {
+        let listed = client
+            .list_dir(
+                &dir,
+                ListOptions {
+                    show_hidden: true,
+                },
+            )
+            .await;
+        let entries = match listed {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[walk_smb] list_dir({:?}) FAILED: {}", dir, e);
+                Vec::new()
+            }
+        };
+        for e in entries {
+            if e.is_symlink {
+                continue;
+            }
+            if e.is_dir {
+                stack.push(e.path);
+            } else {
+                out.push((e.path, e.size, e.mtime));
+            }
+        }
+    }
+    eprintln!("[walk_smb] done root={:?} files={}", root, out.len());
     Ok(out)
 }
 

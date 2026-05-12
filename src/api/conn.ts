@@ -75,6 +75,20 @@ export interface SmbConfig {
 export const connCreateSmb = (config: SmbConfig): Promise<string> =>
   invoke<string>("conn_create_smb", { config });
 
+/** Probe an SMB server for the list of disk shares the supplied
+ *  credentials can see. Used by the Connect dialog's Share-field
+ *  autocomplete — server-side opens a fresh session, calls
+ *  NetShareEnumAll, drops on return. The backend already filters
+ *  admin shares (`IPC$`, `ADMIN$`, `C$` …) so the caller doesn't
+ *  need to. Pass a placeholder `share` (e.g. ""); the backend
+ *  ignores it for the list path. */
+export const smbListShares = (
+  config: Omit<SmbConfig, "share"> & { share?: string },
+): Promise<string[]> =>
+  invoke<string[]>("smb_list_shares", {
+    config: { share: "", ...config },
+  });
+
 export const connDisconnect = (id: string): Promise<void> =>
   invoke<void>("conn_disconnect", { id });
 

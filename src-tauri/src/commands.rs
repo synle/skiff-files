@@ -1517,6 +1517,23 @@ pub async fn conn_create_smb(
     Ok(id)
 }
 
+/// Probe an SMB server for the list of disk shares the supplied
+/// credentials can see. Used by the Connect dialog's Share-field
+/// autocomplete: when host + user + password are filled but Share is
+/// empty, the frontend calls this to surface the server's actual
+/// shares rather than making the user remember the name.
+///
+/// Stateless — opens a fresh session, calls `srvsvc.NetShareEnumAll`,
+/// drops on return. Doesn't touch the connection registry. Admin
+/// shares (`IPC$`, `ADMIN$`, `C$` …) are filtered out by the smb2
+/// crate so the user only sees shares they can usefully browse.
+#[tauri::command]
+pub async fn smb_list_shares(
+    config: crate::fs::smb::SmbConfig,
+) -> FsResult<Vec<String>> {
+    crate::fs::smb::list_shares(config).await
+}
+
 /// Resolve the known-hosts file path under `app_data_dir()`. Mirrors
 /// `settings_path` but for SFTP host-key pinning state.
 fn known_hosts_path(app: &tauri::AppHandle) -> FsResult<std::path::PathBuf> {
@@ -1606,12 +1623,21 @@ pub async fn conn_list_dir(
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<Vec<Entry>> {
     let opts = options.unwrap_or_default();
-    match registry.get(&id).as_deref() {
+    eprintln!("[conn_list_dir] id={} path={:?}", id, path);
+    let r = match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.list_dir(&path, opts).await,
         Some(Connection::Ftp(client)) => client.list_dir(&path, opts).await,
         Some(Connection::Smb(client)) => client.list_dir(&path, opts).await,
         None => Err(format!("connection not found: {id}")),
-    }
+    };
+    eprintln!(
+        "[conn_list_dir] id={} path={:?} ok={} count={}",
+        id,
+        path,
+        r.is_ok(),
+        r.as_ref().map(|v| v.len()).unwrap_or(0)
+    );
+    r
 }
 
 #[tauri::command]
@@ -1620,12 +1646,15 @@ pub async fn conn_stat(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<Entry> {
-    match registry.get(&id).as_deref() {
+    eprintln!("[conn_stat] id={} path={:?}", id, path);
+    let r = match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.stat(&path).await,
         Some(Connection::Ftp(client)) => client.stat(&path).await,
         Some(Connection::Smb(client)) => client.stat(&path).await,
         None => Err(format!("connection not found: {id}")),
-    }
+    };
+    eprintln!("[conn_stat] id={} ok={}", id, r.is_ok());
+    r
 }
 
 #[tauri::command]
@@ -1685,12 +1714,15 @@ pub async fn conn_mkdir(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<()> {
-    match registry.get(&id).as_deref() {
+    eprintln!("[conn_mkdir] id={} path={:?}", id, path);
+    let r = match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.mkdir(&path).await,
         Some(Connection::Ftp(client)) => client.mkdir(&path).await,
         Some(Connection::Smb(client)) => client.mkdir(&path).await,
         None => Err(format!("connection not found: {id}")),
-    }
+    };
+    eprintln!("[conn_mkdir] id={} path={:?} ok={}", id, path, r.is_ok());
+    r
 }
 
 /// Remote rename / same-FS move.
@@ -1701,12 +1733,15 @@ pub async fn conn_rename(
     to: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<()> {
-    match registry.get(&id).as_deref() {
+    eprintln!("[conn_rename] id={} {:?} -> {:?}", id, from, to);
+    let r = match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.rename(&from, &to).await,
         Some(Connection::Ftp(client)) => client.rename(&from, &to).await,
         Some(Connection::Smb(client)) => client.rename(&from, &to).await,
         None => Err(format!("connection not found: {id}")),
-    }
+    };
+    eprintln!("[conn_rename] id={} ok={}", id, r.is_ok());
+    r
 }
 
 /// Remote remove. Recursive for directories. There's no "send to trash"
@@ -1718,12 +1753,40 @@ pub async fn conn_remove(
     path: String,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<()> {
-    match registry.get(&id).as_deref() {
+    eprintln!("[conn_remove] id={} path={:?}", id, path);
+    let r = match registry.get(&id).as_deref() {
         Some(Connection::Sftp(client)) => client.remove(&path).await,
         Some(Connection::Ftp(client)) => client.remove(&path).await,
         Some(Connection::Smb(client)) => client.remove(&path).await,
         None => Err(format!("connection not found: {id}")),
-    }
+    };
+    eprintln!("[conn_remove] id={} path={:?} ok={}", id, path, r.is_ok());
+    r
+}
+
+/// Create an empty file on a remote connection. Mirrors the local
+/// `fs_create_empty_file` for the New File dialog: same three
+/// connection kinds (SFTP / FTP / SMB) supported, all of which
+/// expose a "write these bytes to this path" method that accepts
+/// an empty slice.
+#[tauri::command]
+pub async fn conn_create_empty_file(
+    id: String,
+    path: String,
+    registry: State<'_, Arc<Registry>>,
+) -> FsResult<()> {
+    eprintln!("[conn_create_empty_file] id={} path={:?}", id, path);
+    let r = match registry.get(&id).as_deref() {
+        Some(Connection::Sftp(client)) => client.write_full(&path, &[]).await,
+        Some(Connection::Ftp(client)) => client.write_bytes(&path, &[]).await,
+        Some(Connection::Smb(client)) => client.write_bytes(&path, &[]).await,
+        None => Err(format!("connection not found: {id}")),
+    };
+    eprintln!(
+        "[conn_create_empty_file] id={} path={:?} ok={}",
+        id, path, r.is_ok()
+    );
+    r
 }
 
 // ---------- Sync commands (Phase 4a) ----------
@@ -1973,6 +2036,16 @@ pub fn sync_dedup(path: String) -> FsResult<DedupSummary> {
 /// to an FTP host in the Sidebar would silently treat the URL as
 /// a local path and surface a confusing "no such file" error
 /// instead of telling the user the slice isn't shipped.
+/// Debug-only label for a Backend variant — used by the
+/// `[sync_start_cross]` traces. Not user-visible.
+fn backend_kind(b: &Backend) -> &'static str {
+    match b {
+        Backend::Local => "local",
+        Backend::Sftp(_) => "sftp",
+        Backend::Smb(_) => "smb",
+    }
+}
+
 fn resolve_backend(
     path: &str,
     fs_registry: &Registry,
@@ -1989,6 +2062,23 @@ fn resolve_backend(
         };
         let client = fs_registry.get_sftp(id)?;
         Ok((Backend::Sftp(client), remote_path.to_string()))
+    } else if let Some(rest) = path.strip_prefix("smb://") {
+        // Mirror of the SFTP branch — split `<uuid>/<path-in-share>`,
+        // fetch the live SMB connection from the registry, return it
+        // as a `Backend::Smb`. The remote_path is share-relative
+        // (everything after the connection id); `SmbConnection`
+        // strips a leading slash internally so leaving it on is fine.
+        let slash = rest.find('/');
+        let id = match slash {
+            Some(i) => &rest[..i],
+            None => rest,
+        };
+        let remote_path = match slash {
+            Some(i) => &rest[i..],
+            None => "/",
+        };
+        let client = fs_registry.get_smb(id)?;
+        Ok((Backend::Smb(client), remote_path.to_string()))
     } else if path.starts_with("ftp://") {
         Err(
             "Skiffsync transfers to or from FTP aren't supported yet — \
@@ -2025,6 +2115,13 @@ pub fn sync_start_cross(
         verify_after_copy: false,
     });
     let id = Uuid::new_v4().to_string();
+    // DEBUG(paste-smb): log every cross-sync invocation so we can see
+    // the src/dest URLs landing in Rust. Remove once SMB paste is
+    // verified end-to-end.
+    eprintln!(
+        "[sync_start_cross] id={} src={:?} dest={:?}",
+        id, src, dest
+    );
     let info = JobInfo {
         id: id.clone(),
         src: src.clone(),
@@ -2043,8 +2140,16 @@ pub fn sync_start_cross(
         // Resolve both sides up front. Errors surface as sync:error so
         // the UI can show the connection-id-not-found / etc. message.
         let (src_backend, src_path) = match resolve_backend(&src, &fs_registry_arc) {
-            Ok(p) => p,
+            Ok(p) => {
+                eprintln!(
+                    "[sync_start_cross] resolved src: kind={} path={:?}",
+                    backend_kind(&p.0),
+                    p.1
+                );
+                p
+            }
             Err(e) => {
+                eprintln!("[sync_start_cross] resolve src FAILED: {}", e);
                 jobs_arc.set_state(&id_for_plan, JobState::Failed);
                 let _ = app_for_plan.emit(
                     "sync:error",
@@ -2054,8 +2159,16 @@ pub fn sync_start_cross(
             }
         };
         let (dest_backend, dest_path) = match resolve_backend(&dest, &fs_registry_arc) {
-            Ok(p) => p,
+            Ok(p) => {
+                eprintln!(
+                    "[sync_start_cross] resolved dest: kind={} path={:?}",
+                    backend_kind(&p.0),
+                    p.1
+                );
+                p
+            }
             Err(e) => {
+                eprintln!("[sync_start_cross] resolve dest FAILED: {}", e);
                 jobs_arc.set_state(&id_for_plan, JobState::Failed);
                 let _ = app_for_plan.emit(
                     "sync:error",

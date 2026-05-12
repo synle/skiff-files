@@ -705,6 +705,14 @@ export default function TransfersPage() {
                   j.info.state === "running" || j.info.state === "planning";
                 const paused = j.info.state === "paused";
                 const inFlight = running || paused;
+                // Terminal — kills the indeterminate spinner +
+                // "0 of 0 files" placeholder on jobs the backend
+                // already wrapped up (especially SMB jobs that
+                // skipped emitting per-file progress events).
+                const isDone =
+                  j.info.state === "done" ||
+                  j.info.state === "cancelled" ||
+                  j.info.state === "failed";
                 const buf = samplesRef.current[j.info.id] ?? [];
                 const eta = computeEta(buf, p?.bytesTotal);
                 return (
@@ -727,6 +735,7 @@ export default function TransfersPage() {
                       onResume={paused ? () => void handleResume(j.info.id) : undefined}
                       onCancel={inFlight ? () => void handleCancel(j.info.id) : undefined}
                       error={j.error ?? null}
+                      done={isDone}
                     />
                     {j.summary && (
                       <Typography
