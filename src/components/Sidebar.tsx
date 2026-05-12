@@ -1778,16 +1778,12 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                 <Tooltip title={tooltip} placement="right">
                 <ListItemButton
                   onClick={() => {
-                    // Always switch to the browser page before
-                    // navigating — when the user is on Settings /
-                    // Transfers / Manage Connections, `onNavigate`
-                    // alone updates the (hidden) Browser tab's path
-                    // but leaves the visible page on the current
-                    // non-browser route. The user then has to click
-                    // the host a second time before the page itself
-                    // flips. Fire both calls so a single click is
-                    // sufficient regardless of which page is active.
-                    onSwitchPage("browser");
+                    // App.tsx's `onNavigate` already handles the
+                    // page switch + navigate-event dispatch (with
+                    // the setTimeout(0) deferral that kills the
+                    // first-click-lost race when coming from
+                    // Settings). No need to call onSwitchPage
+                    // explicitly here.
                     onNavigate(`${scheme}://${c.id}/`);
                   }}
                   // Drag-drop target: dropping a Skiff selection here

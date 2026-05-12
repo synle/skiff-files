@@ -89,6 +89,14 @@ interface Props {
    *  Global window listeners (drag-drop, Delete, Cmd/Ctrl+F, sidebar
    *  navigate event) skip themselves so only the visible tab acts. */
   isActive?: boolean;
+  /** Two-pane mode: true iff this Browser sits inside the focused
+   *  pane. Distinct from `isActive` (which only flips with tab
+   *  switching). The NAVIGATE_EVENT listener checks this so a
+   *  sidebar Home click only navigates the focused pane — clicking
+   *  rows / using keyboard shortcuts inside the non-focused pane
+   *  still works, only window-level "go here" events are gated.
+   *  Defaults to true so single-pane callers keep their behavior. */
+  isPaneFocused?: boolean;
   /** Fires when the active path changes (navigation, back, forward,
    *  sidebar drop). Tab strip uses it to keep tab labels in sync. */
   onPathChange?: (path: string) => void;
@@ -107,6 +115,7 @@ interface History {
 export default function Browser({
   initialPath,
   isActive = true,
+  isPaneFocused = true,
   onPathChange,
 }: Props) {
   const { settings, update } = useSettings();
@@ -501,16 +510,39 @@ export default function Browser({
   // Listen for sidebar-driven navigations. Decoupling via a window event keeps
   // the Sidebar from needing a reference to setHistory. Only the active tab
   // responds — otherwise N tabs would all jump on a single sidebar click.
+  //
+  // Two-pane mode adds a second gate: the dispatched detail carries
+  // `pane` ("main" | "right"); a Browser only acts when its pane
+  // matches. Without this, a sidebar Home click navigates both
+  // panes simultaneously — exactly the bug image #67 showed.
+  // Legacy callers may still dispatch a raw-string detail (pre-
+  // two-pane code path); treat those as pane-agnostic.
   useEffect(() => {
     if (!isActive) return;
     const onExternalNavigate = (e: Event) => {
-      const detail = (e as CustomEvent<string>).detail;
-      if (detail) {
-        setHistory((h) => {
-          if (detail === h.back[h.back.length - 1]) return h;
-          return { back: [...h.back, detail], forward: [] };
-        });
+      const raw = (e as CustomEvent<unknown>).detail;
+      // Accept both shapes: legacy bare-string path, and the new
+      // `{ path, pane }` object dispatches from App.tsx / palette.
+      let target: string | null = null;
+      let targetPane: "main" | "right" | null = null;
+      if (typeof raw === "string") {
+        target = raw;
+      } else if (raw && typeof raw === "object") {
+        const obj = raw as { path?: unknown; pane?: unknown };
+        if (typeof obj.path === "string") target = obj.path;
+        if (obj.pane === "main" || obj.pane === "right")
+          targetPane = obj.pane;
       }
+      if (!target) return;
+      // If the event names a target pane and this Browser isn't in
+      // the focused pane, ignore — the other pane's Browser will
+      // pick it up. Single-pane mode passes isPaneFocused=true so
+      // it always handles dispatches.
+      if (targetPane && !isPaneFocused) return;
+      setHistory((h) => {
+        if (target === h.back[h.back.length - 1]) return h;
+        return { back: [...h.back, target!], forward: [] };
+      });
     };
     window.addEventListener(NAVIGATE_EVENT, onExternalNavigate);
     // Command-palette dispatched events — the active Browser
@@ -605,8 +637,13 @@ export default function Browser({
     };
     // handleNewFolder is stable enough — re-binding on every render
     // would also be acceptable since these are window-level events.
+    // isPaneFocused is in the deps so the listener re-binds when the
+    // user clicks between panes (so the new closure captures the new
+    // value of isPaneFocused). Without it, focusing the right pane
+    // wouldn't take effect for the NAVIGATE_EVENT gate until some
+    // other dep changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, path, refresh, entries]);
+  }, [isActive, isPaneFocused, path, refresh, entries]);
 
   // OS-level drag-and-drop. Tauri emits a unified event for enter / over
   // / drop / leave. On drop, we route each dropped path through
@@ -1608,6 +1645,11 @@ export default function Browser({
       )}
       <BulkActionBar
         count={selectedPaths.length}
+        // Two-pane mode halves the bar's horizontal real estate, so
+        // its text+icon buttons start to wrap / overlap. Flip to
+        // icon-only + tooltips when settings say twoPaneMode is on.
+        // Single-pane keeps the original text-bearing layout.
+        dense={settings.twoPaneMode}
         onNewFolder={() => void handleNewFolder()}
         onNewFile={() => void handleNewFile()}
         // Surface the file clipboard's pending-paste count as a

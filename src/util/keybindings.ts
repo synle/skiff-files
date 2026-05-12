@@ -51,6 +51,21 @@ function normalizeKey(key: string, code: string): string {
   if (code === "Equal") return "=";
   if (code === "Quote") return "'";
   if (code === "Semicolon") return ";";
+  // Shifted-symbol normalization for callers that emit only `key`
+  // (no `code`) — fireEvent in tests, some WebView bridges, certain
+  // remote KVMs. Without these the binding ctrl+shift+. wouldn't
+  // match a real keypress that emits `key=">"` because the engine
+  // got the shifted character before `code` was set.
+  if (k === ">") return ".";
+  if (k === "<") return ",";
+  if (k === "?") return "/";
+  if (k === "|") return "\\";
+  if (k === "{") return "[";
+  if (k === "}") return "]";
+  if (k === "_") return "-";
+  if (k === "+") return "=";
+  if (k === '"') return "'";
+  if (k === ":") return ";";
   return k;
 }
 

@@ -12,8 +12,10 @@
 import {
   Box,
   Button,
+  IconButton,
   Menu,
   MenuItem,
+  Tooltip,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
@@ -42,6 +44,12 @@ interface Props {
    *  passing 0. */
   pasteCount?: number;
   onPaste?: () => void;
+  /** Compact form — icons only, tooltips for the label. Set in
+   *  two-pane mode so the bar's buttons don't overflow when the
+   *  full pane width is half the window. Single-pane mode renders
+   *  the original icon+text form. Tooltips are added to BOTH
+   *  forms so the icon-only state stays self-documenting. */
+  dense?: boolean;
   /** Clear the current multi-selection. Surfaces a Clear button
    *  next to New file whenever 1+ rows are picked. Re-added in
    *  0.2.256 after 0.2.253 dropped it — outside-row click is still
@@ -74,6 +82,7 @@ export default function BulkActionBar({
   onNewFile,
   pasteCount,
   onPaste,
+  dense,
   onClearSelection,
   onCopy,
   onCut,
@@ -86,6 +95,57 @@ export default function BulkActionBar({
   const [tagAnchor, setTagAnchor] = useState<HTMLElement | null>(null);
   const hasMultiSelection = count >= 2;
   const hasSelection = count >= 1;
+  // Single render helper for every text+icon action so the dense
+  // (icon-only-with-tooltip) and the regular form stay in sync.
+  // Tooltips wrap BOTH variants — even with the label visible,
+  // pointer-hovering surfaces the keyboard hint / longer
+  // description if we ever attach one. Variant defaults to "text".
+  const ActionButton = ({
+    label,
+    icon,
+    onClick,
+    color,
+    variant,
+    onClickCapture,
+  }: {
+    label: string;
+    icon: React.ReactNode;
+    onClick?: (e: React.MouseEvent<HTMLElement>) => void;
+    color?: "error" | "primary" | "inherit";
+    variant?: "text" | "outlined" | "contained";
+    onClickCapture?: (e: React.MouseEvent<HTMLElement>) => void;
+  }) => {
+    if (dense) {
+      return (
+        <Tooltip title={label}>
+          <IconButton
+            size="small"
+            onClick={onClick}
+            onClickCapture={onClickCapture}
+            color={color}
+            aria-label={label}
+          >
+            {icon}
+          </IconButton>
+        </Tooltip>
+      );
+    }
+    return (
+      <Tooltip title={label}>
+        <Button
+          size="small"
+          variant={variant ?? "text"}
+          color={color}
+          startIcon={icon}
+          onClick={onClick}
+          onClickCapture={onClickCapture}
+          sx={TIGHT_ICON_SX}
+        >
+          {label}
+        </Button>
+      </Tooltip>
+    );
+  };
   return (
     <Box
       sx={{
@@ -109,107 +169,77 @@ export default function BulkActionBar({
           is empty so it doesn't take up bar real estate during
           normal browsing. */}
       {pasteCount != null && pasteCount > 0 && onPaste && (
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<ContentPasteIcon fontSize="small" />}
+        <ActionButton
+          label={`Paste ${pasteCount} item${pasteCount === 1 ? "" : "s"}`}
+          icon={<ContentPasteIcon fontSize="small" />}
           onClick={onPaste}
-          sx={TIGHT_ICON_SX}
-        >
-          Paste {pasteCount} item{pasteCount === 1 ? "" : "s"}
-        </Button>
+          variant="outlined"
+        />
       )}
       {onNewFolder && (
-        <Button
-          size="small"
-          startIcon={<CreateNewFolderIcon fontSize="small" />}
+        <ActionButton
+          label="New folder"
+          icon={<CreateNewFolderIcon fontSize="small" />}
           onClick={onNewFolder}
-          sx={TIGHT_ICON_SX}
-        >
-          New folder
-        </Button>
+        />
       )}
       {onNewFile && (
-        <Button
-          size="small"
-          startIcon={<NoteAddIcon fontSize="small" />}
+        <ActionButton
+          label="New file"
+          icon={<NoteAddIcon fontSize="small" />}
           onClick={onNewFile}
-          sx={TIGHT_ICON_SX}
-        >
-          New file
-        </Button>
+        />
       )}
       {hasSelection && onClearSelection && (
-        <Button
-          size="small"
-          startIcon={<ClearIcon fontSize="small" />}
+        <ActionButton
+          label="Clear"
+          icon={<ClearIcon fontSize="small" />}
           onClick={onClearSelection}
-          sx={TIGHT_ICON_SX}
-        >
-          Clear
-        </Button>
+        />
       )}
       <Box sx={{ flex: 1 }} />
       {hasMultiSelection && onCopy && (
-        <Button
-          size="small"
-          startIcon={<ContentCopyIcon fontSize="small" />}
+        <ActionButton
+          label="Copy"
+          icon={<ContentCopyIcon fontSize="small" />}
           onClick={onCopy}
-          sx={TIGHT_ICON_SX}
-        >
-          Copy
-        </Button>
+        />
       )}
       {hasMultiSelection && onCut && (
-        <Button
-          size="small"
-          startIcon={<ContentCutIcon fontSize="small" />}
+        <ActionButton
+          label="Cut"
+          icon={<ContentCutIcon fontSize="small" />}
           onClick={onCut}
-          sx={TIGHT_ICON_SX}
-        >
-          Cut
-        </Button>
+        />
       )}
       {hasMultiSelection && onCompress && (
-        <Button
-          size="small"
-          startIcon={<ArchiveIcon fontSize="small" />}
+        <ActionButton
+          label="Compress"
+          icon={<ArchiveIcon fontSize="small" />}
           onClick={onCompress}
-          sx={TIGHT_ICON_SX}
-        >
-          Compress
-        </Button>
+        />
       )}
       {hasMultiSelection && onBulkRename && (
-        <Button
-          size="small"
-          startIcon={<EditIcon fontSize="small" />}
+        <ActionButton
+          label="Rename"
+          icon={<EditIcon fontSize="small" />}
           onClick={onBulkRename}
-          sx={TIGHT_ICON_SX}
-        >
-          Rename
-        </Button>
+        />
       )}
       {hasMultiSelection && onSaveSelectionGroup && (
-        <Button
-          size="small"
-          startIcon={<SaveIcon fontSize="small" />}
+        <ActionButton
+          label="Save group"
+          icon={<SaveIcon fontSize="small" />}
           onClick={onSaveSelectionGroup}
-          sx={TIGHT_ICON_SX}
-        >
-          Save group
-        </Button>
+        />
       )}
       {hasMultiSelection && onSetTag && (
         <>
-          <Button
-            size="small"
-            startIcon={<LocalOfferIcon fontSize="small" />}
-            onClick={(e) => setTagAnchor(e.currentTarget)}
-            sx={TIGHT_ICON_SX}
-          >
-            Tag
-          </Button>
+          <ActionButton
+            label="Tag"
+            icon={<LocalOfferIcon fontSize="small" />}
+            onClick={(e) => setTagAnchor(e.currentTarget as HTMLElement)}
+          />
           <Menu
             open={tagAnchor != null}
             anchorEl={tagAnchor}
@@ -249,15 +279,12 @@ export default function BulkActionBar({
         </>
       )}
       {hasMultiSelection && onDelete && (
-        <Button
-          size="small"
-          color="error"
-          startIcon={<DeleteIcon fontSize="small" />}
+        <ActionButton
+          label="Delete"
+          icon={<DeleteIcon fontSize="small" />}
           onClick={onDelete}
-          sx={TIGHT_ICON_SX}
-        >
-          Delete
-        </Button>
+          color="error"
+        />
       )}
     </Box>
   );
