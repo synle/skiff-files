@@ -58,7 +58,7 @@ jobs:
             libssl-dev
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci || npm install --no-fund --prefer-offline
 
       - name: Run frontend tests
         run: npm test
@@ -123,7 +123,7 @@ jobs:
             libssl-dev
 
       - name: Install npm dependencies
-        run: npm install
+        run: npm ci || npm install --no-fund --prefer-offline
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

@@ -1,6 +1,6 @@
 {
   "name": "skiff-files",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Skiff Files — fast cross-platform file explorer with FTP / SFTP / SMB and a smart-sync engine. Tauri v2 + React 19.",
   "private": true,
   "scripts": {
