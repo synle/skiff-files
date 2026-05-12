@@ -53,6 +53,7 @@ The "Backlog" section at the bottom of TODO.md is explicitly deferred. **Do not 
 - Saved-data types ship with all five surfaces (sidebar / drag / right-click / palette / Settings) — see ARCHITECTURE.md.
 - Rebindable shortcuts go through `matchesCombo(e, activeCombo(...))`, not raw `e.key`.
 - Cross-component actions go through window CustomEvents (`skiff:*`), not prop-drilling.
+- New fs verbs go through `dispatchByLocation(path, { local, remote })` in `src/api/client.ts` — never hand-roll a `if (kind === "sftp" || …)` branch per verb. See ARCHITECTURE.md → "Routing model" for the contract.
 
 UI affordances: smoke-test in `npx tauri dev` and watch the pixels change. Typecheck + Vitest pass on bindings that don't flow through.
 
