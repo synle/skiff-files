@@ -14,6 +14,10 @@ const mockedListen = vi.mocked(listen);
 beforeEach(() => {
   mockedInvoke.mockClear();
   mockedListen.mockClear();
+  // SettingsProvider reads operationsDrawerExpanded from localStorage on
+  // mount; clearing keeps each test starting from defaults (expanded=true)
+  // so collapsed-drawer state doesn't leak across cases.
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -120,6 +124,63 @@ describe("OperationsDrawer", () => {
     const allBtns = await waitFor(() => screen.getAllByLabelText(/operations drawer/i));
     fireEvent.click(allBtns[0]);
     expect(screen.getByText(/operation/i)).toBeInTheDocument();
+  });
+
+  it("renders multiple in-flight jobs as an accordion (one expanded at a time)", async () => {
+    mockedInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "sync_list") {
+        return [
+          { id: "job-a", src: "/src/a", dest: "/dest/a", state: "running" },
+          { id: "job-b", src: "/src/b", dest: "/dest/b", state: "running" },
+          { id: "job-c", src: "/src/c", dest: "/dest/c", state: "running" },
+        ];
+      }
+      return null;
+    });
+    await act(async () => {
+      r();
+    });
+    // All three rows render as accordion summaries.
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Toggle /src/a → /dest/a"),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByLabelText("Toggle /src/b → /dest/b"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Toggle /src/c → /dest/c"),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking another accordion summary collapses the previous one", async () => {
+    mockedInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "sync_list") {
+        return [
+          { id: "job-a", src: "/src/a", dest: "/dest/a", state: "running" },
+          { id: "job-b", src: "/src/b", dest: "/dest/b", state: "running" },
+        ];
+      }
+      return null;
+    });
+    await act(async () => {
+      r();
+    });
+    // The first job seeds as open. Asserting via aria-expanded keeps
+    // the check independent of MUI's internal class names.
+    const summaryA = await waitFor(() =>
+      screen.getByLabelText("Toggle /src/a → /dest/a"),
+    );
+    const summaryB = screen.getByLabelText("Toggle /src/b → /dest/b");
+    expect(summaryA.getAttribute("aria-expanded")).toBe("true");
+    expect(summaryB.getAttribute("aria-expanded")).toBe("false");
+    // Clicking B opens it AND closes A — accordion semantics.
+    fireEvent.click(summaryB);
+    await waitFor(() => {
+      expect(summaryB.getAttribute("aria-expanded")).toBe("true");
+    });
+    expect(summaryA.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("Hide button drops the drawer until a new job emits", async () => {
