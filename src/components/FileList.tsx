@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { Box, Typography, Checkbox } from "@mui/material";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -33,7 +34,13 @@ import {
 import { startNativeDrag } from "../api/drag";
 import { TAG_COLORS, tagColorHex } from "../util/tagColors";
 import type { TagColor } from "../state/settings";
-import type { Density, ShowExtensions, ViewMode } from "../state/settings";
+import {
+  LIST_COL_WIDTH_MAX,
+  LIST_COL_WIDTH_MIN,
+  type Density,
+  type ShowExtensions,
+  type ViewMode,
+} from "../state/settings";
 
 export type SortKey = "name" | "size" | "mtime" | "ctime" | "kind" | "tag";
 export type SortDir = "asc" | "desc";
@@ -115,6 +122,15 @@ interface Props {
   /** Per-column visibility for list view. Name is always shown;
    *  the other three are individually hideable. */
   hideColumns?: { size?: boolean; modified?: boolean; kind?: boolean };
+  /** Per-column pixel widths for list view. Drag the right edge of
+   *  any column header to resize; `onColumnResize` fires with the new
+   *  clamped width on every mousemove. Omitted columns fall back to
+   *  built-in defaults so existing callers / tests still work. */
+  columnWidths?: { size?: number; modified?: number; kind?: number };
+  /** Called when the user drags a column header divider. Receives
+   *  the column id + the new clamped pixel width. Parent persists
+   *  to settings; no debounce needed (`update` is cheap). */
+  onColumnResize?: (column: "size" | "modified" | "kind", width: number) => void;
   /** Visual layout. `list` is the virtualized list (default); other
    *  modes render a non-virtualized grid of cards (tile = small
    *  icons, gallery = larger icons / thumbs, column = wide rows).
@@ -356,12 +372,18 @@ function HeaderCell({
   dir,
   onClick,
   width,
+  onResizeStart,
 }: {
   label: string;
   active: boolean;
   dir: SortDir;
   onClick: () => void;
   width: CSSProperties["width"];
+  /** When provided, a 4 px col-resize handle is rendered at the right
+   *  edge of the header. The parent owns the drag math + width
+   *  persistence; this component just emits the mousedown event so
+   *  the handler can attach window listeners. */
+  onResizeStart?: (e: ReactMouseEvent<HTMLDivElement>) => void;
 }) {
   const Arrow = dir === "asc" ? ArrowUpwardIcon : ArrowDownwardIcon;
   return (
@@ -381,8 +403,10 @@ function HeaderCell({
         display: "inline-flex",
         alignItems: "center",
         gap: 0.5,
+        position: "relative",
         "&:hover": { color: "text.primary" },
         "&:hover .sort-indicator-hint": { opacity: 0.4 },
+        "&:hover .col-resize-handle": { opacity: 1 },
       }}
     >
       <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -407,6 +431,32 @@ function HeaderCell({
           />
         )}
       </Box>
+      {onResizeStart && (
+        <Box
+          className="col-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize ${label} column`}
+          onMouseDown={(e) => {
+            // Stop the parent's onClick (which toggles sort) from
+            // firing on the click that started the drag.
+            e.stopPropagation();
+            onResizeStart(e);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            right: -2,
+            width: 6,
+            cursor: "col-resize",
+            opacity: 0,
+            bgcolor: "primary.main",
+            transition: "opacity 120ms",
+          }}
+        />
+      )}
     </Box>
   );
 }
@@ -1215,10 +1265,51 @@ export default function FileList(props: Props) {
     customFileKinds = {},
     dateFormat = "locale",
     hideColumns = {},
+    columnWidths = {},
+    onColumnResize,
     view = "list",
     path,
     onRename,
   } = props;
+  const colWidth = {
+    size: columnWidths.size ?? 96,
+    modified: columnWidths.modified ?? 180,
+    kind: columnWidths.kind ?? 120,
+  };
+
+  /** Build a mousedown handler for the column-resize handle of one
+   *  column. Captures the starting width + clientX so mousemove can
+   *  compute the new width without re-reading layout. Window-level
+   *  listeners are detached on mouseup; cursor + user-select are
+   *  locked across the document for the duration so the mouse can
+   *  leave the handle mid-drag without ending the drag.  */
+  const startColumnResize = useCallback(
+    (column: "size" | "modified" | "kind") =>
+      (evt: ReactMouseEvent<HTMLDivElement>) => {
+        if (!onColumnResize) return;
+        const startX = evt.clientX;
+        const startWidth = colWidth[column];
+        const onMove = (e: MouseEvent) => {
+          const raw = startWidth + (e.clientX - startX);
+          const clamped = Math.max(
+            LIST_COL_WIDTH_MIN,
+            Math.min(LIST_COL_WIDTH_MAX, raw),
+          );
+          onColumnResize(column, clamped);
+        };
+        const onUp = () => {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+          document.body.style.userSelect = "";
+          document.body.style.cursor = "";
+        };
+        document.body.style.userSelect = "none";
+        document.body.style.cursor = "col-resize";
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+      },
+    [colWidth, onColumnResize],
+  );
 
   /** Inline rename state. `renamingPath` is the entry currently being
    *  edited; `renameDraft` is the in-progress name. F2 starts the
@@ -1996,7 +2087,8 @@ export default function FileList(props: Props) {
             active={sortKey === "size"}
             dir={sortDir}
             onClick={() => onSortChange("size")}
-            width={96}
+            width={colWidth.size}
+            onResizeStart={onColumnResize ? startColumnResize("size") : undefined}
           />
         )}
         {!hideColumns.modified && (
@@ -2005,7 +2097,10 @@ export default function FileList(props: Props) {
             active={sortKey === "mtime"}
             dir={sortDir}
             onClick={() => onSortChange("mtime")}
-            width={180}
+            width={colWidth.modified}
+            onResizeStart={
+              onColumnResize ? startColumnResize("modified") : undefined
+            }
           />
         )}
         {!hideColumns.kind && (
@@ -2014,7 +2109,8 @@ export default function FileList(props: Props) {
             active={sortKey === "kind"}
             dir={sortDir}
             onClick={() => onSortChange("kind")}
-            width={120}
+            width={colWidth.kind}
+            onResizeStart={onColumnResize ? startColumnResize("kind") : undefined}
           />
         )}
       </Box>
@@ -2384,7 +2480,7 @@ export default function FileList(props: Props) {
                     <Typography
                       variant="body2"
                       color="text.secondary"
-                      sx={{ width: 96, px: 1 }}
+                      sx={{ width: colWidth.size, flexShrink: 0, px: 1 }}
                       title={
                         e.isDir && folderSizes[e.path] != null
                           ? `Recursive size: ${formatBytes(folderSizes[e.path])}`
@@ -2402,7 +2498,7 @@ export default function FileList(props: Props) {
                     <Typography
                       variant="body2"
                       color="text.secondary"
-                      sx={{ width: 180, px: 1 }}
+                      sx={{ width: colWidth.modified, flexShrink: 0, px: 1 }}
                       noWrap
                       title={formatMtimeRelative(e.mtime)}
                     >
@@ -2413,7 +2509,7 @@ export default function FileList(props: Props) {
                     <Typography
                       variant="body2"
                       color="text.secondary"
-                      sx={{ width: 120, px: 1 }}
+                      sx={{ width: colWidth.kind, flexShrink: 0, px: 1 }}
                       noWrap
                     >
                       {e.kind}

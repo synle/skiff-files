@@ -128,6 +128,104 @@ describe("FileList", () => {
     expect(onSortChange).toHaveBeenCalledWith("size");
   });
 
+  it("dragging a column resize handle fires onColumnResize with clamped width", () => {
+    const onColumnResize = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <div style={{ height: 600 }}>
+          <FileList
+            entries={ENTRIES}
+            sortKey="name"
+            sortDir="asc"
+            onSortChange={vi.fn()}
+            onOpenDir={vi.fn()}
+            onPrimarySelect={vi.fn()}
+            onSelectionChange={vi.fn()}
+            isActive
+            density="comfortable"
+            showExtensions="always"
+            groupFoldersFirst
+            columnWidths={{ size: 96, modified: 180, kind: 120 }}
+            onColumnResize={onColumnResize}
+          />
+        </div>
+      </ThemeProvider>,
+    );
+    const handle = screen.getByLabelText("Resize Size column");
+    fireEvent.mouseDown(handle, { clientX: 200 });
+    fireEvent(window, new MouseEvent("mousemove", { clientX: 250 }));
+    // 96 + (250 - 200) = 146 — well inside [60, 400] clamp.
+    expect(onColumnResize).toHaveBeenLastCalledWith("size", 146);
+    fireEvent(window, new MouseEvent("mouseup"));
+  });
+
+  it("column resize clamps the new width to LIST_COL_WIDTH_MIN/MAX", () => {
+    const onColumnResize = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <div style={{ height: 600 }}>
+          <FileList
+            entries={ENTRIES}
+            sortKey="name"
+            sortDir="asc"
+            onSortChange={vi.fn()}
+            onOpenDir={vi.fn()}
+            onPrimarySelect={vi.fn()}
+            onSelectionChange={vi.fn()}
+            isActive
+            density="comfortable"
+            showExtensions="always"
+            groupFoldersFirst
+            columnWidths={{ size: 96, modified: 180, kind: 120 }}
+            onColumnResize={onColumnResize}
+          />
+        </div>
+      </ThemeProvider>,
+    );
+    const handle = screen.getByLabelText("Resize Size column");
+    fireEvent.mouseDown(handle, { clientX: 200 });
+    // Yank far to the left — 96 + (-500) = -404 → clamps to 60.
+    fireEvent(window, new MouseEvent("mousemove", { clientX: -300 }));
+    expect(onColumnResize).toHaveBeenLastCalledWith("size", 60);
+    // Yank far to the right — 96 + 9999 → clamps to 400.
+    fireEvent(window, new MouseEvent("mousemove", { clientX: 10000 }));
+    expect(onColumnResize).toHaveBeenLastCalledWith("size", 400);
+    fireEvent(window, new MouseEvent("mouseup"));
+  });
+
+  it("resize handle mousedown does NOT trigger the header's sort onClick", () => {
+    const onSortChange = vi.fn();
+    const onColumnResize = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <div style={{ height: 600 }}>
+          <FileList
+            entries={ENTRIES}
+            sortKey="name"
+            sortDir="asc"
+            onSortChange={onSortChange}
+            onOpenDir={vi.fn()}
+            onPrimarySelect={vi.fn()}
+            onSelectionChange={vi.fn()}
+            isActive
+            density="comfortable"
+            showExtensions="always"
+            groupFoldersFirst
+            columnWidths={{ size: 96, modified: 180, kind: 120 }}
+            onColumnResize={onColumnResize}
+          />
+        </div>
+      </ThemeProvider>,
+    );
+    const handle = screen.getByLabelText("Resize Size column");
+    // mousedown on the handle starts the drag — click on the handle
+    // must not bubble up to the column header's sort click.
+    fireEvent.mouseDown(handle);
+    fireEvent.click(handle);
+    fireEvent(window, new MouseEvent("mouseup"));
+    expect(onSortChange).not.toHaveBeenCalled();
+  });
+
   it("double-clicking a folder calls onOpenDir", () => {
     const { onOpenDir } = renderList();
     const folderRow = screen

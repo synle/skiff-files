@@ -133,6 +133,52 @@ describe("App", () => {
     expect(stored.showHidden).toBe(true);
   });
 
+  it("two-pane mode renders a draggable split-bar separator", async () => {
+    // Enable two-pane mode before mount so the divider is in the tree.
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({ twoPaneMode: true }),
+    );
+    render(frame("/"));
+    const sep = await screen.findByRole("separator", { name: /Resize panes/ });
+    expect(sep).toBeInTheDocument();
+  });
+
+  it("dragging the split-bar updates settings.twoPaneSplitRatio", async () => {
+    // Container's getBoundingClientRect is mocked to width=800 (above).
+    // Dragging the divider to clientX=600 → ratio = 600/800 = 0.75.
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({ twoPaneMode: true, twoPaneSplitRatio: 0.5 }),
+    );
+    render(frame("/"));
+    const sep = await screen.findByRole("separator", { name: /Resize panes/ });
+    fireEvent.mouseDown(sep, { clientX: 400 });
+    fireEvent(window, new MouseEvent("mousemove", { clientX: 600 }));
+    fireEvent(window, new MouseEvent("mouseup"));
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
+    );
+    expect(stored.twoPaneSplitRatio).toBeCloseTo(0.75, 5);
+  });
+
+  it("split-bar drag clamps the ratio to [SPLIT_RATIO_MIN, SPLIT_RATIO_MAX]", async () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({ twoPaneMode: true, twoPaneSplitRatio: 0.5 }),
+    );
+    render(frame("/"));
+    const sep = await screen.findByRole("separator", { name: /Resize panes/ });
+    fireEvent.mouseDown(sep, { clientX: 400 });
+    // Yank far left — would compute negative ratio; clamp floors at 0.15.
+    fireEvent(window, new MouseEvent("mousemove", { clientX: -500 }));
+    fireEvent(window, new MouseEvent("mouseup"));
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
+    );
+    expect(stored.twoPaneSplitRatio).toBeCloseTo(0.15, 5);
+  });
+
   it("Cmd/Ctrl+Shift+. fires when only e.code is 'Period' (layout-independent)", () => {
     render(frame("/"));
     fireEvent.keyDown(window, {

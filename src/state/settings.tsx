@@ -211,6 +211,16 @@ export interface Settings {
    *  left pane, `savedTabsRight` for the right). Toggle via Cmd/Ctrl+\.
    *  Default false (single-pane). */
   twoPaneMode: boolean;
+  /** Ratio (0..1) of horizontal space allocated to the LEFT pane in
+   *  two-pane mode. The right pane gets `1 - ratio`. Drag the divider
+   *  between the panes to update. Clamped to [0.15, 0.85] so neither
+   *  pane can collapse below a usable width. Default 0.5 (even split). */
+  twoPaneSplitRatio: number;
+  /** Per-column pixel widths for the FileList list-view. Drag the
+   *  right edge of any column header to resize. Clamped per-column to
+   *  the LIST_COL_WIDTH_MIN/MAX bands; `name` is implicitly the
+   *  remaining flex space so it isn't stored here. */
+  listColumnWidths: { size: number; modified: number; kind: number };
   /** Tabs persisted for the RIGHT pane in two-pane mode. Empty in
    *  single-pane mode (BrowserTabs spawns a default Home on first
    *  mount). Capped at TABS_MAX. */
@@ -424,6 +434,16 @@ export const SIDEBAR_WIDTH_DEFAULT = 220;
 export const PREVIEW_WIDTH_MIN = 240;
 export const PREVIEW_WIDTH_MAX = 720;
 
+/** Two-pane split ratio clamps. 15% / 85% keeps either pane wide
+ *  enough to show at least one column of file names. */
+export const SPLIT_RATIO_MIN = 0.15;
+export const SPLIT_RATIO_MAX = 0.85;
+
+/** Per-column width clamps for FileList list-view. Below the min the
+ *  header label gets clipped; above the max the Name column starves. */
+export const LIST_COL_WIDTH_MIN = 60;
+export const LIST_COL_WIDTH_MAX = 400;
+
 /** Max entries kept in `recentPaths`. 10 is enough to cover a normal
  *  day's navigation without making the sidebar scroll forever. */
 export const RECENT_PATHS_MAX = 10;
@@ -511,6 +531,8 @@ export const DEFAULTS: Settings = {
   sidebarShowStatusDots: true,
   openNewTabAtCurrent: false,
   twoPaneMode: false,
+  twoPaneSplitRatio: 0.5,
+  listColumnWidths: { size: 96, modified: 180, kind: 120 },
   savedTabsRight: [],
   savedActiveTabIdRight: null,
   recentlyClosedTabs: [],
