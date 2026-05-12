@@ -334,9 +334,15 @@ export default function BrowserTabs({
   };
 
   // Keyboard shortcuts. Cmd/Ctrl+T = new tab, Cmd/Ctrl+W = close active,
-  // Cmd/Ctrl+1..9 = switch to nth tab, Cmd/Ctrl+Shift+←/→ = reorder
-  // active tab. Skipped while the user is in an input so typing 'w'
-  // in the path bar doesn't close the tab.
+  // Cmd/Ctrl+Q = close window, Cmd/Ctrl+1..9 = switch to nth tab,
+  // Cmd/Ctrl+Shift+←/→ = reorder active tab. Skipped while the user is
+  // in an input so typing 'w' in the path bar doesn't close the tab.
+  //
+  // In two-pane mode both BrowserTabs instances mount this listener,
+  // so Cmd+W / Cmd+Q / Cmd+T / Cmd+N / numeric tab-switch ALL gate on
+  // `isFocusedPane` — the user expects the focused pane's tabs to
+  // respond, not both. (Single-pane mode passes `isFocusedPane=true`
+  // unconditionally so it's a no-op there.)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -357,6 +363,7 @@ export default function BrowserTabs({
           ),
         )
       ) {
+        if (!isFocusedPane) return;
         e.preventDefault();
         restoreClosedTab();
         return;
@@ -367,6 +374,7 @@ export default function BrowserTabs({
           activeCombo("tabs.newTab", "cmd+t", settings.shortcutOverrides),
         )
       ) {
+        if (!isFocusedPane) return;
         e.preventDefault();
         addTab();
         return;
@@ -377,6 +385,7 @@ export default function BrowserTabs({
           activeCombo("tabs.closeTab", "cmd+w", settings.shortcutOverrides),
         )
       ) {
+        if (!isFocusedPane) return;
         e.preventDefault();
         closeTab(activeId);
         return;
@@ -384,7 +393,9 @@ export default function BrowserTabs({
       // Tab-switch by index — Cmd/Ctrl+1..9. Migrated to the
       // rebindable framework: each digit gets its own actionId so
       // users can rebind individually (or disable, e.g. when one
-      // collides with a system shortcut).
+      // collides with a system shortcut). Gated on isFocusedPane so
+      // two-pane mode doesn't fire in both lists at once.
+      if (!isFocusedPane) return;
       for (let i = 1; i <= 9; i++) {
         const matched = matchesCombo(
           e,
@@ -496,15 +507,39 @@ export default function BrowserTabs({
     setActiveId(id);
   };
 
+  /** Close the current Skiff Files window via Tauri. Dynamic-imported so
+   *  browser-dev / Vitest (which mock @tauri-apps/api/window) silently
+   *  no-op. Used by Cmd/Ctrl+Q and by the "no tabs left" branch of
+   *  Cmd/Ctrl+W: closing the last tab is the browser-convention
+   *  trigger for closing the window. */
+  const closeWindow = async () => {
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().close();
+    } catch {
+      /* outside Tauri — no-op */
+    }
+  };
+
   const closeTab = (id: string) => {
+    let shouldCloseWindow = false;
     setTabs((prev) => {
-      // Keep at least one tab open so the user always has a Browser.
-      if (prev.length <= 1) return prev;
       const idx = prev.findIndex((t) => t.id === id);
       const closed = prev[idx];
       // Pinned tabs ignore Cmd+W / × clicks — the user has to
       // explicitly Unpin first. Browser muscle memory.
       if (closed?.pinned) return prev;
+      // Closing the last unpinned tab: collapse to the empty state
+      // for one tick, then close the window after this setState
+      // settles. Browser convention — clicking × on the last tab in
+      // Chrome / Firefox closes the window. The 0-tab snapshot is
+      // safe because we navigate the window away before the render
+      // could complete; if Tauri isn't available the close call no-
+      // ops and the empty tab list naturally reseeds on next mount.
+      if (prev.length <= 1) {
+        shouldCloseWindow = true;
+        return [];
+      }
       const next = prev.filter((t) => t.id !== id);
       if (id === activeId && next.length > 0) {
         setActiveId(next[Math.max(0, idx - 1)].id);
@@ -529,6 +564,7 @@ export default function BrowserTabs({
       }
       return next;
     });
+    if (shouldCloseWindow) void closeWindow();
   };
 
   /** Pop the most recently closed tab back to life, focused. */

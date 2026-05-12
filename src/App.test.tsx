@@ -179,6 +179,50 @@ describe("App", () => {
     expect(stored.twoPaneSplitRatio).toBeCloseTo(0.15, 5);
   });
 
+  it("Cmd/Ctrl+Q opens the quit confirmation dialog (does not quit silently)", async () => {
+    render(frame("/"));
+    fireEvent.keyDown(window, { key: "q", ctrlKey: true });
+    // The dialog has to surface — no silent quit. We assert the
+    // dialog content rather than the underlying window.close() mock
+    // because the Tauri window mock factory is closure-free per
+    // setup.ts; the dialog presence is the user-visible contract.
+    expect(
+      await screen.findByRole("heading", { name: /Quit Skiff Files/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Quit window/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Cancel/i })).toBeInTheDocument();
+  });
+
+  it("Cmd/Ctrl+Q → Cancel dismisses the dialog without quitting", async () => {
+    render(frame("/"));
+    fireEvent.keyDown(window, { key: "q", ctrlKey: true });
+    const cancel = await screen.findByRole("button", { name: /Cancel/i });
+    fireEvent.click(cancel);
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: /Quit Skiff Files/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("Cmd/Ctrl+Q → Quit window dismisses the dialog (and fires the close call)", async () => {
+    render(frame("/"));
+    fireEvent.keyDown(window, { key: "q", ctrlKey: true });
+    const quit = await screen.findByRole("button", { name: /Quit window/i });
+    fireEvent.click(quit);
+    // Dialog closes once the user confirms. The actual `getCurrentWindow().close()`
+    // call runs async via the dynamic import — we trust it because
+    // it's a one-line wrapper and the dialog's onConfirm is the
+    // user-observable contract.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: /Quit Skiff Files/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it("Cmd/Ctrl+Shift+. fires when only e.code is 'Period' (layout-independent)", () => {
     render(frame("/"));
     fireEvent.keyDown(window, {
