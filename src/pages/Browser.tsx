@@ -1792,6 +1792,13 @@ export default function Browser({
           dateFormat={settings.dateFormat}
           customFileKinds={settings.customFileKinds}
           hideColumns={settings.hideColumns}
+          columnWidths={settings.listColumnWidths}
+          onColumnResize={(column, width) =>
+            update("listColumnWidths", {
+              ...settings.listColumnWidths,
+              [column]: width,
+            })
+          }
           view={settings.folderViewMode[path] ?? settings.defaultView}
           path={path}
           onRename={async (entry, newName) => {
