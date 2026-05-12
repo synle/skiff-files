@@ -273,9 +273,13 @@ describe("Sidebar — extras", () => {
     expect(onNavigate).toHaveBeenCalledWith("sftp://abc/");
   });
 
-  it("'Add connection…' click switches to connections page (empty list)", async () => {
+  it("'Manage connections…' click switches to connections page (empty list)", async () => {
+    // Label changed from "Add connection…" → "Manage connections…"
+    // in the SMB-dialog branch when ConnectionsPage was renamed to
+    // "Manage Connections" and both sidebar entries (empty + non-
+    // empty connection lists) were unified.
     const { onSwitchPage } = r();
-    const btn = await waitFor(() => screen.getByText("Add connection…"));
+    const btn = await waitFor(() => screen.getByText("Manage connections…"));
     fireEvent.click(btn);
     expect(onSwitchPage).toHaveBeenCalledWith("connections");
   });

@@ -14,6 +14,7 @@ pub mod sync;
 use commands::{
     conn_create_ftp, conn_create_sftp, conn_create_smb, conn_dir_summary, conn_disconnect, conn_hash_sha256,
     conn_known_hosts_list, conn_known_hosts_remove, conn_list, conn_list_dir, conn_mkdir,
+    conn_create_empty_file,
     conn_read_base64, conn_read_text, conn_remove, conn_rename, conn_stat, crash_logs_count,
     crash_logs_dir, fs_archive_extract_one,
     fs_archive_list, fs_canonicalize,
@@ -26,7 +27,7 @@ use commands::{
     fs_stat, fs_trash, fs_trash_many, fs_trash_restore, get_app_version, settings_app_data_dir, settings_load,
     settings_save, window_open_at, window_open_new, window_set_always_on_top,
     fs_watch_clear, fs_watch_set, FsWatchState,
-    ssh_config_hosts, sync_cancel, sync_cpstamp, sync_dedup,
+    smb_list_shares, ssh_config_hosts, sync_cancel, sync_cpstamp, sync_dedup,
     sync_list, sync_pause, sync_resolve_conflict, sync_resume, sync_start_cross, sync_start_local,
     sync_start_repo,
 };
@@ -131,6 +132,7 @@ pub fn run() {
             conn_create_sftp,
             conn_create_ftp,
             conn_create_smb,
+            smb_list_shares,
             conn_disconnect,
             conn_list,
             conn_list_dir,
@@ -141,6 +143,7 @@ pub fn run() {
             conn_mkdir,
             conn_rename,
             conn_remove,
+            conn_create_empty_file,
             conn_known_hosts_list,
             conn_known_hosts_remove,
             conn_hash_sha256,

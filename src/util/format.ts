@@ -90,20 +90,32 @@ export function formatMtimeRelative(
 export function pathSegments(path: string): { label: string; path: string }[] {
   if (!path) return [];
 
-  // Remote (sftp://id/a/b/c) — first segment is the connection id; the rest
-  // are POSIX-shaped within the remote root.
-  if (path.startsWith("sftp://")) {
-    const rest = path.slice("sftp://".length);
+  // Remote (sftp:// / ftp:// / smb://) — first segment is the
+  // connection id; the rest are POSIX-shaped within the remote
+  // root. Without an explicit case here, ftp:// and smb:// paths
+  // fall through to the POSIX branch below which produces nonsense
+  // segments (`/smb:` / `/smb:/<uuid>` instead of `smb://<uuid>/`),
+  // and `parentPath` then walks the user past the share root and
+  // off into the filesystem — exactly the "up-button past root"
+  // bug from image #74-#76.
+  const REMOTE_SCHEMES: { prefix: string; scheme: string }[] = [
+    { prefix: "sftp://", scheme: "sftp" },
+    { prefix: "ftp://", scheme: "ftp" },
+    { prefix: "smb://", scheme: "smb" },
+  ];
+  for (const { prefix, scheme } of REMOTE_SCHEMES) {
+    if (!path.startsWith(prefix)) continue;
+    const rest = path.slice(prefix.length);
     const slash = rest.indexOf("/");
     const id = slash < 0 ? rest : rest.slice(0, slash);
     const remote = slash < 0 ? "/" : rest.slice(slash) || "/";
     const out: { label: string; path: string }[] = [];
-    out.push({ label: id, path: `sftp://${id}/` });
+    out.push({ label: id, path: `${scheme}://${id}/` });
     const parts = remote.split("/").filter(Boolean);
     let acc = "";
     for (const p of parts) {
       acc += `/${p}`;
-      out.push({ label: p, path: `sftp://${id}${acc}` });
+      out.push({ label: p, path: `${scheme}://${id}${acc}` });
     }
     return out;
   }

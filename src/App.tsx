@@ -55,6 +55,14 @@ export default function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   /** Active page. Replaces react-router's Routes-based switching. */
   const [page, setPage] = useState<Page>("browser");
+  // Which pane the next sidebar / quick-jump / palette navigation
+  // targets in two-pane mode. Mouse focus inside a pane (BrowserTabs
+  // fires onPaneFocus on mousedown) updates this; the dispatched
+  // NAVIGATE_EVENT carries the active pane on its detail so only the
+  // matching Browser instance honors it. Single-pane mode treats
+  // every dispatch as "main" — the right pane simply isn't mounted
+  // and its listener never runs.
+  const [activePane, setActivePane] = useState<"main" | "right">("main");
   const { settings, setSettings, update } = useSettings();
 
   // Cmd/Ctrl+K → toggle the quick-jump palette. Cmd/Ctrl+B → toggle
@@ -324,12 +332,33 @@ export default function App() {
             // path. Order matters: if we're on Settings the Browser
             // isn't mounted yet, so dispatching first would no-op.
             setPage("browser");
-            // queueMicrotask so the page change commits before the
-            // listener fires.
-            queueMicrotask(() =>
-              window.dispatchEvent(
-                new CustomEvent(NAVIGATE_EVENT, { detail: p }),
-              ),
+            // Defer the dispatch with setTimeout(0) instead of
+            // queueMicrotask. Microtasks drain BEFORE React's commit
+            // + effects phase in some scheduling orders, so on the
+            // very first click from Settings the Browser's
+            // NAVIGATE_EVENT listener hasn't been registered yet
+            // (the Browser was unmounted while Settings was active).
+            // The event then fires into the void, the user lands on
+            // the Browser's previous path (home), and they have to
+            // click the host a second time to navigate.
+            //
+            // setTimeout(0) queues a macrotask which runs strictly
+            // after React's reconciliation + useEffect registration,
+            // so the listener is guaranteed to be live when the
+            // dispatch happens. One render-tick of latency is
+            // imperceptible compared to the two-click bug it kills.
+            //
+            // detail carries `pane` so two-pane mode routes the
+            // navigation to the focused pane only. Single-pane mode
+            // always targets "main".
+            setTimeout(
+              () =>
+                window.dispatchEvent(
+                  new CustomEvent(NAVIGATE_EVENT, {
+                    detail: { path: p, pane: activePane },
+                  }),
+                ),
+              0,
             );
           }}
         />
@@ -352,6 +381,27 @@ export default function App() {
         {page === "browser" ? (
           settings.twoPaneMode ? (
             <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
+              {/* TODO(split-pane-resize): the divider between the
+                  two panes is currently a fixed 50/50 split (each
+                  Box flex: 1). Should let users drag the divider to
+                  re-balance, with the ratio persisted to settings.
+                  Same pass should add resizable columns to FileList
+                  in list-view mode (Name / Size / Modified / Kind).
+                  Both are pure-UX work, no backend changes. Out of
+                  scope for the SMB-dialog branch — split as a
+                  follow-up so this PR stays focused. */}
+              {/* Each pane in two-pane mode owns its own
+                  focus-state indicator. Visual treatment:
+                    - Focused pane gets a 3px primary-tinted ring on
+                      ALL FOUR sides (inset boxShadow), plus a very
+                      subtle background tint so it's unmistakable
+                      even at a glance from across the room.
+                    - Unfocused pane shows no ring + the default
+                      background so the contrast does the work.
+                  mousedown (not click) sets the active pane so the
+                  intent is registered before any inner click handler
+                  fires — important because the inner Browser may
+                  consume the click event (e.g. selecting a row). */}
               <Box
                 sx={{
                   flex: 1,
@@ -360,9 +410,27 @@ export default function App() {
                   minWidth: 0,
                   borderRight: 1,
                   borderColor: "divider",
+                  position: "relative",
+                  boxShadow: (t) =>
+                    activePane === "main"
+                      ? `inset 0 0 0 3px ${t.palette.primary.main}`
+                      : "none",
+                  bgcolor: (t) =>
+                    activePane === "main"
+                      ? t.palette.mode === "dark"
+                        ? "rgba(144, 202, 249, 0.04)"
+                        : "rgba(25, 118, 210, 0.03)"
+                      : "transparent",
+                  transition:
+                    "box-shadow 120ms ease-out, background-color 120ms ease-out",
                 }}
+                onMouseDown={() => setActivePane("main")}
               >
-                <BrowserTabs home={home} pane="main" />
+                <BrowserTabs
+                  home={home}
+                  pane="main"
+                  isFocusedPane={activePane === "main"}
+                />
               </Box>
               <Box
                 sx={{
@@ -370,13 +438,33 @@ export default function App() {
                   display: "flex",
                   flexDirection: "column",
                   minWidth: 0,
+                  position: "relative",
+                  boxShadow: (t) =>
+                    activePane === "right"
+                      ? `inset 0 0 0 3px ${t.palette.primary.main}`
+                      : "none",
+                  bgcolor: (t) =>
+                    activePane === "right"
+                      ? t.palette.mode === "dark"
+                        ? "rgba(144, 202, 249, 0.04)"
+                        : "rgba(25, 118, 210, 0.03)"
+                      : "transparent",
+                  transition:
+                    "box-shadow 120ms ease-out, background-color 120ms ease-out",
                 }}
+                onMouseDown={() => setActivePane("right")}
               >
-                <BrowserTabs home={home} pane="right" />
+                <BrowserTabs
+                  home={home}
+                  pane="right"
+                  isFocusedPane={activePane === "right"}
+                />
               </Box>
             </Box>
           ) : (
-            <BrowserTabs home={home} />
+            // Single-pane mode: the lone instance is always
+            // "focused" — there's no other pane to compete with.
+            <BrowserTabs home={home} isFocusedPane={true} />
           )
         ) : page === "connections" ? (
           <ConnectionsPage />
@@ -402,7 +490,11 @@ export default function App() {
         onJump={(p) => {
           setPage("browser");
           queueMicrotask(() =>
-            window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: p })),
+            window.dispatchEvent(
+              new CustomEvent(NAVIGATE_EVENT, {
+                detail: { path: p, pane: activePane },
+              }),
+            ),
           );
         }}
       />
@@ -414,6 +506,7 @@ export default function App() {
           setPage,
           settings,
           update,
+          activePane,
         })}
       />
       {/* Floating bottom-right drawer that surfaces every in-flight
@@ -433,15 +526,23 @@ function buildCommandActions(deps: {
   setPage: (p: Page) => void;
   settings: ReturnType<typeof useSettings>["settings"];
   update: ReturnType<typeof useSettings>["update"];
+  /** Which pane the next navigation should target. Two-pane mode
+   *  routes via NAVIGATE_EVENT detail so only the focused pane
+   *  responds; single-pane treats every dispatch as "main". */
+  activePane: "main" | "right";
 }): CommandAction[] {
-  const { page, setPage, settings, update } = deps;
+  const { page, setPage, settings, update, activePane } = deps;
   /** Common helper: switch to Browser then dispatch a navigate event so
    *  the Browser actually goes there. Used by every "Go to <path>"
    *  action surfaced from bookmarks / recent. */
   const goTo = (target: string) => {
     setPage("browser");
     queueMicrotask(() =>
-      window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: target })),
+      window.dispatchEvent(
+        new CustomEvent(NAVIGATE_EVENT, {
+          detail: { path: target, pane: activePane },
+        }),
+      ),
     );
   };
   // Bookmark + recent path actions. Each becomes a row in the
