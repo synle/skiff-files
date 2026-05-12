@@ -11,6 +11,7 @@ import BrowserTabs from "./components/BrowserTabs";
 import QuickJump from "./components/QuickJump";
 import CommandPalette, { type CommandAction } from "./components/CommandPalette";
 import OperationsDrawer from "./components/OperationsDrawer";
+import ConfirmDialog from "./components/ConfirmDialog";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -69,6 +70,19 @@ export default function App() {
   // and its listener never runs.
   const [activePane, setActivePane] = useState<"main" | "right">("main");
   const { settings, setSettings, update } = useSettings();
+  /** Cmd/Ctrl+Q confirm dialog. Tauri's webview suppresses native
+   *  confirm() in some configurations (see CLAUDE.md footgun), so we
+   *  route the quit prompt through the same `ConfirmDialog` Move-to-
+   *  Trash uses. */
+  const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
+  const closeCurrentWindow = async () => {
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().close();
+    } catch {
+      /* outside Tauri — no-op */
+    }
+  };
   /** Two-pane mode split-bar drag state. Drag the divider to update
    *  `settings.twoPaneSplitRatio`. The ref holds the live container
    *  rect captured on mousedown so mousemove doesn't keep re-reading
@@ -128,6 +142,28 @@ export default function App() {
         void windowOpenNew().catch(() => {
           /* running outside Tauri / browser dev — silent fallback */
         });
+        return;
+      }
+      if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "app.closeWindow",
+            "cmd+q",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
+        // Cmd/Ctrl+Q — prompt before quitting so the user can't
+        // accidentally drop every open tab in this window from one
+        // typo. The native OS Cmd+Q would also close the window,
+        // but Tauri suppresses it in some configurations; routing
+        // through our own ConfirmDialog gives consistent behavior
+        // and a chance to recover. Saved tabs persist in
+        // settings.json regardless, so a confirmed quit isn't
+        // destructive — it's just a guard against fat-finger.
+        e.preventDefault();
+        setQuitConfirmOpen(true);
         return;
       }
       if (
@@ -573,6 +609,23 @@ export default function App() {
           sync from any page, so closing the Transfers tab doesn't
           hide an active operation. */}
       <OperationsDrawer />
+      {/* Cmd/Ctrl+Q confirmation. Lives at the root so the keybinding
+          fires regardless of which page is active. Saved tabs persist
+          via settings.json before this dialog opens, so a confirmed
+          quit isn't destructive — the prompt exists purely to guard
+          against fat-finger Cmd+Q while typing. */}
+      <ConfirmDialog
+        open={quitConfirmOpen}
+        title="Quit Skiff Files?"
+        message="Closing this window will close every open tab in it. Your saved tabs are remembered across launches — they'll reappear next time you open Skiff Files."
+        confirmLabel="Quit window"
+        destructive
+        onCancel={() => setQuitConfirmOpen(false)}
+        onConfirm={() => {
+          setQuitConfirmOpen(false);
+          void closeCurrentWindow();
+        }}
+      />
     </Box>
   );
 }

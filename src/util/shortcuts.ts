@@ -192,9 +192,15 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       },
       {
         keys: "Cmd / Ctrl + W",
-        description: "Close active tab",
+        description: "Close active tab (closes the window when no tabs remain)",
         actionId: "tabs.closeTab",
         defaultCombo: "cmd+w",
+      },
+      {
+        keys: "Cmd / Ctrl + Q",
+        description: "Close all tabs and the active window",
+        actionId: "app.closeWindow",
+        defaultCombo: "cmd+q",
       },
       {
         keys: "Cmd / Ctrl + Shift + T",
