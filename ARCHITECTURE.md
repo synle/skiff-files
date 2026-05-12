@@ -90,9 +90,29 @@ Four files; one per command family:
 - **`fs.ts`** — `fs_*` commands (local filesystem)
 - **`conn.ts`** — `conn_*` commands (SFTP)
 - **`sync.ts`** — `sync_*` commands + event subscriptions (`onProgress` / `onDone` / `onError` / `onConflict`)
-- **`client.ts`** — backend-agnostic dispatch. `listDir(path)`, `mkdir(path)`, `removeOrTrashMany(paths)`, `startSync(src, dest)` etc. all parse `sftp://<id>/<path>` and route to the right command. Components import from here when they shouldn't care which backend a path lives on.
+- **`client.ts`** — backend-agnostic dispatch. `listDir(path)`, `mkdir(path)`, `removeOrTrashMany(paths)`, `startSync(src, dest)` etc. all parse `sftp://<id>/<path>` (or `ftp://` / `smb://`) and route to the right command. Components import from here when they shouldn't care which backend a path lives on.
 
 Every command has a typed wrapper here, so command renames are a single-file refactor.
+
+#### Routing model (0.2.271+)
+
+Every fs-verb wrapper in `client.ts` goes through a single `dispatchByLocation<T>(path, spec)` helper. The helper owns the URL → backend decision once; each verb supplies a `local` handler and an optional `remote` handler that receives `(connectionId, remotePath, kind)`. Verbs with partial support (`hashSha256` SFTP-only; `dirSummary` SFTP-only with FTP/SMB getting conservative zeros) declare a `remote` that kind-discriminates internally.
+
+```ts
+// Adding a new fs verb:
+export async function chmod(path: string, mode: number): Promise<void> {
+  return dispatchByLocation(path, {
+    local: (p) => fsChmod(p, mode),
+    remote: (id, p) => connChmod(id, p, mode),
+  });
+}
+```
+
+Adding a new backend (e.g. WebDAV) means: extend the `Backend` union in `util/location.ts`, extend `parseLocation`, and TypeScript will surface every verb whose `remote` handler needs widening. The pre-0.2.271 shape required hand-editing ~12 verb branches in `client.ts` plus the `Sidebar` scheme picker — the 0.2.270 SMB bug cluster (`mkdir` / `createEmptyFile` / `removeOrTrashMany` / `rename` all missed SMB) was a direct consequence of that.
+
+Future stretch goal: a parallel set of `fs_*_any` Tauri commands that accept the full URL and route in Rust via `resolve_backend`, collapsing the frontend wrappers to one-line `invoke()`s. The dispatcher is the front-half of that refactor; the Rust commands are incremental.
+
+The regression suite in `src/api/client.test.ts` pins every verb's per-backend route — 69 cases covering local + sftp + ftp + smb fan-out and the cross-backend / partial-support edge cases.
 
 ### Cross-component coordination — window CustomEvents
 
