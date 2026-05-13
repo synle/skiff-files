@@ -82,8 +82,9 @@ export interface Settings {
   /** Pinned paths that show up in the sidebar's Bookmarks section. */
   bookmarks: Bookmark[];
   /** Auto-tracked navigation history. Most-recent first. Capped at
-   *  RECENT_PATHS_MAX so the list doesn't grow unbounded. Surfaces in
-   *  the sidebar's Recent section. */
+   *  RECENT_PATHS_TRACK_MAX so the list doesn't grow unbounded.
+   *  Surfaces in the sidebar's Recent section (top N) plus the
+   *  "Show all recent" dialog (full list). */
   recentPaths: string[];
   /** Favorites the user has hidden via the sidebar context menu.
    *  Stored as the relative-from-home segment (e.g. "Desktop") plus
@@ -276,9 +277,10 @@ export interface Settings {
    *  to just the header. Persists so a user who collapses the
    *  drawer doesn't have it re-expand on every new job. */
   operationsDrawerExpanded: boolean;
-  /** Cap on `recentPaths` length. 0 disables tracking entirely. The
-   *  Sidebar's Recent section always shows up to 5 entries from the
-   *  head of the list regardless of the cap. */
+  /** How many recent-path entries the Sidebar's Recent section shows
+   *  inline. 0 disables recent-path tracking entirely (the array is
+   *  also wiped). Tracking always retains up to RECENT_PATHS_TRACK_MAX
+   *  entries on disk; the "Show all recent" dialog surfaces the rest. */
   recentPathsMax: number;
   /** Per-extension override of the icon kind. Keys are extensions
    *  WITHOUT the leading dot (e.g. "rs", "tex"); values are FileKind
@@ -444,9 +446,16 @@ export const SPLIT_RATIO_MAX = 0.85;
 export const LIST_COL_WIDTH_MIN = 60;
 export const LIST_COL_WIDTH_MAX = 400;
 
-/** Max entries kept in `recentPaths`. 10 is enough to cover a normal
- *  day's navigation without making the sidebar scroll forever. */
-export const RECENT_PATHS_MAX = 10;
+/** Max entries kept in `recentPaths` regardless of the sidebar
+ *  display count. 200 keeps the "Show all recent" dialog useful
+ *  for a busy day's history while staying bounded on disk. */
+export const RECENT_PATHS_TRACK_MAX = 200;
+/** Backwards-compatibility alias — historically the sidebar display
+ *  cap and the storage cap were the same value. Kept as an export so
+ *  external imports don't break; new code should use the
+ *  `recentPathsMax` setting (sidebar count) or
+ *  `RECENT_PATHS_TRACK_MAX` (storage cap) directly. */
+export const RECENT_PATHS_MAX = RECENT_PATHS_TRACK_MAX;
 /** Cap on persisted search queries. 10 is enough to recall this
  *  morning's hunting and short enough to fit in a small dropdown. */
 export const SEARCH_HISTORY_MAX = 10;
@@ -525,7 +534,10 @@ export const DEFAULTS: Settings = {
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarCollapsed: {},
-  sidebarSectionsVisible: {},
+  // Recent is hidden by default — the Recent section was visually
+  // heavy in 0.2.272's sidebar (double-line entries, full paths) and
+  // most users don't need it on. Re-enable from Settings → Sidebar.
+  sidebarSectionsVisible: { recent: false },
   sidebarSectionOrder: [],
   sidebarAccordion: false,
   sidebarShowStatusDots: true,

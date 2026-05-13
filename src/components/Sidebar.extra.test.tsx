@@ -70,6 +70,8 @@ describe("Sidebar — extras", () => {
       "skiff-files.settings.v1",
       JSON.stringify({
         recentPaths: ["/foo", "/bar"],
+        // Recent is hidden by default since 0.2.273 — opt-in here.
+        sidebarSectionsVisible: { recent: true },
       }),
     );
     r();
@@ -361,20 +363,26 @@ describe("Sidebar — extras", () => {
   it("right-clicking a recent path opens its context menu", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo", "/bar"] }),
+      JSON.stringify({
+        recentPaths: ["/foo", "/bar"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
   });
 
   it("recent-path menu 'Add to bookmarks' adds an entry", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo"] }),
+      JSON.stringify({
+        recentPaths: ["/foo"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Add to bookmarks"));
     const stored = JSON.parse(
       localStorage.getItem("skiff-files.settings.v1") ?? "{}",
@@ -385,10 +393,13 @@ describe("Sidebar — extras", () => {
   it("recent-path menu 'Remove from recent' drops the entry", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo", "/bar"] }),
+      JSON.stringify({
+        recentPaths: ["/foo", "/bar"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Remove from recent"));
     const stored = JSON.parse(
       localStorage.getItem("skiff-files.settings.v1") ?? "{}",

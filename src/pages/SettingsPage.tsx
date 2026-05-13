@@ -1452,7 +1452,7 @@ export default function SettingsPage() {
           />
 
           <TextField
-            label="Recent paths cap"
+            label="Recent paths shown in sidebar"
             size="small"
             type="number"
             value={settings.recentPathsMax}
@@ -1461,8 +1461,8 @@ export default function SettingsPage() {
               if (!Number.isFinite(n)) return;
               update("recentPathsMax", Math.max(0, Math.min(50, Math.floor(n))));
             }}
-            helperText="0 disables recent-path tracking. Sidebar shows up to 5 entries from the head."
-            sx={{ maxWidth: 240 }}
+            helperText="0 disables recent-path tracking. The full history (up to 200) is always accessible via the sidebar's “Show more” button."
+            sx={{ maxWidth: 320 }}
           />
 
           {SIDEBAR_SECTION_DEFAULT_ORDER.map((id) => {
