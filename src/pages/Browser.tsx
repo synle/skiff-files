@@ -69,7 +69,7 @@ import ArchiveViewerDialog from "../components/ArchiveViewerDialog";
 import NewEntryDialog from "../components/NewEntryDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { parentPath } from "../util/format";
-import { useSettings } from "../state/settings";
+import { RECENT_PATHS_TRACK_MAX, useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
 import { uniqueDuplicateName } from "../util/duplicateName";
 import {
@@ -487,11 +487,12 @@ export default function Browser({
   // contributes so multiple inactive tabs don't pollute history.
   useEffect(() => {
     if (!isActive || !path) return;
-    // Cap of 0 disables recent-path tracking entirely so privacy-
-    // conscious users can opt out without the sidebar's Recent
-    // section staying perpetually frozen on stale entries.
-    const cap = settings.recentPathsMax;
-    if (cap === 0) {
+    // `recentPathsMax` is now the sidebar DISPLAY cap, not the
+    // tracking cap — a value of 0 still disables tracking so privacy-
+    // conscious users can opt out completely. Storage is bounded by
+    // RECENT_PATHS_TRACK_MAX so the "Show all recent" dialog has
+    // depth past the visible sidebar slice.
+    if (settings.recentPathsMax === 0) {
       if (settings.recentPaths.length > 0) update("recentPaths", []);
       return;
     }
@@ -499,7 +500,7 @@ export default function Browser({
     const next = [
       path,
       ...settings.recentPaths.filter((p) => p !== path),
-    ].slice(0, cap);
+    ].slice(0, RECENT_PATHS_TRACK_MAX);
     update("recentPaths", next);
     // We deliberately don't depend on `settings.recentPaths` — the
     // update function reads its current value through useState, and
