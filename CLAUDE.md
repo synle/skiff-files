@@ -39,6 +39,14 @@ Spotted a leak in tree? Flag it first — rotation of the underlying credential 
 
 The "Backlog" section at the bottom of TODO.md is explicitly deferred. **Do not implement or test those items unless the user names one and says "go work on X".**
 
+## Windows console-flash pitfall (Windows-only)
+
+The GUI parent ships with `windows_subsystem = "windows"` (`src-tauri/src/main.rs:2`) and therefore has no console of its own. Two recurring traps follow:
+
+- **Place the `windows_subsystem` attribute on the binary root, never on `lib.rs`.** The inner attribute is silently accepted by Rust on `lib.rs` but has zero effect on the binary's PE subsystem header — the release `.exe` then ships as a console-subsystem program and pops a console for the *parent* process. Adding `CREATE_NO_WINDOW` to child spawns cannot fix this. (`sqlui-native` regressed on this at v3.1.9 — same trap, same fix.) A `cargo test` (`windows_subsystem_attribute_lives_on_binary_root` in `src-tauri/src/lib.rs`) fails the build if it drifts.
+- **Route every console-program child spawn through `crate::win_cmd::hidden_command(program)`** — not bare `std::process::Command::new(program)`. The helper pre-applies the Win32 `CREATE_NO_WINDOW` (`0x08000000`) creation flag on Windows and is a `Command::new(...)` no-op on macOS / Linux. Skiffsync's `cprepo` shelling out to `git ls-files` (`sync/repo.rs`) is the recurring offender — every invocation would otherwise flash. A `cargo test` (`no_bare_console_spawns_in_production_code`) scans production source for bare `Command::new("git" | "powershell" | "reg")` and fails the build if one slips in. Extend the test's file list if a new production spawn site lands. **Exception**: the user-initiated "Open Terminal here" action in `commands.rs::fs_open_in_terminal` runs `cmd /K` because the user *wants* a terminal — leave that alone (the test excludes it).
+- **Scope: Windows-only.** Both `windows_subsystem` (PE header) and `CREATE_NO_WINDOW` (creation flag) are Win32 abstractions. macOS and Linux do not auto-allocate a terminal for child processes — a GUI parent launched from Finder / `.desktop` / app launcher has no controlling terminal, child stdio inherits null fds, and no window appears.
+
 ## Footgun checklist (full context in DEV.md)
 
 - No `window.alert` / `confirm` / `prompt` — Tauri webview suppresses them; use modal dialogs.

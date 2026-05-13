@@ -11,8 +11,10 @@
 //! unchanged.
 
 use crate::sync::plan::PlannedFile;
+use crate::win_cmd::hidden_command;
 use std::fs;
 use std::path::Path;
+#[cfg(test)]
 use std::process::Command;
 use std::time::UNIX_EPOCH;
 
@@ -27,7 +29,11 @@ pub fn plan_repo(src: &Path, dest_root: &Path) -> Result<(Vec<PlannedFile>, u64)
     // `git -C <src> ls-files -z` emits NUL-separated tracked paths,
     // relative to the repo root. NUL avoids the rename/whitespace traps
     // that newline-delimited output has.
-    let output = Command::new("git")
+    //
+    // `hidden_command` routes through `CREATE_NO_WINDOW` on Windows so
+    // each `git ls-files` invocation does not flash a console window
+    // for the user. No-op on macOS / Linux.
+    let output = hidden_command("git")
         .arg("-C")
         .arg(src)
         .arg("ls-files")
