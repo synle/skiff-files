@@ -131,6 +131,13 @@ interface Props {
   /** Number of active kind-filter groups (used to badge the toolbar
    *  button when the row is collapsed). */
   kindFilterActiveCount?: number;
+  /** True when the current folder is unreachable (broken pipe / bad
+   *  creds / disconnected remote). Collapses the toolbar to just
+   *  back / forward / up / refresh; refresh becomes the "retry the
+   *  listing" affordance. Hides New folder / New file / search /
+   *  view-mode / sort / preview / overflow because none of them can
+   *  act on a folder we can't read. */
+  disabled?: boolean;
 }
 
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
@@ -180,6 +187,7 @@ export default function Toolbar(props: Props) {
     kindFilterOpen,
     onKindFilterToggle,
     kindFilterActiveCount = 0,
+    disabled = false,
   } = props;
 
   const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(
@@ -338,6 +346,17 @@ export default function Toolbar(props: Props) {
           )}
         </IconButton>
       </Tooltip>
+      {/* When the current folder is unreachable (broken pipe / bad
+       *  creds / disconnected remote), every affordance past Refresh
+       *  is meaningless: New folder / New file / search / view-mode
+       *  / sort / preview / overflow all act on a folder we can't
+       *  read. Early-return after the navigation cluster and let
+       *  the FileList's error placeholder carry the "click Refresh
+       *  to retry" message. */}
+      {disabled ? (
+        <Box sx={{ flexGrow: 1 }} />
+      ) : (
+        <>
       <Tooltip title="New folder">
         <IconButton
           size="small"
@@ -847,6 +866,8 @@ export default function Toolbar(props: Props) {
           </ToggleButton>
         </Tooltip>
       </ToggleButtonGroup>
+        </>
+      )}
     </Box>
   );
 }
