@@ -70,6 +70,7 @@ describe("Sidebar — extras", () => {
       "skiff-files.settings.v1",
       JSON.stringify({
         recentPaths: ["/foo", "/bar"],
+        sidebarSectionsVisible: { recent: true },
       }),
     );
     r();
@@ -80,7 +81,7 @@ describe("Sidebar — extras", () => {
     r();
     // Just confirm the multi-section sidebar mounts cleanly with
     // every default section header.
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Favorites")).toBeInTheDocument();
   });
 
@@ -89,12 +90,13 @@ describe("Sidebar — extras", () => {
       "skiff-files.settings.v1",
       JSON.stringify({
         sidebarSectionOrder: ["hosts", "favorites", "devices"],
+        sidebarSectionsVisible: { recent: true },
       }),
     );
     r();
     // No-throw on a non-default ordering — confirm the section labels
     // are still rendered.
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Devices")).toBeInTheDocument();
   });
 
@@ -115,7 +117,7 @@ describe("Sidebar — extras", () => {
     r();
     // Every section label should render in non-accordion mode.
     expect(screen.getByText("Favorites")).toBeInTheDocument();
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Devices")).toBeInTheDocument();
   });
 
@@ -273,9 +275,9 @@ describe("Sidebar — extras", () => {
     expect(onNavigate).toHaveBeenCalledWith("sftp://abc/");
   });
 
-  it("'Add connection…' click switches to connections page (empty list)", async () => {
+  it("'Manage connections…' click switches to connections page (empty list)", async () => {
     const { onSwitchPage } = r();
-    const btn = await waitFor(() => screen.getByText("Add connection…"));
+    const btn = await waitFor(() => screen.getByText("Manage connections…"));
     fireEvent.click(btn);
     expect(onSwitchPage).toHaveBeenCalledWith("connections");
   });
@@ -357,20 +359,26 @@ describe("Sidebar — extras", () => {
   it("right-clicking a recent path opens its context menu", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo", "/bar"] }),
+      JSON.stringify({
+        recentPaths: ["/foo", "/bar"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
   });
 
   it("recent-path menu 'Add to bookmarks' adds an entry", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo"] }),
+      JSON.stringify({
+        recentPaths: ["/foo"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Add to bookmarks"));
     const stored = JSON.parse(
       localStorage.getItem("skiff-files.settings.v1") ?? "{}",
@@ -381,10 +389,13 @@ describe("Sidebar — extras", () => {
   it("recent-path menu 'Remove from recent' drops the entry", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo", "/bar"] }),
+      JSON.stringify({
+        recentPaths: ["/foo", "/bar"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Remove from recent"));
     const stored = JSON.parse(
       localStorage.getItem("skiff-files.settings.v1") ?? "{}",

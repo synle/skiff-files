@@ -54,14 +54,16 @@
 // `kind === "sftp" || ...` checks.
 // ============================================================
 import {
+  fsCreateEmptyFile,
+  fsDirSummary,
   fsHashSha256,
   fsListDir,
   fsMkdir,
+  fsReadBase64,
+  fsReadText,
+  fsRemove,
   fsRename,
   fsStat,
-  fsReadText,
-  fsReadBase64,
-  fsDirSummary,
   fsTrashMany,
   type DirSummary,
   type Entry,
@@ -84,12 +86,44 @@ import {
   formatSmb,
   isRemote,
   parseLocation,
+  type Backend,
+  type Location,
 } from "../util/location";
 import {
   syncStartCross,
   syncStartLocal,
   type JobOptions,
 } from "./sync";
+
+export type RemoteKind = Extract<Backend, { kind: "sftp" | "ftp" | "smb" }>["kind"];
+
+interface DispatchSpec<T> {
+  local: (path: string) => Promise<T>;
+  remote?: (id: string, remotePath: string, kind: RemoteKind) => Promise<T>;
+  unsupportedRemote?: (kind: RemoteKind) => Error;
+}
+
+export async function dispatchByLocation<T>(
+  path: string,
+  spec: DispatchSpec<T>,
+): Promise<T> {
+  const loc = parseLocation(path);
+  if (loc.backend.kind === "local") {
+    return spec.local(path);
+  }
+  if (!spec.remote) {
+    const kind = loc.backend.kind;
+    const err =
+      spec.unsupportedRemote?.(kind) ??
+      new Error(`operation not supported on ${kind} connections`);
+    throw err;
+  }
+  return spec.remote(
+    loc.backend.connectionId,
+    loc.remotePath,
+    loc.backend.kind,
+  );
+}
 
 /** Re-shape a remote Entry so its `path` field is the full
  *  `<scheme>://<id>/...` form rather than the bare server-side
@@ -98,7 +132,7 @@ import {
 function reshapeRemote(
   e: Entry,
   connectionId: string,
-  scheme: "sftp" | "ftp" | "smb",
+  scheme: RemoteKind,
 ): Entry {
   const formatter =
     scheme === "ftp" ? formatFtp : scheme === "smb" ? formatSmb : formatSftp;
@@ -267,6 +301,19 @@ export async function rename(from: string, to: string): Promise<void> {
   return fsRename(from, to);
 }
 
+/** Window CustomEvent fired by [[startSync]] the moment a Skiffsync
+ *  job has been queued in Rust. Decouples the dispatch path from the
+ *  drawer so we don't need a `sync:started` Tauri event.
+ *
+ *  Payload: `{ jobId: string; src: string; dest: string }`. */
+export const SYNC_QUEUED_EVENT = "skiff:sync-queued";
+
+export interface SyncQueuedDetail {
+  jobId: string;
+  src: string;
+  dest: string;
+}
+
 /** Backend-agnostic sync starter. Pure local-to-local goes through
  *  `sync_start_local` (kernel-accelerated copy path); anything that
  *  involves a remote endpoint routes through `sync_start_cross`. The
@@ -276,10 +323,18 @@ export async function startSync(
   dest: string,
   options?: JobOptions,
 ): Promise<string> {
-  if (isRemote(src) || isRemote(dest)) {
-    return syncStartCross(src, dest, options);
+  const jobId =
+    isRemote(src) || isRemote(dest)
+      ? await syncStartCross(src, dest, options)
+      : await syncStartLocal(src, dest, options);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(SYNC_QUEUED_EVENT, {
+        detail: { jobId, src, dest },
+      }),
+    );
   }
-  return syncStartLocal(src, dest, options);
+  return jobId;
 }
 
 /** True iff this backend kind has a server-side connection in the
