@@ -13,6 +13,9 @@ import OpenIcon from "@mui/icons-material/FolderOpen";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ContentCutIcon from "@mui/icons-material/ContentCut";
+import ContentPasteIcon from "@mui/icons-material/ContentPaste";
+import LinkIcon from "@mui/icons-material/Link";
 import InfoIcon from "@mui/icons-material/Info";
 import BookmarkIcon from "@mui/icons-material/BookmarkBorder";
 import ArchiveIcon from "@mui/icons-material/Archive";
@@ -79,6 +82,20 @@ interface Props {
   currentTag?: TagColor | null;
   /** Set or clear a tag on the entry. `null` clears. */
   onSetTag?: (entry: Entry, color: TagColor | null) => void;
+  /** Mark the current selection for a copy paste. Same semantics as
+   *  the toolbar's Copy button — populates the file clipboard. */
+  onCutToClipboard?: (entry: Entry) => void;
+  /** Mark the current selection for a cut paste. Same semantics as
+   *  the toolbar's Cut button. */
+  onCopyToClipboard?: (entry: Entry) => void;
+  /** Paste the file clipboard contents into the entry's parent
+   *  folder. Only rendered when [[pasteCount]] > 0. */
+  onPaste?: () => void;
+  /** Count of entries waiting in the file clipboard. Drives whether
+   *  the Paste row renders at all (hidden when nothing's queued so
+   *  the menu doesn't grow a dead row) and the label suffix
+   *  ("Paste 2 items"). */
+  pasteCount?: number;
 }
 
 export default function EntryContextMenu({
@@ -102,6 +119,10 @@ export default function EntryContextMenu({
   comparePending = false,
   currentTag = null,
   onSetTag,
+  onCutToClipboard,
+  onCopyToClipboard,
+  onPaste,
+  pasteCount = 0,
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
@@ -222,6 +243,10 @@ export default function EntryContextMenu({
           <ListItemText>Open in terminal</ListItemText>
         </MenuItem>
       )}
+      {/* Separator before the rename / cut / copy / paste cluster —
+          visually splits "open / reveal" from "edit / clipboard"
+          actions. Bug 8 (0.2.280). */}
+      <Divider />
       <MenuItem
         onClick={() => {
           if (state) onRename(state.entry);
@@ -234,6 +259,63 @@ export default function EntryContextMenu({
         <ListItemText>Rename…</ListItemText>
         {shortcut("F2")}
       </MenuItem>
+      {onCutToClipboard && state && (
+        <MenuItem
+          onClick={() => {
+            onCutToClipboard(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <ContentCutIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Cut</ListItemText>
+          {shortcut("⌘X")}
+        </MenuItem>
+      )}
+      {onCopyToClipboard && state && (
+        <MenuItem
+          onClick={() => {
+            onCopyToClipboard(state.entry);
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Copy</ListItemText>
+          {shortcut("⌘C")}
+        </MenuItem>
+      )}
+      {/* Paste only renders when there's something queued in the file
+       *  clipboard. Mirrors the toolbar's "Paste N items" pill. The
+       *  paste lands in the entry's parent folder; Browser owns the
+       *  resolution. */}
+      {onPaste && pasteCount > 0 && (
+        <MenuItem
+          onClick={() => {
+            onPaste();
+            onClose();
+          }}
+        >
+          <ListItemIcon>
+            <ContentPasteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>
+            {`Paste ${pasteCount} item${pasteCount === 1 ? "" : "s"}`}
+          </ListItemText>
+          {shortcut("⌘V")}
+        </MenuItem>
+      )}
+      {/* Separator before the "copy as text" power-user cluster.
+       *  These are pure string-to-clipboard ops, distinct from the
+       *  real file-clipboard Copy above. Bug 8 (0.2.280) — earlier
+       *  shape rendered Copy path / Copy filename / etc. with the
+       *  same ContentCopy icon as the real Copy action, which the
+       *  user kept misreading as duplicates. Icons swapped: path =
+       *  link (it IS a URL-ish reference), filename = text label,
+       *  parent path = folder. */}
+      <Divider />
       <MenuItem
         onClick={() => {
           if (state) onCopyPath(state.entry);
@@ -241,14 +323,10 @@ export default function EntryContextMenu({
         }}
       >
         <ListItemIcon>
-          <ContentCopyIcon fontSize="small" />
+          <LinkIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Copy path</ListItemText>
       </MenuItem>
-      {/* Power-user copy variants. These bypass the onCopyPath
-       *  callback because they're pure string transforms — no need
-       *  to round-trip through Browser. Best-effort: silently no-op
-       *  when navigator.clipboard isn't available. */}
       <MenuItem
         onClick={() => {
           if (state && navigator?.clipboard) {
@@ -258,7 +336,7 @@ export default function EntryContextMenu({
         }}
       >
         <ListItemIcon>
-          <ContentCopyIcon fontSize="small" />
+          <LinkIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Copy filename</ListItemText>
       </MenuItem>
@@ -279,7 +357,7 @@ export default function EntryContextMenu({
         }}
       >
         <ListItemIcon>
-          <ContentCopyIcon fontSize="small" />
+          <LinkIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText>Copy parent path</ListItemText>
       </MenuItem>
@@ -298,7 +376,7 @@ export default function EntryContextMenu({
           }}
         >
           <ListItemIcon>
-            <ContentCopyIcon fontSize="small" />
+            <LinkIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Copy as file:// URI</ListItemText>
         </MenuItem>

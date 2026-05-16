@@ -1991,6 +1991,31 @@ export default function Browser({
             void navigator.clipboard.writeText(e.path);
           }
         }}
+        // Bug 8 (0.2.280) — wire Cut / Copy / Paste into the
+        // right-click menu. Mirrors the toolbar buttons + Cmd+X /
+        // Cmd+C / Cmd+V keyboard shortcuts: when the right-clicked
+        // entry is part of the current multi-selection, cut / copy
+        // ALL of them; otherwise just the right-clicked row. Paste
+        // is a folder-level action so it bypasses the per-entry arg.
+        onCutToClipboard={(e) => {
+          const targets =
+            selectedPaths.length > 0 && selectedPaths.includes(e.path)
+              ? selectedPaths
+              : [e.path];
+          setFileClipboard(targets, "cut");
+        }}
+        onCopyToClipboard={(e) => {
+          const targets =
+            selectedPaths.length > 0 && selectedPaths.includes(e.path)
+              ? selectedPaths
+              : [e.path];
+          setFileClipboard(targets, "copy");
+        }}
+        onPaste={() => {
+          const cb = getFileClipboard();
+          if (cb) void handlePaste(cb);
+        }}
+        pasteCount={clipboardSnap?.paths.length ?? 0}
         onProperties={(e) => setPropertiesTarget(e)}
         currentTag={
           contextMenu ? settings.fileTags[contextMenu.entry.path] ?? null : null
