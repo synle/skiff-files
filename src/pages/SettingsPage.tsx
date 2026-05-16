@@ -1013,6 +1013,29 @@ export default function SettingsPage() {
             label="Two-pane mode (split view, FileZilla-style — Cmd/Ctrl+\\ toggles)"
           />
 
+          <FormControl size="small" sx={{ maxWidth: 360 }}>
+            <InputLabel id="bulk-bar-labels">Action bar labels</InputLabel>
+            <Select
+              labelId="bulk-bar-labels"
+              label="Action bar labels"
+              value={settings.bulkActionBarLabels}
+              onChange={(e) =>
+                update(
+                  "bulkActionBarLabels",
+                  e.target.value as typeof settings.bulkActionBarLabels,
+                )
+              }
+            >
+              {/* "auto" mirrors the 0.2.270 behavior: text+icon in
+                  single-pane, icon-only in two-pane (where labels
+                  would otherwise wrap into the right pane). The two
+                  explicit modes pin it regardless of pane mode. */}
+              <MenuItem value="auto">Auto (icons in split view, labels otherwise)</MenuItem>
+              <MenuItem value="labels">Always show labels</MenuItem>
+              <MenuItem value="icons">Always icon-only (tooltips on hover)</MenuItem>
+            </Select>
+          </FormControl>
+
           <Divider sx={{ my: 1 }} />
           <Typography variant="subtitle2">Custom palette</Typography>
           <Typography variant="caption" color="text.secondary">
