@@ -11,6 +11,7 @@
 
 pub mod commands;
 pub mod crash;
+pub mod creds;
 pub mod fs;
 pub mod sync;
 pub mod win_cmd;
@@ -28,6 +29,7 @@ use commands::{
     fs_thumbnail, fs_thumbnail_clear, fs_thumbnail_stats,
     fs_open_with_default, fs_read_text, fs_remove, fs_rename, fs_reveal_in_os,
     fs_trash_path,
+    creds_capable, creds_delete, creds_load, creds_store,
     fs_stat, fs_trash, fs_trash_many, fs_trash_restore, get_app_version, settings_app_data_dir, settings_load,
     settings_save, window_open_at, window_open_new, window_set_always_on_top,
     fs_watch_clear, fs_watch_set, FsWatchState,
@@ -125,6 +127,10 @@ pub fn run() {
             settings_load,
             settings_save,
             settings_app_data_dir,
+            creds_store,
+            creds_load,
+            creds_delete,
+            creds_capable,
             crash_logs_dir,
             crash_logs_count,
             window_open_new,
