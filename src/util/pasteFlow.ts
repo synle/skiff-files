@@ -1,20 +1,26 @@
-// Pure orchestration helper for the Cmd+V paste flow. Extracted from
-// `pages/Browser.tsx` so we can unit-test the refresh-after-sync-done
-// + clipboard-clear contract without rendering the React tree.
+// Pure orchestration helper for the Cmd+V paste flow. Extracted
+// from `pages/Browser.tsx` so we can unit-test the
+// refresh-after-sync-done + clipboard-clear contract without
+// rendering the React tree.
 //
 // Two regressions this guards against:
 //   1) Destination wasn't refreshing after a multi-file SMB paste —
 //      `sync_start_cross` returns when the job is QUEUED, so an
-//      immediate `refresh()` ran before the bytes had landed and the
-//      user had to hit the manual Refresh button to see the new
-//      files (image #5).
-//   2) The "Paste N items" toolbar pill stayed visible after a paste,
-//      so users hit Cmd+V again thinking it didn't take and ended up
-//      with duplicate copies (image #6).
+//      immediate `refresh()` ran before the bytes had landed.
+//   2) The "Paste N items" toolbar pill stayed visible after a
+//      paste, so users hit Cmd+V again thinking it didn't take and
+//      ended up with duplicate copies.
 //
-// The orchestrator clears the clipboard up-front, dispatches a sync
-// per source, waits for the `sync:done` event on each job-id, and
-// refreshes the destination once each one lands.
+// And one workflow improvement:
+//   3) Multi-file pastes are SERIALIZED through one sync job at a
+//      time. Earlier "fire all N in parallel" produced "60
+//      operations in progress" stuck rows in the drawer — every
+//      job was queued before the first had a chance to finish, and
+//      the remote-side single-flight mutex (SMB) meant nothing
+//      really progressed in parallel anyway. Serial dispatch keeps
+//      the drawer clean (one row at a time), gives the user clear
+//      per-file progress, and matches what every other file manager
+//      does for multi-file paste.
 
 import type { Summary } from "../api/sync";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -52,15 +58,18 @@ export interface PasteDeps {
    *  destination refresh. Returns the path currently shown by the
    *  caller; the orchestrator compares against the original destFolder. */
   currentPath: () => string;
-  /** Watchdog timeout for unfired `sync:done` events (cancelled /
-   *  failed jobs). Defaults to 60s; tests override to keep runs fast. */
-  doneTimeoutMs?: number;
+  /** Per-job watchdog: if `sync:done` never fires (cancelled job /
+   *  engine crash), give up waiting after this many ms and proceed
+   *  to the next source. Defaults to 30 minutes — long enough for a
+   *  multi-GB transfer to finish on a slow connection, short enough
+   *  that a stuck job doesn't block the rest forever. */
+  perJobTimeoutMs?: number;
 }
 
-/** Orchestrate a paste: hide the pill, dispatch syncs, refresh after
- *  each job completes, and on `cut` remove the sources once every
- *  job has fired. Resolves once the orchestration kicks off — the
- *  refresh + cut-cleanup happens asynchronously via `onDone`. */
+/** Orchestrate a paste: hide the pill, dispatch syncs one-at-a-time,
+ *  refresh after each completes, and on `cut` remove the sources
+ *  once every job has fired. Returns once the entire orchestration
+ *  has settled. */
 export async function runPaste(
   clipboard: PasteClipboard,
   destFolder: string,
@@ -69,10 +78,52 @@ export async function runPaste(
   const isCut = clipboard.operation === "cut";
   const remoteCutPaths: string[] = [];
   const jobIds = new Set<string>();
-  // Bug 2 — clear clipboard up-front so the "Paste 2 items" pill
-  // disappears the instant the user clicks paste. Repeated paste-
-  // into-same-folder was almost always an accident.
+  const perJobTimeoutMs = deps.perJobTimeoutMs ?? 30 * 60_000;
+
+  // Hide the "Paste N items" toolbar pill up-front so repeated
+  // paste-into-same-folder doesn't happen by accident.
   deps.clearClipboard();
+
+  // Single shared `sync:done` subscription — we resolve a per-job
+  // promise from inside the listener. Subscribing once (instead of
+  // once-per-source) keeps the listener overhead constant
+  // regardless of how many files the user pasted.
+  const resolvers = new Map<string, () => void>();
+  let unlisten: UnlistenFn | null = null;
+  try {
+    unlisten = await deps.onDone((summary) => {
+      const resolve = resolvers.get(summary.jobId);
+      if (!resolve) return;
+      resolvers.delete(summary.jobId);
+      resolve();
+    });
+  } catch {
+    // Without the listener we'd loop forever on the per-job await;
+    // fall back to a non-blocking dispatch with a single refresh at
+    // the end so partial behaviour is still acceptable.
+    unlisten = null;
+  }
+  /** Wait for `sync:done` for the given job-id, or the per-job
+   *  watchdog. Resolves cleanly in both cases — callers don't need
+   *  to distinguish (the engine prunes its own state regardless). */
+  const waitForJob = (jobId: string) =>
+    new Promise<void>((resolve) => {
+      if (!unlisten) {
+        // No listener attached — bail immediately so the loop can
+        // continue without blocking.
+        resolve();
+        return;
+      }
+      const timer = setTimeout(() => {
+        resolvers.delete(jobId);
+        resolve();
+      }, perJobTimeoutMs);
+      resolvers.set(jobId, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+
   for (const src of clipboard.paths) {
     try {
       const meta = await deps.stat(src);
@@ -80,63 +131,41 @@ export async function runPaste(
       const jobId = await deps.startSync(src, dest);
       jobIds.add(jobId);
       if (isCut) remoteCutPaths.push(src);
+      // Wait for this job to finish before kicking the next one.
+      // Serial dispatch keeps the OperationsDrawer at one row at a
+      // time and avoids the "60 stuck rows" pile-up the parallel
+      // shape produced.
+      await waitForJob(jobId);
+      // Refresh the destination after each file lands so the user
+      // sees the listing grow as files arrive. Skipped when the
+      // user has navigated away.
+      if (deps.currentPath() === destFolder) {
+        try { await deps.refresh(destFolder); } catch { /* tolerated */ }
+      }
     } catch (e) {
       deps.onError(String(e));
     }
   }
-  if (jobIds.size === 0) {
-    // Every dispatch failed — still refresh in case partial state landed.
-    if (deps.currentPath() === destFolder) await deps.refresh(destFolder);
-    return { jobIds };
+
+  if (unlisten) {
+    try { unlisten(); } catch { /* ignore */ }
   }
-  // Optimistic post-dispatch refresh. Kernel-accelerated local copies
-  // can land bytes synchronously before sync:done makes the event-loop
-  // hop; refreshing here means the new entries show up the instant
-  // sync_start_local returns, no awkward "waiting on event" gap.
-  if (deps.currentPath() === destFolder) {
-    try { await deps.refresh(destFolder); } catch { /* surface elsewhere */ }
+
+  // Cut-mode cleanup: remove the sources once every copy is done.
+  if (isCut && remoteCutPaths.length > 0) {
+    try {
+      await deps.removeOrTrashMany(remoteCutPaths);
+    } catch {
+      /* engine errors surface in TransfersPage; the saved jobs are
+       * already gone from the user's POV anyway. */
+    }
+    if (deps.currentPath() === destFolder) {
+      try { await deps.refresh(destFolder); } catch { /* tolerated */ }
+    }
+  } else if (deps.currentPath() === destFolder) {
+    // Belt-and-braces final refresh for the copy path.
+    try { await deps.refresh(destFolder); } catch { /* tolerated */ }
   }
-  // Bug 1 — wait for sync:done for each queued job and refresh as
-  // each one lands. We unlisten once every id has fired.
-  const pending = new Set(jobIds);
-  let unlisten: UnlistenFn | null = null;
-  let settled = false;
-  const cleanup = () => {
-    if (unlisten) {
-      try { unlisten(); } catch { /* ignore */ }
-      unlisten = null;
-    }
-  };
-  const finalize = () => {
-    if (settled) return;
-    settled = true;
-    cleanup();
-    if (isCut && remoteCutPaths.length > 0) {
-      void deps.removeOrTrashMany(remoteCutPaths)
-        .catch(() => { /* engine errors surface elsewhere */ })
-        .finally(() => {
-          if (deps.currentPath() === destFolder) void deps.refresh(destFolder);
-        });
-    } else if (deps.currentPath() === destFolder) {
-      void deps.refresh(destFolder);
-    }
-  };
-  const un = await deps.onDone((summary) => {
-    if (!pending.has(summary.jobId)) return;
-    pending.delete(summary.jobId);
-    if (deps.currentPath() === destFolder) void deps.refresh(destFolder);
-    if (pending.size === 0) finalize();
-  });
-  unlisten = un;
-  // Race: every job may have completed before the listener attached
-  // (rare, but possible for kernel-accelerated local copies on a
-  // fast disk).
-  if (pending.size === 0) finalize();
-  // Watchdog so a cancelled / failed job that never emits sync:done
-  // doesn't leak the listener forever.
-  const timeoutMs = deps.doneTimeoutMs ?? 60_000;
-  setTimeout(() => {
-    if (!settled) finalize();
-  }, timeoutMs);
+
   return { jobIds };
 }

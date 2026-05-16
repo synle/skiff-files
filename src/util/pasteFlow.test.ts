@@ -1,19 +1,22 @@
 // Regression tests for the Cmd+V paste orchestrator.
 //
-// Both regressions live in here so they can't reopen silently:
-//   - Bug 1 (image #4/#5): after pasting 2 files into an SMB folder,
-//     only one showed until manual refresh. Root cause:
-//     `sync_start_*` returns when the job is QUEUED, not when bytes
-//     have landed. We must refresh once `sync:done` fires per job.
-//   - Bug 2 (image #6): the "Paste 2 items" toolbar pill remained
-//     after a paste, inviting accidental duplicate pastes. We clear
-//     the clipboard up-front when paste starts.
-import { describe, expect, it, vi } from "vitest";
+// Pins:
+//   - Clipboard pill clears the instant paste starts (no duplicate-
+//     paste accidents).
+//   - Destination refreshes after each sync:done so the file list
+//     grows as files arrive.
+//   - Multi-file paste runs SERIALLY through one sync at a time
+//     (parallel dispatch produced "N stuck rows" in the drawer).
+//   - Cut-mode removes sources only after every copy lands.
+//   - Per-source errors don't abort the rest of the batch.
+//
+// The test uses fake timers + a manual "fire sync:done" trigger so
+// the serial sequence is deterministic — without that, each await
+// inside `runPaste` would wait forever for an event that never came.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runPaste, type PasteDeps } from "./pasteFlow";
 import type { Summary } from "../api/sync";
 
-/** Build a `Summary` matching the engine's `sync:done` payload shape.
- *  Default fields are no-op values — tests only care about `jobId`. */
 function makeSummary(jobId: string): Summary {
   return {
     jobId,
@@ -26,9 +29,9 @@ function makeSummary(jobId: string): Summary {
   };
 }
 
-/** Factory for a `PasteDeps` test double. Returns the deps + a manual
- *  trigger that fires the registered `sync:done` listener so the test
- *  controls the timing precisely. */
+/** Build a `PasteDeps` test double with a manual `fireDone` trigger.
+ *  Because `runPaste` now blocks on `sync:done` per job, every test
+ *  has to drive the listener manually after each `startSync`. */
 function makeDeps(over: Partial<PasteDeps> = {}) {
   let doneListener: ((s: Summary) => void) | null = null;
   const refresh = vi.fn();
@@ -40,7 +43,12 @@ function makeDeps(over: Partial<PasteDeps> = {}) {
     isDir: false,
   }));
   let jobIdCounter = 0;
-  const startSync = vi.fn(async () => `job-${++jobIdCounter}`);
+  const startedJobIds: string[] = [];
+  const startSync = vi.fn(async () => {
+    const id = `job-${++jobIdCounter}`;
+    startedJobIds.push(id);
+    return id;
+  });
   const onDone = vi.fn(async (cb: (s: Summary) => void) => {
     doneListener = cb;
     return () => { doneListener = null; };
@@ -54,7 +62,7 @@ function makeDeps(over: Partial<PasteDeps> = {}) {
     removeOrTrashMany,
     onError,
     currentPath: () => "/dest",
-    doneTimeoutMs: 1_000,
+    perJobTimeoutMs: 5_000,
     ...over,
   };
   return {
@@ -66,121 +74,184 @@ function makeDeps(over: Partial<PasteDeps> = {}) {
     startSync,
     stat,
     onDone,
+    startedJobIds,
     fireDone: (id: string) => doneListener?.(makeSummary(id)),
   };
 }
 
+/** Run a paste while interleaving "fire sync:done" calls between
+ *  each `startSync`. Mimics what happens at runtime: the engine
+ *  completes one job, the orchestrator unblocks, kicks the next.
+ *  We can't `await runPaste(...)` directly because it would block
+ *  forever waiting for done events; instead we kick a microtask
+ *  loop that drains pending starts + fires done events for them. */
+async function pumpPaste(
+  promise: Promise<{ jobIds: Set<string> }>,
+  startedJobIds: string[],
+  fireDone: (id: string) => void,
+): Promise<{ jobIds: Set<string> }> {
+  let done = false;
+  promise.finally(() => { done = true; });
+  // Round-trip the microtask queue until the paste resolves or we
+  // exhaust a generous iteration budget. Each pass drains pending
+  // `startSync` resolutions; we fire `done` for each newly-started
+  // job so the per-job await unblocks.
+  let fired = 0;
+  for (let i = 0; i < 100 && !done; i++) {
+    // Yield the microtask queue twice so `await stat` + `await
+    // startSync` both settle before we look at startedJobIds.
+    await new Promise((r) => setTimeout(r, 0));
+    while (fired < startedJobIds.length) {
+      fireDone(startedJobIds[fired++]);
+    }
+  }
+  return promise;
+}
+
+beforeEach(() => {
+  // Real timers — pumpPaste uses real setTimeout to flush microtasks.
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("runPaste", () => {
-  it("clears the file clipboard up-front (Bug 2)", async () => {
-    // Even before any sync_start_* resolves, the toolbar pill must
-    // disappear. Verifies the contract regardless of network latency.
-    const { deps, clearClipboard } = makeDeps();
-    await runPaste(
-      { paths: ["/src/a.png"], operation: "copy" },
-      "/dest",
-      deps,
+  it("clears the file clipboard up-front", async () => {
+    const { deps, clearClipboard, startedJobIds, fireDone } = makeDeps();
+    await pumpPaste(
+      runPaste({ paths: ["/src/a.png"], operation: "copy" }, "/dest", deps),
+      startedJobIds,
+      fireDone,
     );
     expect(clearClipboard).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes the destination after each sync:done fires (Bug 1)", async () => {
-    // Two-file paste — the destination must refresh as each job
-    // lands, not only after the initial dispatch returns. Mirrors the
-    // SMB scenario from image #4/#5.
-    const { deps, refresh, fireDone } = makeDeps();
-    const { jobIds } = await runPaste(
-      { paths: ["/src/a.png", "/src/b.png"], operation: "copy" },
-      "/dest",
-      deps,
+  it("dispatches sync jobs SERIALLY — one source at a time", async () => {
+    // Earlier shape fired all N startSyncs in parallel and produced
+    // "60 stuck rows" in the drawer. Serial dispatch is the fix.
+    const { deps, startSync, startedJobIds, fireDone } = makeDeps();
+    await pumpPaste(
+      runPaste(
+        { paths: ["/src/a", "/src/b", "/src/c"], operation: "copy" },
+        "/dest",
+        deps,
+      ),
+      startedJobIds,
+      fireDone,
+    );
+    expect(startSync).toHaveBeenCalledTimes(3);
+    // Order matters: a, then b, then c.
+    expect(startSync).toHaveBeenNthCalledWith(1, "/src/a", "/dest");
+    expect(startSync).toHaveBeenNthCalledWith(2, "/src/b", "/dest");
+    expect(startSync).toHaveBeenNthCalledWith(3, "/src/c", "/dest");
+  });
+
+  it("refreshes the destination after each sync:done fires", async () => {
+    const { deps, refresh, startedJobIds, fireDone } = makeDeps();
+    const { jobIds } = await pumpPaste(
+      runPaste(
+        { paths: ["/src/a.png", "/src/b.png"], operation: "copy" },
+        "/dest",
+        deps,
+      ),
+      startedJobIds,
+      fireDone,
     );
     expect(jobIds.size).toBe(2);
-    // Optimistic post-dispatch refresh.
-    expect(refresh).toHaveBeenCalledWith("/dest");
-    const before = refresh.mock.calls.length;
-    // Fire sync:done for each queued job. Each one should refresh.
-    for (const id of jobIds) fireDone(id);
-    expect(refresh.mock.calls.length).toBeGreaterThan(before);
-    // Last refresh call must target the original destFolder (the
-    // user might have navigated away, but currentPath() returns the
-    // same folder here).
+    // One refresh per job (after its done event) plus the final
+    // belt-and-braces refresh = at least 2 calls.
+    expect(refresh.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(refresh).toHaveBeenLastCalledWith("/dest");
   });
 
-  it("dispatches one sync per source with the right dest shape", async () => {
-    // Sources that are directories get their basename appended to the
-    // destination folder; file sources land directly under destFolder.
+  it("dirs get their basename appended to the dest; files land directly", async () => {
     const customStat = vi.fn(async (p: string) => ({
       name: p.split("/").pop() ?? p,
       isDir: p.endsWith("/folder"),
     }));
-    const { deps, startSync } = makeDeps({ stat: customStat });
-    await runPaste(
-      { paths: ["/src/file.txt", "/src/folder"], operation: "copy" },
-      "/dest",
-      deps,
+    const { deps, startSync, startedJobIds, fireDone } = makeDeps({
+      stat: customStat,
+    });
+    await pumpPaste(
+      runPaste(
+        { paths: ["/src/file.txt", "/src/folder"], operation: "copy" },
+        "/dest",
+        deps,
+      ),
+      startedJobIds,
+      fireDone,
     );
     expect(customStat).toHaveBeenCalledTimes(2);
     expect(startSync).toHaveBeenCalledWith("/src/file.txt", "/dest");
     expect(startSync).toHaveBeenCalledWith("/src/folder", "/dest/folder");
   });
 
-  it("removes sources after every cut-paste job completes (symmetric path)", async () => {
-    // Pair with the copy-paste case above. On `cut` we must:
-    //   1) still clear the clipboard up-front (Bug 2),
-    //   2) wait for ALL syncs to finish before removing sources,
-    //   3) refresh the destination after the removal lands.
-    const { deps, removeOrTrashMany, fireDone } = makeDeps();
-    const { jobIds } = await runPaste(
-      { paths: ["/src/a", "/src/b"], operation: "cut" },
-      "/dest",
-      deps,
+  it("cut-mode removes sources after every copy lands", async () => {
+    const { deps, removeOrTrashMany, startedJobIds, fireDone } = makeDeps();
+    await pumpPaste(
+      runPaste(
+        { paths: ["/src/a", "/src/b"], operation: "cut" },
+        "/dest",
+        deps,
+      ),
+      startedJobIds,
+      fireDone,
     );
-    expect(removeOrTrashMany).not.toHaveBeenCalled();
-    const ids = Array.from(jobIds);
-    fireDone(ids[0]);
-    // First job done — sources must not be removed yet (the second
-    // is still copying).
-    expect(removeOrTrashMany).not.toHaveBeenCalled();
-    fireDone(ids[1]);
-    // Both jobs done — removal kicks in with all original sources.
+    expect(removeOrTrashMany).toHaveBeenCalledTimes(1);
     expect(removeOrTrashMany).toHaveBeenCalledWith(["/src/a", "/src/b"]);
   });
 
   it("skips refresh when the user has navigated away mid-paste", async () => {
-    // The `currentPath()` test seam returns a non-matching folder, so
-    // the orchestrator must not refresh someone else's tab.
     const refresh = vi.fn();
-    const { deps, fireDone } = makeDeps({
+    const { deps, startedJobIds, fireDone } = makeDeps({
       refresh,
       currentPath: () => "/somewhere/else",
     });
-    const { jobIds } = await runPaste(
-      { paths: ["/src/a"], operation: "copy" },
-      "/dest",
-      deps,
+    await pumpPaste(
+      runPaste({ paths: ["/src/a"], operation: "copy" }, "/dest", deps),
+      startedJobIds,
+      fireDone,
     );
-    for (const id of jobIds) fireDone(id);
-    // Optimistic refresh + per-done refresh both gated on currentPath
-    // == destFolder. Neither must have fired.
     expect(refresh).not.toHaveBeenCalled();
   });
 
   it("surfaces per-source stat errors via onError, continues other sources", async () => {
-    // One bad source mustn't abort the whole paste — the per-item
-    // try/catch is load-bearing for partial-success behavior.
-    const { deps, onError, startSync } = makeDeps({
+    const { deps, onError, startSync, startedJobIds, fireDone } = makeDeps({
       stat: vi.fn(async (p: string) => {
         if (p === "/src/bad") throw new Error("stat failed");
         return { name: p.split("/").pop() ?? p, isDir: false };
       }),
     });
-    await runPaste(
-      { paths: ["/src/bad", "/src/good"], operation: "copy" },
-      "/dest",
-      deps,
+    await pumpPaste(
+      runPaste(
+        { paths: ["/src/bad", "/src/good"], operation: "copy" },
+        "/dest",
+        deps,
+      ),
+      startedJobIds,
+      fireDone,
     );
     expect(onError).toHaveBeenCalledTimes(1);
     expect(startSync).toHaveBeenCalledTimes(1);
     expect(startSync).toHaveBeenCalledWith("/src/good", "/dest");
+  });
+
+  it("per-job watchdog unblocks the loop when sync:done never fires", async () => {
+    // Defensive — if the engine crashes mid-job and never emits
+    // sync:done, the orchestrator must NOT block the rest of the
+    // paste forever. The per-job timeout drains the await.
+    const { deps, startSync, startedJobIds } = makeDeps({
+      perJobTimeoutMs: 30,
+    });
+    // Don't fire any done events — let the watchdog do the work.
+    await runPaste(
+      { paths: ["/src/a", "/src/b"], operation: "copy" },
+      "/dest",
+      deps,
+    );
+    // Both syncs still kicked, just spaced out by the watchdog.
+    expect(startSync).toHaveBeenCalledTimes(2);
+    expect(startedJobIds).toHaveLength(2);
   });
 });
