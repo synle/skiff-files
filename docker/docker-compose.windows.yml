@@ -1,19 +1,21 @@
-# Remote-backend test harness (macOS / Linux) — SFTP + FTP + SMB.
-# Mounts the host's home directory (${HOME}) into every server so you
-# can browse / sync your real files through the protocols.
+# Remote-backend test harness (Windows) — SFTP + FTP + SMB.
+# Mounts D:/ into every server so you can browse / sync that drive
+# through the protocols. To use a different drive or path, edit the
+# `volumes:` entries below — paths with spaces need quoting in YAML.
 #
-# Spin up:    docker compose -f docker/docker-compose.yml up -d
-# Tear down:  docker compose -f docker/docker-compose.yml down
+# Spin up:    docker compose -f docker/docker-compose.windows.yml up -d
+# Tear down:  docker compose -f docker/docker-compose.windows.yml down
+#
+# Docker Desktop → Settings → Resources → File Sharing must include
+# the drive (D:) before the mount will work.
 #
 # Mirrors the one-shot `docker run` recipes in docker/docker.md.
-# Windows equivalent: docker-compose.windows.yml (mounts D:/).
+# macOS / Linux equivalent: docker-compose.yml (mounts ${HOME}).
 #
 # Credentials are deliberately weak ("skiffpass") and the boxes only
 # bind to 127.0.0.1 — never expose this stack to a public network.
 
 services:
-  # SFTP / SSH. linuxserver/openssh-server ships a real shell + modern
-  # KEX defaults that russh expects out of the box.
   skiff-sftp:
     image: lscr.io/linuxserver/openssh-server:latest
     container_name: skiff-sftp
@@ -28,9 +30,8 @@ services:
     ports:
       - "127.0.0.1:2222:2222"
     volumes:
-      - ${HOME}:/config
+      - D:/:/config
 
-  # Plain FTP with passive-mode ports.
   skiff-ftp:
     image: delfer/alpine-ftp-server:latest
     container_name: skiff-ftp
@@ -43,9 +44,8 @@ services:
       - "127.0.0.1:2121:21"
       - "127.0.0.1:21000-21009:21000-21009"
     volumes:
-      - ${HOME}:/home/testuser
+      - D:/:/home/testuser
 
-  # SMB 2/3 — exposes a single share `testshare` backed by ${HOME}.
   skiff-smb:
     image: dperson/samba:latest
     container_name: skiff-smb
@@ -56,4 +56,4 @@ services:
     ports:
       - "127.0.0.1:1445:445"
     volumes:
-      - ${HOME}:/share
+      - D:/:/share
