@@ -437,21 +437,36 @@ export default function Browser({
     let cancelled = false;
     let unlisten: (() => void) | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    void import("@tauri-apps/api/event").then(({ listen }) =>
-      listen<string>("fs:changed", (event) => {
-        // Filter: only react when the changed path is the one we're
-        // showing. Watcher emits the path that triggered (notify
-        // surfaces the file path, not the parent dir).
-        const changed = event.payload ?? "";
-        const norm = path.replace(/\/+$/, "");
-        if (changed && !changed.startsWith(norm)) return;
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => void refresh(path), 250);
-      }).then((u) => {
-        if (cancelled) u();
-        else unlisten = u;
-      }),
-    );
+    // Tolerated rejection: outside a real Tauri runtime (vitest jsdom,
+    // SSR previews) the `listen` import resolves but the underlying
+    // IPC transport is missing, so the call rejects with
+    // "Cannot read properties of undefined (reading 'transformCallback')".
+    // Without an explicit .catch() the rejection bubbles up as an
+    // unhandled promise rejection and pollutes test output. Log only
+    // in DEV so a genuine listen failure in production stays quiet.
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen<string>("fs:changed", (event) => {
+          // Filter: only react when the changed path is the one we're
+          // showing. Watcher emits the path that triggered (notify
+          // surfaces the file path, not the parent dir).
+          const changed = event.payload ?? "";
+          const norm = path.replace(/\/+$/, "");
+          if (changed && !changed.startsWith(norm)) return;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => void refresh(path), 250);
+        }).then((u) => {
+          if (cancelled) u();
+          else unlisten = u;
+        }),
+      )
+      .catch((err: unknown) => {
+        // Best-effort diagnostic — surfaces a genuine listen failure
+        // in production via the browser console without producing
+        // user-visible UI noise. Tests (jsdom) reach here every time;
+        // the warning is cheap and silenceable via vi.spyOn(console).
+        console.warn("fs:changed listener init failed", err);
+      });
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);

@@ -915,9 +915,11 @@ function buildCommandActions(deps: {
       run: () => {
         // dynamic import keeps the module out of the palette's hot
         // path render — only loads when the user actually triggers it.
-        void import("./api/fs").then(({ windowOpenNew }) =>
-          windowOpenNew().catch(() => {}),
-        );
+        void import("./api/fs")
+          .then(({ windowOpenNew }) => windowOpenNew().catch(() => {}))
+          .catch(() => {
+            /* dynamic import failure — best effort, ignore */
+          });
       },
     },
     // User-curated paths land at the bottom — they're noisier than
