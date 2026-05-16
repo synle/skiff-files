@@ -18,7 +18,7 @@ use russh_sftp::client::SftpSession;
 use russh_sftp::protocol::{FileAttributes, OpenFlags};
 use tokio::io::AsyncWriteExt;
 use serde::Deserialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
@@ -51,6 +51,36 @@ pub struct SftpConfig {
 
 fn default_port() -> u16 {
     22
+}
+
+/// Expand a leading `~` or `~/...` to the current user's home directory.
+///
+/// Skiff Files surfaces `~/.ssh/id_*` as the natural placeholder in the
+/// **Private key path** field, so users type tilde-paths by reflex.
+/// russh / std::fs don't expand `~` (the shell normally does), which
+/// turns into `No such file or directory` at key-load time. Returns the
+/// input unchanged when there's no tilde to expand, or when no home
+/// directory can be resolved.
+///
+/// # Arguments
+///
+/// * `raw` - Path string as typed by the user (may begin with `~`).
+///
+/// # Returns
+///
+/// `PathBuf` with `~` replaced by the resolved home directory, or the
+/// raw path unchanged otherwise.
+fn expand_home(raw: &str) -> PathBuf {
+    if raw == "~" {
+        if let Some(home) = dirs::home_dir() {
+            return home;
+        }
+    } else if let Some(rest) = raw.strip_prefix("~/").or_else(|| raw.strip_prefix("~\\")) {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(rest);
+        }
+    }
+    PathBuf::from(raw)
 }
 
 /// Russh client handler. When `known_hosts_path` is `Some`, applies
@@ -220,11 +250,14 @@ impl SftpClient {
                     .await
                     .map_err(|e| format!("ssh auth (password): {e}"))?;
             } else if let Some(key_path) = &config.private_key_path {
+                let resolved = expand_home(key_path);
                 let key = russh_keys::load_secret_key(
-                    key_path,
+                    &resolved,
                     config.private_key_passphrase.as_deref(),
                 )
-                .map_err(|e| format!("load private key {key_path}: {e}"))?;
+                .map_err(|e| {
+                    format!("load private key {}: {e}", resolved.display())
+                })?;
                 authenticated = session
                     .authenticate_publickey(&config.user, Arc::new(key))
                     .await
@@ -648,6 +681,21 @@ mod tests {
         let json = r#"{"host":"a","user":"b","password":"c"}"#;
         let cfg: SftpConfig = serde_json::from_str(json).unwrap();
         assert_eq!(cfg.port, 22);
+    }
+
+    #[test]
+    fn expand_home_resolves_tilde_paths() {
+        let home = dirs::home_dir().expect("test host must have a home dir");
+        // `~/foo` => $HOME/foo
+        assert_eq!(expand_home("~/foo"), home.join("foo"));
+        // bare `~` => $HOME
+        assert_eq!(expand_home("~"), home);
+        // absolute path is untouched
+        assert_eq!(expand_home("/etc/passwd"), PathBuf::from("/etc/passwd"));
+        // tilde-username (~alice) is intentionally NOT expanded — we only
+        // resolve the current user's home, matching shell semantics is
+        // out of scope.
+        assert_eq!(expand_home("~alice/foo"), PathBuf::from("~alice/foo"));
     }
 
     /// Build a FileAttributes with `permissions` set to a unix-style
