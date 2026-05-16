@@ -21,3 +21,7 @@ Frontend-only dev (browser preview at http://localhost:1420, faster UI iteration
 ```bash
 npm run dev
 ```
+
+## Remote-backend test harness (SFTP / FTP / SMB)
+
+Need real remote servers to develop against? There's a docker-based harness in [`docker/`](./docker/) that spins up SFTP, FTP, and SMB on `127.0.0.1`. Both a `docker-compose.yml` (one-shot, named volumes) and `docker run` recipes (mount a host folder like `~/` on macOS or `D:/` on Windows) are documented in [`docker/docker.md`](./docker/docker.md) — see there for full commands, endpoints, and credentials.
