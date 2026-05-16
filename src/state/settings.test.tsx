@@ -128,6 +128,15 @@ describe("loadSettingsFromDisk / saveSettingsToDisk", () => {
     expect(DEFAULTS.bookmarks).toEqual([]);
   });
 
+  // Bug 20 — default conflict policy is "prompt" so colliding files
+  // during paste / drag-drop surface the TeraCopy-style modal instead
+  // of silently being skipped. The earlier "skip" default looked
+  // identical to a stalled copy from the user's POV. Pin the default
+  // explicitly so a future refactor can't silently regress it.
+  it("DEFAULTS.syncDefaultConflictPolicy is 'prompt' (Bug 20)", () => {
+    expect(DEFAULTS.syncDefaultConflictPolicy).toBe("prompt");
+  });
+
   it("saved settings without folderViewMode get merged against DEFAULTS", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",

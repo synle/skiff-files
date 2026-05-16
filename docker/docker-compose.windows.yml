@@ -1,0 +1,88 @@
+# Remote-backend test harness (Windows) — SFTP + FTP + SMB.
+# Mounts D:/ into every server so you can browse / sync that drive
+# through the protocols. To use a different drive or path, edit the
+# `volumes:` entries below — paths with spaces need quoting in YAML.
+#
+# Spin up:    docker compose -f docker/docker-compose.windows.yml up -d
+# Tear down:  docker compose -f docker/docker-compose.windows.yml down
+#
+# Docker Desktop → Settings → Resources → File Sharing must include
+# the drive (D:) before the mount will work.
+#
+# Mirrors the one-shot `docker run` recipes in docker/docker.md.
+# macOS / Linux equivalent: docker-compose.yml (mounts ${HOME}).
+#
+# Credentials are deliberately weak ("skiff" / "password") and the
+# boxes only bind to 127.0.0.1 — never expose this stack to a public
+# network.
+
+services:
+  # SFTP — atmoz/sftp (see note in docker-compose.yml). Host drive is
+  # mounted at /home/skiff/data so chroot stays valid; clients land in
+  # the chroot root and see one "data/" directory.
+  skiff-sftp:
+    image: atmoz/sftp:alpine
+    container_name: skiff-sftp
+    command: skiff:password:1001
+    ports:
+      - "127.0.0.1:2222:22"
+    volumes:
+      - D:/:/home/skiff/data
+    # Explicit ulimits override the daemon default — works around a
+    # Docker Desktop 29.x bug where the default-ulimits "Name" field is
+    # dropped and runc rejects the empty name.
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  # SFTP — key-auth variant on port 2223. Mounts %USERPROFILE%\.ssh\
+  # id_rsa.pub from the Windows host; atmoz/sftp installs it as
+  # authorized_keys at startup. Connect with the matching private key.
+  skiff-sftp-key:
+    image: atmoz/sftp:alpine
+    container_name: skiff-sftp-key
+    command: skiff::1001
+    ports:
+      - "127.0.0.1:2223:22"
+    volumes:
+      - D:/:/home/skiff/data
+      - ${USERPROFILE}/.ssh/id_rsa.pub:/home/skiff/.ssh/keys/id_rsa.pub:ro
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  skiff-ftp:
+    image: delfer/alpine-ftp-server:latest
+    container_name: skiff-ftp
+    environment:
+      USERS: "skiff|password|/home/skiff|1000"
+      ADDRESS: "127.0.0.1"
+      MIN_PORT: "21000"
+      MAX_PORT: "21009"
+    ports:
+      - "127.0.0.1:2121:21"
+      - "127.0.0.1:21000-21009:21000-21009"
+    volumes:
+      - D:/:/home/skiff
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  skiff-smb:
+    image: dperson/samba:latest
+    container_name: skiff-smb
+    command: >
+      -u "skiff;password"
+      -s "testshare;/share;yes;no;no;skiff;skiff"
+      -p
+    ports:
+      - "127.0.0.1:1445:445"
+    volumes:
+      - D:/:/share
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000

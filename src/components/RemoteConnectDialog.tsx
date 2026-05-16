@@ -15,6 +15,7 @@
 // caller can navigate to the canonical URL form.
 
 import {
+  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -37,8 +38,13 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
-import { connCreateFtp, connCreateSftp, connCreateSmb } from "../api/conn";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  connCreateFtp,
+  connCreateSftp,
+  connCreateSmb,
+  smbListShares,
+} from "../api/conn";
 import {
   loadFtpDrafts,
   loadSftpDrafts,
@@ -98,6 +104,16 @@ export default function RemoteConnectDialog({
   // on Use-click or directly from the form.
   const [smbShare, setSmbShare] = useState("");
   const [smbDomain, setSmbDomain] = useState("");
+  /** Live list of disk shares the supplied credentials can see, used
+   *  to populate the Share field's autocomplete options. Empty until
+   *  the backend probe succeeds; a failed probe leaves it empty so
+   *  the user can still free-type a share name. */
+  const [smbShareOptions, setSmbShareOptions] = useState<string[]>([]);
+  const [smbShareLoading, setSmbShareLoading] = useState(false);
+  /** Bumped each time the user changes host/user/password/port —
+   *  identifies an in-flight share-list request so a stale response
+   *  doesn't overwrite the options for a subsequent attempt. */
+  const smbProbeSeq = useRef(0);
   const [saveDraft, setSaveDraft] = useState(false);
   /** Tracks which saved draft (if any) is pre-filling the form, so
    *  switching back to "new" is a single click and the "Save for
@@ -144,11 +160,67 @@ export default function RemoteConnectDialog({
       setSmbShare("");
     }
     setSmbDomain("");
+    setSmbShareOptions([]);
+    setSmbShareLoading(false);
     setSaveDraft(false);
     setSelectedDraftId(null);
     setError(null);
     setBusy(false);
   }, [open, request]);
+
+  /** Manually trigger the SMB share-list probe with the form's
+   *  current host / user / password / port / domain. Fires
+   *  NetShareEnumAll server-side, feeds the result into the Share
+   *  field's Autocomplete options.
+   *
+   *  CRITICAL: this must NEVER be wired to a useEffect over
+   *  `[password]` — every keystroke would fire a probe with a
+   *  partial password, and SMB servers (especially OpenWrt /
+   *  router-based Samba) ban the source IP after a small number
+   *  of rapid failed logins. The result is the legitimate full-
+   *  password connect attempt gets TCP-dropped ("Disconnected from
+   *  server") because the IP is already in the deny list. We call
+   *  this on `onOpen` of the Share Autocomplete instead, so the
+   *  probe only runs when the user explicitly asks for it — exactly
+   *  once per dropdown open with the form's settled values. */
+  const probeSmbShares = () => {
+    if (scheme !== "smb") return;
+    if (!host || !user || !password || !port) {
+      setSmbShareOptions([]);
+      setSmbShareLoading(false);
+      return;
+    }
+    const seq = ++smbProbeSeq.current;
+    setSmbShareLoading(true);
+    void smbListShares({ host, port, user, password, domain: smbDomain })
+      .then((names) => {
+        if (smbProbeSeq.current !== seq) return;
+        setSmbShareOptions(names);
+      })
+      .catch(() => {
+        if (smbProbeSeq.current !== seq) return;
+        // Probe failure isn't surfaced as an error — the user can
+        // still type a share manually and the real Connect-button
+        // call will report the auth/network problem with full
+        // context. We just clear the options so a stale list from
+        // a previous probe doesn't mislead.
+        setSmbShareOptions([]);
+      })
+      .finally(() => {
+        if (smbProbeSeq.current !== seq) return;
+        setSmbShareLoading(false);
+      });
+  };
+
+  // When the user edits host / port / user / password / domain, the
+  // previously fetched share list no longer matches the new auth.
+  // Clear the options (but DO NOT re-probe — see the comment above
+  // `probeSmbShares`). The next dropdown-open re-fetches with the
+  // settled values.
+  useEffect(() => {
+    setSmbShareOptions([]);
+    setSmbShareLoading(false);
+  }, [scheme, host, port, user, password, smbDomain]);
 
   const matches = useMemo(() => {
     if (!request) return [] as Array<
@@ -307,7 +379,33 @@ export default function RemoteConnectDialog({
   if (!request) return null;
 
   return (
-    <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="sm" fullWidth>
+    // Render the Dialog's Paper as a real <form> so the browser
+    // enforces `required` on every TextField with that prop. Hitting
+    // Enter inside any field — or clicking Connect (type="submit") —
+    // submits via this handler; if anything required is empty the
+    // browser shows its native "Please fill out this field" tooltip
+    // anchored to the offending input. preventDefault stops the
+    // synthetic navigation form-submit triggers by default.
+    <Dialog
+      open={open}
+      onClose={busy ? undefined : onClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{
+        paper: {
+          component: "form",
+          // MUI v9 types Paper as HTMLDivElement so its SubmitEvent
+          // generic is HTMLDivElement — incorrect once we swap the
+          // root with `component: "form"`. The runtime element is a
+          // real <form>, so `currentTarget` IS an HTMLFormElement at
+          // runtime; the cast just unwedges the static check.
+          onSubmit: ((e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            void handleConnect();
+          }) as unknown as React.FormEventHandler<HTMLDivElement>,
+        },
+      }}
+    >
       <DialogTitle>
         Connect to {request.host}
         {request.port != null ? `:${request.port}` : ""}
@@ -343,8 +441,10 @@ export default function RemoteConnectDialog({
                         primary={draft.label}
                         secondary={
                           m.kind === "sftp"
-                            ? `${m.kind.toUpperCase()} · ${draft.user}@${draft.host}:${draft.port} · ${m.draft.authMode}`
-                            : `FTP · ${draft.user}@${draft.host}:${draft.port}`
+                            ? `SFTP · ${draft.user}@${draft.host}:${draft.port} · ${m.draft.authMode}`
+                            : m.kind === "smb"
+                              ? `SMB · ${draft.user || "guest"}@${draft.host}:${draft.port}/${m.draft.share}`
+                              : `FTP · ${draft.user}@${draft.host}:${draft.port}`
                         }
                       />
                     </ListItemButton>
@@ -393,6 +493,7 @@ export default function RemoteConnectDialog({
             </FormControl>
             <TextField
               size="small"
+              required
               label="Host"
               value={host}
               onChange={(e) => setHost(e.target.value)}
@@ -400,51 +501,28 @@ export default function RemoteConnectDialog({
             />
             <TextField
               size="small"
+              required
               label="Port"
               type="number"
               value={port}
               onChange={(e) => setPort(Number(e.target.value) || 0)}
+              // HTML5 number-input min keeps the native validator
+              // honest — `required` on a `type="number"` field with
+              // value 0 would technically pass otherwise.
+              slotProps={{ htmlInput: { min: 1, max: 65535 } }}
               sx={{ width: 100 }}
             />
           </Stack>
 
-          <TextField
-            size="small"
-            label="User"
-            value={user}
-            onChange={(e) => setUser(e.target.value)}
-            helperText={
-              scheme === "ftp"
-                ? "Leave as 'anonymous' for public FTP mirrors."
-                : undefined
-            }
-          />
-
-          {scheme === "smb" && (
-            <>
-              <Stack direction="row" spacing={1}>
-                <TextField
-                  size="small"
-                  label="Share"
-                  value={smbShare}
-                  onChange={(e) => setSmbShare(e.target.value)}
-                  helperText='e.g. "Documents", "shared", "Public"'
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Domain (optional)"
-                  value={smbDomain}
-                  onChange={(e) => setSmbDomain(e.target.value)}
-                  helperText="AD domain; leave empty for home / NAS"
-                  sx={{ flex: 1 }}
-                />
-              </Stack>
-            </>
-          )}
-
           {scheme === "sftp" ? (
             <>
+              <TextField
+                size="small"
+                required
+                label="User"
+                value={user}
+                onChange={(e) => setUser(e.target.value)}
+              />
               <FormControl size="small">
                 <Typography variant="caption" sx={{ mb: 0.5 }}>
                   Authentication
@@ -475,6 +553,7 @@ export default function RemoteConnectDialog({
               {authMode === "password" && (
                 <TextField
                   size="small"
+                  required
                   label="Password"
                   type="password"
                   value={password}
@@ -486,6 +565,7 @@ export default function RemoteConnectDialog({
                 <>
                   <TextField
                     size="small"
+                    required
                     label="Private key path"
                     value={privateKeyPath}
                     onChange={(e) => setPrivateKeyPath(e.target.value)}
@@ -507,18 +587,100 @@ export default function RemoteConnectDialog({
               )}
             </>
           ) : (
-            <TextField
-              size="small"
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              helperText={
-                scheme === "ftp"
-                  ? "Leave as 'anonymous@' for public FTP mirrors."
-                  : "Required for SMB. Never persisted."
-              }
-            />
+            <>
+              {/* User + Password on one row — credentials read left-to-right
+                  the way most NAS / FTP login UIs lay them out. SFTP keeps
+                  its own layout above because the auth radio collapses
+                  Password under a conditional render. */}
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  size="small"
+                  // FTP defaults to "anonymous"; we pre-fill on open
+                  // so the field is never actually empty there. SMB
+                  // has no anonymous concept — require it.
+                  required={scheme === "smb"}
+                  label="User"
+                  value={user}
+                  onChange={(e) => setUser(e.target.value)}
+                  helperText={
+                    scheme === "ftp"
+                      ? "Leave as 'anonymous' for public FTP mirrors."
+                      : undefined
+                  }
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  // FTP anonymous mirrors accept "anonymous@" as the
+                  // password — pre-filled. SMB needs a real one.
+                  required={scheme === "smb"}
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  helperText={
+                    scheme === "ftp"
+                      ? "Leave as 'anonymous@' for public mirrors."
+                      : "Never persisted."
+                  }
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+
+              {scheme === "smb" && (
+                <Stack direction="row" spacing={1}>
+                  {/* Share is required by SMB at session-setup, but the
+                      user shouldn't have to remember the name. Once
+                      host/user/password are filled the dialog opens a
+                      one-shot session and lists the disk shares the
+                      creds can see (admin shares are filtered by the
+                      smb2 crate); the result populates this dropdown.
+                      freeSolo keeps manual typing open for cases where
+                      the share isn't enumerable (some NAS firmwares
+                      hide it from NetShareEnumAll). */}
+                  <Autocomplete
+                    freeSolo
+                    size="small"
+                    options={smbShareOptions}
+                    value={smbShare}
+                    onChange={(_e, v) => setSmbShare(typeof v === "string" ? v : "")}
+                    onInputChange={(_e, v) => setSmbShare(v)}
+                    // Probe is on-open only: typing the password
+                    // pre-probe would fire a request with every
+                    // keystroke and burn through router-level fail2ban
+                    // throttles. Opening the dropdown means the user
+                    // has settled on the credentials.
+                    onOpen={probeSmbShares}
+                    loading={smbShareLoading}
+                    loadingText="Listing shares…"
+                    noOptionsText="Fill host / user / password to list shares"
+                    sx={{ flex: 1 }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        required
+                        label="Share"
+                        helperText={
+                          smbShareLoading
+                            ? "Listing shares…"
+                            : smbShareOptions.length > 0
+                              ? `${smbShareOptions.length} share${smbShareOptions.length === 1 ? "" : "s"} available — type to filter or pick one`
+                              : "Fill host / user / password to list shares, or type one"
+                        }
+                      />
+                    )}
+                  />
+                  <TextField
+                    size="small"
+                    label="Domain (optional)"
+                    value={smbDomain}
+                    onChange={(e) => setSmbDomain(e.target.value)}
+                    helperText="AD domain; leave empty for home / NAS"
+                    sx={{ flex: 1 }}
+                  />
+                </Stack>
+              )}
+            </>
           )}
 
           {/* Save-as-draft toggle. Off when a saved draft is the
@@ -544,13 +706,18 @@ export default function RemoteConnectDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={busy}>
+        <Button onClick={onClose} disabled={busy} type="button">
           Cancel
         </Button>
         <Button
           variant="contained"
-          onClick={() => void handleConnect()}
-          disabled={busy || !host || !port}
+          type="submit"
+          // No onClick — submission flows through the <form onSubmit>
+          // on the Dialog's Paper. That path runs the browser's
+          // built-in validity check first, which is what surfaces the
+          // "Please fill out this field" tooltip on missing required
+          // inputs. An onClick would bypass that check.
+          disabled={busy}
         >
           {busy ? "Connecting…" : "Connect"}
         </Button>

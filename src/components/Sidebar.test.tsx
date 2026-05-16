@@ -41,7 +41,8 @@ describe("Sidebar", () => {
   it("renders the headline section labels", () => {
     r();
     expect(screen.getByText("Favorites")).toBeInTheDocument();
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    // 0.2.281 renamed "Hosts" → "Network" (Bug 10).
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Devices")).toBeInTheDocument();
   });
 
@@ -179,7 +180,7 @@ describe("Sidebar", () => {
       if (!el) throw new Error(`No order wrapper for ${label}`);
       return el;
     };
-    expect(wrapperFor("Hosts").style.order).toBe("0");
+    expect(wrapperFor("Network").style.order).toBe("0");
     expect(wrapperFor("Devices").style.order).toBe("1");
     expect(wrapperFor("Favorites").style.order).toBe("2");
   });
@@ -198,7 +199,7 @@ describe("Sidebar", () => {
     // SIDEBAR_SECTION_DEFAULT_ORDER puts favorites first (index 0),
     // hosts at index 7, devices at index 8.
     expect(wrapperFor("Favorites").style.order).toBe("0");
-    expect(wrapperFor("Hosts").style.order).toBe("7");
+    expect(wrapperFor("Network").style.order).toBe("7");
     expect(wrapperFor("Devices").style.order).toBe("8");
   });
 });

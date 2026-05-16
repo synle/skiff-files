@@ -143,4 +143,182 @@ describe("EntryContextMenu", () => {
     r({ entry: remoteFolder, x: 10, y: 10 });
     expect(screen.queryByText("Open in terminal")).not.toBeInTheDocument();
   });
+
+  // Bug 8 regression (0.2.280) — Cut / Copy / Paste are first-class
+  // context-menu actions now, separated from the Copy-path / Copy-
+  // filename string-clipboard cluster.
+  describe("Cut / Copy / Paste cluster (Bug 8)", () => {
+    function rExt(opts: {
+      pasteCount?: number;
+      onCutToClipboard?: (entry: Entry) => void;
+      onCopyToClipboard?: (entry: Entry) => void;
+      onPaste?: () => void;
+    }) {
+      const handlers = {
+        onClose: vi.fn(),
+        onOpen: vi.fn(),
+        onRename: vi.fn(),
+        onTrash: vi.fn(),
+        onCopyPath: vi.fn(),
+        onProperties: vi.fn(),
+        onBookmark: vi.fn(),
+        onOpenWithDefault: vi.fn(),
+        onRevealInOs: vi.fn(),
+        onOpenInTerminal: vi.fn(),
+        onOpenInNewTab: vi.fn(),
+        onCompareWith: vi.fn(),
+        onDuplicate: vi.fn(),
+        onCompressZip: vi.fn(),
+        onExtractZip: vi.fn(),
+        onCutToClipboard: opts.onCutToClipboard ?? vi.fn(),
+        onCopyToClipboard: opts.onCopyToClipboard ?? vi.fn(),
+        onPaste: opts.onPaste ?? vi.fn(),
+        pasteCount: opts.pasteCount ?? 0,
+      };
+      render(
+        <ThemeProvider theme={theme}>
+          <EntryContextMenu
+            state={{ entry: file, x: 10, y: 10 }}
+            {...handlers}
+          />
+        </ThemeProvider>,
+      );
+      return handlers;
+    }
+
+    it("Cut row fires onCutToClipboard with the entry", () => {
+      const onCutToClipboard = vi.fn();
+      rExt({ onCutToClipboard });
+      fireEvent.click(screen.getByText("Cut"));
+      expect(onCutToClipboard).toHaveBeenCalledWith(file);
+    });
+
+    it("Copy row fires onCopyToClipboard with the entry", () => {
+      const onCopyToClipboard = vi.fn();
+      rExt({ onCopyToClipboard });
+      fireEvent.click(screen.getByText("Copy"));
+      expect(onCopyToClipboard).toHaveBeenCalledWith(file);
+    });
+
+    it("Paste row is hidden when the file clipboard is empty", () => {
+      rExt({ pasteCount: 0 });
+      expect(screen.queryByText(/^Paste/)).not.toBeInTheDocument();
+    });
+
+    it("Paste row renders with the count when items are queued", () => {
+      const onPaste = vi.fn();
+      rExt({ pasteCount: 3, onPaste });
+      const row = screen.getByText("Paste 3 items");
+      fireEvent.click(row);
+      expect(onPaste).toHaveBeenCalled();
+    });
+
+    it("singular Paste label when exactly one item is queued", () => {
+      rExt({ pasteCount: 1 });
+      expect(screen.getByText("Paste 1 item")).toBeInTheDocument();
+    });
+
+    // Bug 8 — visually separate "edit / clipboard cluster" from the
+    // "copy-as-text" cluster. The component renders <Divider> nodes
+    // between groups; users were misreading the two clusters as
+    // duplicates when both used the same ContentCopy icon.
+    it("renders multiple dividers separating the action clusters", () => {
+      rExt({ pasteCount: 2 });
+      // MUI's <Divider> renders with role="separator". The menu
+      // should have several — between open/reveal and rename/cut,
+      // between cut/paste and copy-as-text, and before Trash.
+      const dividers = screen.getAllByRole("separator");
+      // At least 3 separators are expected; using >= keeps the test
+      // resilient to future minor reshuffles.
+      expect(dividers.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  // Bug 8 — the three "Copy as text" rows (Copy path / Copy filename
+  // / Copy parent path) each must (a) write the correct string to
+  // navigator.clipboard, and (b) render with a LinkIcon — not the
+  // ContentCopyIcon the real Copy uses. Without distinct icons users
+  // misread the rows as duplicates of the file-clipboard Copy.
+  describe("Copy-as-text cluster icons + clipboard writes (Bug 8)", () => {
+    const handlers = () => ({
+      onClose: vi.fn(),
+      onOpen: vi.fn(),
+      onRename: vi.fn(),
+      onTrash: vi.fn(),
+      onCopyPath: vi.fn(),
+      onProperties: vi.fn(),
+      onBookmark: vi.fn(),
+      onOpenWithDefault: vi.fn(),
+      onRevealInOs: vi.fn(),
+      onOpenInTerminal: vi.fn(),
+      onOpenInNewTab: vi.fn(),
+      onCompareWith: vi.fn(),
+      onDuplicate: vi.fn(),
+      onCompressZip: vi.fn(),
+      onExtractZip: vi.fn(),
+    });
+
+    it("Copy path fires onCopyPath with the entry (not navigator.clipboard)", () => {
+      const h = handlers();
+      const localFile: Entry = { ...file, path: "/a/b/c.txt", name: "c.txt" };
+      render(
+        <ThemeProvider theme={theme}>
+          <EntryContextMenu
+            state={{ entry: localFile, x: 10, y: 10 }}
+            {...h}
+          />
+        </ThemeProvider>,
+      );
+      fireEvent.click(screen.getByText("Copy path"));
+      expect(h.onCopyPath).toHaveBeenCalledWith(localFile);
+    });
+
+    it("Copy filename writes the basename to navigator.clipboard", () => {
+      const h = handlers();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: { clipboard: { writeText } },
+      });
+      const localFile: Entry = {
+        ...file,
+        path: "/folder/subfolder/myfile.txt",
+        name: "myfile.txt",
+      };
+      render(
+        <ThemeProvider theme={theme}>
+          <EntryContextMenu
+            state={{ entry: localFile, x: 10, y: 10 }}
+            {...h}
+          />
+        </ThemeProvider>,
+      );
+      fireEvent.click(screen.getByText("Copy filename"));
+      expect(writeText).toHaveBeenCalledWith("myfile.txt");
+    });
+
+    it("Copy parent path writes the parent directory to navigator.clipboard", () => {
+      const h = handlers();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: { clipboard: { writeText } },
+      });
+      const localFile: Entry = {
+        ...file,
+        path: "/folder/subfolder/myfile.txt",
+        name: "myfile.txt",
+      };
+      render(
+        <ThemeProvider theme={theme}>
+          <EntryContextMenu
+            state={{ entry: localFile, x: 10, y: 10 }}
+            {...h}
+          />
+        </ThemeProvider>,
+      );
+      fireEvent.click(screen.getByText("Copy parent path"));
+      expect(writeText).toHaveBeenCalledWith("/folder/subfolder");
+    });
+  });
 });

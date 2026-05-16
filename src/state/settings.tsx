@@ -20,6 +20,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ThemeMode } from "../theme";
 import type { ConflictPolicy } from "../api/sync";
 import type { SortDir, SortKey } from "../components/FileList";
+import {
+  migrateLegacyDrafts,
+  type SavedConnection,
+} from "./connectionStore";
 
 /** What rendering style the file list uses. Per-folder overrides land later. */
 export type ViewMode = "list" | "tile" | "gallery" | "column";
@@ -82,8 +86,9 @@ export interface Settings {
   /** Pinned paths that show up in the sidebar's Bookmarks section. */
   bookmarks: Bookmark[];
   /** Auto-tracked navigation history. Most-recent first. Capped at
-   *  RECENT_PATHS_MAX so the list doesn't grow unbounded. Surfaces in
-   *  the sidebar's Recent section. */
+   *  RECENT_PATHS_TRACK_MAX so the list doesn't grow unbounded.
+   *  Surfaces in the sidebar's Recent section (top N) plus the
+   *  "Show all recent" dialog (full list). */
   recentPaths: string[];
   /** Favorites the user has hidden via the sidebar context menu.
    *  Stored as the relative-from-home segment (e.g. "Desktop") plus
@@ -211,6 +216,37 @@ export interface Settings {
    *  left pane, `savedTabsRight` for the right). Toggle via Cmd/Ctrl+\.
    *  Default false (single-pane). */
   twoPaneMode: boolean;
+  /** Controls whether the BulkActionBar (the toolbar above the file
+   *  list) renders text labels next to its icons. Three modes:
+   *  - `"auto"` — show labels in single-pane mode, hide them in
+   *    two-pane mode (the original 0.2.270 behavior, kept as the
+   *    default so existing users see no change).
+   *  - `"labels"` — always show labels regardless of pane mode.
+   *  - `"icons"` — always icon-only with tooltips, regardless of
+   *    pane mode. Saves vertical space and matches the Finder /
+   *    Explorer toolbar feel some users prefer.
+   *  Default `"auto"`. */
+  bulkActionBarLabels: "auto" | "labels" | "icons";
+  /** Unified saved-connections list — every SFTP / FTP / SMB
+   *  connection the user has added. Replaces the three per-kind
+   *  localStorage keys (`.connections.v1` / `.ftp.v1` / `.smb.v1`).
+   *  Persisted as part of settings.json (mirrored from localStorage)
+   *  so users see the same list across devices once cloud-sync
+   *  lands. Phase 1: passwords stored here in plaintext when
+   *  `rememberPassword` is true. Phase 2 (planned): swap to OS
+   *  keychain (macOS Keychain / Windows Credential Manager / Linux
+   *  libsecret) via the `keyring` Rust crate. */
+  connections: import("./connectionStore").SavedConnection[];
+  /** Ratio (0..1) of horizontal space allocated to the LEFT pane in
+   *  two-pane mode. The right pane gets `1 - ratio`. Drag the divider
+   *  between the panes to update. Clamped to [0.15, 0.85] so neither
+   *  pane can collapse below a usable width. Default 0.5 (even split). */
+  twoPaneSplitRatio: number;
+  /** Per-column pixel widths for the FileList list-view. Drag the
+   *  right edge of any column header to resize. Clamped per-column to
+   *  the LIST_COL_WIDTH_MIN/MAX bands; `name` is implicitly the
+   *  remaining flex space so it isn't stored here. */
+  listColumnWidths: { size: number; modified: number; kind: number };
   /** Tabs persisted for the RIGHT pane in two-pane mode. Empty in
    *  single-pane mode (BrowserTabs spawns a default Home on first
    *  mount). Capped at TABS_MAX. */
@@ -266,9 +302,10 @@ export interface Settings {
    *  to just the header. Persists so a user who collapses the
    *  drawer doesn't have it re-expand on every new job. */
   operationsDrawerExpanded: boolean;
-  /** Cap on `recentPaths` length. 0 disables tracking entirely. The
-   *  Sidebar's Recent section always shows up to 5 entries from the
-   *  head of the list regardless of the cap. */
+  /** How many recent-path entries the Sidebar's Recent section shows
+   *  inline. 0 disables recent-path tracking entirely (the array is
+   *  also wiped). Tracking always retains up to RECENT_PATHS_TRACK_MAX
+   *  entries on disk; the "Show all recent" dialog surfaces the rest. */
   recentPathsMax: number;
   /** Per-extension override of the icon kind. Keys are extensions
    *  WITHOUT the leading dot (e.g. "rs", "tex"); values are FileKind
@@ -424,9 +461,26 @@ export const SIDEBAR_WIDTH_DEFAULT = 220;
 export const PREVIEW_WIDTH_MIN = 240;
 export const PREVIEW_WIDTH_MAX = 720;
 
-/** Max entries kept in `recentPaths`. 10 is enough to cover a normal
- *  day's navigation without making the sidebar scroll forever. */
-export const RECENT_PATHS_MAX = 10;
+/** Two-pane split ratio clamps. 15% / 85% keeps either pane wide
+ *  enough to show at least one column of file names. */
+export const SPLIT_RATIO_MIN = 0.15;
+export const SPLIT_RATIO_MAX = 0.85;
+
+/** Per-column width clamps for FileList list-view. Below the min the
+ *  header label gets clipped; above the max the Name column starves. */
+export const LIST_COL_WIDTH_MIN = 60;
+export const LIST_COL_WIDTH_MAX = 400;
+
+/** Max entries kept in `recentPaths` regardless of the sidebar
+ *  display count. 200 keeps the "Show all recent" dialog useful
+ *  for a busy day's history while staying bounded on disk. */
+export const RECENT_PATHS_TRACK_MAX = 200;
+/** Backwards-compatibility alias — historically the sidebar display
+ *  cap and the storage cap were the same value. Kept as an export so
+ *  external imports don't break; new code should use the
+ *  `recentPathsMax` setting (sidebar count) or
+ *  `RECENT_PATHS_TRACK_MAX` (storage cap) directly. */
+export const RECENT_PATHS_MAX = RECENT_PATHS_TRACK_MAX;
 /** Cap on persisted search queries. 10 is enough to recall this
  *  morning's hunting and short enough to fit in a small dropdown. */
 export const SEARCH_HISTORY_MAX = 10;
@@ -463,7 +517,7 @@ export const SIDEBAR_SECTION_LABELS: Record<string, string> = {
   syncjobs: "Sync jobs",
   selections: "Selections",
   recent: "Recent",
-  hosts: "Hosts",
+  hosts: "Network",
   devices: "Devices",
 };
 
@@ -489,7 +543,14 @@ export const DEFAULTS: Settings = {
   folderKindFilter: {},
   folderTagFilter: {},
   folderRecencyFilter: {},
-  syncDefaultConflictPolicy: "skip",
+  // Default to "prompt" so file collisions during paste / drag-drop
+  // surface the TeraCopy-style modal (Keep both / Overwrite /
+  // Overwrite if older / Overwrite if size differs / Skip — plus
+  // their "Apply to all" variants). Earlier default "skip" silently
+  // dropped colliding files, which looked exactly like a stalled
+  // copy from the user's POV. Power users who prefer auto-skip can
+  // flip this back in Settings → Skiffsync.
+  syncDefaultConflictPolicy: "prompt",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
   syncDefaultBandwidthKbps: 0,
@@ -505,12 +566,19 @@ export const DEFAULTS: Settings = {
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarCollapsed: {},
-  sidebarSectionsVisible: {},
+  // Recent is hidden by default — the Recent section was visually
+  // heavy in 0.2.272's sidebar (double-line entries, full paths) and
+  // most users don't need it on. Re-enable from Settings → Sidebar.
+  sidebarSectionsVisible: { recent: false },
   sidebarSectionOrder: [],
   sidebarAccordion: false,
   sidebarShowStatusDots: true,
   openNewTabAtCurrent: false,
   twoPaneMode: false,
+  bulkActionBarLabels: "auto",
+  connections: [],
+  twoPaneSplitRatio: 0.5,
+  listColumnWidths: { size: 96, modified: 180, kind: 120 },
   savedTabsRight: [],
   savedActiveTabIdRight: null,
   recentlyClosedTabs: [],
@@ -550,11 +618,19 @@ const STORAGE_KEY = "skiff-files.settings.v1";
 
 /** Migrate a parsed payload from older schema shapes. Currently:
  *  - `showExtensions` was a `boolean` until 0.2.65; coerce it to the
- *    new enum so Settings.json round-trips cleanly across versions. */
+ *    new enum so Settings.json round-trips cleanly across versions.
+ *  - `connections` was three separate localStorage keys (per-kind
+ *    drafts) until the merged Connections list landed; fold those
+ *    into a unified array on first read. Idempotent — running
+ *    against an already-migrated payload is a no-op. */
 function migrate(parsed: Record<string, unknown>): Partial<Settings> {
   if (typeof parsed.showExtensions === "boolean") {
     parsed.showExtensions = parsed.showExtensions ? "always" : "never";
   }
+  const existing = Array.isArray(parsed.connections)
+    ? (parsed.connections as SavedConnection[])
+    : [];
+  parsed.connections = migrateLegacyDrafts(existing);
   return parsed as Partial<Settings>;
 }
 
@@ -564,8 +640,13 @@ export function loadSettings(): Settings {
   if (typeof localStorage === "undefined") return { ...DEFAULTS };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULTS };
-    const parsed = migrate(JSON.parse(raw) as Record<string, unknown>);
+    // Run migrate even when there's no stored settings payload so
+    // first-launch upgrades from older builds (which kept per-kind
+    // drafts in separate localStorage keys) still pick up the
+    // legacy entries.
+    const parsed = migrate(
+      raw ? (JSON.parse(raw) as Record<string, unknown>) : {},
+    );
     return { ...DEFAULTS, ...parsed };
   } catch {
     // Corrupt JSON should not brick the app — fall back to defaults silently.

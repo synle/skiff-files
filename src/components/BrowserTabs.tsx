@@ -9,6 +9,7 @@
 // opened, used for the tab strip.
 import {
   Box,
+  Chip,
   Divider,
   IconButton,
   Menu,
@@ -22,6 +23,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -32,6 +34,8 @@ import Browser from "../pages/Browser";
 import { useSettings, type SavedTab } from "../state/settings";
 import { activeCombo, matchesCombo } from "../util/keybindings";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
+import { connList, type ConnectionInfo } from "../api/conn";
+import { parseLocation } from "../util/location";
 import { OPEN_IN_TAB_EVENT } from "../App";
 
 interface TabRow {
@@ -61,6 +65,12 @@ interface Props {
    *  in Settings. Default `"main"` keeps the single-pane callsite
    *  unchanged. */
   pane?: "main" | "right";
+  /** True iff this pane is the currently-focused one (the next
+   *  sidebar / palette / quick-jump navigation targets it). In
+   *  single-pane mode the lone instance is always focused. The
+   *  inner Browser uses this to gate its NAVIGATE_EVENT listener
+   *  so navigations don't fire in both panes at once. */
+  isFocusedPane?: boolean;
 }
 
 /** Pull a friendly label out of an absolute path: the last segment, or
@@ -71,7 +81,11 @@ function labelFor(path: string): string {
   return segs[segs.length - 1] ?? path;
 }
 
-export default function BrowserTabs({ home, pane = "main" }: Props) {
+export default function BrowserTabs({
+  home,
+  pane = "main",
+  isFocusedPane = true,
+}: Props) {
   // Seed tabs from persisted settings. Empty saved list → spawn the
   // default Home tab. Settings is also our write-back target so the
   // tabs survive restart. Per-pane keys: the right pane uses the
@@ -320,9 +334,15 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
   };
 
   // Keyboard shortcuts. Cmd/Ctrl+T = new tab, Cmd/Ctrl+W = close active,
-  // Cmd/Ctrl+1..9 = switch to nth tab, Cmd/Ctrl+Shift+←/→ = reorder
-  // active tab. Skipped while the user is in an input so typing 'w'
-  // in the path bar doesn't close the tab.
+  // Cmd/Ctrl+Q = close window, Cmd/Ctrl+1..9 = switch to nth tab,
+  // Cmd/Ctrl+Shift+←/→ = reorder active tab. Skipped while the user is
+  // in an input so typing 'w' in the path bar doesn't close the tab.
+  //
+  // In two-pane mode both BrowserTabs instances mount this listener,
+  // so Cmd+W / Cmd+Q / Cmd+T / Cmd+N / numeric tab-switch ALL gate on
+  // `isFocusedPane` — the user expects the focused pane's tabs to
+  // respond, not both. (Single-pane mode passes `isFocusedPane=true`
+  // unconditionally so it's a no-op there.)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -343,6 +363,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           ),
         )
       ) {
+        if (!isFocusedPane) return;
         e.preventDefault();
         restoreClosedTab();
         return;
@@ -353,6 +374,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           activeCombo("tabs.newTab", "cmd+t", settings.shortcutOverrides),
         )
       ) {
+        if (!isFocusedPane) return;
         e.preventDefault();
         addTab();
         return;
@@ -363,6 +385,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           activeCombo("tabs.closeTab", "cmd+w", settings.shortcutOverrides),
         )
       ) {
+        if (!isFocusedPane) return;
         e.preventDefault();
         closeTab(activeId);
         return;
@@ -370,7 +393,9 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       // Tab-switch by index — Cmd/Ctrl+1..9. Migrated to the
       // rebindable framework: each digit gets its own actionId so
       // users can rebind individually (or disable, e.g. when one
-      // collides with a system shortcut).
+      // collides with a system shortcut). Gated on isFocusedPane so
+      // two-pane mode doesn't fire in both lists at once.
+      if (!isFocusedPane) return;
       for (let i = 1; i <= 9; i++) {
         const matched = matchesCombo(
           e,
@@ -482,15 +507,39 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
     setActiveId(id);
   };
 
+  /** Close the current Skiff Files window via Tauri. Dynamic-imported so
+   *  browser-dev / Vitest (which mock @tauri-apps/api/window) silently
+   *  no-op. Used by Cmd/Ctrl+Q and by the "no tabs left" branch of
+   *  Cmd/Ctrl+W: closing the last tab is the browser-convention
+   *  trigger for closing the window. */
+  const closeWindow = async () => {
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().close();
+    } catch {
+      /* outside Tauri — no-op */
+    }
+  };
+
   const closeTab = (id: string) => {
+    let shouldCloseWindow = false;
     setTabs((prev) => {
-      // Keep at least one tab open so the user always has a Browser.
-      if (prev.length <= 1) return prev;
       const idx = prev.findIndex((t) => t.id === id);
       const closed = prev[idx];
       // Pinned tabs ignore Cmd+W / × clicks — the user has to
       // explicitly Unpin first. Browser muscle memory.
       if (closed?.pinned) return prev;
+      // Closing the last unpinned tab: collapse to the empty state
+      // for one tick, then close the window after this setState
+      // settles. Browser convention — clicking × on the last tab in
+      // Chrome / Firefox closes the window. The 0-tab snapshot is
+      // safe because we navigate the window away before the render
+      // could complete; if Tauri isn't available the close call no-
+      // ops and the empty tab list naturally reseeds on next mount.
+      if (prev.length <= 1) {
+        shouldCloseWindow = true;
+        return [];
+      }
       const next = prev.filter((t) => t.id !== id);
       if (id === activeId && next.length > 0) {
         setActiveId(next[Math.max(0, idx - 1)].id);
@@ -515,6 +564,7 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
       }
       return next;
     });
+    if (shouldCloseWindow) void closeWindow();
   };
 
   /** Pop the most recently closed tab back to life, focused. */
@@ -537,14 +587,47 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
   };
 
   /** Updates a tab's label after the inner Browser navigates. Lifted
-   *  here so the tab strip stays in sync with the active path. */
-  const updateLabel = (id: string, path: string) => {
+   *  here so the tab strip stays in sync with the active path.
+   *
+   *  Memoized — Browser receives this as `onPathChange` and lists it
+   *  in a useEffect dep array; without a stable identity the effect
+   *  re-fires every render, calls setState here, triggers another
+   *  render, and loops until React aborts with
+   *  "Maximum update depth exceeded". */
+  const updateLabel = useCallback((id: string, path: string) => {
     setTabs((prev) =>
       prev.map((t) =>
         t.id === id ? { ...t, label: labelFor(path), currentPath: path } : t,
       ),
     );
-  };
+  }, []);
+
+  // Connection-id → friendly label map. Used to swap the UUID for
+  // the registry's human label (`admin@192.168.1.1:445/G`) when a
+  // tab is browsing a remote URL. Refreshed on the
+  // `skiff:connections-changed` event the ConnectionsPage dispatches
+  // after a successful connect / disconnect, so newly-opened
+  // connections light up immediately. Outside Tauri (test runs) the
+  // initial `connList()` rejects and we keep the empty map — tabs
+  // gracefully fall back to the UUID in `labelFor`.
+  const [connMap, setConnMap] = useState<Map<string, ConnectionInfo>>(
+    new Map(),
+  );
+  useEffect(() => {
+    const refresh = () => {
+      void connList()
+        .then((list) => {
+          setConnMap(new Map(list.map((c) => [c.id, c])));
+        })
+        .catch(() => {
+          /* outside Tauri / no connections — keep empty */
+        });
+    };
+    refresh();
+    window.addEventListener("skiff:connections-changed", refresh);
+    return () =>
+      window.removeEventListener("skiff:connections-changed", refresh);
+  }, []);
 
   // Active sync job count — reflected in the window title so users
   // see "(2) Skiff Files" in the OS taskbar / dock when transfers
@@ -657,13 +740,48 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           sx={{ flex: 1, minHeight: 36 }}
         >
           {tabs.map((t) => {
-            // Remote tabs (sftp:// + future smb:// / gdrive:// / s3://)
-            // get a primary-tinted underline so users can tell remote
-            // from local at a glance without reading the breadcrumb.
-            // Local tabs render unchanged.
-            const isRemote = (t.currentPath || t.initialPath).startsWith(
-              "sftp://",
-            );
+            // Remote tabs (sftp:// / ftp:// / smb://) get a primary-
+            // tinted underline so users can tell remote from local at
+            // a glance without reading the breadcrumb. Local tabs
+            // render unchanged.
+            const effectivePath = t.currentPath || t.initialPath;
+            const loc = parseLocation(effectivePath);
+            const isRemote = loc.backend.kind !== "local";
+            // Derive a friendly display label for remote tabs from the
+            // connection registry — `admin@192.168.1.1:445/G` instead
+            // of the raw `3303b0c8-…` UUID the address-bar form uses.
+            // Local + customLabel tabs keep their existing label
+            // unchanged.
+            const conn =
+              loc.backend.kind !== "local"
+                ? connMap.get(loc.backend.connectionId)
+                : null;
+            const friendlyTabLabel =
+              t.customLabel ||
+              (conn
+                ? // Append the remote path tail when we're deep in
+                  // the share so two tabs pointing at the same host
+                  // don't both read identically.
+                  loc.remotePath && loc.remotePath !== "/"
+                  ? `${conn.label}${loc.remotePath}`
+                  : conn.label
+                : t.label);
+            // Small protocol chip shown alongside the label. Only
+            // rendered for remote tabs — local file-system tabs don't
+            // need a "FS" chip, that's the implicit default.
+            const protocolChip = isRemote ? (
+              <Chip
+                size="small"
+                label={loc.backend.kind.toUpperCase()}
+                sx={{
+                  height: 16,
+                  fontSize: 10,
+                  // Tighten internal padding so the chip stays
+                  // visually compact next to the label text.
+                  "& .MuiChip-label": { px: 0.5 },
+                }}
+              />
+            ) : null;
             return (
             <Tab
               key={t.id}
@@ -788,10 +906,15 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
                       }}
                     />
                   )}
+                  {/* Protocol chip (SFTP / FTP / SMB) sits before
+                   *  the label so users can tell the connection's
+                   *  protocol at a glance. Local tabs render no
+                   *  chip — file-system is the implicit default. */}
+                  {!t.pinned && protocolChip}
                   {/* Hide the label on pinned tabs to keep them slim,
                    *  similar to Chrome. The full path stays accessible
                    *  via the title tooltip + right-click menu. */}
-                  {!t.pinned && (t.customLabel || t.label)}
+                  {!t.pinned && friendlyTabLabel}
                   {tabs.length > 1 && !t.pinned && (
                     <CloseIcon
                       fontSize="inherit"
@@ -1078,6 +1201,12 @@ export default function BrowserTabs({ home, pane = "main" }: Props) {
           <Browser
             initialPath={t.initialPath}
             isActive={t.id === activeId}
+            // Separate from isActive: clicks / keyboard inside a
+            // non-focused pane still work, but window-level events
+            // (sidebar nav, palette jumps) only fire in the focused
+            // pane. Browser checks isPaneFocused inside its
+            // NAVIGATE_EVENT listener, not its other handlers.
+            isPaneFocused={isFocusedPane}
             onPathChange={(p) => updateLabel(t.id, p)}
           />
         </Box>

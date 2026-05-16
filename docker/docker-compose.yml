@@ -1,44 +1,65 @@
-# Remote-backend test harness — spins up an SFTP, an FTP, and an SMB
-# server bound to known localhost ports so the integration suite (and
-# manual debugging sessions) hit real protocol implementations rather
-# than mocks. Used by `cargo test --test remote_integration` when
-# `SKIFF_INTEGRATION=1` is set, and by `.github/workflows/integration.yml`.
+# Remote-backend test harness (macOS / Linux) — SFTP + FTP + SMB.
+# Mounts the host's home directory (${HOME}) into every server so you
+# can browse / sync your real files through the protocols.
 #
 # Spin up:    docker compose -f docker/docker-compose.yml up -d
-# Tear down:  docker compose -f docker/docker-compose.yml down -v
+# Tear down:  docker compose -f docker/docker-compose.yml down
 #
-# Credentials are deliberately weak ("skiffpass") and the boxes only
-# bind to 127.0.0.1 — never expose this stack to a public network.
-# DUMMY values per CLAUDE.md secrets policy (real-looking creds like
-# "hunter2" get baked into Vitest coverage HTML by name).
+# Mirrors the one-shot `docker run` recipes in docker/docker.md.
+# Windows equivalent: docker-compose.windows.yml (mounts D:/).
+#
+# Credentials are deliberately weak ("skiff" / "password") and the
+# boxes only bind to 127.0.0.1 — never expose this stack to a public
+# network.
 
 services:
-  # SFTP / SSH. linuxserver/openssh-server is preferred over atmoz/sftp
-  # because it ships with a real shell + supports modern KEX defaults
-  # russh expects out of the box.
+  # SFTP / SSH. atmoz/sftp is purpose-built for serving a host folder
+  # over SFTP — no init-time chown sweep (which made linuxserver's
+  # openssh-server image hang for minutes on a large ${HOME} mount).
+  # Chroot requires /home/skiff itself to stay root-owned, so the host
+  # folder is mounted one level deeper at /home/skiff/data — clients
+  # see a single "data/" entry on login.
   skiff-sftp:
-    image: lscr.io/linuxserver/openssh-server:latest
+    image: atmoz/sftp:alpine
     container_name: skiff-sftp
-    environment:
-      PUID: "1000"
-      PGID: "1000"
-      TZ: "UTC"
-      USER_NAME: "testuser"
-      USER_PASSWORD: "skiffpass"
-      PASSWORD_ACCESS: "true"
-      SUDO_ACCESS: "false"
+    command: skiff:password:1001
     ports:
-      - "127.0.0.1:2222:2222"
+      - "127.0.0.1:2222:22"
     volumes:
-      - skiff-sftp-home:/config
+      - ${HOME}:/home/skiff/data
+    # Explicit ulimits override the daemon default — works around a
+    # Docker Desktop 29.x bug where the default-ulimits "Name" field is
+    # dropped and runc rejects the empty name. Safe to leave in place.
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-  # Plain FTP. delfer/alpine-ftp-server is small (~20 MB) and ships a
-  # working passive-mode config out of the box.
+  # SFTP — key-auth variant on port 2223. Same image / layout as
+  # skiff-sftp, but the empty password field ("skiff::1001") disables
+  # password auth and the user's local public key is mounted into
+  # /home/skiff/.ssh/keys/, which atmoz/sftp auto-installs into
+  # authorized_keys at startup. Connect with the matching private key.
+  skiff-sftp-key:
+    image: atmoz/sftp:alpine
+    container_name: skiff-sftp-key
+    command: skiff::1001
+    ports:
+      - "127.0.0.1:2223:22"
+    volumes:
+      - ${HOME}:/home/skiff/data
+      - ${HOME}/.ssh/id_rsa.pub:/home/skiff/.ssh/keys/id_rsa.pub:ro
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  # Plain FTP with passive-mode ports.
   skiff-ftp:
     image: delfer/alpine-ftp-server:latest
     container_name: skiff-ftp
     environment:
-      USERS: "testuser|skiffpass|/home/testuser|1000"
+      USERS: "skiff|password|/home/skiff|1000"
       ADDRESS: "127.0.0.1"
       MIN_PORT: "21000"
       MAX_PORT: "21009"
@@ -46,24 +67,25 @@ services:
       - "127.0.0.1:2121:21"
       - "127.0.0.1:21000-21009:21000-21009"
     volumes:
-      - skiff-ftp-home:/home/testuser
+      - ${HOME}:/home/skiff
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-  # SMB 2/3 — dperson/samba is the most-used Samba image with simple
-  # `-s` share definitions. The single share `testshare` writes to a
-  # tmpfs-style volume; smb2 client connects as `testuser`.
+  # SMB 2/3 — exposes a single share `testshare` backed by ${HOME}.
   skiff-smb:
     image: dperson/samba:latest
     container_name: skiff-smb
     command: >
-      -u "testuser;skiffpass"
-      -s "testshare;/share;yes;no;no;testuser;testuser"
+      -u "skiff;password"
+      -s "testshare;/share;yes;no;no;skiff;skiff"
       -p
     ports:
       - "127.0.0.1:1445:445"
     volumes:
-      - skiff-smb-share:/share
-
-volumes:
-  skiff-sftp-home:
-  skiff-ftp-home:
-  skiff-smb-share:
+      - ${HOME}:/share
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000

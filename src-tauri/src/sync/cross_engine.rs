@@ -60,7 +60,10 @@ pub async fn plan_cross(
                     .and_then(|s| s.to_str())
                     .unwrap_or("")
                     .to_string(),
-                Backend::Sftp(_) => abs
+                // SFTP + SMB both use POSIX-style remote paths
+                // regardless of host OS, so the same rsplit-on-'/'
+                // basename works for both.
+                Backend::Sftp(_) | Backend::Smb(_) => abs
                     .rsplit('/')
                     .next()
                     .unwrap_or("")

@@ -3,6 +3,7 @@
 import {
   Badge,
   Box,
+  Chip,
   CircularProgress,
   IconButton,
   List,
@@ -36,6 +37,8 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import SidebarContextMenu, {
   type SidebarContextState,
 } from "./SidebarContextMenu";
+import RecentPathsDialog from "./RecentPathsDialog";
+import { shortPath } from "../util/shortPath";
 import { OPEN_IN_TAB_EVENT, type Page } from "../App";
 import { useEffect, useState } from "react";
 import { connList, type ConnectionInfo } from "../api/conn";
@@ -524,6 +527,10 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
    *  bookmarks that scrolling becomes painful (>= 10). Substring
    *  match against label, case-insensitive. Empty = show all. */
   const [bookmarkFilter, setBookmarkFilter] = useState("");
+  /** Open state for the "Show all recent" overflow dialog. The
+   *  sidebar slice is capped at `settings.recentPathsMax`; this
+   *  dialog surfaces the full tracked history. */
+  const [recentDialogOpen, setRecentDialogOpen] = useState(false);
 
   const startDrag = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1654,77 +1661,105 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             {renderSectionHeader("recent", t("sidebar.section.recent"))}
             {!isCollapsed("recent") && (
             <List dense disablePadding id="sidebar-section-recent">
-              {settings.recentPaths.slice(0, 5).map((p) => {
-                // Pretty label: basename + a short parent hint so the
-                // list isn't ambiguous when multiple folders share a
-                // basename ("src" in two different repos, etc.).
-                const segs = p.split(/[\\/]/).filter(Boolean);
-                const label = segs.at(-1) ?? p;
-                const parent = segs.length >= 2 ? segs[segs.length - 2] : "";
-                return (
-                  <ListItem key={p} disablePadding>
-                    <ListItemButton
-                      onClick={() => onNavigate(p)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        const alreadyBookmarked = settings.bookmarks.some(
-                          (bk) => bk.path === p,
-                        );
-                        setContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          section: "recent",
-                          itemId: p,
-                          actions: [
-                            ...(p.startsWith("sftp://")
-                              ? []
-                              : [
-                                  {
-                                    key: "reveal",
-                                    icon: <LaunchIcon fontSize="small" />,
-                                    label: "Show in Finder/Explorer",
-                                    dividerAfter: true,
-                                    onClick: () => {
-                                      void fsRevealInOs(p).catch(() => {});
-                                    },
-                                  },
-                                ]),
-                            {
-                              key: "bookmark",
-                              icon: <BookmarkIcon fontSize="small" />,
-                              label: "Add to bookmarks",
-                              disabled: alreadyBookmarked,
-                              dividerAfter: true,
-                              onClick: () => bookmarkPath(p, label),
-                            },
-                            {
-                              key: "remove",
-                              icon: <CloseIcon fontSize="small" />,
-                              label: "Remove from recent",
-                              onClick: () => removeRecent(p),
-                            },
-                          ],
-                        });
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <HistoryIcon
-                          fontSize="small"
-                          sx={{ color: "text.secondary" }}
-                        />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={label}
-                        secondary={parent || undefined}
-                        slotProps={{
-                          primary: { variant: "body2", noWrap: true },
-                          secondary: { variant: "caption", noWrap: true },
-                        }}
+              {settings.recentPaths
+                .slice(0, Math.max(0, settings.recentPathsMax))
+                .map((p) => {
+                  // Compact single-line label so the Recent section
+                  // doesn't dominate the sidebar's vertical budget.
+                  // The basename is preserved verbatim; middle dirs
+                  // collapse to one char each. Full path is in the
+                  // tooltip + the "Show all recent" dialog.
+                  const segs = p.split(/[\\/]/).filter(Boolean);
+                  const basename = segs.at(-1) ?? p;
+                  const label = shortPath(p, home);
+                  return (
+                    <ListItem key={p} disablePadding>
+                      <Tooltip title={p} placement="right" enterDelay={500}>
+                        <ListItemButton
+                          onClick={() => onNavigate(p)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            const alreadyBookmarked =
+                              settings.bookmarks.some((bk) => bk.path === p);
+                            setContextMenu({
+                              x: e.clientX,
+                              y: e.clientY,
+                              section: "recent",
+                              itemId: p,
+                              actions: [
+                                ...(p.startsWith("sftp://")
+                                  ? []
+                                  : [
+                                      {
+                                        key: "reveal",
+                                        icon: <LaunchIcon fontSize="small" />,
+                                        label: "Show in Finder/Explorer",
+                                        dividerAfter: true,
+                                        onClick: () => {
+                                          void fsRevealInOs(p).catch(() => {});
+                                        },
+                                      },
+                                    ]),
+                                {
+                                  key: "bookmark",
+                                  icon: <BookmarkIcon fontSize="small" />,
+                                  label: "Add to bookmarks",
+                                  disabled: alreadyBookmarked,
+                                  dividerAfter: true,
+                                  onClick: () => bookmarkPath(p, basename),
+                                },
+                                {
+                                  key: "remove",
+                                  icon: <CloseIcon fontSize="small" />,
+                                  label: "Remove from recent",
+                                  onClick: () => removeRecent(p),
+                                },
+                              ],
+                            });
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 32 }}>
+                            <HistoryIcon
+                              fontSize="small"
+                              sx={{ color: "text.secondary" }}
+                            />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={label}
+                            slotProps={{
+                              primary: { variant: "body2", noWrap: true },
+                            }}
+                          />
+                        </ListItemButton>
+                      </Tooltip>
+                    </ListItem>
+                  );
+                })}
+              {settings.recentPaths.length > settings.recentPathsMax && (
+                <ListItem disablePadding>
+                  <ListItemButton
+                    onClick={() => setRecentDialogOpen(true)}
+                    aria-label="Show all recent paths"
+                  >
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <KeyboardArrowDownIcon
+                        fontSize="small"
+                        sx={{ color: "text.secondary" }}
                       />
-                    </ListItemButton>
-                  </ListItem>
-                );
-              })}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={`Show more (${settings.recentPaths.length - settings.recentPathsMax})`}
+                      slotProps={{
+                        primary: {
+                          variant: "body2",
+                          noWrap: true,
+                          sx: { color: "text.secondary" },
+                        },
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              )}
             </List>
             )}
           </>
@@ -1747,7 +1782,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   <HubIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText
-                  primary="Add connection…"
+                  primary="Manage connections…"
                   slotProps={{ primary: { variant: "body2" } }}
                 />
               </ListItemButton>
@@ -1759,9 +1794,17 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               // After 0.2.246 we have multiple remote kinds — pick
               // the address-bar scheme + the kind-specific icon
               // here instead of hardcoding `sftp://`. The kind label
-              // is uppercased so it reads as a protocol tag (FTP /
-              // SFTP) in the connection's tooltip.
-              const scheme = c.kind === "ftp" ? "ftp" : "sftp";
+              // is uppercased so it reads as a protocol tag in the
+              // connection's tooltip.
+              //
+              // 0.2.265 added SMB. The previous ternary defaulted to
+              // "sftp" for any non-FTP kind, which silently routed
+              // SMB navigation to `sftp://<smb-uuid>/` and broke
+              // every downstream resolve_backend call (the SMB
+              // connection-id wasn't in the SFTP registry). Pick
+              // the scheme explicitly per kind.
+              const scheme =
+                c.kind === "ftp" ? "ftp" : c.kind === "smb" ? "smb" : "sftp";
               const kindLabel = c.kind.toUpperCase();
               const tooltip = `${kindLabel} · ${c.label}`;
               const KindIcon = c.kind === "ftp" ? CloudIcon : HubIcon;
@@ -1769,9 +1812,15 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               <ListItem key={c.id} disablePadding>
                 <Tooltip title={tooltip} placement="right">
                 <ListItemButton
-                  onClick={() =>
-                    onNavigate(`${scheme}://${c.id}/`)
-                  }
+                  onClick={() => {
+                    // App.tsx's `onNavigate` already handles the
+                    // page switch + navigate-event dispatch (with
+                    // the setTimeout(0) deferral that kills the
+                    // first-click-lost race when coming from
+                    // Settings). No need to call onSwitchPage
+                    // explicitly here.
+                    onNavigate(`${scheme}://${c.id}/`);
+                  }}
                   // Drag-drop target: dropping a Skiff selection here
                   // starts a Skiffsync job from the dragged paths to a
                   // user-prompted destination on the remote. Uses the
@@ -1822,10 +1871,40 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     )}
                   </ListItemIcon>
                   <ListItemText
-                    primary={c.label}
-                    slotProps={{
-                      primary: { variant: "body2", noWrap: true },
-                    }}
+                    primary={
+                      // Bug 10 (0.2.281) — protocol chip + label,
+                      // mirroring the tab strip + address-bar shape
+                      // so the user sees "FTP testuser@…" / "SMB
+                      // admin@…" in every surface that mentions a
+                      // remote connection.
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          minWidth: 0,
+                        }}
+                      >
+                        <Chip
+                          size="small"
+                          label={kindLabel}
+                          sx={{
+                            height: 16,
+                            fontSize: 9,
+                            fontWeight: 600,
+                            flexShrink: 0,
+                            "& .MuiChip-label": { px: 0.5 },
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          noWrap
+                          sx={{ minWidth: 0, flex: 1 }}
+                        >
+                          {c.label}
+                        </Typography>
+                      </Box>
+                    }
                   />
                 </ListItemButton>
                 </Tooltip>
@@ -1956,6 +2035,14 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       <SidebarContextMenu
         state={contextMenu}
         onClose={() => setContextMenu(null)}
+      />
+      {/* Overflow surface for the Recent section. Sidebar only renders
+          the top N entries; this dialog surfaces the full history. */}
+      <RecentPathsDialog
+        open={recentDialogOpen}
+        paths={settings.recentPaths}
+        onClose={() => setRecentDialogOpen(false)}
+        onNavigate={onNavigate}
       />
     </Box>
   );
