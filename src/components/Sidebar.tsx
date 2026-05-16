@@ -3,6 +3,7 @@
 import {
   Badge,
   Box,
+  Chip,
   CircularProgress,
   IconButton,
   List,
@@ -1870,10 +1871,40 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     )}
                   </ListItemIcon>
                   <ListItemText
-                    primary={c.label}
-                    slotProps={{
-                      primary: { variant: "body2", noWrap: true },
-                    }}
+                    primary={
+                      // Bug 10 (0.2.281) — protocol chip + label,
+                      // mirroring the tab strip + address-bar shape
+                      // so the user sees "FTP testuser@…" / "SMB
+                      // admin@…" in every surface that mentions a
+                      // remote connection.
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          minWidth: 0,
+                        }}
+                      >
+                        <Chip
+                          size="small"
+                          label={kindLabel}
+                          sx={{
+                            height: 16,
+                            fontSize: 9,
+                            fontWeight: 600,
+                            flexShrink: 0,
+                            "& .MuiChip-label": { px: 0.5 },
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          noWrap
+                          sx={{ minWidth: 0, flex: 1 }}
+                        >
+                          {c.label}
+                        </Typography>
+                      </Box>
+                    }
                   />
                 </ListItemButton>
                 </Tooltip>
