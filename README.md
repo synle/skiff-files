@@ -28,6 +28,8 @@ First-class support for:
 
 One dialog covers every remote protocol. Pick the scheme, enter host + credentials, optionally remember the password (stored in the OS keychain — macOS Keychain, Windows Credential Manager, or Linux libsecret). Share field on SMB is optional — leave it empty to browse every disk share on the server.
 
+> Forgot a saved password? Search your OS keychain for `com.synle.skiff-files` — macOS **Keychain Access**, Windows **Credential Manager**, or Linux **Seahorse** / `secret-tool`. Full recovery recipes in [DEV.md → Credential storage](./DEV.md#credential-storage--os-keychain).
+
 ![Connect dialog with SMB selected](./screenshots/02-connect-dialog.png)
 
 ### Browse remote drives like local folders
