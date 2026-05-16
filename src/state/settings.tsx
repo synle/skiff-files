@@ -503,7 +503,7 @@ export const SIDEBAR_SECTION_LABELS: Record<string, string> = {
   syncjobs: "Sync jobs",
   selections: "Selections",
   recent: "Recent",
-  hosts: "Hosts",
+  hosts: "Network",
   devices: "Devices",
 };
 

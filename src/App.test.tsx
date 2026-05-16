@@ -49,10 +49,13 @@ function frame(initialPath: string) {
 }
 
 describe("App", () => {
-  it("renders the sidebar with Favorites + Hosts + Devices sections", () => {
+  it("renders the sidebar with Favorites + Network + Devices sections", () => {
+    // Renamed "Hosts" → "Network" in 0.2.281 (Bug 10) — the section
+    // groups SFTP / FTP / SMB connections, which collectively read
+    // as "Network drives" rather than the legacy "hosts" framing.
     render(frame("/"));
     expect(screen.getByText("Favorites")).toBeInTheDocument();
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Devices")).toBeInTheDocument();
   });
 
