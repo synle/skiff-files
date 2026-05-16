@@ -6,7 +6,7 @@ Endpoints (all modes):
 
 | Protocol | Host:Port           | User       | Password    | Share / Path          |
 | -------- | ------------------- | ---------- | ----------- | --------------------- |
-| SFTP     | `127.0.0.1:2222`    | `skiff`    | `password`  | user home (`/config`) |
+| SFTP     | `127.0.0.1:2222`    | `skiff`    | `password`  | `data/` (your `${HOME}` / `D:/`) |
 | FTP      | `127.0.0.1:2121`    | `skiff`    | `password`  | `/home/skiff`         |
 | SMB      | `127.0.0.1:1445`    | `skiff`    | `password`  | share `testshare`     |
 
@@ -35,7 +35,7 @@ One-shot equivalents of the compose stacks — handy when you only want one of t
 ### macOS / Linux — mount `~/` (your home dir)
 
 ```bash
-docker run -d --name skiff-sftp -p 127.0.0.1:2222:2222 -e USER_NAME=skiff -e USER_PASSWORD=password -e PASSWORD_ACCESS=true -v ~/:/config lscr.io/linuxserver/openssh-server:latest
+docker run -d --name skiff-sftp -p 127.0.0.1:2222:22 -v ~/:/home/skiff/data atmoz/sftp:alpine skiff:password:1001
 docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=skiff|password|/home/skiff|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v ~/:/home/skiff delfer/alpine-ftp-server:latest
 docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v ~/:/share dperson/samba:latest -u "skiff;password" -s "testshare;/share;yes;no;no;skiff;skiff" -p
 ```
@@ -43,7 +43,7 @@ docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v ~/:/share dperson/samba:
 ### Windows — mount `D:/` (PowerShell or cmd)
 
 ```powershell
-docker run -d --name skiff-sftp -p 127.0.0.1:2222:2222 -e USER_NAME=skiff -e USER_PASSWORD=password -e PASSWORD_ACCESS=true -v D:/:/config lscr.io/linuxserver/openssh-server:latest
+docker run -d --name skiff-sftp -p 127.0.0.1:2222:22 -v D:/:/home/skiff/data atmoz/sftp:alpine skiff:password:1001
 docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=skiff|password|/home/skiff|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v D:/:/home/skiff delfer/alpine-ftp-server:latest
 docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v D:/:/share dperson/samba:latest -u "skiff;password" -s "testshare;/share;yes;no;no;skiff;skiff" -p
 ```
@@ -67,7 +67,7 @@ Open the app → **Connections** in the sidebar → **+ Add connection** → pic
 | Username | `skiff`    |
 | Password | `password`   |
 
-Files appear under the SFTP user's home (the container path `/config`), which is your `${HOME}` (macOS / Linux) or `D:/` (Windows) on the host.
+Login lands in the chroot root and shows a single `data/` directory — that's your `${HOME}` (macOS / Linux) or `D:/` (Windows) on the host. The chroot wrapper requires the user's home itself to stay root-owned, so the host folder is mounted one level deeper. In Skiff Files, expand `data/` to browse your files.
 
 ### FTP
 
@@ -97,7 +97,7 @@ If you leave **Share** blank, the app lists shares at the root and you can drill
 Useful if a Skiff connection won't open and you need to isolate the harness from the app:
 
 ```bash
-# SFTP — should land you in /config (your $HOME)
+# SFTP — should drop you into a chroot showing a single "data/" dir (your $HOME)
 sftp -P 2222 skiff@127.0.0.1            # password: password
 
 # FTP — should list /home/skiff

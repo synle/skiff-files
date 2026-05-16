@@ -13,23 +13,20 @@
 # network.
 
 services:
-  # SFTP / SSH. linuxserver/openssh-server ships a real shell + modern
-  # KEX defaults that russh expects out of the box.
+  # SFTP / SSH. atmoz/sftp is purpose-built for serving a host folder
+  # over SFTP — no init-time chown sweep (which made linuxserver's
+  # openssh-server image hang for minutes on a large ${HOME} mount).
+  # Chroot requires /home/skiff itself to stay root-owned, so the host
+  # folder is mounted one level deeper at /home/skiff/data — clients
+  # see a single "data/" entry on login.
   skiff-sftp:
-    image: lscr.io/linuxserver/openssh-server:latest
+    image: atmoz/sftp:alpine
     container_name: skiff-sftp
-    environment:
-      PUID: "1000"
-      PGID: "1000"
-      TZ: "UTC"
-      USER_NAME: "skiff"
-      USER_PASSWORD: "password"
-      PASSWORD_ACCESS: "true"
-      SUDO_ACCESS: "false"
+    command: skiff:password:1001
     ports:
-      - "127.0.0.1:2222:2222"
+      - "127.0.0.1:2222:22"
     volumes:
-      - ${HOME}:/config
+      - ${HOME}:/home/skiff/data
     # Explicit ulimits override the daemon default — works around a
     # Docker Desktop 29.x bug where the default-ulimits "Name" field is
     # dropped and runc rejects the empty name. Safe to leave in place.
