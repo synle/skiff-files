@@ -192,6 +192,62 @@ describe("RemoteConnectDialog", () => {
     expect(screen.getByText(/Use a saved connection/)).toBeInTheDocument();
   });
 
+  // Bug 7 regression (0.2.279) — successfully connecting must
+  // dispatch `skiff:connections-changed` so the Sidebar HOSTS
+  // accordion / BrowserTabs labels / PathBar friendly-label map
+  // refresh immediately. Without this the user had to navigate
+  // away and back before the new host appeared. We exercise the
+  // form-submit path the dialog uses internally (Enter inside any
+  // field or clicking Connect both flow through `<form onSubmit>`).
+  async function fireConnect(): Promise<void> {
+    const dialog = screen.getByRole("dialog");
+    const form = dialog.querySelector("form") ?? dialog;
+    fireEvent.submit(form);
+    // Two ticks: one for the await connCreate* mock, one for the
+    // surrounding handleConnect cleanup so the event dispatch lands
+    // before assertions.
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  it("dispatches skiff:connections-changed after a successful SMB connect", async () => {
+    const listener = vi.fn();
+    window.addEventListener("skiff:connections-changed", listener);
+    try {
+      r({ scheme: "smb", host: "nas", port: null, remotePath: "/Public/dir" });
+      // Fill in the SMB-required fields the form would otherwise
+      // refuse to submit. User is empty by default; password is
+      // empty; share is now optional (0.2.277).
+      fireEvent.change(screen.getByLabelText(/^User \*?$/) as HTMLInputElement, {
+        target: { value: "admin" },
+      });
+      fireEvent.change(
+        screen.getByLabelText(/^Password \*?$/) as HTMLInputElement,
+        { target: { value: "p" } },
+      );
+      await fireConnect();
+      expect(listener).toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("skiff:connections-changed", listener);
+    }
+  });
+
+  // FTP path — anonymous defaults populate user/password so a bare
+  // submit fires the event without further setup. Same contract
+  // applies to SFTP / SMB; one example per scheme is enough since
+  // the dispatch call is shared.
+  it("dispatches skiff:connections-changed after a successful FTP connect", async () => {
+    const listener = vi.fn();
+    window.addEventListener("skiff:connections-changed", listener);
+    try {
+      r({ scheme: "ftp", host: "mirror", port: null, remotePath: "/" });
+      await fireConnect();
+      expect(listener).toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("skiff:connections-changed", listener);
+    }
+  });
+
   // Bug 5 regression — SMB Share is OPTIONAL. Leaving it empty must
   // not surface a "required" indicator and must let the form submit
   // (share-agnostic mode lists root shares as virtual folders).

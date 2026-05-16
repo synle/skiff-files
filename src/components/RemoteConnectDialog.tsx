@@ -375,6 +375,17 @@ export default function RemoteConnectDialog({
       } else {
         tail = request.remotePath || "/";
       }
+      // Bug 7 (0.2.279) — surface the new connection to every listener
+      // (Sidebar HOSTS accordion, BrowserTabs tab labels, PathBar
+      // friendly-label map) immediately. `ConnectionsPage` already
+      // dispatches this on its inline-flow connects; the address-bar /
+      // RemoteConnectDialog path was missing it, so newly-added SMB
+      // (and SFTP / FTP) hosts only appeared in the sidebar after the
+      // user navigated away and back. Fire BEFORE `onConnected` so the
+      // Sidebar's `connList()` refresh wins the race with the route
+      // change. Local-storage drafts are persisted above; that's a
+      // separate channel.
+      window.dispatchEvent(new CustomEvent("skiff:connections-changed"));
       onConnected(`${scheme}://${uuid}${tail}`);
       onClose();
     } catch (e) {
