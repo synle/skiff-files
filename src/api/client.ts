@@ -280,10 +280,38 @@ export async function startSync(
   dest: string,
   options?: JobOptions,
 ): Promise<string> {
-  if (isRemote(src) || isRemote(dest)) {
-    return syncStartCross(src, dest, options);
+  const jobId =
+    isRemote(src) || isRemote(dest)
+      ? await syncStartCross(src, dest, options)
+      : await syncStartLocal(src, dest, options);
+  // Surface the queued job to the OperationsDrawer the instant
+  // `sync_start_*` returns — earlier shape only seeded the drawer on
+  // the first `sync:progress` event, so tiny files that complete
+  // before any progress emit (small SMB / kernel-accelerated local
+  // copies) would never appear at all. Frontends that want a "job
+  // just queued" hook listen for this event (currently only the
+  // OperationsDrawer; see Bug 3 in 0.2.275).
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(SYNC_QUEUED_EVENT, {
+        detail: { jobId, src, dest },
+      }),
+    );
   }
-  return syncStartLocal(src, dest, options);
+  return jobId;
+}
+
+/** Window CustomEvent fired by [[startSync]] the moment a Skiffsync
+ *  job has been queued in Rust. Decouples the dispatch path from the
+ *  drawer so we don't need a `sync:started` Tauri event.
+ *
+ *  Payload: `{ jobId: string; src: string; dest: string }`. */
+export const SYNC_QUEUED_EVENT = "skiff:sync-queued";
+
+export interface SyncQueuedDetail {
+  jobId: string;
+  src: string;
+  dest: string;
 }
 
 /** True iff this location targets a backend whose deletes are

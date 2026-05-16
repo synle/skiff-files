@@ -183,6 +183,37 @@ describe("OperationsDrawer", () => {
     expect(summaryA.getAttribute("aria-expanded")).toBe("false");
   });
 
+  it("seeds the drawer on a SYNC_QUEUED_EVENT (Bug 3 regression)", async () => {
+    // Without this, tiny SMB pastes that complete before any
+    // sync:progress event would never appear in the drawer at all —
+    // exactly the "I am not seeing any progress window" feedback.
+    mockedInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "sync_list") return [];
+      return null;
+    });
+    await act(async () => {
+      r();
+    });
+    // Fire the window event the way `startSync` does.
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("skiff:sync-queued", {
+          detail: {
+            jobId: "queued-job-1",
+            src: "/src/file.png",
+            dest: "smb://abc/share/file.png",
+          },
+        }),
+      );
+    });
+    // Drawer now renders with the queued job's src/dest visible.
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Toggle /src/file.png → smb://abc/share/file.png"),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("Hide button drops the drawer until a new job emits", async () => {
     mockedInvoke.mockImplementation(async (cmd) => {
       if (cmd === "sync_list") {

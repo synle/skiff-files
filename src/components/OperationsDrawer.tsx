@@ -34,6 +34,7 @@ import {
 import { computeEta, pushSample, type EtaSample } from "../util/etaTracker";
 import ProgressWidget from "./ProgressWidget";
 import { useSettings } from "../state/settings";
+import { SYNC_QUEUED_EVENT, type SyncQueuedDetail } from "../api/client";
 
 interface JobUiState {
   info: JobInfo;
@@ -138,10 +139,38 @@ export default function OperationsDrawer() {
         });
       });
     })();
+    // Bug 3 fix — seed the drawer the instant `startSync` returns a
+    // job-id so the user sees the job's src/dest even before the
+    // first `sync:progress` event fires. Without this, tiny SMB
+    // pastes that complete before any progress emit (sub-100 ms
+    // local-to-local kernel copies, or one-byte files) would never
+    // appear in the drawer at all — exactly the "I am not seeing
+    // any progress window" report.
+    const onQueued = (ev: Event) => {
+      const detail = (ev as CustomEvent<SyncQueuedDetail>).detail;
+      if (!detail?.jobId) return;
+      setJobs((prev) => {
+        if (prev[detail.jobId]) return prev; // already tracked
+        return {
+          ...prev,
+          [detail.jobId]: {
+            info: {
+              id: detail.jobId,
+              src: detail.src,
+              dest: detail.dest,
+              state: "planning",
+            },
+          },
+        };
+      });
+      setHidden(false);
+    };
+    window.addEventListener(SYNC_QUEUED_EVENT, onQueued);
     return () => {
       unsubP?.();
       unsubD?.();
       unsubE?.();
+      window.removeEventListener(SYNC_QUEUED_EVENT, onQueued);
     };
   }, []);
 
