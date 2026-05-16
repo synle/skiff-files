@@ -137,6 +137,12 @@ export async function resolveRemoteUrl(path: string): Promise<string> {
     user: parsed.user || undefined,
     password: parsed.password || undefined,
   });
+  // Bug 7 (0.2.279) — notify the Sidebar HOSTS / BrowserTabs / PathBar
+  // friendly-label map so anonymous-FTP URLs typed in the address bar
+  // surface immediately, without a navigate-away-and-back kick.
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("skiff:connections-changed"));
+  }
   return `${FTP_PREFIX}${newId}${rest}`;
 }
 

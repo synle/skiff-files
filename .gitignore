@@ -26,6 +26,9 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 
+# Claude
+.claude/
+
 # Env
 .env
 .env.local

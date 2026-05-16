@@ -117,11 +117,17 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 vi.mock("@tauri-apps/api/window", () => ({
-  // BrowserTabs imports this to mirror the active path into the OS
-  // window title. Tests don't need the real window — return a stub
-  // so the dynamic import resolves cleanly.
+  // BrowserTabs + App import this to mirror the active path into the
+  // OS window title and to close the window via Cmd+W on last tab /
+  // Cmd+Q. Tests don't need the real window — return a stub so the
+  // dynamic import resolves cleanly. Tests that need to assert on the
+  // close call should observe behavior (collapsed tab list, dialog
+  // state) rather than poking at this mock — keeping the mock
+  // factory closure-free avoids the vi.mock hoist / module-graph
+  // ordering quirks that bit us when we tried to share an instance.
   getCurrentWindow: () => ({
     setTitle: vi.fn(async () => {}),
+    close: vi.fn(async () => {}),
   }),
 }));
 

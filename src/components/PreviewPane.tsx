@@ -34,6 +34,9 @@ import { dirSummary, readBase64, readText } from "../api/client";
 import { startNativeDrag } from "../api/drag";
 import { formatBytes, formatMtime } from "../util/format";
 import { isImage, mimeForPath } from "../util/mime";
+import { toNativeRemoteUrl } from "../util/nativeRemoteUrl";
+import { parseLocation } from "../util/location";
+import { humanizeRemoteUrl } from "../util/humanizeRemoteUrl";
 import {
   PREVIEW_WIDTH_MAX,
   PREVIEW_WIDTH_MIN,
@@ -681,7 +684,7 @@ function Body({
 }
 
 export default function PreviewPane({ selected, width }: Props) {
-  const { update } = useSettings();
+  const { settings, update } = useSettings();
   /** Natural pixel dimensions of the currently-rendered image, if any.
    *  Reset on selection change by ImageBody so a stale value from the
    *  previous image doesn't surface for the next one. */
@@ -819,7 +822,7 @@ export default function PreviewPane({ selected, width }: Props) {
             >
               {selected.name}
             </Typography>
-            {!selected.path.startsWith("sftp://") && (
+            {parseLocation(selected.path).backend.kind === "local" && (
               <Tooltip title="Reveal in Finder/Explorer">
                 <IconButton
                   size="small"
@@ -832,19 +835,30 @@ export default function PreviewPane({ selected, width }: Props) {
                 </IconButton>
               </Tooltip>
             )}
-            {!selected.isDir && !selected.path.startsWith("sftp://") && (
-              <Tooltip title="Open with default app">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    void fsOpenWithDefault(selected.path);
-                  }}
-                  aria-label="Open with default app"
-                >
-                  <LaunchIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
+            {!selected.isDir && (() => {
+              // SMB has a native OS handler — translate the internal
+              // `smb://<uuid>/...` URL to `smb://[user@]host/share/...`
+              // before handing to the OS. SFTP / FTP don't have a
+              // native handler, so the button is hidden entirely.
+              const { url } = toNativeRemoteUrl(
+                selected.path,
+                settings.connections,
+              );
+              if (url == null) return null;
+              return (
+                <Tooltip title="Open with default app">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      void fsOpenWithDefault(url);
+                    }}
+                    aria-label="Open with default app"
+                  >
+                    <LaunchIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              );
+            })()}
           </Box>
 
           <Body entry={selected} onImageDimensions={setImageDimensions} />
@@ -899,7 +913,16 @@ export default function PreviewPane({ selected, width }: Props) {
                 value={`0${selected.mode.toString(8).slice(-3)}`}
               />
             )}
-            <Field label="Path" value={selected.path} />
+            <Field
+              label="Path"
+              // Display the friendly form so users see
+              // `smb://admin@nas:445/G/folder/file` instead of the
+              // raw internal UUID.
+              value={humanizeRemoteUrl(
+                selected.path,
+                new Map(settings.connections.map((c) => [c.id, c.label])),
+              )}
+            />
           </Stack>
         </Stack>
       )}

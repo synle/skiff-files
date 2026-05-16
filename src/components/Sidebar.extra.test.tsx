@@ -70,17 +70,19 @@ describe("Sidebar — extras", () => {
       "skiff-files.settings.v1",
       JSON.stringify({
         recentPaths: ["/foo", "/bar"],
+        // Recent is hidden by default since 0.2.273 — opt-in here.
+        sidebarSectionsVisible: { recent: true },
       }),
     );
     r();
     expect(screen.getByText("Recent")).toBeInTheDocument();
   });
 
-  it("Hosts section header renders alongside the favorites", () => {
+  it("Network section header renders alongside the favorites", () => {
     r();
     // Just confirm the multi-section sidebar mounts cleanly with
     // every default section header.
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Favorites")).toBeInTheDocument();
   });
 
@@ -94,7 +96,7 @@ describe("Sidebar — extras", () => {
     r();
     // No-throw on a non-default ordering — confirm the section labels
     // are still rendered.
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Devices")).toBeInTheDocument();
   });
 
@@ -115,7 +117,7 @@ describe("Sidebar — extras", () => {
     r();
     // Every section label should render in non-accordion mode.
     expect(screen.getByText("Favorites")).toBeInTheDocument();
-    expect(screen.getByText("Hosts")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
     expect(screen.getByText("Devices")).toBeInTheDocument();
   });
 
@@ -361,20 +363,26 @@ describe("Sidebar — extras", () => {
   it("right-clicking a recent path opens its context menu", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo", "/bar"] }),
+      JSON.stringify({
+        recentPaths: ["/foo", "/bar"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
   });
 
   it("recent-path menu 'Add to bookmarks' adds an entry", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo"] }),
+      JSON.stringify({
+        recentPaths: ["/foo"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Add to bookmarks"));
     const stored = JSON.parse(
       localStorage.getItem("skiff-files.settings.v1") ?? "{}",
@@ -385,10 +393,13 @@ describe("Sidebar — extras", () => {
   it("recent-path menu 'Remove from recent' drops the entry", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
-      JSON.stringify({ recentPaths: ["/foo", "/bar"] }),
+      JSON.stringify({
+        recentPaths: ["/foo", "/bar"],
+        sidebarSectionsVisible: { recent: true },
+      }),
     );
     r();
-    fireEvent.contextMenu(screen.getByText("foo"));
+    fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Remove from recent"));
     const stored = JSON.parse(
       localStorage.getItem("skiff-files.settings.v1") ?? "{}",
@@ -435,5 +446,69 @@ describe("Sidebar — extras", () => {
       localStorage.getItem("skiff-files.settings.v1") ?? "{}",
     );
     expect(stored.bookmarks[0].label).toBe("Renamed");
+  });
+
+  // Bug 10 — clicking a Network row navigates Browser to
+  // scheme://id/. Each kind picks its own scheme (sftp / ftp / smb)
+  // — the previous shape defaulted to "sftp" for anything non-FTP
+  // and silently routed SMB clicks through the SFTP registry.
+  it("Network section: clicking a SMB row navigates to smb://<id>/", async () => {
+    const mocked = vi.mocked(invoke);
+    mocked.mockImplementation(async (cmd: string) => {
+      if (cmd === "conn_list") {
+        return [{ id: "smb-uuid", kind: "smb", label: "admin@nas" }];
+      }
+      return null;
+    });
+    const { onNavigate } = r();
+    const row = await waitFor(() => screen.getByText("admin@nas"));
+    fireEvent.click(row);
+    expect(onNavigate).toHaveBeenCalledWith("smb://smb-uuid/");
+  });
+
+  it("Network section: clicking an FTP row navigates to ftp://<id>/", async () => {
+    const mocked = vi.mocked(invoke);
+    mocked.mockImplementation(async (cmd: string) => {
+      if (cmd === "conn_list") {
+        return [{ id: "ftp-uuid", kind: "ftp", label: "anon@mirror" }];
+      }
+      return null;
+    });
+    const { onNavigate } = r();
+    const row = await waitFor(() => screen.getByText("anon@mirror"));
+    fireEvent.click(row);
+    expect(onNavigate).toHaveBeenCalledWith("ftp://ftp-uuid/");
+  });
+
+  // Bug 10 regression (0.2.281) — connection rows in the Network
+  // section render a protocol chip (SFTP / FTP / SMB) next to the
+  // label, mirroring the tab strip and address bar.
+  it("Network section: each connection row shows its protocol chip", async () => {
+    // `connList()` invokes a Tauri command. Stub it with a small
+    // multi-protocol roster.
+    (invoke as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (cmd: string) => {
+        if (cmd === "conn_list") {
+          return [
+            { id: "s1", kind: "sftp", label: "user@example.com:22" },
+            { id: "f1", kind: "ftp", label: "anonymous@mirror.kernel.org:21" },
+            { id: "m1", kind: "smb", label: "admin@192.168.1.1:445/G" },
+          ];
+        }
+        return null;
+      },
+    );
+    r();
+    await waitFor(() => {
+      expect(
+        screen.getByText("user@example.com:22"),
+      ).toBeInTheDocument();
+    });
+    // One chip per protocol — assert the UPPERCASE labels render.
+    // (Chips share the same string in the Manage-connections trailing
+    // row but those aren't inside the connection rows themselves.)
+    expect(screen.getByText("SFTP")).toBeInTheDocument();
+    expect(screen.getByText("FTP")).toBeInTheDocument();
+    expect(screen.getByText("SMB")).toBeInTheDocument();
   });
 });

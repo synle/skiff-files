@@ -1077,6 +1077,53 @@ pub fn settings_load(app: tauri::AppHandle) -> FsResult<Option<String>> {
 }
 
 /// Returns the absolute path of the app data directory. Used by the
+/// Store a connection credential in the OS keychain. Returns Err
+/// when the keychain backend can't be reached (Linux installs
+/// without a running secret-service daemon, locked macOS Keychain
+/// on first prompt, etc.). The frontend probes `creds_capable()`
+/// before offering the toggle so this failure path is rare in
+/// practice.
+#[tauri::command]
+pub fn creds_store(
+    connection_id: String,
+    kind: crate::creds::SecretKind,
+    secret: String,
+) -> FsResult<()> {
+    crate::creds::store(&connection_id, kind, &secret)
+}
+
+/// Load a connection credential from the OS keychain. Returns
+/// `Ok(None)` when no entry exists (the dialog falls through to
+/// the prompt path); `Err` for keychain access failures.
+#[tauri::command]
+pub fn creds_load(
+    connection_id: String,
+    kind: crate::creds::SecretKind,
+) -> FsResult<Option<String>> {
+    crate::creds::load(&connection_id, kind)
+}
+
+/// Delete a connection credential from the OS keychain. Idempotent
+/// — deleting a non-existent entry is a no-op so the frontend can
+/// blindly call this when the "Remember password" toggle flips off.
+#[tauri::command]
+pub fn creds_delete(
+    connection_id: String,
+    kind: crate::creds::SecretKind,
+) -> FsResult<()> {
+    crate::creds::delete(&connection_id, kind)
+}
+
+/// Probe whether the keychain backend is reachable. macOS / Windows
+/// always return true; Linux returns false when secret-service is
+/// not running. The frontend uses this to gate the "Remember
+/// password" toggle — falling back silently to plaintext would
+/// surprise users.
+#[tauri::command]
+pub fn creds_capable() -> bool {
+    crate::creds::capable()
+}
+
 /// Settings → Advanced "Reveal app data directory" button so power
 /// users can manually inspect settings.json + see whatever else
 /// future versions stash there (thumbnail cache, job DB, etc.).
@@ -1494,19 +1541,26 @@ pub async fn conn_create_smb(
     config: crate::fs::smb::SmbConfig,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<String> {
-    let label = if config.domain.is_empty() {
+    // Friendly registry label. Share suffix is omitted in
+    // share-agnostic mode (empty `config.share`) so the label reads
+    // `admin@host:445` instead of an awkward `admin@host:445/`.
+    let base_label = if config.domain.is_empty() {
         format!(
-            "{}@{}:{}/{}",
+            "{}@{}:{}",
             if config.user.is_empty() { "guest" } else { &config.user },
             config.host,
             config.port,
-            config.share
         )
     } else {
         format!(
-            "{}\\{}@{}:{}/{}",
-            config.domain, config.user, config.host, config.port, config.share
+            "{}\\{}@{}:{}",
+            config.domain, config.user, config.host, config.port,
         )
+    };
+    let label = if config.share.is_empty() {
+        base_label
+    } else {
+        format!("{}/{}", base_label, config.share)
     };
     let client = crate::fs::smb::SmbConnection::connect(config).await?;
     let id = registry.insert(

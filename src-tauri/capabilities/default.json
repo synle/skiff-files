@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "Default capability set for the main window.",
   "windows": ["main"],
-  "permissions": ["core:default", "shell:allow-open", "drag:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "shell:allow-open",
+    "drag:default",
+    "dialog:allow-open"
+  ]
 }
