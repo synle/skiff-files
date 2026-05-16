@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from "@mui/material";
 import RemoteConnectDialog, {
   type RemoteConnectRequest,
 } from "./RemoteConnectDialog";
+import { SettingsProvider } from "../state/settings";
 
 vi.mock("../api/conn", () => ({
   connCreateSftp: vi.fn(async () => "sftp-uuid"),
@@ -22,12 +23,14 @@ function r(request: RemoteConnectRequest | null, open = true) {
   const onConnected = vi.fn();
   render(
     <ThemeProvider theme={theme}>
-      <RemoteConnectDialog
-        open={open}
-        request={request}
-        onClose={onClose}
-        onConnected={onConnected}
-      />
+      <SettingsProvider>
+        <RemoteConnectDialog
+          open={open}
+          request={request}
+          onClose={onClose}
+          onConnected={onConnected}
+        />
+      </SettingsProvider>
     </ThemeProvider>,
   );
   return { onClose, onConnected };
@@ -37,12 +40,14 @@ describe("RemoteConnectDialog", () => {
   it("renders nothing when request is null", () => {
     const { container } = render(
       <ThemeProvider theme={theme}>
+        <SettingsProvider>
         <RemoteConnectDialog
           open
           request={null}
           onClose={vi.fn()}
           onConnected={vi.fn()}
         />
+        </SettingsProvider>
       </ThemeProvider>,
     );
     expect(container.querySelector("[role=dialog]")).toBeNull();
@@ -155,10 +160,13 @@ describe("RemoteConnectDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("Save-for-next-time toggle is visible for a new connection", () => {
+  it("Remember password toggle is visible for password-auth schemes", () => {
+    // Saving is now implicit — every successful connect persists.
+    // The user-visible toggle is for the password (off by default,
+    // flip on to skip the prompt next time).
     r({ scheme: "ftp", host: "new.example", port: null, remotePath: "/" });
     expect(
-      screen.getByLabelText(/Save this connection for next time/),
+      screen.getByLabelText(/Remember password/),
     ).toBeInTheDocument();
   });
 
@@ -169,18 +177,25 @@ describe("RemoteConnectDialog", () => {
   });
 
   it("lists saved sftp drafts for the typed host", () => {
+    // Saved connections now live under `Settings.connections` (not
+    // the legacy per-kind localStorage key). Seed via the settings
+    // payload that `SettingsProvider` reads at mount.
     localStorage.setItem(
-      "skiff-files.connections.v1",
-      JSON.stringify([
-        {
-          id: "s-1",
-          label: "saved-host",
-          host: "example.com",
-          port: 22,
-          user: "user",
-          authMode: "password",
-        },
-      ]),
+      "skiff-files.settings.v1",
+      JSON.stringify({
+        connections: [
+          {
+            id: "s-1",
+            kind: "sftp",
+            label: "saved-host",
+            host: "example.com",
+            port: 22,
+            user: "user",
+            authMode: "password",
+            rememberPassword: false,
+          },
+        ],
+      }),
     );
     r({
       scheme: "sftp",

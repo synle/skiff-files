@@ -20,6 +20,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ThemeMode } from "../theme";
 import type { ConflictPolicy } from "../api/sync";
 import type { SortDir, SortKey } from "../components/FileList";
+import {
+  migrateLegacyDrafts,
+  type SavedConnection,
+} from "./connectionStore";
 
 /** What rendering style the file list uses. Per-folder overrides land later. */
 export type ViewMode = "list" | "tile" | "gallery" | "column";
@@ -223,6 +227,16 @@ export interface Settings {
    *    Explorer toolbar feel some users prefer.
    *  Default `"auto"`. */
   bulkActionBarLabels: "auto" | "labels" | "icons";
+  /** Unified saved-connections list — every SFTP / FTP / SMB
+   *  connection the user has added. Replaces the three per-kind
+   *  localStorage keys (`.connections.v1` / `.ftp.v1` / `.smb.v1`).
+   *  Persisted as part of settings.json (mirrored from localStorage)
+   *  so users see the same list across devices once cloud-sync
+   *  lands. Phase 1: passwords stored here in plaintext when
+   *  `rememberPassword` is true. Phase 2 (planned): swap to OS
+   *  keychain (macOS Keychain / Windows Credential Manager / Linux
+   *  libsecret) via the `keyring` Rust crate. */
+  connections: import("./connectionStore").SavedConnection[];
   /** Ratio (0..1) of horizontal space allocated to the LEFT pane in
    *  two-pane mode. The right pane gets `1 - ratio`. Drag the divider
    *  between the panes to update. Clamped to [0.15, 0.85] so neither
@@ -555,6 +569,7 @@ export const DEFAULTS: Settings = {
   openNewTabAtCurrent: false,
   twoPaneMode: false,
   bulkActionBarLabels: "auto",
+  connections: [],
   twoPaneSplitRatio: 0.5,
   listColumnWidths: { size: 96, modified: 180, kind: 120 },
   savedTabsRight: [],
@@ -596,11 +611,19 @@ const STORAGE_KEY = "skiff-files.settings.v1";
 
 /** Migrate a parsed payload from older schema shapes. Currently:
  *  - `showExtensions` was a `boolean` until 0.2.65; coerce it to the
- *    new enum so Settings.json round-trips cleanly across versions. */
+ *    new enum so Settings.json round-trips cleanly across versions.
+ *  - `connections` was three separate localStorage keys (per-kind
+ *    drafts) until the merged Connections list landed; fold those
+ *    into a unified array on first read. Idempotent — running
+ *    against an already-migrated payload is a no-op. */
 function migrate(parsed: Record<string, unknown>): Partial<Settings> {
   if (typeof parsed.showExtensions === "boolean") {
     parsed.showExtensions = parsed.showExtensions ? "always" : "never";
   }
+  const existing = Array.isArray(parsed.connections)
+    ? (parsed.connections as SavedConnection[])
+    : [];
+  parsed.connections = migrateLegacyDrafts(existing);
   return parsed as Partial<Settings>;
 }
 
@@ -610,8 +633,13 @@ export function loadSettings(): Settings {
   if (typeof localStorage === "undefined") return { ...DEFAULTS };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULTS };
-    const parsed = migrate(JSON.parse(raw) as Record<string, unknown>);
+    // Run migrate even when there's no stored settings payload so
+    // first-launch upgrades from older builds (which kept per-kind
+    // drafts in separate localStorage keys) still pick up the
+    // legacy entries.
+    const parsed = migrate(
+      raw ? (JSON.parse(raw) as Record<string, unknown>) : {},
+    );
     return { ...DEFAULTS, ...parsed };
   } catch {
     // Corrupt JSON should not brick the app — fall back to defaults silently.
