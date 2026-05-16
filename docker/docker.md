@@ -37,6 +37,7 @@ One-shot equivalents of the compose stacks — handy when you only want one of t
 
 ```bash
 docker run -d --name skiff-sftp -p 127.0.0.1:2222:22 -v ~/:/home/skiff/data atmoz/sftp:alpine skiff:password:1001
+docker run -d --name skiff-sftp-key -p 127.0.0.1:2223:22 -v ~/:/home/skiff/data -v ~/.ssh/id_rsa.pub:/home/skiff/.ssh/keys/id_rsa.pub:ro atmoz/sftp:alpine skiff::1001
 docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=skiff|password|/home/skiff|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v ~/:/home/skiff delfer/alpine-ftp-server:latest
 docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v ~/:/share dperson/samba:latest -u "skiff;password" -s "testshare;/share;yes;no;no;skiff;skiff" -p
 ```
@@ -45,6 +46,7 @@ docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v ~/:/share dperson/samba:
 
 ```powershell
 docker run -d --name skiff-sftp -p 127.0.0.1:2222:22 -v D:/:/home/skiff/data atmoz/sftp:alpine skiff:password:1001
+docker run -d --name skiff-sftp-key -p 127.0.0.1:2223:22 -v D:/:/home/skiff/data -v %USERPROFILE%/.ssh/id_rsa.pub:/home/skiff/.ssh/keys/id_rsa.pub:ro atmoz/sftp:alpine skiff::1001
 docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=skiff|password|/home/skiff|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v D:/:/home/skiff delfer/alpine-ftp-server:latest
 docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v D:/:/share dperson/samba:latest -u "skiff;password" -s "testshare;/share;yes;no;no;skiff;skiff" -p
 ```
@@ -53,7 +55,7 @@ Notes:
 
 - On Windows the recipes mount `D:/`. To use a path under your user profile (e.g. `C:/Users/<You>`), spaces in the path need quoting: `-v "C:/Users/Your Name:/share"`.
 - Docker Desktop → Settings → Resources → File Sharing must include the drive (e.g. `D:`) before the mount will work on Windows.
-- Stop / remove the standalone containers with `docker rm -f skiff-sftp skiff-ftp skiff-smb`.
+- Stop / remove the standalone containers with `docker rm -f skiff-sftp skiff-sftp-key skiff-ftp skiff-smb`.
 
 ## Connecting from Skiff Files
 
@@ -88,7 +90,7 @@ Sanity check from the terminal:
 sftp -P 2223 -i ~/.ssh/id_rsa skiff@127.0.0.1            # no password prompt
 ```
 
-If your local key lives somewhere other than `~/.ssh/id_rsa.pub`, edit the `volumes:` mount in `docker/docker-compose.yml` (the second mount on `skiff-sftp-key`) and recreate the container with `docker compose -f docker/docker-compose.yml up -d --force-recreate skiff-sftp-key`.
+If your local key lives somewhere other than `~/.ssh/id_rsa.pub`, edit the second `volumes:` entry on `skiff-sftp-key` in both `docker/docker-compose.yml` (macOS / Linux) and `docker/docker-compose.windows.yml` (Windows), then recreate with `docker compose -f <file> up -d --force-recreate skiff-sftp-key`. In the **Private key path** field, `~` / `~/...` are expanded to your home directory — absolute paths also work.
 
 ### FTP
 
@@ -118,8 +120,11 @@ If you leave **Share** blank, the app lists shares at the root and you can drill
 Useful if a Skiff connection won't open and you need to isolate the harness from the app:
 
 ```bash
-# SFTP — should drop you into a chroot showing a single "data/" dir (your $HOME)
-sftp -P 2222 skiff@127.0.0.1            # password: password
+# SFTP (password) — should drop you into a chroot showing a single "data/" dir (your $HOME)
+sftp -P 2222 skiff@127.0.0.1                            # password: password
+
+# SFTP (key) — same layout, no password prompt
+sftp -P 2223 -i ~/.ssh/id_rsa skiff@127.0.0.1
 
 # FTP — should list /home/skiff
 curl -u skiff:password ftp://127.0.0.1:2121/
