@@ -1494,19 +1494,26 @@ pub async fn conn_create_smb(
     config: crate::fs::smb::SmbConfig,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<String> {
-    let label = if config.domain.is_empty() {
+    // Friendly registry label. Share suffix is omitted in
+    // share-agnostic mode (empty `config.share`) so the label reads
+    // `admin@host:445` instead of an awkward `admin@host:445/`.
+    let base_label = if config.domain.is_empty() {
         format!(
-            "{}@{}:{}/{}",
+            "{}@{}:{}",
             if config.user.is_empty() { "guest" } else { &config.user },
             config.host,
             config.port,
-            config.share
         )
     } else {
         format!(
-            "{}\\{}@{}:{}/{}",
-            config.domain, config.user, config.host, config.port, config.share
+            "{}\\{}@{}:{}",
+            config.domain, config.user, config.host, config.port,
         )
+    };
+    let label = if config.share.is_empty() {
+        base_label
+    } else {
+        format!("{}/{}", base_label, config.share)
     };
     let client = crate::fs::smb::SmbConnection::connect(config).await?;
     let id = registry.insert(

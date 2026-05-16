@@ -191,4 +191,20 @@ describe("RemoteConnectDialog", () => {
     expect(screen.getByText("saved-host")).toBeInTheDocument();
     expect(screen.getByText(/Use a saved connection/)).toBeInTheDocument();
   });
+
+  // Bug 5 regression — SMB Share is OPTIONAL. Leaving it empty must
+  // not surface a "required" indicator and must let the form submit
+  // (share-agnostic mode lists root shares as virtual folders).
+  it("SMB Share field is not required (Bug 5)", () => {
+    r({ scheme: "smb", host: "nas", port: null, remotePath: "/" });
+    const shareInput = screen.getByLabelText(/Share/) as HTMLInputElement;
+    // The HTML5 `required` attribute must NOT be set. Older shape
+    // (pre-0.2.277) marked it required, which blocked submit when
+    // the user wanted to browse every share on the server.
+    expect(shareInput.required).toBe(false);
+    // Helper text reads as optional.
+    expect(
+      screen.getByLabelText(/Share \(optional\)/i),
+    ).toBeInTheDocument();
+  });
 });

@@ -317,11 +317,15 @@ export default function RemoteConnectDialog({
           domain: smbDomain || undefined,
         });
         if (saveDraft && selectedDraftId == null) {
+          // Friendly label: include the share suffix only when the
+          // user picked one. Empty share = "browse all shares" mode,
+          // and `admin@host:445/` would read as a typo.
+          const baseLabel = smbDomain
+            ? `${smbDomain}\\${user}@${host}:${port}`
+            : `${user || "guest"}@${host}:${port}`;
           const next: SmbDraft = {
             id: `smb-${Date.now()}`,
-            label: smbDomain
-              ? `${smbDomain}\\${user}@${host}:${port}/${smbShare}`
-              : `${user || "guest"}@${host}:${port}/${smbShare}`,
+            label: smbShare ? `${baseLabel}/${smbShare}` : baseLabel,
             host,
             port,
             share: smbShare,
@@ -355,12 +359,16 @@ export default function RemoteConnectDialog({
           setFtpDrafts(merged);
         }
       }
-      // For SMB the share is bound to the connection, so the URL's
-      // share segment is dropped from the canonical path (everything
-      // after `smb://<uuid>/` is now share-relative). For SFTP/FTP
-      // the full remotePath survives as-is.
+      // For SMB the path tail depends on whether the user picked a
+      // specific share. With a non-empty share, the connection binds
+      // it at session-setup so the URL drops the share segment
+      // (everything after `smb://<uuid>/` is share-relative). With an
+      // empty share (0.2.277 share-agnostic mode), the connection
+      // routes per-share at access time, so the URL must preserve
+      // the share segment — `smb://<uuid>/<share-name>/<rel>`. For
+      // SFTP / FTP the full remotePath survives as-is.
       let tail: string;
-      if (scheme === "smb") {
+      if (scheme === "smb" && smbShare) {
         const trimmed = (request.remotePath || "/").replace(/^\/+/, "");
         const slash = trimmed.indexOf("/");
         tail = slash >= 0 ? `/${trimmed.slice(slash + 1)}` : "/";
@@ -629,15 +637,17 @@ export default function RemoteConnectDialog({
 
               {scheme === "smb" && (
                 <Stack direction="row" spacing={1}>
-                  {/* Share is required by SMB at session-setup, but the
-                      user shouldn't have to remember the name. Once
-                      host/user/password are filled the dialog opens a
-                      one-shot session and lists the disk shares the
-                      creds can see (admin shares are filtered by the
-                      smb2 crate); the result populates this dropdown.
-                      freeSolo keeps manual typing open for cases where
-                      the share isn't enumerable (some NAS firmwares
-                      hide it from NetShareEnumAll). */}
+                  {/* Share is now OPTIONAL (0.2.277, Bug 5). Leave it
+                      empty and the connection enters share-agnostic
+                      mode: the address bar form becomes
+                      `smb://<uuid>/<share-name>/<path>` and listing
+                      the root URL returns the server's shares as
+                      virtual folders. Filling Share keeps the older
+                      "bind one share at session-setup" shape, which
+                      avoids a round-trip per share if you only care
+                      about one. freeSolo keeps manual typing open
+                      for NAS firmwares that hide their shares from
+                      NetShareEnumAll. */}
                   <Autocomplete
                     freeSolo
                     size="small"
@@ -658,14 +668,13 @@ export default function RemoteConnectDialog({
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        required
-                        label="Share"
+                        label="Share (optional)"
                         helperText={
                           smbShareLoading
                             ? "Listing shares…"
                             : smbShareOptions.length > 0
-                              ? `${smbShareOptions.length} share${smbShareOptions.length === 1 ? "" : "s"} available — type to filter or pick one`
-                              : "Fill host / user / password to list shares, or type one"
+                              ? `${smbShareOptions.length} share${smbShareOptions.length === 1 ? "" : "s"} available — pick one or leave empty to browse all`
+                              : "Leave empty to browse every share, or pick one"
                         }
                       />
                     )}
