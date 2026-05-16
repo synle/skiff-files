@@ -385,4 +385,28 @@ describe("Browser smoke", () => {
       screen.getByLabelText(/Search current folder/i),
     ).toBeInTheDocument();
   });
+
+  // Bug 11 — when a remote listDir rejects, the Browser sets a
+  // sticky `listFailure` flag. Three downstream contracts depend on
+  // it: (1) the search input vanishes (Toolbar.disabled collapses
+  // it), (2) BulkActionBar is unmounted entirely, (3) the
+  // UnreachableFolderPlaceholder's Retry button is the primary CTA.
+  // Pin each downstream surface so the gate can't silently
+  // regress.
+  it("listFailure on a remote path hides BulkActionBar and the search input", async () => {
+    await act(async () => {
+      r({ initialPath: "sftp://unreachable/home" });
+    });
+    // listDir under jsdom rejects → listFailure is set.
+    expect(
+      screen.getByRole("button", { name: /Retry connection/i }),
+    ).toBeInTheDocument();
+    // Search input is hidden by the Toolbar's disabled-collapse —
+    // smoke for (1).
+    expect(screen.queryByLabelText(/Search current folder/i)).toBeNull();
+    // BulkActionBar's "New folder" button is the cheapest stable
+    // marker for the bar's presence; absence ⇒ unmounted — smoke
+    // for (2).
+    expect(screen.queryByRole("button", { name: "New folder" })).toBeNull();
+  });
 });

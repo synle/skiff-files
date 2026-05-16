@@ -66,4 +66,58 @@ describe("creds bindings", () => {
       secret: "p",
     });
   });
+
+  // Bug 16 — full Remember-password round-trip. Store, then load,
+  // and the same secret comes back. Pins the (kind, connectionId)
+  // tuple's role as the keychain key; a refactor that swapped store
+  // and load on different keys would surface here as a mismatched
+  // round-trip.
+  it("round-trips: store followed by load returns the same secret", async () => {
+    // Internal map keyed by JSON(connectionId, kind) — simulates the
+    // keychain backend.
+    const vault = new Map<string, string>();
+    const key = (id: string, kind: string) => `${kind}:${id}`;
+    mockedInvoke.mockImplementation(async (cmd, args) => {
+      const a = args as Record<string, string>;
+      if (cmd === "creds_store") {
+        vault.set(key(a.connectionId, a.kind), a.secret);
+        return undefined;
+      }
+      if (cmd === "creds_load") {
+        return vault.get(key(a.connectionId, a.kind)) ?? null;
+      }
+      if (cmd === "creds_delete") {
+        vault.delete(key(a.connectionId, a.kind));
+        return undefined;
+      }
+      return null;
+    });
+    await credsStore("rt-1", "auth", "swordfish");
+    expect(await credsLoad("rt-1", "auth")).toBe("swordfish");
+    // Deleting clears the slot — subsequent load returns null.
+    await credsDelete("rt-1", "auth");
+    expect(await credsLoad("rt-1", "auth")).toBeNull();
+  });
+
+  // Symmetric path — auth and keyPassphrase slots are independent.
+  // Storing under one must NOT clobber the other for the same id.
+  it("auth and keyPassphrase slots are independent for the same connection id", async () => {
+    const vault = new Map<string, string>();
+    const key = (id: string, kind: string) => `${kind}:${id}`;
+    mockedInvoke.mockImplementation(async (cmd, args) => {
+      const a = args as Record<string, string>;
+      if (cmd === "creds_store") {
+        vault.set(key(a.connectionId, a.kind), a.secret);
+        return undefined;
+      }
+      if (cmd === "creds_load") {
+        return vault.get(key(a.connectionId, a.kind)) ?? null;
+      }
+      return null;
+    });
+    await credsStore("shared-id", "auth", "auth-secret");
+    await credsStore("shared-id", "keyPassphrase", "key-secret");
+    expect(await credsLoad("shared-id", "auth")).toBe("auth-secret");
+    expect(await credsLoad("shared-id", "keyPassphrase")).toBe("key-secret");
+  });
 });

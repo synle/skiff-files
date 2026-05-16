@@ -263,6 +263,71 @@ describe("RemoteConnectDialog", () => {
     }
   });
 
+  // SFTP coverage for Bug 7 — pins that every scheme the dialog
+  // handles fires the event, not just SMB + FTP. SFTP needs a real
+  // password to satisfy the form's `required` validators.
+  it("dispatches skiff:connections-changed after a successful SFTP connect", async () => {
+    const listener = vi.fn();
+    window.addEventListener("skiff:connections-changed", listener);
+    try {
+      r({ scheme: "sftp", host: "example.com", port: 22, remotePath: "/" });
+      // SFTP password-mode requires both User and Password to be
+      // filled. The Port default (22) and Host are pre-seeded.
+      fireEvent.change(
+        screen.getByLabelText(/^User \*?$/) as HTMLInputElement,
+        { target: { value: "bob" } },
+      );
+      fireEvent.change(
+        screen.getByLabelText(/^Password \*?$/) as HTMLInputElement,
+        { target: { value: "p" } },
+      );
+      await fireConnect();
+      expect(listener).toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("skiff:connections-changed", listener);
+    }
+  });
+
+  // Ordering contract — the event fires BEFORE the onConnected
+  // callback, so any listener (the Sidebar's connList() refresh) has
+  // a chance to settle ahead of the route change. Pinned explicitly
+  // because reordering these calls is a likely "looks fine in dev"
+  // regression that breaks the immediate-sidebar-refresh feel.
+  it("fires skiff:connections-changed before onConnected resolves the canonical URL", async () => {
+    const order: string[] = [];
+    const eventListener = vi.fn(() => {
+      order.push("event");
+    });
+    window.addEventListener("skiff:connections-changed", eventListener);
+    const onConnected = vi.fn(() => {
+      order.push("onConnected");
+    });
+    const onClose = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <SettingsProvider>
+          <RemoteConnectDialog
+            open
+            request={{ scheme: "ftp", host: "mirror", port: null, remotePath: "/" }}
+            onClose={onClose}
+            onConnected={onConnected}
+          />
+        </SettingsProvider>
+      </ThemeProvider>,
+    );
+    try {
+      const dialog = screen.getByRole("dialog");
+      const form = dialog.querySelector("form") ?? dialog;
+      fireEvent.submit(form);
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+      expect(order.length).toBeGreaterThanOrEqual(2);
+      expect(order.indexOf("event")).toBeLessThan(order.indexOf("onConnected"));
+    } finally {
+      window.removeEventListener("skiff:connections-changed", eventListener);
+    }
+  });
+
   // Bug 5 regression — SMB Share is OPTIONAL. Leaving it empty must
   // not surface a "required" indicator and must let the form submit
   // (share-agnostic mode lists root shares as virtual folders).

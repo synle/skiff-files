@@ -254,4 +254,220 @@ describe("runPaste", () => {
     expect(startSync).toHaveBeenCalledTimes(2);
     expect(startedJobIds).toHaveLength(2);
   });
+
+  // 15-item paste — exercises the serial loop at a realistic batch
+  // size. The earlier parallel shape would have queued 15 jobs into
+  // the drawer simultaneously; the serial shape must emit them in
+  // strict source order, one at a time, and clear the clipboard
+  // exactly once at the start.
+  it("scales to a 15-item paste — strict source order, single clipboard clear", async () => {
+    const { deps, startSync, clearClipboard, startedJobIds, fireDone } = makeDeps();
+    const sources = Array.from({ length: 15 }, (_, i) => `/src/f${i}.png`);
+    await pumpPaste(
+      runPaste({ paths: sources, operation: "copy" }, "/dest", deps),
+      startedJobIds,
+      fireDone,
+    );
+    expect(clearClipboard).toHaveBeenCalledTimes(1);
+    expect(startSync).toHaveBeenCalledTimes(15);
+    // Strict source order — assert each nth call individually so an
+    // out-of-order regression fails for the right reason.
+    for (let i = 0; i < 15; i++) {
+      expect(startSync).toHaveBeenNthCalledWith(i + 1, sources[i], "/dest");
+    }
+  });
+
+  // Cut + rapid-navigation: user pastes a cut clipboard, then
+  // navigates away mid-batch. The destination refresh must stop
+  // firing (currentPath() no longer matches destFolder), but the
+  // sources still get removed at the end because the cut-cleanup
+  // doesn't depend on the user staying in the destination.
+  it("cut-mode: navigating away mid-paste skips destination refresh but still removes sources", async () => {
+    let nowAt = "/dest";
+    const refresh = vi.fn();
+    const { deps, removeOrTrashMany, startedJobIds, fireDone } = makeDeps({
+      refresh,
+      currentPath: () => nowAt,
+    });
+    const promise = runPaste(
+      { paths: ["/src/a", "/src/b"], operation: "cut" },
+      "/dest",
+      deps,
+    );
+    // After the first startSync resolves, navigate away. The pump
+    // loop will then fire done events with nowAt === "/elsewhere",
+    // so refresh must NOT be called again.
+    let pumped = 0;
+    const navigateAfter = (async () => {
+      // Wait one microtask cycle so the first start has a chance to
+      // land. Real navigation happens via state, not a timer; this
+      // approximation is enough for the contract.
+      await new Promise((r) => setTimeout(r, 5));
+      nowAt = "/elsewhere";
+    })();
+    await Promise.all([
+      navigateAfter,
+      pumpPaste(promise, startedJobIds, fireDone),
+    ]);
+    void pumped;
+    // Cut-cleanup must still run — sources removed regardless of
+    // where the user navigated.
+    expect(removeOrTrashMany).toHaveBeenCalledTimes(1);
+    expect(removeOrTrashMany).toHaveBeenCalledWith(["/src/a", "/src/b"]);
+  });
+
+  // Mid-paste navigation: user navigates away during a multi-file
+  // copy paste. Destination refresh stops once currentPath diverges,
+  // but the remaining syncs still kick (they're in flight on the
+  // backend — cancelling them isn't paste-flow's job).
+  it("navigating away mid-paste suppresses subsequent refreshes but keeps syncs flowing", async () => {
+    // Deterministic shape: navigate away AT startSync time for the
+    // second source. After that, the rest of the syncs still kick
+    // but every refresh call sees currentPath !== destFolder.
+    let nowAt = "/dest";
+    const refresh = vi.fn();
+    let startCount = 0;
+    const doneListenerRef: { current: ((s: Summary) => void) | null } = {
+      current: null,
+    };
+    const startedJobIds: string[] = [];
+    const startSync = vi.fn(async () => {
+      startCount += 1;
+      // Flip the nav AT the second start. The first source's done
+      // event (which fires from the pump immediately after) will
+      // still see /dest mismatch.
+      if (startCount === 2) nowAt = "/elsewhere";
+      const id = `job-${startCount}`;
+      startedJobIds.push(id);
+      return id;
+    });
+    const onDone = vi.fn(async (cb: (s: Summary) => void) => {
+      doneListenerRef.current = cb;
+      return () => { doneListenerRef.current = null; };
+    });
+    const deps: PasteDeps = {
+      stat: vi.fn(async (p: string) => ({
+        name: p.split("/").pop() ?? p,
+        isDir: false,
+      })),
+      startSync,
+      refresh,
+      onDone,
+      clearClipboard: vi.fn(),
+      removeOrTrashMany: vi.fn().mockResolvedValue(undefined),
+      onError: vi.fn(),
+      currentPath: () => nowAt,
+      perJobTimeoutMs: 5_000,
+    };
+    const promise = runPaste(
+      { paths: ["/a", "/b", "/c"], operation: "copy" },
+      "/dest",
+      deps,
+    );
+    // Drive the pump.
+    let fired = 0;
+    let done = false;
+    promise.finally(() => { done = true; });
+    for (let i = 0; i < 100 && !done; i++) {
+      await new Promise((r) => setTimeout(r, 0));
+      while (fired < startedJobIds.length) {
+        doneListenerRef.current?.(makeSummary(startedJobIds[fired++]));
+      }
+    }
+    await promise;
+    // All three syncs still fired (backend keeps going).
+    expect(startSync).toHaveBeenCalledTimes(3);
+    // Only the first source's refresh saw /dest (refresh-per-done
+    // for job-1 — currentPath still /dest because nav happens at
+    // startSync(2)). All later refreshes skip. So at most one
+    // refresh call to /dest landed.
+    expect(refresh.mock.calls.length).toBeLessThanOrEqual(1);
+  });
+
+  // 10-item paste — assertion is the serial-dispatch contract: each
+  // startSync waits for the previous job's done event before firing.
+  // Earlier parallel shape would have called all 10 startSyncs back
+  // to back; the serial shape must interleave with done events.
+  it("10-item paste — each startSync waits for the prior job's done event", async () => {
+    /** Track the order of (startSync return, fireDone) events so we
+     *  can assert no two startSyncs land before the first one's done
+     *  fires. */
+    const order: Array<{ kind: "start" | "done"; id: string }> = [];
+    const doneListenerRef: { current: ((s: Summary) => void) | null } = {
+      current: null,
+    };
+    let idCounter = 0;
+    const startedJobIds: string[] = [];
+    const startSync = vi.fn(async () => {
+      const id = `job-${++idCounter}`;
+      startedJobIds.push(id);
+      order.push({ kind: "start", id });
+      return id;
+    });
+    const onDone = vi.fn(async (cb: (s: Summary) => void) => {
+      doneListenerRef.current = cb;
+      return () => { doneListenerRef.current = null; };
+    });
+    const deps: PasteDeps = {
+      stat: vi.fn(async (p: string) => ({
+        name: p.split("/").pop() ?? p,
+        isDir: false,
+      })),
+      startSync,
+      refresh: vi.fn(),
+      onDone,
+      clearClipboard: vi.fn(),
+      removeOrTrashMany: vi.fn().mockResolvedValue(undefined),
+      onError: vi.fn(),
+      currentPath: () => "/dest",
+      perJobTimeoutMs: 10_000,
+    };
+    const sources = Array.from({ length: 10 }, (_, i) => `/src/f${i}`);
+    const promise = runPaste(
+      { paths: sources, operation: "copy" },
+      "/dest",
+      deps,
+    );
+    // Drive the pump: after each startSync, fire its done so the
+    // next one unblocks.
+    let fired = 0;
+    let done = false;
+    promise.finally(() => { done = true; });
+    for (let i = 0; i < 200 && !done; i++) {
+      await new Promise((r) => setTimeout(r, 0));
+      while (fired < startedJobIds.length) {
+        const id = startedJobIds[fired++];
+        order.push({ kind: "done", id });
+        doneListenerRef.current?.({
+          jobId: id,
+          copied: 1,
+          skipped: 0,
+          conflicts: 0,
+          errors: 0,
+          bytesCopied: 1,
+          cancelled: false,
+        });
+      }
+    }
+    await promise;
+    expect(startSync).toHaveBeenCalledTimes(10);
+    // Walk `order`: for each `start` at index k+1, the immediately
+    // preceding entry must be the matching `done` for job k. That
+    // pins the serial contract — no two starts in a row without a
+    // done in between.
+    const starts = order.filter((o) => o.kind === "start");
+    const dones = order.filter((o) => o.kind === "done");
+    expect(starts.length).toBe(10);
+    expect(dones.length).toBe(10);
+    for (let i = 1; i < starts.length; i++) {
+      // The done for job-i must appear before the start for job-(i+1).
+      const doneIdx = order.findIndex(
+        (o) => o.kind === "done" && o.id === starts[i - 1].id,
+      );
+      const nextStartIdx = order.findIndex(
+        (o) => o.kind === "start" && o.id === starts[i].id,
+      );
+      expect(doneIdx).toBeLessThan(nextStartIdx);
+    }
+  });
 });

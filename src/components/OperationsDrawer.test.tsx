@@ -232,4 +232,99 @@ describe("OperationsDrawer", () => {
     fireEvent.click(hideBtn);
     expect(screen.queryByText(/operation/i)).toBeNull();
   });
+
+  // Symmetric path to the Hide test above — once the user dismisses
+  // the drawer with ×, the NEXT queued job must reveal it again.
+  // Bug 3 is specifically that the drawer would stay hidden through
+  // the next paste because the queued-event listener wasn't wired,
+  // so users who hit × never saw their next sync.
+  it("auto-reveals after explicit Hide on the next queued event", async () => {
+    mockedInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "sync_list") {
+        return [{ id: "j", src: "/s", dest: "/d", state: "running" }];
+      }
+      return null;
+    });
+    await act(async () => {
+      r();
+    });
+    // Hide the drawer.
+    const hideBtn = await waitFor(() =>
+      screen.getByLabelText("Hide operations drawer"),
+    );
+    fireEvent.click(hideBtn);
+    expect(screen.queryByLabelText("Hide operations drawer")).toBeNull();
+    // Fire a queued event for a brand-new job — drawer must come
+    // back, and the new src/dest must be rendered.
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("skiff:sync-queued", {
+          detail: {
+            jobId: "after-hide",
+            src: "/src/post-hide.png",
+            dest: "/dest/post-hide.png",
+          },
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText(
+          "Toggle /src/post-hide.png → /dest/post-hide.png",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // Bug 3 + cleanup — after the drawer seeds a job from a queued
+  // event, the matching sync:done event must prune the row. Without
+  // this contract a 1-byte SMB paste would leave a "ghost row"
+  // forever (the drawer seeded the row from the queued event, but
+  // there was never a sync:progress to keep it alive nor a
+  // sync:done to remove it).
+  it("queued-then-done prunes the seeded row", async () => {
+    mockedInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "sync_list") return [];
+      return null;
+    });
+    let doneHandler:
+      | ((e: { payload: { jobId: string } }) => void)
+      | null = null;
+    mockedListen.mockImplementation(async (name, handler) => {
+      if (name === "sync:done") {
+        doneHandler = handler as typeof doneHandler;
+      }
+      return () => {};
+    });
+    await act(async () => {
+      r();
+    });
+    // Queue a job — drawer reveals.
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("skiff:sync-queued", {
+          detail: {
+            jobId: "tiny-job",
+            src: "/src/tiny.txt",
+            dest: "/dest/tiny.txt",
+          },
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Toggle /src/tiny.txt → /dest/tiny.txt"),
+      ).toBeInTheDocument();
+    });
+    // Fire done — row must vanish (drawer drops to no-jobs state,
+    // which short-circuits to null).
+    await act(async () => {
+      doneHandler?.({ payload: { jobId: "tiny-job" } });
+    });
+    await waitFor(() => {
+      expect(
+        screen.queryByLabelText("Toggle /src/tiny.txt → /dest/tiny.txt"),
+      ).toBeNull();
+    });
+  });
 });

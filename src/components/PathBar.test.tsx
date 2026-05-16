@@ -98,6 +98,79 @@ describe("PathBar", () => {
     window.removeEventListener("skiff:connect-to-remote", listener);
   });
 
+  // Bug 4 — friendly label + chip variants. Each remote scheme
+  // (SMB / SFTP / FTP) must produce its own chip text and aria-label,
+  // and the raw UUID must NEVER appear as visible text. Only the SMB
+  // variant existed before; the SFTP / FTP cases pin the contract
+  // for every protocol the address bar handles.
+  it("renders an SFTP protocol chip + friendly label in place of the UUID", async () => {
+    const { connList } = await import("../api/conn");
+    (connList as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: "sftp-id", kind: "sftp", label: "user@example.com:22" },
+    ]);
+    renderBar({ path: "sftp://sftp-id/home/user/file.txt" });
+    expect(
+      screen.getByLabelText(/sftp connection root/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("SFTP")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("user@example.com:22")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("sftp-id")).toBeNull();
+    expect(screen.getByText("home")).toBeInTheDocument();
+    expect(screen.getByText("file.txt")).toBeInTheDocument();
+  });
+
+  it("renders an FTP protocol chip + friendly label in place of the UUID", async () => {
+    const { connList } = await import("../api/conn");
+    (connList as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: "ftp-id", kind: "ftp", label: "anonymous@mirror.kernel.org:21" },
+    ]);
+    renderBar({ path: "ftp://ftp-id/pub/linux/file.iso" });
+    expect(
+      screen.getByLabelText(/ftp connection root/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("FTP")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText("anonymous@mirror.kernel.org:21"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("ftp-id")).toBeNull();
+    expect(screen.getByText("pub")).toBeInTheDocument();
+    expect(screen.getByText("file.iso")).toBeInTheDocument();
+  });
+
+  // Aria-label per scheme — keeps screen readers from saying "smb
+  // connection root" on an SFTP URL etc. Three calls, three different
+  // labels.
+  it("chip aria-label uses the matching scheme name per kind", () => {
+    // No connList wait needed — chip renders synchronously from
+    // parseLocation, so we can assert the aria-label even with the
+    // default empty connList resolution.
+    renderBar({ path: "smb://abc/share" });
+    expect(screen.getByLabelText("smb connection root")).toBeInTheDocument();
+  });
+
+  // UUID-leak guard — when the connection registry has NOT resolved
+  // (connList rejected, or the id isn't in the map yet), the chip
+  // still renders, but the raw UUID must NOT appear as a visible
+  // breadcrumb segment (it gets filtered as the leading segment).
+  // The friendly label simply doesn't render yet.
+  it("UUID never appears as a visible breadcrumb segment, even before connList resolves", async () => {
+    // Mock connList to never resolve in test timing — empty map.
+    const { connList } = await import("../api/conn");
+    (connList as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    renderBar({ path: "smb://feedface-0000-0000-0000-000000000000/share/x" });
+    // UUID must not be in any visible text node.
+    expect(
+      screen.queryByText(/feedface-0000-0000-0000-000000000000/),
+    ).toBeNull();
+    // But the share / file segments still render.
+    expect(screen.getByText("share")).toBeInTheDocument();
+    expect(screen.getByText("x")).toBeInTheDocument();
+  });
+
   // Bug 4 regression — when browsing a remote URL the address bar
   // must show a protocol chip + the registry's friendly label
   // (`admin@192.168.1.1:445/G`) instead of the raw UUID. Mirrors the

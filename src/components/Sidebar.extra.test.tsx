@@ -448,6 +448,38 @@ describe("Sidebar — extras", () => {
     expect(stored.bookmarks[0].label).toBe("Renamed");
   });
 
+  // Bug 10 — clicking a Network row navigates Browser to
+  // scheme://id/. Each kind picks its own scheme (sftp / ftp / smb)
+  // — the previous shape defaulted to "sftp" for anything non-FTP
+  // and silently routed SMB clicks through the SFTP registry.
+  it("Network section: clicking a SMB row navigates to smb://<id>/", async () => {
+    const mocked = vi.mocked(invoke);
+    mocked.mockImplementation(async (cmd: string) => {
+      if (cmd === "conn_list") {
+        return [{ id: "smb-uuid", kind: "smb", label: "admin@nas" }];
+      }
+      return null;
+    });
+    const { onNavigate } = r();
+    const row = await waitFor(() => screen.getByText("admin@nas"));
+    fireEvent.click(row);
+    expect(onNavigate).toHaveBeenCalledWith("smb://smb-uuid/");
+  });
+
+  it("Network section: clicking an FTP row navigates to ftp://<id>/", async () => {
+    const mocked = vi.mocked(invoke);
+    mocked.mockImplementation(async (cmd: string) => {
+      if (cmd === "conn_list") {
+        return [{ id: "ftp-uuid", kind: "ftp", label: "anon@mirror" }];
+      }
+      return null;
+    });
+    const { onNavigate } = r();
+    const row = await waitFor(() => screen.getByText("anon@mirror"));
+    fireEvent.click(row);
+    expect(onNavigate).toHaveBeenCalledWith("ftp://ftp-uuid/");
+  });
+
   // Bug 10 regression (0.2.281) — connection rows in the Network
   // section render a protocol chip (SFTP / FTP / SMB) next to the
   // label, mirroring the tab strip and address bar.

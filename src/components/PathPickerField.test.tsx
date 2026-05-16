@@ -101,4 +101,81 @@ describe("PathPickerField", () => {
     const input = screen.getByLabelText(/Private key path/) as HTMLInputElement;
     expect(input.required).toBe(true);
   });
+
+  // Symmetric path to the "warning when fsStat rejects" test —
+  // clearing the input must wipe the warning, not leave a stale
+  // message stuck under a now-empty field.
+  it("clears the warning when the value transitions to empty", async () => {
+    const { fsStat } = await import("../api/fs");
+    (fsStat as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("ENOENT"));
+    // Render once with a bad path so the warning fires.
+    const { rerender } = render(
+      <ThemeProvider theme={theme}>
+        <PathPickerField
+          label="Private key path"
+          value="/does/not/exist"
+          onChange={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+    await waitFor(
+      () =>
+        expect(
+          screen.getByText(/doesn['']t exist/i),
+        ).toBeInTheDocument(),
+      { timeout: 1500 },
+    );
+    // Re-render with an empty value — warning must clear.
+    rerender(
+      <ThemeProvider theme={theme}>
+        <PathPickerField
+          label="Private key path"
+          value=""
+          onChange={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText(/doesn['']t exist/i)).not.toBeInTheDocument();
+    });
+  });
+
+  // Debounce contract — rapid typing must coalesce into ONE fsStat
+  // call (after the final keystroke), not one per keystroke. Without
+  // this the keychain / SSH-key picker would spam the Rust side on
+  // every keystroke and flicker the warning between "checking" and
+  // "missing".
+  it("debounces rapid value changes into a single fsStat probe", async () => {
+    const { fsStat } = await import("../api/fs");
+    const stat = fsStat as ReturnType<typeof vi.fn>;
+    stat.mockClear();
+    stat.mockResolvedValue({ name: "ok" });
+    const { rerender } = render(
+      <ThemeProvider theme={theme}>
+        <PathPickerField label="P" value="/a" onChange={vi.fn()} />
+      </ThemeProvider>,
+    );
+    // Three quick re-renders within the 350ms debounce window —
+    // none should fire fsStat yet.
+    rerender(
+      <ThemeProvider theme={theme}>
+        <PathPickerField label="P" value="/ab" onChange={vi.fn()} />
+      </ThemeProvider>,
+    );
+    rerender(
+      <ThemeProvider theme={theme}>
+        <PathPickerField label="P" value="/abc" onChange={vi.fn()} />
+      </ThemeProvider>,
+    );
+    rerender(
+      <ThemeProvider theme={theme}>
+        <PathPickerField label="P" value="/abcd" onChange={vi.fn()} />
+      </ThemeProvider>,
+    );
+    // Wait past the 350ms debounce.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Exactly one call, for the final value.
+    expect(stat).toHaveBeenCalledTimes(1);
+    expect(stat).toHaveBeenLastCalledWith("/abcd");
+  });
 });
