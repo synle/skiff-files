@@ -42,6 +42,7 @@ import RemoteConnectDialog, {
   type RemoteConnectRequest,
 } from "../components/RemoteConnectDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { credsCapable, credsDelete, credsStore } from "../api/creds";
 import { useSettings } from "../state/settings";
 import {
   removeConnection,
@@ -115,6 +116,48 @@ export default function ConnectionsPage() {
       window.removeEventListener("skiff:connections-changed", onChange);
   }, [refreshLive]);
 
+  /** One-shot migration: move any plaintext password we previously
+   *  stored on `SavedConnection.password` (phase 1 storage) into
+   *  the OS keychain (phase 2) and clear the plaintext slot. Runs
+   *  whenever the saved-connections list changes — idempotent on
+   *  subsequent passes because the plaintext field is wiped on
+   *  success. Aborts cleanly when the keychain isn't reachable so
+   *  Linux users without secret-service keep their data. */
+  useEffect(() => {
+    const candidates = settings.connections.filter(
+      (c) => c.rememberPassword && c.password != null && c.password !== "",
+    );
+    if (candidates.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const ok = await credsCapable().catch(() => false);
+      if (!ok || cancelled) return;
+      let next = settings.connections;
+      let changed = false;
+      for (const c of candidates) {
+        if (cancelled) return;
+        try {
+          await credsStore(c.id, "auth", c.password!);
+          next = next.map((row) =>
+            row.id === c.id ? { ...row, password: undefined } : row,
+          );
+          changed = true;
+        } catch {
+          // Leave the plaintext fallback in place if the keychain
+          // refused — the next user-driven save will retry.
+        }
+      }
+      if (changed && !cancelled) update("connections", next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // We deliberately ignore `update` in the deps — it's stable
+    // from useSettings + including it would re-fire the effect
+    // every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.connections]);
+
   /** Index of live sessions by id — O(1) lookup while rendering rows. */
   const liveById = useMemo(
     () => new Map(live.map((c) => [c.id, c])),
@@ -151,7 +194,8 @@ export default function ConnectionsPage() {
     });
   };
 
-  /** Delete a saved entry (+ disconnect any live session sharing the id). */
+  /** Delete a saved entry (+ disconnect any live session sharing the id
+   *  + wipe any keychain entries we own for it). */
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     const id = pendingDelete.id;
@@ -161,6 +205,18 @@ export default function ConnectionsPage() {
       } catch {
         /* surface no error — we still want to remove the saved entry */
       }
+    }
+    // Wipe both keychain slots — auth password + optional SSH key
+    // passphrase. Idempotent; no-op when nothing was stored.
+    try {
+      await credsDelete(id, "auth");
+    } catch {
+      /* ignore */
+    }
+    try {
+      await credsDelete(id, "keyPassphrase");
+    } catch {
+      /* ignore */
     }
     update("connections", removeConnection(settings.connections, id));
     setPendingDelete(null);

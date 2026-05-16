@@ -47,6 +47,7 @@ import {
 } from "../api/conn";
 import PathPickerField from "./PathPickerField";
 import { useSettings } from "../state/settings";
+import { credsDelete, credsLoad, credsStore } from "../api/creds";
 import {
   addOrUpdateConnection,
   connToFtpDraft,
@@ -223,7 +224,25 @@ export default function RemoteConnectDialog({
         setHost(saved.host);
         setPort(saved.port);
         setUser(saved.user);
-        setPassword(saved.password ?? "");
+        // Password resolution order on edit-mode open:
+        //   1. Keychain (preferred — `creds_load`)
+        //   2. Plaintext on the SavedConnection (legacy fallback)
+        //   3. Empty (user re-enters)
+        // The async read leaves the field empty for one render
+        // then fills in when the keychain answers — same UX as the
+        // password manager autofill flow users already know.
+        if (saved.rememberPassword) {
+          void credsLoad(saved.id, "auth")
+            .then((stored) => {
+              if (stored != null) setPassword(stored);
+              else if (saved.password) setPassword(saved.password);
+            })
+            .catch(() => {
+              if (saved.password) setPassword(saved.password);
+            });
+        } else {
+          setPassword("");
+        }
         setRememberPassword(!!saved.rememberPassword);
         if (saved.kind === "sftp") {
           setAuthMode(saved.authMode ?? "password");
@@ -338,12 +357,18 @@ export default function RemoteConnectDialog({
     setUser(entry.draft.user);
     setSelectedDraftId(entry.draft.id);
     // Pre-fill the password + Remember toggle from the saved entry
-    // when present. We look up the full SavedConnection from
-    // settings (the draft projections drop the password field).
+    // when present. Keychain takes precedence over plaintext.
     const saved = settings.connections.find((c) => c.id === entry.draft.id);
-    if (saved?.rememberPassword && saved.password != null) {
-      setPassword(saved.password);
+    if (saved?.rememberPassword) {
       setRememberPassword(true);
+      void credsLoad(saved.id, "auth")
+        .then((stored) => {
+          if (stored != null) setPassword(stored);
+          else if (saved.password) setPassword(saved.password);
+        })
+        .catch(() => {
+          if (saved?.password) setPassword(saved.password);
+        });
     } else {
       setRememberPassword(false);
     }
@@ -412,8 +437,37 @@ export default function RemoteConnectDialog({
         smbShare,
         smbDomain,
       });
+      const newConnId = isEditing ? selectedDraftId : `${scheme}-${Date.now()}`;
+      // Persist the password — keychain first (preferred), plaintext
+      // in settings.json as a fallback when the keychain backend
+      // isn't reachable. Either way the saved entry carries
+      // `rememberPassword` so the dialog knows to look for it on
+      // next open. The `password` field on SavedConnection is left
+      // unset when the keychain accepted the secret so the same row
+      // doesn't double-store. When the toggle flips off we wipe
+      // both stores (idempotent on the keychain side).
+      let plaintextPasswordFallback: string | undefined;
+      if (rememberPassword) {
+        try {
+          await credsStore(newConnId, "auth", password);
+        } catch {
+          // Keychain failed (locked / unavailable). Fall back to
+          // the plaintext-on-disk slot so the user's intent is
+          // honored even on Linux installs without secret-service.
+          // The user-visible "Remember password" toggle's helper
+          // text already warns about plaintext storage.
+          plaintextPasswordFallback = password;
+        }
+      } else {
+        // Toggle is off — wipe any previously-stored secret.
+        try {
+          await credsDelete(newConnId, "auth");
+        } catch {
+          /* idempotent; ignore */
+        }
+      }
       const newConn: SavedConnection = {
-        id: isEditing ? selectedDraftId : `${scheme}-${Date.now()}`,
+        id: newConnId,
         kind: scheme,
         label,
         host,
@@ -427,7 +481,7 @@ export default function RemoteConnectDialog({
         share: scheme === "smb" ? smbShare : undefined,
         domain: scheme === "smb" ? smbDomain : undefined,
         rememberPassword,
-        password: rememberPassword ? password : undefined,
+        password: plaintextPasswordFallback,
       };
       update(
         "connections",
