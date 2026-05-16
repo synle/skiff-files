@@ -85,6 +85,8 @@ import { onDone } from "../api/sync";
 import { runPaste } from "../util/pasteFlow";
 import { resolveBulkActionBarDense } from "../util/bulkActionBarMode";
 import UnreachableFolderPlaceholder from "../components/UnreachableFolderPlaceholder";
+import { connList } from "../api/conn";
+import { humanizeMessage, humanizeRemoteUrl } from "../util/humanizeRemoteUrl";
 
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
@@ -127,6 +129,26 @@ export default function Browser({
   const [history, setHistory] = useState<History>({ back: [], forward: [] });
   const [entries, setEntries] = useState<Entry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** connection_id → friendly registry label (e.g. `admin@host:445/G`).
+   *  Used to swap raw UUIDs in error messages / unreachable paths
+   *  for human-readable text. Refreshed on
+   *  `skiff:connections-changed`. */
+  const [connLabels, setConnLabels] = useState<Map<string, string>>(
+    new Map(),
+  );
+  useEffect(() => {
+    const refresh = () => {
+      void connList()
+        .then((list) =>
+          setConnLabels(new Map(list.map((c) => [c.id, c.label]))),
+        )
+        .catch(() => { /* outside Tauri — keep empty */ });
+    };
+    refresh();
+    window.addEventListener("skiff:connections-changed", refresh);
+    return () =>
+      window.removeEventListener("skiff:connections-changed", refresh);
+  }, []);
   // Sort state. The Toolbar's column-header click cycles direction,
   // so we keep these locally — but read the *initial* value from
   // settings (per-folder override → app default → "name asc"). On
@@ -1769,12 +1791,16 @@ export default function Browser({
           // Render an actionable error placeholder instead of the
           // misleading "Empty folder" line + a full FileList header
           // that pretends the listing exists. The Toolbar above
-          // stays mounted so back / up / refresh remain the way out.
+          // stays mounted so back / refresh remain the way out.
+          // Up is intentionally NOT passed: if we can't reach this
+          // folder, we can't reach its parent either (same dead
+          // connection), so the "Go up" button would just push the
+          // user into another error state. Back is the actual
+          // escape hatch — handled by the Toolbar's history cluster.
           <UnreachableFolderPlaceholder
-            path={path}
-            error={listFailure}
+            path={humanizeRemoteUrl(path, connLabels)}
+            error={humanizeMessage(listFailure, connLabels)}
             onRetry={() => path && void refresh(path)}
-            onUp={goUp}
           />
         ) : (
         <FileList
@@ -1874,7 +1900,15 @@ export default function Browser({
         selectedSize={
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
         }
-        errorMessage={searchError ?? error}
+        errorMessage={
+          // Swap raw UUIDs in error messages for friendly labels so
+          // users see `admin@host:445/G` rather than the registry id.
+          searchError != null
+            ? humanizeMessage(searchError, connLabels)
+            : error != null
+              ? humanizeMessage(error, connLabels)
+              : null
+        }
         onDismissError={() => {
           setError(null);
           setSearchError(null);

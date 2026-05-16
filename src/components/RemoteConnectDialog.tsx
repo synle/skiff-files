@@ -45,6 +45,7 @@ import {
   connCreateSmb,
   smbListShares,
 } from "../api/conn";
+import PathPickerField from "./PathPickerField";
 import {
   loadFtpDrafts,
   loadSftpDrafts,
@@ -582,13 +583,22 @@ export default function RemoteConnectDialog({
               )}
               {authMode === "privateKey" && (
                 <>
-                  <TextField
-                    size="small"
+                  <PathPickerField
                     required
                     label="Private key path"
                     value={privateKeyPath}
-                    onChange={(e) => setPrivateKeyPath(e.target.value)}
+                    onChange={setPrivateKeyPath}
                     placeholder="~/.ssh/id_ed25519"
+                    filters={[
+                      // SSH key files typically have no extension
+                      // (`id_rsa`, `id_ed25519`), so we include the
+                      // "All files" filter alongside the common
+                      // exported / converted formats so a user with
+                      // a PuTTY-style `.ppk` or PEM-exported key can
+                      // still pick it via the dialog.
+                      { name: "SSH keys", extensions: ["pem", "key", "ppk"] },
+                      { name: "All files", extensions: ["*"] },
+                    ]}
                   />
                   <TextField
                     size="small"
