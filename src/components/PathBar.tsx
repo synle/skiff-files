@@ -5,6 +5,7 @@
 import {
   Box,
   Breadcrumbs,
+  Chip,
   IconButton,
   Link,
   Menu,
@@ -19,9 +20,10 @@ import { fsCanonicalize, fsRevealInOs } from "../api/fs";
 import { parseRemoteUrl } from "../util/remoteResolve";
 import { listDir } from "../api/client";
 import { pathSegments } from "../util/format";
-import { isRemote } from "../util/location";
+import { isRemote, parseLocation } from "../util/location";
 import { completePath, splitForCompletion } from "../util/autocomplete";
 import { OPEN_IN_TAB_EVENT } from "../App";
+import { connList, type ConnectionInfo } from "../api/conn";
 
 interface Props {
   path: string;
@@ -74,7 +76,48 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
   // starts from the latest value, not the value when the component mounted.
   useEffect(() => setDraft(path), [path]);
 
+  // Connection-id → registry label map. Lets us swap the raw UUID at
+  // the start of an `smb://<uuid>/…` / `sftp://<uuid>/…` breadcrumb
+  // for a human label (`admin@192.168.1.1:445/G`) — same shape the tab
+  // strip in `BrowserTabs` already uses. Outside Tauri (test runs) the
+  // initial `connList()` rejects and we keep the empty map; the
+  // breadcrumb gracefully falls back to the UUID.
+  const [connMap, setConnMap] = useState<Map<string, ConnectionInfo>>(
+    new Map(),
+  );
+  useEffect(() => {
+    const refresh = () => {
+      void connList()
+        .then((list) => setConnMap(new Map(list.map((c) => [c.id, c]))))
+        .catch(() => { /* outside Tauri — keep empty */ });
+    };
+    refresh();
+    window.addEventListener("skiff:connections-changed", refresh);
+    return () =>
+      window.removeEventListener("skiff:connections-changed", refresh);
+  }, []);
+
   const segments = pathSegments(path);
+  // Remote-aware breadcrumb shape: when the path is `smb://<uuid>/…`
+  // we render a protocol chip + the friendly connection label in
+  // place of the first breadcrumb segment (the UUID). The remaining
+  // share-relative segments render unchanged. Mirrors the tab-strip
+  // contract so the address bar and the tab title read identically.
+  const loc = parseLocation(path);
+  const isRemoteLoc = loc.backend.kind !== "local";
+  const remoteConn =
+    loc.backend.kind !== "local"
+      ? connMap.get(loc.backend.connectionId) ?? null
+      : null;
+  // Skip the leading "/" segment AND, for remote paths, the
+  // connection-id segment — both are replaced by the protocol chip
+  // + friendly label rendered separately. Local paths keep their
+  // existing slice (just drop the visual "/").
+  const visibleSegments = segments.filter((seg, idx) => {
+    if (seg.label === "/") return false;
+    if (isRemoteLoc && idx === 0) return false; // raw UUID
+    return true;
+  });
 
   const commit = async () => {
     const target = draft.trim();
@@ -181,29 +224,67 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
           slotProps={{ htmlInput: { "aria-label": "Path" } }}
         />
       ) : (
-        <Breadcrumbs
-          sx={{ flexGrow: 1, overflow: "hidden" }}
-          maxItems={6}
-          onContextMenu={(e) => {
-            // Right-click anywhere in the breadcrumb strip copies
-            // the full current path to the clipboard. Best-effort —
-            // silent fallback in tests / browsers without clipboard
-            // permission.
-            e.preventDefault();
-            if (typeof navigator !== "undefined" && navigator.clipboard) {
-              void navigator.clipboard.writeText(path);
-            }
+        <Box
+          sx={{
+            flexGrow: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            overflow: "hidden",
           }}
-          title="Right-click to copy full path"
         >
-          {segments
-            // Skip the leading "/" segment — the breadcrumb reads
-            // cleaner without it and the Home button covers "go to
-            // root" navigation. We keep "/" in the underlying
-            // segments array because `parentPath` + back-navigation
-            // rely on it.
-            .filter((seg) => seg.label !== "/")
-            .map((seg) => (
+          {loc.backend.kind !== "local" && (
+            // Protocol chip — SMB / SFTP / FTP — same shape the tab
+            // strip uses. Tooltip carries the raw connection id so
+            // users can still copy/paste the UUID if they need to.
+            <Tooltip
+              title={`${loc.backend.kind.toUpperCase()} · ${loc.backend.connectionId}`}
+            >
+              <Chip
+                size="small"
+                label={loc.backend.kind.toUpperCase()}
+                onClick={() => onNavigate(segments[0]?.path ?? path)}
+                aria-label={`${loc.backend.kind} connection root`}
+                sx={{
+                  height: 18,
+                  fontSize: 10,
+                  cursor: "pointer",
+                  "& .MuiChip-label": { px: 0.5 },
+                }}
+              />
+            </Tooltip>
+          )}
+          {isRemoteLoc && remoteConn && (
+            // Friendly registry label (e.g. `admin@192.168.1.1:445/G`)
+            // replacing the raw UUID at the start of the breadcrumb.
+            // Clickable — navigates to the connection root.
+            <Link
+              component="button"
+              onClick={() => onNavigate(segments[0]?.path ?? path)}
+              underline="hover"
+              color="inherit"
+              title={remoteConn.label}
+              sx={{ fontSize: "0.875rem", fontWeight: 500, whiteSpace: "nowrap" }}
+            >
+              {remoteConn.label}
+            </Link>
+          )}
+          <Breadcrumbs
+            sx={{ flexGrow: 1, overflow: "hidden", minWidth: 0 }}
+            maxItems={6}
+            onContextMenu={(e) => {
+              // Right-click anywhere in the breadcrumb strip copies
+              // the full current path to the clipboard. Best-effort —
+              // silent fallback in tests / browsers without clipboard
+              // permission.
+              e.preventDefault();
+              if (typeof navigator !== "undefined" && navigator.clipboard) {
+                void navigator.clipboard.writeText(path);
+              }
+            }}
+            title="Right-click to copy full path"
+          >
+            {visibleSegments.map((seg) => (
               <Link
                 key={seg.path}
                 component="button"
@@ -230,7 +311,8 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
                 {seg.label}
               </Link>
             ))}
-        </Breadcrumbs>
+          </Breadcrumbs>
+        </Box>
       )}
 
       <Tooltip title={editing ? "Cancel" : "Edit path"}>

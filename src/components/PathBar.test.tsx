@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import PathBar from "./PathBar";
 
@@ -16,6 +16,11 @@ vi.mock("../api/fs", async () => {
   };
 });
 vi.mock("../api/client", () => ({ listDir: vi.fn(async () => []) }));
+// Friendly-label test for Bug 4 needs connList to resolve a known
+// connection. Default no-op for the existing cases.
+vi.mock("../api/conn", () => ({
+  connList: vi.fn(async () => []),
+}));
 
 const theme = createTheme();
 
@@ -91,5 +96,35 @@ describe("PathBar", () => {
     });
     expect(onNavigate).not.toHaveBeenCalled();
     window.removeEventListener("skiff:connect-to-remote", listener);
+  });
+
+  // Bug 4 regression — when browsing a remote URL the address bar
+  // must show a protocol chip + the registry's friendly label
+  // (`admin@192.168.1.1:445/G`) instead of the raw UUID. Mirrors the
+  // tab-strip contract.
+  it("renders an SMB protocol chip + friendly label in place of the UUID", async () => {
+    const { connList } = await import("../api/conn");
+    (connList as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { id: "abc-uuid", kind: "smb", label: "admin@192.168.1.1:445/G" },
+    ]);
+    renderBar({ path: "smb://abc-uuid/folder/file.txt" });
+    // Protocol chip carries the backend kind in upper case — renders
+    // synchronously regardless of connList.
+    expect(
+      screen.getByLabelText(/smb connection root/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("SMB")).toBeInTheDocument();
+    // Friendly label resolves async via connList — wait for it.
+    await waitFor(() =>
+      expect(
+        screen.getByText("admin@192.168.1.1:445/G"),
+      ).toBeInTheDocument(),
+    );
+    // Raw UUID is NOT in the breadcrumb (it lives in the chip
+    // tooltip's hidden title attr, but no visible text node).
+    expect(screen.queryByText("abc-uuid")).toBeNull();
+    // Share-relative segments still render.
+    expect(screen.getByText("folder")).toBeInTheDocument();
+    expect(screen.getByText("file.txt")).toBeInTheDocument();
   });
 });
