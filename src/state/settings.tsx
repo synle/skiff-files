@@ -212,6 +212,17 @@ export interface Settings {
    *  left pane, `savedTabsRight` for the right). Toggle via Cmd/Ctrl+\.
    *  Default false (single-pane). */
   twoPaneMode: boolean;
+  /** Controls whether the BulkActionBar (the toolbar above the file
+   *  list) renders text labels next to its icons. Three modes:
+   *  - `"auto"` — show labels in single-pane mode, hide them in
+   *    two-pane mode (the original 0.2.270 behavior, kept as the
+   *    default so existing users see no change).
+   *  - `"labels"` — always show labels regardless of pane mode.
+   *  - `"icons"` — always icon-only with tooltips, regardless of
+   *    pane mode. Saves vertical space and matches the Finder /
+   *    Explorer toolbar feel some users prefer.
+   *  Default `"auto"`. */
+  bulkActionBarLabels: "auto" | "labels" | "icons";
   /** Ratio (0..1) of horizontal space allocated to the LEFT pane in
    *  two-pane mode. The right pane gets `1 - ratio`. Drag the divider
    *  between the panes to update. Clamped to [0.15, 0.85] so neither
@@ -543,6 +554,7 @@ export const DEFAULTS: Settings = {
   sidebarShowStatusDots: true,
   openNewTabAtCurrent: false,
   twoPaneMode: false,
+  bulkActionBarLabels: "auto",
   twoPaneSplitRatio: 0.5,
   listColumnWidths: { size: 96, modified: 180, kind: 120 },
   savedTabsRight: [],

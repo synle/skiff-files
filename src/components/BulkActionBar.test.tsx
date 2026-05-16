@@ -116,4 +116,29 @@ describe("BulkActionBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(props.onDelete).toHaveBeenCalledTimes(1);
   });
+
+  // Bug 6 regression — dense mode swaps `<Button>` (renders the
+  // label as visible text) for `<IconButton>` (label moves into the
+  // aria-label attribute only). The settings dropdown in
+  // SettingsPage maps to this `dense` prop via the new
+  // `bulkActionBarLabels` resolver in `Browser.tsx`.
+  describe("dense mode (Bug 6)", () => {
+    it("renders icon-only buttons with tooltip labels when dense=true", () => {
+      r({ count: 2, dense: true });
+      // Buttons are still accessible by their aria-label.
+      const copy = screen.getByRole("button", { name: "Copy" });
+      const cut = screen.getByRole("button", { name: "Cut" });
+      // Label text is NOT a visible text node in dense mode — only
+      // the aria-label / tooltip carries it.
+      expect(copy.textContent).toBe("");
+      expect(cut.textContent).toBe("");
+    });
+
+    it("renders icon + label buttons when dense=false (default)", () => {
+      r({ count: 2 });
+      // Label appears as visible button text in labels mode.
+      const copy = screen.getByRole("button", { name: "Copy" });
+      expect(copy.textContent).toContain("Copy");
+    });
+  });
 });

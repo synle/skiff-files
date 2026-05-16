@@ -83,6 +83,7 @@ import { NAVIGATE_EVENT, OPEN_IN_TAB_EVENT } from "../App";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { onDone } from "../api/sync";
 import { runPaste } from "../util/pasteFlow";
+import { resolveBulkActionBarDense } from "../util/bulkActionBarMode";
 
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
@@ -1639,11 +1640,17 @@ export default function Browser({
       )}
       <BulkActionBar
         count={selectedPaths.length}
-        // Two-pane mode halves the bar's horizontal real estate, so
-        // its text+icon buttons start to wrap / overlap. Flip to
-        // icon-only + tooltips when settings say twoPaneMode is on.
-        // Single-pane keeps the original text-bearing layout.
-        dense={settings.twoPaneMode}
+        // Dense (icon-only + tooltip) vs labeled (icon + text) is
+        // resolved from `bulkActionBarLabels`:
+        //   - "auto"   → dense when two-pane mode is on (the 0.2.270
+        //                default — labels wrap / overlap at half
+        //                width). Single-pane keeps labels.
+        //   - "labels" → always labeled, regardless of pane mode.
+        //   - "icons"  → always dense.
+        dense={resolveBulkActionBarDense(
+          settings.bulkActionBarLabels,
+          settings.twoPaneMode,
+        )}
         onNewFolder={() => void handleNewFolder()}
         onNewFile={() => void handleNewFile()}
         // Surface the file clipboard's pending-paste count as a
