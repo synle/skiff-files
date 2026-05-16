@@ -29,6 +29,13 @@ services:
       - "127.0.0.1:2222:2222"
     volumes:
       - ${HOME}:/config
+    # Explicit ulimits override the daemon default — works around a
+    # Docker Desktop 29.x bug where the default-ulimits "Name" field is
+    # dropped and runc rejects the empty name. Safe to leave in place.
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
   # Plain FTP with passive-mode ports.
   skiff-ftp:
@@ -44,6 +51,10 @@ services:
       - "127.0.0.1:21000-21009:21000-21009"
     volumes:
       - ${HOME}:/home/testuser
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
   # SMB 2/3 — exposes a single share `testshare` backed by ${HOME}.
   skiff-smb:
@@ -57,3 +68,7 @@ services:
       - "127.0.0.1:1445:445"
     volumes:
       - ${HOME}:/share
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000

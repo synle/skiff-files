@@ -31,6 +31,13 @@ services:
       - "127.0.0.1:2222:2222"
     volumes:
       - D:/:/config
+    # Explicit ulimits override the daemon default — works around a
+    # Docker Desktop 29.x bug where the default-ulimits "Name" field is
+    # dropped and runc rejects the empty name.
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
   skiff-ftp:
     image: delfer/alpine-ftp-server:latest
@@ -45,6 +52,10 @@ services:
       - "127.0.0.1:21000-21009:21000-21009"
     volumes:
       - D:/:/home/testuser
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
   skiff-smb:
     image: dperson/samba:latest
@@ -57,3 +68,7 @@ services:
       - "127.0.0.1:1445:445"
     volumes:
       - D:/:/share
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
