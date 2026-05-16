@@ -30,6 +30,7 @@ Coverage HTML ships as a public CI artifact (0.2.250). Treat coverage artifacts,
 - **No `process.env` / `std::env` reads at module load.** The variable *name* alone is a phishing target. Read env inside runtime functions only; never echo.
 - **CI secrets are job-scoped.** `${{ secrets.X }}` only in jobs that need it (release, signing). `coverage` / `build` / `pr_comment` reference no repo secrets.
 - **Don't commit** `.env*`, `.npmrc` with auth, `.cargo/config.toml` with tokens, `secrets.json`, signing keys, keychain exports. Keep `.gitignore` `.env*` line intact.
+- **Saved connection passwords live in the OS keychain**, not on disk. Service = `com.synle.skiff-files`, account = `auth:<connection-id>`. Backend in [`src-tauri/src/creds.rs`](./src-tauri/src/creds.rs); recovery / inspection recipes per platform in [DEV.md → Credential storage](./DEV.md#credential-storage--os-keychain). Never log or echo a secret read back from the keychain.
 - **Sanitize before logging.** Paths/hosts/users/queries are PII — log non-identifying discriminators (size, count, kind, status). See DEV.md footguns.
 - **Audit before publishing source.** Before any artifact that bakes source (coverage HTML, screenshots, pastebins), grep for `AKIA`, `xoxb-`, `ghp_`, `sk-`, `eyJ`, `BEGIN PRIVATE KEY`, `password.*=.*"`.
 
