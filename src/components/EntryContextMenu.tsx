@@ -192,9 +192,13 @@ export default function EntryContextMenu({
             // would also need the SFTP connection registry, and
             // we don't yet round-trip connection state to a freshly
             // spawned window.
-            void import("../api/fs").then(({ windowOpenAt }) =>
-              windowOpenAt(state!.entry.path).catch(() => {}),
-            );
+            void import("../api/fs")
+              .then(({ windowOpenAt }) =>
+                windowOpenAt(state!.entry.path).catch(() => {}),
+              )
+              .catch(() => {
+                /* dynamic import failure — best effort, ignore */
+              });
             onClose();
           }}
         >
