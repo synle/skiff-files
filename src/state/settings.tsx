@@ -543,7 +543,14 @@ export const DEFAULTS: Settings = {
   folderKindFilter: {},
   folderTagFilter: {},
   folderRecencyFilter: {},
-  syncDefaultConflictPolicy: "skip",
+  // Default to "prompt" so file collisions during paste / drag-drop
+  // surface the TeraCopy-style modal (Keep both / Overwrite /
+  // Overwrite if older / Overwrite if size differs / Skip — plus
+  // their "Apply to all" variants). Earlier default "skip" silently
+  // dropped colliding files, which looked exactly like a stalled
+  // copy from the user's POV. Power users who prefer auto-skip can
+  // flip this back in Settings → Skiffsync.
+  syncDefaultConflictPolicy: "prompt",
   syncDefaultMaxSizeGb: 1,
   syncDefaultLookbackDays: 7,
   syncDefaultBandwidthKbps: 0,

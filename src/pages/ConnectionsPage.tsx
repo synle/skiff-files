@@ -29,7 +29,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import LinkIcon from "@mui/icons-material/Link";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   connDisconnect,
   connKnownHostsList,
@@ -63,7 +63,7 @@ function requestForEdit(c: SavedConnection): RemoteConnectRequest {
 }
 
 export default function ConnectionsPage() {
-  const { settings, update } = useSettings();
+  const { settings, setSettings, update } = useSettings();
   /** Live SMB/SFTP/FTP sessions held by Rust. Matched to saved rows
    *  by id so we can render a status pill + toggle between Connect
    *  and Disconnect actions. */
@@ -118,43 +118,61 @@ export default function ConnectionsPage() {
 
   /** One-shot migration: move any plaintext password we previously
    *  stored on `SavedConnection.password` (phase 1 storage) into
-   *  the OS keychain (phase 2) and clear the plaintext slot. Runs
-   *  whenever the saved-connections list changes — idempotent on
-   *  subsequent passes because the plaintext field is wiped on
-   *  success. Aborts cleanly when the keychain isn't reachable so
-   *  Linux users without secret-service keep their data. */
+   *  the OS keychain (phase 2) and clear the plaintext slot.
+   *  Aborts cleanly when the keychain isn't reachable so Linux
+   *  users without secret-service keep their data.
+   *
+   *  Uses the functional `setSettings(prev => ...)` form so the
+   *  final write sees the LATEST `connections` array, not the one
+   *  captured at the time the effect's async IIFE started. Without
+   *  that, a race with Delete-connection (user clicks Delete while
+   *  the migration is still running its keychain writes) would
+   *  resurrect the deleted row when the migration's final
+   *  `update(...)` overwrote the deletion with the pre-delete
+   *  snapshot. */
+  const migrationDoneRef = useRef(false);
   useEffect(() => {
+    if (migrationDoneRef.current) return;
     const candidates = settings.connections.filter(
       (c) => c.rememberPassword && c.password != null && c.password !== "",
     );
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+      migrationDoneRef.current = true;
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const ok = await credsCapable().catch(() => false);
       if (!ok || cancelled) return;
-      let next = settings.connections;
-      let changed = false;
+      const migrated: string[] = [];
       for (const c of candidates) {
         if (cancelled) return;
         try {
           await credsStore(c.id, "auth", c.password!);
-          next = next.map((row) =>
-            row.id === c.id ? { ...row, password: undefined } : row,
-          );
-          changed = true;
+          migrated.push(c.id);
         } catch {
           // Leave the plaintext fallback in place if the keychain
           // refused — the next user-driven save will retry.
         }
       }
-      if (changed && !cancelled) update("connections", next);
+      if (cancelled || migrated.length === 0) return;
+      // Functional update — operate on `prev.connections` so any
+      // intervening Delete-connection action's removal is preserved.
+      setSettings((prev) => {
+        const next = prev.connections.map((row) =>
+          migrated.includes(row.id) && row.password
+            ? { ...row, password: undefined }
+            : row,
+        );
+        return { ...prev, connections: next };
+      });
+      migrationDoneRef.current = true;
     })();
     return () => {
       cancelled = true;
     };
-    // We deliberately ignore `update` in the deps — it's stable
-    // from useSettings + including it would re-fire the effect
-    // every render.
+    // setSettings + the ref guarantee single-run semantics; we
+    // only re-trigger when the saved list changes shape.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.connections]);
 

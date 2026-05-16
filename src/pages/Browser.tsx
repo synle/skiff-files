@@ -87,6 +87,8 @@ import { resolveBulkActionBarDense } from "../util/bulkActionBarMode";
 import UnreachableFolderPlaceholder from "../components/UnreachableFolderPlaceholder";
 import { connList } from "../api/conn";
 import { humanizeMessage, humanizeRemoteUrl } from "../util/humanizeRemoteUrl";
+import { toNativeRemoteUrl } from "../util/nativeRemoteUrl";
+import { parseLocation } from "../util/location";
 
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
@@ -379,6 +381,22 @@ export default function Browser({
     // matters at first launch, not whenever Settings updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Hand a path to the OS-native open-with-default handler.
+   *  Internal `<scheme>://<uuid>/<path>` URLs are first translated
+   *  to the OS-native form via `toNativeRemoteUrl` so macOS /
+   *  Windows / Linux don't try to resolve the UUID as a hostname.
+   *  SFTP / FTP paths surface a friendly "no native handler"
+   *  error toast — they have no OS-side opener and silently
+   *  failing here was the actual bug. */
+  const openNative = (target: string) => {
+    const { url, reason } = toNativeRemoteUrl(target, settings.connections);
+    if (url == null) {
+      setError(reason ?? "This path can't be opened natively.");
+      return;
+    }
+    void fsOpenWithDefault(url).catch((err) => setError(String(err)));
+  };
 
   /** Sticky "this folder is unreachable" flag. Distinguishes
    *  "list_dir failed" from "the folder is genuinely empty", so the
@@ -928,10 +946,8 @@ export default function Browser({
         e.preventDefault();
         if (primarySelected.isDir) {
           navigate(primarySelected.path);
-        } else if (!primarySelected.path.startsWith("sftp://")) {
-          void fsOpenWithDefault(primarySelected.path).catch((err) =>
-            setError(String(err)),
-          );
+        } else {
+          openNative(primarySelected.path);
         }
       }
     };
@@ -1825,11 +1841,10 @@ export default function Browser({
             }
           }}
           onOpenFile={(e) => {
-            // Hand off to the OS default app. Skipped for remote
-            // entries since the local OS can't open them without
-            // download.
-            if (e.path.startsWith("sftp://")) return;
-            void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
+            // Hand off to the OS default app. Internal remote
+            // URLs are translated to the native form first; SFTP /
+            // FTP surface a friendly "no native handler" toast.
+            openNative(e.path);
           }}
           onOpenDirInNewTab={(e) => {
             window.dispatchEvent(
@@ -2110,10 +2125,16 @@ export default function Browser({
             update("fileTags", next);
           }
         }}
-        onOpenWithDefault={(e) => {
-          void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
-        }}
+        onOpenWithDefault={(e) => openNative(e.path)}
         onRevealInOs={(e) => {
+          // Reveal-in-OS doesn't apply to remote backends — the OS
+          // file manager can't navigate into our in-app SMB / SFTP
+          // listings. Surface a friendly toast instead of letting
+          // Rust reject the call with a generic error.
+          if (parseLocation(e.path).backend.kind !== "local") {
+            setError("Reveal in OS only works on local files.");
+            return;
+          }
           void fsRevealInOs(e.path).catch((err) => setError(String(err)));
         }}
         onOpenInTerminal={(e) => {

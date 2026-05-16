@@ -64,7 +64,7 @@ describe("TransfersPage", () => {
           dest: "/dest",
           options: expect.objectContaining({
             maxSizeGb: 1,
-            conflictPolicy: "skip",
+            conflictPolicy: "prompt",
             dryRun: false,
           }),
         }),
