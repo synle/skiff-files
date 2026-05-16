@@ -48,6 +48,12 @@ Cmd/Ctrl+\\ opens a second pane side by side — perfect for FileZilla-style dra
 
 ![Two-pane mode — local on left, SMB on right](./screenshots/06-two-pane-mode.png)
 
+### Keep browsing while transfers run
+
+Copy, move, and Skiffsync jobs run in the background with a live operations panel — progress, ETA, pause/resume, cancel. Keep navigating, open new tabs, queue more transfers; nothing blocks the UI.
+
+![Browsing an SMB share with an operations-in-progress panel](./screenshots/08-operations-in-progress.png)
+
 ### Gallery view for media folders
 
 List / tile / gallery / column views are toggleable per folder. Gallery view kicks thumbnails through a SQLite-backed cache so re-visits stay instant.
