@@ -54,14 +54,12 @@
 // `kind === "sftp" || ...` checks.
 // ============================================================
 import {
-  fsCreateEmptyFile,
   fsDirSummary,
   fsHashSha256,
   fsListDir,
   fsMkdir,
   fsReadBase64,
   fsReadText,
-  fsRemove,
   fsRename,
   fsStat,
   fsTrashMany,
@@ -87,7 +85,6 @@ import {
   isRemote,
   parseLocation,
   type Backend,
-  type Location,
 } from "../util/location";
 import {
   syncStartCross,
