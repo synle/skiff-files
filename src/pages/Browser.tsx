@@ -81,6 +81,8 @@ import {
 } from "../util/fileClipboard";
 import { NAVIGATE_EVENT, OPEN_IN_TAB_EVENT } from "../App";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { onDone } from "../api/sync";
+import { runPaste } from "../util/pasteFlow";
 
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
@@ -238,6 +240,12 @@ export default function Browser({
   const [diffOther, setDiffOther] = useState<string | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
+  // Mirror of `path` for async closures (paste flow, watchdogs). The
+  // paste handler resolves after the user may have navigated away —
+  // capturing `path` in the closure would refresh stale tabs. Reading
+  // through the ref reflects the latest current folder.
+  const pathRef = useRef(path);
+  useEffect(() => { pathRef.current = path; }, [path]);
 
   // Per-folder kind filter — read from settings keyed by current path
   // so the active chips persist across navigation. Setter writes back
@@ -1179,67 +1187,52 @@ export default function Browser({
   /** Cmd+V handler — start a Skiffsync from each clipboard entry to
    *  the current folder. On `cut`, deletes the source after the
    *  sync's done event. Same backend abstraction as the drag-drop
-   *  flow; works cross-protocol. */
+   *  flow; works cross-protocol.
+   *
+   *  Refresh contract: `sync_start_*` returns when the job is QUEUED,
+   *  not when bytes have landed at the destination. So an immediate
+   *  `refresh(path)` shows the destination *before* the copy
+   *  completes (regression observed on SMB — only one of two pasted
+   *  files appeared until the user hit Refresh). We subscribe to
+   *  `sync:done` for the started job-ids and re-list the destination
+   *  once each job finishes. Local-to-local kernel copies usually
+   *  complete before the event listener attaches, so we also refresh
+   *  once at the end of dispatch as a fast-path.
+   *
+   *  Clipboard parity: we clear the file clipboard up-front (for both
+   *  cut and copy) so the "Paste N items" toolbar pill disappears the
+   *  moment the user clicks paste — repeated paste-into-same-folder
+   *  was almost always an accident (the user pressed Cmd+V twice
+   *  thinking nothing happened because the destination hadn't
+   *  refreshed yet). */
   const handlePaste = async (clipboard: FileClipboardEntry) => {
     if (!path) return;
-    const isCut = clipboard.operation === "cut";
-    const remoteCutPaths: string[] = [];
-    // DEBUG(paste-smb): trace inputs so we can see exactly what
-    // Skiffsync is being asked to do. Remove once SMB paste is
-    // verified end-to-end.
-    console.log("[paste] start", {
-      op: clipboard.operation,
-      count: clipboard.paths.length,
-      destFolder: path,
-      sampleSrc: clipboard.paths[0],
-    });
-    for (const src of clipboard.paths) {
-      try {
-        // Backend-agnostic stat — `fsStat` is local-only and would
-        // throw `CanonicalizePath` on `smb://…` / `sftp://…` sources,
-        // killing the per-item try/catch and silently skipping every
-        // remote-source paste (the "75 items ready to move" status
-        // bar would never change because removeOrTrashMany only
-        // touches paths that successfully synced).
-        const meta = await clientStat(src);
-        const dest = meta.isDir ? `${path}/${meta.name}` : path;
-        console.log("[paste] startSync call", { src, dest, isDir: meta.isDir });
-        const jobId = await startSync(src, dest, {
-          maxSizeGb: 100,
-          conflictPolicy: settings.syncDefaultConflictPolicy,
-        });
-        console.log("[paste] startSync ok", { src, jobId });
-        if (isCut) {
-          // Defer deletion to the run-loop after sync starts —
-          // sync_start_* returns once the job is queued, the actual
-          // copy happens async. For correctness we should wait for
-          // the done event; for simplicity we trust the engine here
-          // and queue removal optimistically.
-          remoteCutPaths.push(src);
-        }
-      } catch (e) {
-        console.error("[paste] startSync failed", { src, error: String(e) });
-        setError(String(e));
-      }
-    }
-    // For cut: remove sources after sync completes. We do this best-
-    // effort; if the sync fails the source stays put.
-    if (isCut && remoteCutPaths.length > 0) {
-      // Wait a beat so the sync engine has time to read the source
-      // before we remove it. Not bulletproof but adequate for MVP —
-      // the alternative requires hooking sync:done events and is
-      // significantly more complex.
-      setTimeout(() => {
-        void removeOrTrashMany(remoteCutPaths)
-          .catch(() => {/* engine errors surface in TransfersPage */})
-          .finally(() => {
-            clearFileClipboard();
-            if (path) void refresh(path);
-          });
-      }, 1500);
-    } else {
-      if (path) void refresh(path);
-    }
+    const destFolder = path;
+    // Delegated to `util/pasteFlow.runPaste` so the contract (clear
+    // clipboard up front; refresh once `sync:done` fires per queued
+    // job-id) is unit-tested without a React render — see
+    // `pasteFlow.test.ts`.
+    await runPaste(
+      { paths: clipboard.paths, operation: clipboard.operation },
+      destFolder,
+      {
+        stat: async (p) => {
+          const m = await clientStat(p);
+          return { name: m.name, isDir: m.isDir };
+        },
+        startSync: (src, dest) =>
+          startSync(src, dest, {
+            maxSizeGb: 100,
+            conflictPolicy: settings.syncDefaultConflictPolicy,
+          }),
+        refresh: (p) => refresh(p),
+        onDone: (cb) => onDone(cb),
+        clearClipboard: clearFileClipboard,
+        removeOrTrashMany,
+        onError: setError,
+        currentPath: () => pathRef.current,
+      },
+    );
   };
 
   /** Open the New File dialog. The dialog itself owns input + collision
