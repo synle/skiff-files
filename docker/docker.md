@@ -6,9 +6,9 @@ Endpoints (all modes):
 
 | Protocol | Host:Port           | User       | Password    | Share / Path          |
 | -------- | ------------------- | ---------- | ----------- | --------------------- |
-| SFTP     | `127.0.0.1:2222`    | `testuser` | `skiffpass` | user home (`/config`) |
-| FTP      | `127.0.0.1:2121`    | `testuser` | `skiffpass` | `/home/testuser`      |
-| SMB      | `127.0.0.1:1445`    | `testuser` | `skiffpass` | share `testshare`     |
+| SFTP     | `127.0.0.1:2222`    | `skiff`    | `password`  | user home (`/config`) |
+| FTP      | `127.0.0.1:2121`    | `skiff`    | `password`  | `/home/skiff`         |
+| SMB      | `127.0.0.1:1445`    | `skiff`    | `password`  | share `testshare`     |
 
 Credentials are deliberately weak and the servers only bind to `127.0.0.1` — never expose this stack to a public network.
 
@@ -35,17 +35,17 @@ One-shot equivalents of the compose stacks — handy when you only want one of t
 ### macOS / Linux — mount `~/` (your home dir)
 
 ```bash
-docker run -d --name skiff-sftp -p 127.0.0.1:2222:2222 -e USER_NAME=testuser -e USER_PASSWORD=skiffpass -e PASSWORD_ACCESS=true -v ~/:/config lscr.io/linuxserver/openssh-server:latest
-docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=testuser|skiffpass|/home/testuser|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v ~/:/home/testuser delfer/alpine-ftp-server:latest
-docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v ~/:/share dperson/samba:latest -u "testuser;skiffpass" -s "testshare;/share;yes;no;no;testuser;testuser" -p
+docker run -d --name skiff-sftp -p 127.0.0.1:2222:2222 -e USER_NAME=skiff -e USER_PASSWORD=password -e PASSWORD_ACCESS=true -v ~/:/config lscr.io/linuxserver/openssh-server:latest
+docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=skiff|password|/home/skiff|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v ~/:/home/skiff delfer/alpine-ftp-server:latest
+docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v ~/:/share dperson/samba:latest -u "skiff;password" -s "testshare;/share;yes;no;no;skiff;skiff" -p
 ```
 
 ### Windows — mount `D:/` (PowerShell or cmd)
 
 ```powershell
-docker run -d --name skiff-sftp -p 127.0.0.1:2222:2222 -e USER_NAME=testuser -e USER_PASSWORD=skiffpass -e PASSWORD_ACCESS=true -v D:/:/config lscr.io/linuxserver/openssh-server:latest
-docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=testuser|skiffpass|/home/testuser|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v D:/:/home/testuser delfer/alpine-ftp-server:latest
-docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v D:/:/share dperson/samba:latest -u "testuser;skiffpass" -s "testshare;/share;yes;no;no;testuser;testuser" -p
+docker run -d --name skiff-sftp -p 127.0.0.1:2222:2222 -e USER_NAME=skiff -e USER_PASSWORD=password -e PASSWORD_ACCESS=true -v D:/:/config lscr.io/linuxserver/openssh-server:latest
+docker run -d --name skiff-ftp -p 127.0.0.1:2121:21 -p 127.0.0.1:21000-21009:21000-21009 -e "USERS=skiff|password|/home/skiff|1000" -e ADDRESS=127.0.0.1 -e MIN_PORT=21000 -e MAX_PORT=21009 -v D:/:/home/skiff delfer/alpine-ftp-server:latest
+docker run -d --name skiff-smb -p 127.0.0.1:1445:445 -v D:/:/share dperson/samba:latest -u "skiff;password" -s "testshare;/share;yes;no;no;skiff;skiff" -p
 ```
 
 Notes:
@@ -64,8 +64,8 @@ Open the app → **Connections** in the sidebar → **+ Add connection** → pic
 | -------- | ------------- |
 | Host     | `127.0.0.1`   |
 | Port     | `2222`        |
-| Username | `testuser`    |
-| Password | `skiffpass`   |
+| Username | `skiff`    |
+| Password | `password`   |
 
 Files appear under the SFTP user's home (the container path `/config`), which is your `${HOME}` (macOS / Linux) or `D:/` (Windows) on the host.
 
@@ -75,8 +75,8 @@ Files appear under the SFTP user's home (the container path `/config`), which is
 | -------- | ------------- |
 | Host     | `127.0.0.1`   |
 | Port     | `2121`        |
-| Username | `testuser`    |
-| Password | `skiffpass`   |
+| Username | `skiff`    |
+| Password | `password`   |
 
 Passive-mode data channel uses ports `21000–21009`, which the compose file forwards. If a corporate firewall blocks them, FTP listing will hang — switch to SFTP or SMB.
 
@@ -86,8 +86,8 @@ Passive-mode data channel uses ports `21000–21009`, which the compose file for
 | --------------- | ------------- |
 | Host            | `127.0.0.1`   |
 | Port            | `1445`        |
-| Username        | `testuser`    |
-| Password        | `skiffpass`   |
+| Username        | `skiff`    |
+| Password        | `password`   |
 | Share (optional)| `testshare`   |
 
 If you leave **Share** blank, the app lists shares at the root and you can drill into `testshare` from there. The first listing after container start can be slow (~5–10 s) while Samba finishes initializing.
@@ -98,13 +98,13 @@ Useful if a Skiff connection won't open and you need to isolate the harness from
 
 ```bash
 # SFTP — should land you in /config (your $HOME)
-sftp -P 2222 testuser@127.0.0.1            # password: skiffpass
+sftp -P 2222 skiff@127.0.0.1            # password: password
 
-# FTP — should list /home/testuser
-curl -u testuser:skiffpass ftp://127.0.0.1:2121/
+# FTP — should list /home/skiff
+curl -u skiff:password ftp://127.0.0.1:2121/
 
 # SMB — should list "testshare" among the shares
-smbclient -L //127.0.0.1 -p 1445 -U testuser%skiffpass
+smbclient -L //127.0.0.1 -p 1445 -U skiff%password
 ```
 
 ## Windows + WSL (Ubuntu)
@@ -125,9 +125,9 @@ If you started the harness on the **Windows** side (Docker Desktop running in Wi
 
   ```bash
   HOST=$(ip route show | awk '/default/ {print $3}')   # or: HOST=host.docker.internal
-  sftp -P 2222 testuser@$HOST
-  curl -u testuser:skiffpass ftp://$HOST:2121/
-  smbclient -L //$HOST -p 1445 -U testuser%skiffpass
+  sftp -P 2222 skiff@$HOST
+  curl -u skiff:password ftp://$HOST:2121/
+  smbclient -L //$HOST -p 1445 -U skiff%password
   ```
 
   In Skiff Files running inside WSL, plug the same address into the **Host** field (everything else stays the same as the tables above).
