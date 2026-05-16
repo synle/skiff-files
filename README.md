@@ -2,6 +2,8 @@
 
 A fast, cross-platform desktop file explorer for **Windows / macOS / Linux**, built on **Tauri v2** for a small native bundle.
 
+![Skiff Files browsing a local folder](./screenshots/01-local-file-browser.png)
+
 First-class support for:
 
 - **Local filesystem** with live updates
@@ -11,8 +13,6 @@ First-class support for:
 - **NTFS** mounts (optional, gated behind a build feature)
 - **Skiffsync** — a smart-copy engine inspired by `cpsync` that skips unchanged files across protocols, with progress, ETA, pause/resume, and saved jobs.
 
-> Status: **scaffolding** — see [`TODO.md`](./TODO.md) for the phased plan.
-
 ## Highlights
 
 - **Familiar UX** — list / tile / gallery / column views, drag-and-drop, breadcrumb path bar, two-pane mode for transfers
@@ -21,6 +21,44 @@ First-class support for:
 - **Power-user keyboard nav** — every common action has a binding
 - **Virtualized lists** — smooth at 100k entries
 - **Native trash, native credentials** — `trash` crate for OS trash, `keyring` for Keychain / Credential Manager / Secret Service
+
+## Feature gallery
+
+### Connect to SFTP / FTP / SMB hosts
+
+One dialog covers every remote protocol. Pick the scheme, enter host + credentials, optionally remember the password (stored in the OS keychain — macOS Keychain, Windows Credential Manager, or Linux libsecret). Share field on SMB is optional — leave it empty to browse every disk share on the server.
+
+![Connect dialog with SMB selected](./screenshots/02-connect-dialog.png)
+
+### Browse remote drives like local folders
+
+Once connected, the remote shows up under **Network** in the sidebar with a protocol chip. All the same actions you have on a local folder work on the remote: New folder, New file, Copy / Cut / Paste, Compress, Rename, Delete, Drag-and-drop. Skiffsync handles cross-protocol transfers natively.
+
+![SMB share listed alongside local folders](./screenshots/03-smb-share-listing.png)
+
+### Deep folders, same speed
+
+Virtualized lists stay smooth even in folders with thousands of entries. The breadcrumb path bar carries a protocol chip + friendly connection label so deep paths stay readable. Click any segment to jump back; right-click to copy.
+
+![Deep folder inside an SMB share](./screenshots/04-smb-deep-folder.png)
+
+### Two-pane transfers
+
+Cmd/Ctrl+\\ opens a second pane side by side — perfect for FileZilla-style drag transfers between local and remote, between two remotes, or just between two folders on the same host. Each pane keeps its own tabs, history, sort, and selection.
+
+![Two-pane mode — local on left, SMB on right](./screenshots/06-two-pane-mode.png)
+
+### Gallery view for media folders
+
+List / tile / gallery / column views are toggleable per folder. Gallery view kicks thumbnails through a SQLite-backed cache so re-visits stay instant.
+
+![Gallery view with image thumbnails](./screenshots/07-gallery-view.png)
+
+### Settings everywhere
+
+System theme follows your OS by default; flip it explicitly to Light / Dark, change font size or density, pick a language, override the start path, toggle the status bar. Everything persists across launches in `settings.json` under your OS app-data directory.
+
+![Settings page — Appearance section in dark mode](./screenshots/05-settings.png)
 
 ## Requirements
 
