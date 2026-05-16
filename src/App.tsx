@@ -2,8 +2,7 @@
 // inside the HashRouter (set up in main.tsx), so the sidebar can use the
 // navigation hooks directly.
 import { Box } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
-import type React from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import ShortcutsModal from "./components/ShortcutsModal";
 import ConflictModal from "./components/ConflictModal";
@@ -11,7 +10,6 @@ import BrowserTabs from "./components/BrowserTabs";
 import QuickJump from "./components/QuickJump";
 import CommandPalette, { type CommandAction } from "./components/CommandPalette";
 import OperationsDrawer from "./components/OperationsDrawer";
-import ConfirmDialog from "./components/ConfirmDialog";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -22,12 +20,8 @@ import {
   windowSetAlwaysOnTop,
 } from "./api/fs";
 import { listen } from "@tauri-apps/api/event";
-import {
-  loadSettingsFromDisk,
-  SPLIT_RATIO_MAX,
-  SPLIT_RATIO_MIN,
-  useSettings,
-} from "./state/settings";
+import { loadSettingsFromDisk } from "./state/settings";
+import { useSettings } from "./state/settings";
 import { pruneStaleBookmarks, pruneStalePaths } from "./util/pruneStale";
 import { activeCombo, matchesCombo } from "./util/keybindings";
 
@@ -70,51 +64,6 @@ export default function App() {
   // and its listener never runs.
   const [activePane, setActivePane] = useState<"main" | "right">("main");
   const { settings, setSettings, update } = useSettings();
-  /** Cmd/Ctrl+Q confirm dialog. Tauri's webview suppresses native
-   *  confirm() in some configurations (see CLAUDE.md footgun), so we
-   *  route the quit prompt through the same `ConfirmDialog` Move-to-
-   *  Trash uses. */
-  const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
-  const closeCurrentWindow = async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      await getCurrentWindow().close();
-    } catch {
-      /* outside Tauri — no-op */
-    }
-  };
-  /** Two-pane mode split-bar drag state. Drag the divider to update
-   *  `settings.twoPaneSplitRatio`. The ref holds the live container
-   *  rect captured on mousedown so mousemove doesn't keep re-reading
-   *  layout — measured once per drag is plenty. */
-  const splitDragRef = useRef<{ left: number; width: number } | null>(null);
-  const onSplitMouseDown = (evt: React.MouseEvent<HTMLDivElement>) => {
-    const container = evt.currentTarget.parentElement;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    splitDragRef.current = { left: rect.left, width: rect.width };
-    const onMove = (e: MouseEvent) => {
-      const drag = splitDragRef.current;
-      if (!drag || drag.width <= 0) return;
-      const raw = (e.clientX - drag.left) / drag.width;
-      const clamped = Math.max(SPLIT_RATIO_MIN, Math.min(SPLIT_RATIO_MAX, raw));
-      update("twoPaneSplitRatio", clamped);
-    };
-    const onUp = () => {
-      splitDragRef.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-    // Lock cursor + suppress text selection across the entire window
-    // for the duration of the drag — mouse leaving the divider mid-
-    // drag is normal.
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "col-resize";
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
 
   // Cmd/Ctrl+K → toggle the quick-jump palette. Cmd/Ctrl+B → toggle
   // the sidebar (persisted in Settings so it survives restart).
@@ -142,28 +91,6 @@ export default function App() {
         void windowOpenNew().catch(() => {
           /* running outside Tauri / browser dev — silent fallback */
         });
-        return;
-      }
-      if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "app.closeWindow",
-            "cmd+q",
-            settings.shortcutOverrides,
-          ),
-        )
-      ) {
-        // Cmd/Ctrl+Q — prompt before quitting so the user can't
-        // accidentally drop every open tab in this window from one
-        // typo. The native OS Cmd+Q would also close the window,
-        // but Tauri suppresses it in some configurations; routing
-        // through our own ConfirmDialog gives consistent behavior
-        // and a chance to recover. Saved tabs persist in
-        // settings.json regardless, so a confirmed quit isn't
-        // destructive — it's just a guard against fat-finger.
-        e.preventDefault();
-        setQuitConfirmOpen(true);
         return;
       }
       if (
@@ -454,6 +381,15 @@ export default function App() {
         {page === "browser" ? (
           settings.twoPaneMode ? (
             <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
+              {/* TODO(split-pane-resize): the divider between the
+                  two panes is currently a fixed 50/50 split (each
+                  Box flex: 1). Should let users drag the divider to
+                  re-balance, with the ratio persisted to settings.
+                  Same pass should add resizable columns to FileList
+                  in list-view mode (Name / Size / Modified / Kind).
+                  Both are pure-UX work, no backend changes. Out of
+                  scope for the SMB-dialog branch — split as a
+                  follow-up so this PR stays focused. */}
               {/* Each pane in two-pane mode owns its own
                   focus-state indicator. Visual treatment:
                     - Focused pane gets a 3px primary-tinted ring on
@@ -465,22 +401,15 @@ export default function App() {
                   mousedown (not click) sets the active pane so the
                   intent is registered before any inner click handler
                   fires — important because the inner Browser may
-                  consume the click event (e.g. selecting a row).
-
-                  The 6px Box between the panes is a drag handle that
-                  updates settings.twoPaneSplitRatio. While dragging,
-                  cursor + user-select are locked at the document
-                  level so the mouse can leave the handle without
-                  ending the drag (a hard requirement when the user
-                  drags faster than the layout reflows). */}
+                  consume the click event (e.g. selecting a row). */}
               <Box
                 sx={{
-                  flexGrow: settings.twoPaneSplitRatio,
-                  flexShrink: 1,
-                  flexBasis: 0,
+                  flex: 1,
                   display: "flex",
                   flexDirection: "column",
                   minWidth: 0,
+                  borderRight: 1,
+                  borderColor: "divider",
                   position: "relative",
                   boxShadow: (t) =>
                     activePane === "main"
@@ -504,33 +433,8 @@ export default function App() {
                 />
               </Box>
               <Box
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Resize panes"
-                onMouseDown={onSplitMouseDown}
                 sx={{
-                  flex: "0 0 6px",
-                  cursor: "col-resize",
-                  bgcolor: "divider",
-                  position: "relative",
-                  "&:hover": { bgcolor: "primary.main" },
-                  // Wider invisible hit-target so the user doesn't
-                  // have to land on a 6px stripe. The visible bar
-                  // stays 6px; the ±4px padding extends the
-                  // pointer-events surface only.
-                  "&::before": {
-                    content: '""',
-                    position: "absolute",
-                    inset: "0 -4px",
-                  },
-                  transition: "background-color 120ms ease-out",
-                }}
-              />
-              <Box
-                sx={{
-                  flexGrow: 1 - settings.twoPaneSplitRatio,
-                  flexShrink: 1,
-                  flexBasis: 0,
+                  flex: 1,
                   display: "flex",
                   flexDirection: "column",
                   minWidth: 0,
@@ -609,23 +513,6 @@ export default function App() {
           sync from any page, so closing the Transfers tab doesn't
           hide an active operation. */}
       <OperationsDrawer />
-      {/* Cmd/Ctrl+Q confirmation. Lives at the root so the keybinding
-          fires regardless of which page is active. Saved tabs persist
-          via settings.json before this dialog opens, so a confirmed
-          quit isn't destructive — the prompt exists purely to guard
-          against fat-finger Cmd+Q while typing. */}
-      <ConfirmDialog
-        open={quitConfirmOpen}
-        title="Quit Skiff Files?"
-        message="Closing this window will close every open tab in it. Your saved tabs are remembered across launches — they'll reappear next time you open Skiff Files."
-        confirmLabel="Quit window"
-        destructive
-        onCancel={() => setQuitConfirmOpen(false)}
-        onConfirm={() => {
-          setQuitConfirmOpen(false);
-          void closeCurrentWindow();
-        }}
-      />
     </Box>
   );
 }
