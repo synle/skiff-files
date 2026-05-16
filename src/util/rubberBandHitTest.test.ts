@@ -51,4 +51,37 @@ describe("shouldStartRubberBand", () => {
     // xRel === clientWidth lands on the first pixel of the gutter.
     expect(shouldStartRubberBand(585, 100, box())).toBe(false);
   });
+
+  // Both scrollbars present — the corner where vertical + horizontal
+  // gutters meet is the most common "I tried to drag the resize
+  // corner but the rubber-band stole my click" failure. Pinning the
+  // corner case explicitly so the AND condition (xRel >= clientWidth
+  // AND yRel >= clientHeight) can't silently flip to OR.
+  it("skips the scrollbar corner where both gutters meet", () => {
+    const b = {
+      rect: { left: 0, top: 0, right: 600, bottom: 400 },
+      clientWidth: 585,
+      clientHeight: 385,
+    };
+    // Click deep into the corner — both x and y are in gutter range.
+    expect(shouldStartRubberBand(595, 395, b)).toBe(false);
+    // Boundary pixel of the corner.
+    expect(shouldStartRubberBand(585, 385, b)).toBe(false);
+  });
+
+  // Defensive — a malformed dragRect (right < left or bottom < top)
+  // should NOT start the drag. The hit-test must reject the input
+  // rather than coercing it into a "click is inside" answer.
+  it("rejects clicks against an inverted (negative) container rect", () => {
+    const inverted = {
+      rect: { left: 100, top: 100, right: 50, bottom: 50 }, // right < left
+      clientWidth: 50,
+      clientHeight: 50,
+    };
+    // clientX=75 is between right(50) and left(100) but the rect is
+    // inverted — both bounds checks reject it.
+    expect(shouldStartRubberBand(75, 75, inverted)).toBe(false);
+    // Also rejects negative-shape clicks.
+    expect(shouldStartRubberBand(-50, -50, inverted)).toBe(false);
+  });
 });

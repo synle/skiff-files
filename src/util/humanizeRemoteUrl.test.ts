@@ -79,4 +79,39 @@ describe("humanizeMessage", () => {
   it("handles empty input", () => {
     expect(humanizeMessage("", LABELS)).toBe("");
   });
+
+  // UUID nested inside a longer string — must be replaced regardless
+  // of surrounding text. Pin against substring replacement regressions
+  // where the regex anchors at the start or end of the string.
+  it("rewrites a UUID found mid-sentence inside a longer error message", () => {
+    const msg =
+      "Failed to list smb://ba47a8e7-cc66-4af6-8d61-093b9b7b2fae/share — broken pipe";
+    expect(humanizeMessage(msg, LABELS)).toBe(
+      "Failed to list smb://admin@192.168.1.1:445/G/share — broken pipe",
+    );
+  });
+
+  // UUID with surrounding punctuation — parens, brackets, quotes.
+  // The regex must match on the bare UUID bytes regardless of what
+  // sits on either side.
+  it("rewrites a UUID surrounded by punctuation (parens / brackets / quotes)", () => {
+    expect(
+      humanizeMessage(
+        "(ba47a8e7-cc66-4af6-8d61-093b9b7b2fae) timed out",
+        LABELS,
+      ),
+    ).toBe("(admin@192.168.1.1:445/G) timed out");
+    expect(
+      humanizeMessage(
+        '"550e8400-e29b-41d4-a716-446655440000" is gone',
+        LABELS,
+      ),
+    ).toBe('"user@example.com:22" is gone');
+    expect(
+      humanizeMessage(
+        "[ba47a8e7-cc66-4af6-8d61-093b9b7b2fae]/foo/bar",
+        LABELS,
+      ),
+    ).toBe("[admin@192.168.1.1:445/G]/foo/bar");
+  });
 });

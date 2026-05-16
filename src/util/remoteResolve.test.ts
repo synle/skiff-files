@@ -202,6 +202,43 @@ describe("resolveRemoteUrl", () => {
       "ftp://deadbeef-0000-0000-0000-aaaaaaaaaaaa/",
     );
   });
+
+  // Bug 7 — typing `ftp://mirror.kernel.org/` directly into the
+  // address bar takes the host-form auto-create branch (NOT the
+  // RemoteConnectDialog flow). That branch must also fire
+  // `skiff:connections-changed` so the Sidebar / tab strip / PathBar
+  // friendly-label map refresh immediately. Without the dispatch
+  // here, anonymous-FTP host URLs are the one path that still showed
+  // the old "stale until navigate away" behavior.
+  it("fires skiff:connections-changed after host-form auto-create", async () => {
+    const listener = vi.fn();
+    window.addEventListener("skiff:connections-changed", listener);
+    try {
+      await resolveRemoteUrl("ftp://anon.example/pub");
+      expect(listener).toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("skiff:connections-changed", listener);
+    }
+  });
+
+  // Symmetric path — the reuse branch (no new connection created)
+  // must NOT fire the event. Listeners would otherwise refresh every
+  // address-bar navigation, which is wasteful and could mask real
+  // changes.
+  it("does NOT fire skiff:connections-changed when reusing an existing connection", async () => {
+    const { connList } = await import("../api/conn");
+    vi.mocked(connList).mockResolvedValue([
+      { id: "existing-uuid", kind: "ftp", label: "anon.example:21" },
+    ]);
+    const listener = vi.fn();
+    window.addEventListener("skiff:connections-changed", listener);
+    try {
+      await resolveRemoteUrl("ftp://anon.example/pub");
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("skiff:connections-changed", listener);
+    }
+  });
 });
 
 // parseRemoteUrl is the entry point PathBar uses to decide whether to

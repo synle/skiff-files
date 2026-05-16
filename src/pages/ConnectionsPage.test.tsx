@@ -196,6 +196,80 @@ describe("ConnectionsPage (merged list)", () => {
     expect(screen.getByText("Saved password")).toBeInTheDocument();
   });
 
+  // Bug 18 — Delete-connection silently failed when the
+  // plaintext→keychain migration effect's async IIFE captured the
+  // pre-delete connections snapshot and its final write resurrected
+  // the row. Fix: functional setSettings(prev => ...) form so the
+  // merge reads the latest state, plus a single-run guard via
+  // migrationDoneRef. Pin: delete one entry while a parallel
+  // migration could fire — the deleted row must STAY gone.
+  it("delete while plaintext-keychain migration runs — deleted row stays gone", async () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({
+        connections: [
+          {
+            id: "with-pw",
+            kind: "ftp",
+            label: "ftpsrv",
+            host: "ftpsrv",
+            port: 21,
+            user: "anonymous",
+            rememberPassword: true,
+            password: "to-migrate",
+          },
+          {
+            id: "to-delete",
+            kind: "ftp",
+            label: "doomed",
+            host: "doomed",
+            port: 21,
+            user: "anonymous",
+            rememberPassword: false,
+          },
+        ],
+      }),
+    );
+    // creds_capable returns true to kick the migration; creds_store
+    // resolves so the migration successfully wipes the plaintext.
+    // The migration's setState is functional so the deletion
+    // (dispatched before its setSettings runs) is preserved.
+    mockedInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "conn_list") return [];
+      if (cmd === "creds_capable") return true;
+      if (cmd === "creds_store") return undefined;
+      if (cmd === "creds_delete") return undefined;
+      if (cmd === "conn_known_hosts_list") return [];
+      return null;
+    });
+    r();
+    // Confirm both rows render.
+    expect(screen.getByText("doomed")).toBeInTheDocument();
+    expect(screen.getByText("ftpsrv")).toBeInTheDocument();
+    // Delete "doomed".
+    fireEvent.click(screen.getByLabelText("Delete doomed"));
+    fireEvent.click(screen.getByRole("button", { name: /Delete/i }));
+    // Give the migration's async IIFE a chance to complete its
+    // creds_store + functional setSettings. If the migration captured
+    // a pre-delete snapshot (Bug 18), it would resurrect "doomed".
+    await waitFor(
+      () => {
+        expect(screen.queryByText("doomed")).not.toBeInTheDocument();
+      },
+      { timeout: 1500 },
+    );
+    // Also confirm the survivor is still there.
+    expect(screen.getByText("ftpsrv")).toBeInTheDocument();
+    // localStorage must reflect the deletion.
+    const stored = JSON.parse(
+      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
+    );
+    const ids = (stored.connections as Array<{ id: string }>).map(
+      (c) => c.id,
+    );
+    expect(ids).not.toContain("to-delete");
+  });
+
   it("migrates legacy per-kind drafts into Settings.connections on first load", () => {
     localStorage.setItem(
       "skiff-files.connections.v1",

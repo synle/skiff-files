@@ -140,5 +140,26 @@ describe("BulkActionBar", () => {
       const copy = screen.getByRole("button", { name: "Copy" });
       expect(copy.textContent).toContain("Copy");
     });
+
+    // Aria differences pinned explicitly — in dense mode every
+    // multi-select verb is reachable by its aria-label (screen
+    // readers don't lose the action name when labels collapse). In
+    // labels mode the visible text IS the label, so aria-label
+    // matching is satisfied by accessible name calculation.
+    it("dense mode: every bulk verb is reachable by its aria-label", () => {
+      r({ count: 2, dense: true });
+      // Every bulk verb keeps its action name as the accessible name.
+      ["Copy", "Cut", "Delete", "Compress", "Rename"].forEach((name) => {
+        expect(screen.getByRole("button", { name })).toBeInTheDocument();
+      });
+    });
+
+    it("labels mode: every bulk verb renders its label as visible text", () => {
+      r({ count: 2, dense: false });
+      ["Copy", "Cut", "Delete", "Compress", "Rename"].forEach((name) => {
+        const btn = screen.getByRole("button", { name });
+        expect(btn.textContent).toContain(name);
+      });
+    });
   });
 });
