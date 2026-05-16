@@ -126,6 +126,39 @@ pub async fn list_shares(cfg: SmbConfig) -> FsResult<Vec<String>> {
     Ok(shares.into_iter().map(|s| s.name).collect())
 }
 
+/// One-shot helper used by `smb_list_shares` — opens a session with
+/// the given credentials, calls `SmbClient::list_shares()`, and drops
+/// the client on return. Distinct from `SmbConnection::connect` which
+/// also binds a tree (and so requires a share name). The dialog calls
+/// this when the user hasn't filled in a Share yet, then presents the
+/// returned names as autocomplete options.
+///
+/// Returns disk-share names only — `smb2` already excludes admin shares
+/// (the `$`-suffixed ones like `IPC$`, `ADMIN$`, `C$`) so the user
+/// doesn't see internals they can't browse anyway.
+pub async fn list_shares(cfg: SmbConfig) -> FsResult<Vec<String>> {
+    let addr = format!("{}:{}", cfg.host, cfg.port);
+    let config = ClientConfig {
+        addr: addr.clone(),
+        timeout: Duration::from_secs(10),
+        username: cfg.user.clone(),
+        password: cfg.password.clone(),
+        domain: cfg.domain.clone(),
+        auto_reconnect: false,
+        compression: true,
+        dfs_enabled: true,
+        dfs_target_overrides: Default::default(),
+    };
+    let mut client = SmbClient::connect(config)
+        .await
+        .map_err(|e| format!("connect({addr}): {e}"))?;
+    let shares = client
+        .list_shares()
+        .await
+        .map_err(|e| format!("list_shares({addr}): {e}"))?;
+    Ok(shares.into_iter().map(|s| s.name).collect())
+}
+
 impl SmbConnection {
     /// Open a TCP/SMB connection and authenticate. When `cfg.share`
     /// is non-empty we eagerly bind a `Tree` to that share (single-

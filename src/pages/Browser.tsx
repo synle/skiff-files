@@ -69,7 +69,7 @@ import ArchiveViewerDialog from "../components/ArchiveViewerDialog";
 import NewEntryDialog from "../components/NewEntryDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { parentPath } from "../util/format";
-import { RECENT_PATHS_TRACK_MAX, useSettings } from "../state/settings";
+import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
 import { uniqueDuplicateName } from "../util/duplicateName";
 import {
@@ -81,14 +81,6 @@ import {
 } from "../util/fileClipboard";
 import { NAVIGATE_EVENT, OPEN_IN_TAB_EVENT } from "../App";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { onDone } from "../api/sync";
-import { runPaste } from "../util/pasteFlow";
-import { resolveBulkActionBarDense } from "../util/bulkActionBarMode";
-import UnreachableFolderPlaceholder from "../components/UnreachableFolderPlaceholder";
-import { connList } from "../api/conn";
-import { humanizeMessage, humanizeRemoteUrl } from "../util/humanizeRemoteUrl";
-import { toNativeRemoteUrl } from "../util/nativeRemoteUrl";
-import { parseLocation } from "../util/location";
 
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
@@ -131,26 +123,6 @@ export default function Browser({
   const [history, setHistory] = useState<History>({ back: [], forward: [] });
   const [entries, setEntries] = useState<Entry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  /** connection_id → friendly registry label (e.g. `admin@host:445/G`).
-   *  Used to swap raw UUIDs in error messages / unreachable paths
-   *  for human-readable text. Refreshed on
-   *  `skiff:connections-changed`. */
-  const [connLabels, setConnLabels] = useState<Map<string, string>>(
-    new Map(),
-  );
-  useEffect(() => {
-    const refresh = () => {
-      void connList()
-        .then((list) =>
-          setConnLabels(new Map(list.map((c) => [c.id, c.label]))),
-        )
-        .catch(() => { /* outside Tauri — keep empty */ });
-    };
-    refresh();
-    window.addEventListener("skiff:connections-changed", refresh);
-    return () =>
-      window.removeEventListener("skiff:connections-changed", refresh);
-  }, []);
   // Sort state. The Toolbar's column-header click cycles direction,
   // so we keep these locally — but read the *initial* value from
   // settings (per-folder override → app default → "name asc"). On
@@ -266,12 +238,6 @@ export default function Browser({
   const [diffOther, setDiffOther] = useState<string | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
-  // Mirror of `path` for async closures (paste flow, watchdogs). The
-  // paste handler resolves after the user may have navigated away —
-  // capturing `path` in the closure would refresh stale tabs. Reading
-  // through the ref reflects the latest current folder.
-  const pathRef = useRef(path);
-  useEffect(() => { pathRef.current = path; }, [path]);
 
   // Per-folder kind filter — read from settings keyed by current path
   // so the active chips persist across navigation. Setter writes back
@@ -382,30 +348,6 @@ export default function Browser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Hand a path to the OS-native open-with-default handler.
-   *  Internal `<scheme>://<uuid>/<path>` URLs are first translated
-   *  to the OS-native form via `toNativeRemoteUrl` so macOS /
-   *  Windows / Linux don't try to resolve the UUID as a hostname.
-   *  SFTP / FTP paths surface a friendly "no native handler"
-   *  error toast — they have no OS-side opener and silently
-   *  failing here was the actual bug. */
-  const openNative = (target: string) => {
-    const { url, reason } = toNativeRemoteUrl(target, settings.connections);
-    if (url == null) {
-      setError(reason ?? "This path can't be opened natively.");
-      return;
-    }
-    void fsOpenWithDefault(url).catch((err) => setError(String(err)));
-  };
-
-  /** Sticky "this folder is unreachable" flag. Distinguishes
-   *  "list_dir failed" from "the folder is genuinely empty", so the
-   *  FileList can render an actionable placeholder + Toolbar /
-   *  BulkActionBar can collapse to just back/fwd/up/refresh.
-   *  Carries the underlying error message so the placeholder can
-   *  show it. Cleared on a successful refresh. */
-  const [listFailure, setListFailure] = useState<string | null>(null);
-
   /** Fetch the directory listing for `path` and update local state.
    *  Routes through the unified client so remote paths (`sftp://...`)
    *  hit the registry instead of the local fs. */
@@ -419,12 +361,9 @@ export default function Browser({
         });
         setEntries(list);
         setError(null);
-        setListFailure(null);
       } catch (e) {
         setEntries([]);
-        const msg = String(e);
-        setError(msg);
-        setListFailure(msg);
+        setError(String(e));
       } finally {
         setIsRefreshing(false);
       }
@@ -548,12 +487,11 @@ export default function Browser({
   // contributes so multiple inactive tabs don't pollute history.
   useEffect(() => {
     if (!isActive || !path) return;
-    // `recentPathsMax` is now the sidebar DISPLAY cap, not the
-    // tracking cap — a value of 0 still disables tracking so privacy-
-    // conscious users can opt out completely. Storage is bounded by
-    // RECENT_PATHS_TRACK_MAX so the "Show all recent" dialog has
-    // depth past the visible sidebar slice.
-    if (settings.recentPathsMax === 0) {
+    // Cap of 0 disables recent-path tracking entirely so privacy-
+    // conscious users can opt out without the sidebar's Recent
+    // section staying perpetually frozen on stale entries.
+    const cap = settings.recentPathsMax;
+    if (cap === 0) {
       if (settings.recentPaths.length > 0) update("recentPaths", []);
       return;
     }
@@ -561,7 +499,7 @@ export default function Browser({
     const next = [
       path,
       ...settings.recentPaths.filter((p) => p !== path),
-    ].slice(0, RECENT_PATHS_TRACK_MAX);
+    ].slice(0, cap);
     update("recentPaths", next);
     // We deliberately don't depend on `settings.recentPaths` — the
     // update function reads its current value through useState, and
@@ -946,8 +884,10 @@ export default function Browser({
         e.preventDefault();
         if (primarySelected.isDir) {
           navigate(primarySelected.path);
-        } else {
-          openNative(primarySelected.path);
+        } else if (!primarySelected.path.startsWith("sftp://")) {
+          void fsOpenWithDefault(primarySelected.path).catch((err) =>
+            setError(String(err)),
+          );
         }
       }
     };
@@ -1238,52 +1178,67 @@ export default function Browser({
   /** Cmd+V handler — start a Skiffsync from each clipboard entry to
    *  the current folder. On `cut`, deletes the source after the
    *  sync's done event. Same backend abstraction as the drag-drop
-   *  flow; works cross-protocol.
-   *
-   *  Refresh contract: `sync_start_*` returns when the job is QUEUED,
-   *  not when bytes have landed at the destination. So an immediate
-   *  `refresh(path)` shows the destination *before* the copy
-   *  completes (regression observed on SMB — only one of two pasted
-   *  files appeared until the user hit Refresh). We subscribe to
-   *  `sync:done` for the started job-ids and re-list the destination
-   *  once each job finishes. Local-to-local kernel copies usually
-   *  complete before the event listener attaches, so we also refresh
-   *  once at the end of dispatch as a fast-path.
-   *
-   *  Clipboard parity: we clear the file clipboard up-front (for both
-   *  cut and copy) so the "Paste N items" toolbar pill disappears the
-   *  moment the user clicks paste — repeated paste-into-same-folder
-   *  was almost always an accident (the user pressed Cmd+V twice
-   *  thinking nothing happened because the destination hadn't
-   *  refreshed yet). */
+   *  flow; works cross-protocol. */
   const handlePaste = async (clipboard: FileClipboardEntry) => {
     if (!path) return;
-    const destFolder = path;
-    // Delegated to `util/pasteFlow.runPaste` so the contract (clear
-    // clipboard up front; refresh once `sync:done` fires per queued
-    // job-id) is unit-tested without a React render — see
-    // `pasteFlow.test.ts`.
-    await runPaste(
-      { paths: clipboard.paths, operation: clipboard.operation },
-      destFolder,
-      {
-        stat: async (p) => {
-          const m = await clientStat(p);
-          return { name: m.name, isDir: m.isDir };
-        },
-        startSync: (src, dest) =>
-          startSync(src, dest, {
-            maxSizeGb: 100,
-            conflictPolicy: settings.syncDefaultConflictPolicy,
-          }),
-        refresh: (p) => refresh(p),
-        onDone: (cb) => onDone(cb),
-        clearClipboard: clearFileClipboard,
-        removeOrTrashMany,
-        onError: setError,
-        currentPath: () => pathRef.current,
-      },
-    );
+    const isCut = clipboard.operation === "cut";
+    const remoteCutPaths: string[] = [];
+    // DEBUG(paste-smb): trace inputs so we can see exactly what
+    // Skiffsync is being asked to do. Remove once SMB paste is
+    // verified end-to-end.
+    console.log("[paste] start", {
+      op: clipboard.operation,
+      count: clipboard.paths.length,
+      destFolder: path,
+      sampleSrc: clipboard.paths[0],
+    });
+    for (const src of clipboard.paths) {
+      try {
+        // Backend-agnostic stat — `fsStat` is local-only and would
+        // throw `CanonicalizePath` on `smb://…` / `sftp://…` sources,
+        // killing the per-item try/catch and silently skipping every
+        // remote-source paste (the "75 items ready to move" status
+        // bar would never change because removeOrTrashMany only
+        // touches paths that successfully synced).
+        const meta = await clientStat(src);
+        const dest = meta.isDir ? `${path}/${meta.name}` : path;
+        console.log("[paste] startSync call", { src, dest, isDir: meta.isDir });
+        const jobId = await startSync(src, dest, {
+          maxSizeGb: 100,
+          conflictPolicy: settings.syncDefaultConflictPolicy,
+        });
+        console.log("[paste] startSync ok", { src, jobId });
+        if (isCut) {
+          // Defer deletion to the run-loop after sync starts —
+          // sync_start_* returns once the job is queued, the actual
+          // copy happens async. For correctness we should wait for
+          // the done event; for simplicity we trust the engine here
+          // and queue removal optimistically.
+          remoteCutPaths.push(src);
+        }
+      } catch (e) {
+        console.error("[paste] startSync failed", { src, error: String(e) });
+        setError(String(e));
+      }
+    }
+    // For cut: remove sources after sync completes. We do this best-
+    // effort; if the sync fails the source stays put.
+    if (isCut && remoteCutPaths.length > 0) {
+      // Wait a beat so the sync engine has time to read the source
+      // before we remove it. Not bulletproof but adequate for MVP —
+      // the alternative requires hooking sync:done events and is
+      // significantly more complex.
+      setTimeout(() => {
+        void removeOrTrashMany(remoteCutPaths)
+          .catch(() => {/* engine errors surface in TransfersPage */})
+          .finally(() => {
+            clearFileClipboard();
+            if (path) void refresh(path);
+          });
+      }, 1500);
+    } else {
+      if (path) void refresh(path);
+    }
   };
 
   /** Open the New File dialog. The dialog itself owns input + collision
@@ -1572,11 +1527,6 @@ export default function Browser({
         onBack={goBack}
         onForward={goForward}
         onUp={goUp}
-        // When the current folder failed to load (broken pipe / bad
-        // creds / disconnected remote), collapse the toolbar to just
-        // back / forward / up / refresh. Refresh becomes the "retry"
-        // affordance. See `listFailure` in the refresh() callback.
-        disabled={listFailure != null}
         // Slice off the current path (top of `back`) so the menu only
         // lists destinations the user could actually go back to.
         backHistory={history.back.slice(0, -1)}
@@ -1693,22 +1643,13 @@ export default function Browser({
           onClose={() => setKindFilterOpen(false)}
         />
       )}
-      {/* New folder / New file / Cut / Copy / Delete / Compress /
-       *  Rename actions all need a working listing to make sense.
-       *  Hide the entire bar when the folder failed to load. */}
-      {listFailure == null && <BulkActionBar
+      <BulkActionBar
         count={selectedPaths.length}
-        // Dense (icon-only + tooltip) vs labeled (icon + text) is
-        // resolved from `bulkActionBarLabels`:
-        //   - "auto"   → dense when two-pane mode is on (the 0.2.270
-        //                default — labels wrap / overlap at half
-        //                width). Single-pane keeps labels.
-        //   - "labels" → always labeled, regardless of pane mode.
-        //   - "icons"  → always dense.
-        dense={resolveBulkActionBarDense(
-          settings.bulkActionBarLabels,
-          settings.twoPaneMode,
-        )}
+        // Two-pane mode halves the bar's horizontal real estate, so
+        // its text+icon buttons start to wrap / overlap. Flip to
+        // icon-only + tooltips when settings say twoPaneMode is on.
+        // Single-pane keeps the original text-bearing layout.
+        dense={settings.twoPaneMode}
         onNewFolder={() => void handleNewFolder()}
         onNewFile={() => void handleNewFile()}
         // Surface the file clipboard's pending-paste count as a
@@ -1801,24 +1742,8 @@ export default function Browser({
           if (next.length > 50) next.splice(0, next.length - 50);
           update("savedSelections", next);
         }}
-      />}
+      />
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-        {listFailure != null ? (
-          // Render an actionable error placeholder instead of the
-          // misleading "Empty folder" line + a full FileList header
-          // that pretends the listing exists. The Toolbar above
-          // stays mounted so back / refresh remain the way out.
-          // Up is intentionally NOT passed: if we can't reach this
-          // folder, we can't reach its parent either (same dead
-          // connection), so the "Go up" button would just push the
-          // user into another error state. Back is the actual
-          // escape hatch — handled by the Toolbar's history cluster.
-          <UnreachableFolderPlaceholder
-            path={humanizeRemoteUrl(path, connLabels)}
-            error={humanizeMessage(listFailure, connLabels)}
-            onRetry={() => path && void refresh(path)}
-          />
-        ) : (
         <FileList
           entries={visibleEntries}
           sortKey={sortKey}
@@ -1841,10 +1766,11 @@ export default function Browser({
             }
           }}
           onOpenFile={(e) => {
-            // Hand off to the OS default app. Internal remote
-            // URLs are translated to the native form first; SFTP /
-            // FTP surface a friendly "no native handler" toast.
-            openNative(e.path);
+            // Hand off to the OS default app. Skipped for remote
+            // entries since the local OS can't open them without
+            // download.
+            if (e.path.startsWith("sftp://")) return;
+            void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
           }}
           onOpenDirInNewTab={(e) => {
             window.dispatchEvent(
@@ -1866,13 +1792,6 @@ export default function Browser({
           dateFormat={settings.dateFormat}
           customFileKinds={settings.customFileKinds}
           hideColumns={settings.hideColumns}
-          columnWidths={settings.listColumnWidths}
-          onColumnResize={(column, width) =>
-            update("listColumnWidths", {
-              ...settings.listColumnWidths,
-              [column]: width,
-            })
-          }
           view={settings.folderViewMode[path] ?? settings.defaultView}
           path={path}
           onRename={async (entry, newName) => {
@@ -1895,8 +1814,7 @@ export default function Browser({
             }
           }}
         />
-        )}
-        {effectivePreviewOpen && listFailure == null && (
+        {effectivePreviewOpen && (
           <PreviewPane
             selected={primarySelected}
             width={settings.previewWidth}
@@ -1915,15 +1833,7 @@ export default function Browser({
         selectedSize={
           selectionStats.count > 0 ? selectionStats.size : totals.totalSize
         }
-        errorMessage={
-          // Swap raw UUIDs in error messages for friendly labels so
-          // users see `admin@host:445/G` rather than the registry id.
-          searchError != null
-            ? humanizeMessage(searchError, connLabels)
-            : error != null
-              ? humanizeMessage(error, connLabels)
-              : null
-        }
+        errorMessage={searchError ?? error}
         onDismissError={() => {
           setError(null);
           setSearchError(null);
@@ -2073,31 +1983,6 @@ export default function Browser({
             void navigator.clipboard.writeText(e.path);
           }
         }}
-        // Bug 8 (0.2.280) — wire Cut / Copy / Paste into the
-        // right-click menu. Mirrors the toolbar buttons + Cmd+X /
-        // Cmd+C / Cmd+V keyboard shortcuts: when the right-clicked
-        // entry is part of the current multi-selection, cut / copy
-        // ALL of them; otherwise just the right-clicked row. Paste
-        // is a folder-level action so it bypasses the per-entry arg.
-        onCutToClipboard={(e) => {
-          const targets =
-            selectedPaths.length > 0 && selectedPaths.includes(e.path)
-              ? selectedPaths
-              : [e.path];
-          setFileClipboard(targets, "cut");
-        }}
-        onCopyToClipboard={(e) => {
-          const targets =
-            selectedPaths.length > 0 && selectedPaths.includes(e.path)
-              ? selectedPaths
-              : [e.path];
-          setFileClipboard(targets, "copy");
-        }}
-        onPaste={() => {
-          const cb = getFileClipboard();
-          if (cb) void handlePaste(cb);
-        }}
-        pasteCount={clipboardSnap?.paths.length ?? 0}
         onProperties={(e) => setPropertiesTarget(e)}
         currentTag={
           contextMenu ? settings.fileTags[contextMenu.entry.path] ?? null : null
@@ -2125,16 +2010,10 @@ export default function Browser({
             update("fileTags", next);
           }
         }}
-        onOpenWithDefault={(e) => openNative(e.path)}
+        onOpenWithDefault={(e) => {
+          void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
+        }}
         onRevealInOs={(e) => {
-          // Reveal-in-OS doesn't apply to remote backends — the OS
-          // file manager can't navigate into our in-app SMB / SFTP
-          // listings. Surface a friendly toast instead of letting
-          // Rust reject the call with a generic error.
-          if (parseLocation(e.path).backend.kind !== "local") {
-            setError("Reveal in OS only works on local files.");
-            return;
-          }
           void fsRevealInOs(e.path).catch((err) => setError(String(err)));
         }}
         onOpenInTerminal={(e) => {
