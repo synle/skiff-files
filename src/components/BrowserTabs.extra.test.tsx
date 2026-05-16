@@ -53,10 +53,10 @@ describe("BrowserTabs — extras", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(2);
   });
 
-  it("Cmd/Ctrl+W on the single remaining tab is a no-op", () => {
+  it("Cmd/Ctrl+W on the single remaining tab empties the tab list", () => {
     r();
     fireEvent.keyDown(window, { key: "w", ctrlKey: true });
-    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
   it("Cmd/Ctrl+Shift+T restores a recently closed tab", () => {

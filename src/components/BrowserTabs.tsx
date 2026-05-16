@@ -100,7 +100,7 @@ export default function BrowserTabs({
     pane === "right"
       ? settings.savedActiveTabIdRight
       : settings.savedActiveTabId;
-  const [tabs, setTabs] = useState<TabRow[]>(() => {
+  const initTabs = (() => {
     // Boot-time URL hash override: when the window was spawned via
     // window_open_at(path), the Rust side encoded the path into the
     // URL fragment (#path=<urlEncoded>). Honor it once at first
@@ -148,23 +148,17 @@ export default function BrowserTabs({
         currentPath: "",
       },
     ];
-  });
-  // Closed-tab stack is persisted in `Settings.recentlyClosedTabs`
-  // (across restarts; capped at 10). Local state isn't needed —
-  // `closeTab` writes to settings, `restoreClosedTab` reads + pops.
-
+  })();
+  const [tabs, setTabs] = useState<TabRow[]>(initTabs);
   const [activeId, setActiveId] = useState<string>(() => {
     if (seedActive && seedTabs.some((t) => t.id === seedActive))
       return seedActive;
-    return (seedTabs[0]?.id ?? null) ?? "";
+    // Derive from the already-computed initial tabs so the very
+    // first render has a matching value. The old code fell back
+    // to "" and relied on a useEffect to patch it — MUI Tabs in
+    // v9 suppresses aria role="tab" when no child's value matches.
+    return initTabs[0]?.id ?? "";
   });
-  // First-run default-tab case: activeId would be "" because there
-  // were no saved tabs and the seed tabs[0].id is fresh. Fix that
-  // here rather than complicating the initializer.
-  useEffect(() => {
-    if (!activeId && tabs[0]) setActiveId(tabs[0].id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Cmd/Ctrl+click on a folder in the active tab → spawn a new tab
   // seeded at that folder's path. The Browser dispatches the event;
