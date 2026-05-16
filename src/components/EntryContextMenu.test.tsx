@@ -143,4 +143,79 @@ describe("EntryContextMenu", () => {
     r({ entry: remoteFolder, x: 10, y: 10 });
     expect(screen.queryByText("Open in terminal")).not.toBeInTheDocument();
   });
+
+  // Bug 8 regression (0.2.280) — Cut / Copy / Paste are first-class
+  // context-menu actions now, separated from the Copy-path / Copy-
+  // filename string-clipboard cluster.
+  describe("Cut / Copy / Paste cluster (Bug 8)", () => {
+    function rExt(opts: {
+      pasteCount?: number;
+      onCutToClipboard?: (entry: Entry) => void;
+      onCopyToClipboard?: (entry: Entry) => void;
+      onPaste?: () => void;
+    }) {
+      const handlers = {
+        onClose: vi.fn(),
+        onOpen: vi.fn(),
+        onRename: vi.fn(),
+        onTrash: vi.fn(),
+        onCopyPath: vi.fn(),
+        onProperties: vi.fn(),
+        onBookmark: vi.fn(),
+        onOpenWithDefault: vi.fn(),
+        onRevealInOs: vi.fn(),
+        onOpenInTerminal: vi.fn(),
+        onOpenInNewTab: vi.fn(),
+        onCompareWith: vi.fn(),
+        onDuplicate: vi.fn(),
+        onCompressZip: vi.fn(),
+        onExtractZip: vi.fn(),
+        onCutToClipboard: opts.onCutToClipboard ?? vi.fn(),
+        onCopyToClipboard: opts.onCopyToClipboard ?? vi.fn(),
+        onPaste: opts.onPaste ?? vi.fn(),
+        pasteCount: opts.pasteCount ?? 0,
+      };
+      render(
+        <ThemeProvider theme={theme}>
+          <EntryContextMenu
+            state={{ entry: file, x: 10, y: 10 }}
+            {...handlers}
+          />
+        </ThemeProvider>,
+      );
+      return handlers;
+    }
+
+    it("Cut row fires onCutToClipboard with the entry", () => {
+      const onCutToClipboard = vi.fn();
+      rExt({ onCutToClipboard });
+      fireEvent.click(screen.getByText("Cut"));
+      expect(onCutToClipboard).toHaveBeenCalledWith(file);
+    });
+
+    it("Copy row fires onCopyToClipboard with the entry", () => {
+      const onCopyToClipboard = vi.fn();
+      rExt({ onCopyToClipboard });
+      fireEvent.click(screen.getByText("Copy"));
+      expect(onCopyToClipboard).toHaveBeenCalledWith(file);
+    });
+
+    it("Paste row is hidden when the file clipboard is empty", () => {
+      rExt({ pasteCount: 0 });
+      expect(screen.queryByText(/^Paste/)).not.toBeInTheDocument();
+    });
+
+    it("Paste row renders with the count when items are queued", () => {
+      const onPaste = vi.fn();
+      rExt({ pasteCount: 3, onPaste });
+      const row = screen.getByText("Paste 3 items");
+      fireEvent.click(row);
+      expect(onPaste).toHaveBeenCalled();
+    });
+
+    it("singular Paste label when exactly one item is queued", () => {
+      rExt({ pasteCount: 1 });
+      expect(screen.getByText("Paste 1 item")).toBeInTheDocument();
+    });
+  });
 });

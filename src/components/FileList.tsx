@@ -18,6 +18,7 @@ import { Box, Typography, Checkbox } from "@mui/material";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { shouldStartRubberBand } from "../util/rubberBandHitTest";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
 import GalleryThumb from "./GalleryThumb";
@@ -897,12 +898,18 @@ function FileGridView(props: FileGridViewProps) {
           // see if the user releases over a sibling element.
           const el = containerRef.current;
           if (!el) return;
-          const r = el.getBoundingClientRect();
+          // Bug 9 (0.2.281) — `shouldStartRubberBand` skips clicks on
+          // the scrollbar gutter so the native scrollbar drag still
+          // works on long lists (4800+ files). Without this the
+          // `preventDefault` below killed scrollbar drag. Algorithm
+          // lives in `util/rubberBandHitTest.ts` so the math is
+          // unit-tested.
           if (
-            evt.clientX < r.left ||
-            evt.clientX > r.right ||
-            evt.clientY < r.top ||
-            evt.clientY > r.bottom
+            !shouldStartRubberBand(evt.clientX, evt.clientY, {
+              rect: el.getBoundingClientRect(),
+              clientWidth: el.clientWidth,
+              clientHeight: el.clientHeight,
+            })
           ) {
             return;
           }
@@ -2144,12 +2151,17 @@ export default function FileList(props: Props) {
           if (target.closest("input, button, a")) return;
           const el = parentRef.current;
           if (!el) return;
+          // Bug 9 (0.2.281) — same scrollbar-gutter skip as the
+          // gallery-view handler above. List view is the dominant
+          // view for large folders so dragging the scrollbar here
+          // was the actually-painful symptom.
           const r = el.getBoundingClientRect();
           if (
-            evt.clientX < r.left ||
-            evt.clientX > r.right ||
-            evt.clientY < r.top ||
-            evt.clientY > r.bottom
+            !shouldStartRubberBand(evt.clientX, evt.clientY, {
+              rect: r,
+              clientWidth: el.clientWidth,
+              clientHeight: el.clientHeight,
+            })
           ) {
             return;
           }
