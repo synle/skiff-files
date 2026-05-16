@@ -4,11 +4,12 @@ Spins up real SFTP, FTP, and SMB servers on `127.0.0.1` so the app (and the inte
 
 Endpoints (all modes):
 
-| Protocol | Host:Port           | User       | Password    | Share / Path          |
-| -------- | ------------------- | ---------- | ----------- | --------------------- |
-| SFTP     | `127.0.0.1:2222`    | `skiff`    | `password`  | `data/` (your `${HOME}` / `D:/`) |
-| FTP      | `127.0.0.1:2121`    | `skiff`    | `password`  | `/home/skiff`         |
-| SMB      | `127.0.0.1:1445`    | `skiff`    | `password`  | share `testshare`     |
+| Protocol         | Host:Port           | User       | Auth                 | Path                             |
+| ---------------- | ------------------- | ---------- | -------------------- | -------------------------------- |
+| SFTP (password)  | `127.0.0.1:2222`    | `skiff`    | password `password`  | `data/` (your `${HOME}` / `D:/`) |
+| SFTP (key)       | `127.0.0.1:2223`    | `skiff`    | `~/.ssh/id_rsa`      | `data/` (your `${HOME}` / `D:/`) |
+| FTP              | `127.0.0.1:2121`    | `skiff`    | password `password`  | `/home/skiff`                    |
+| SMB              | `127.0.0.1:1445`    | `skiff`    | password `password`  | share `testshare`                |
 
 Credentials are deliberately weak and the servers only bind to `127.0.0.1` — never expose this stack to a public network.
 
@@ -58,16 +59,36 @@ Notes:
 
 Open the app → **Connections** in the sidebar → **+ Add connection** → pick the protocol → fill in the fields below → **Save / Connect**.
 
-### SFTP
+### SFTP — password
 
 | Field    | Value         |
 | -------- | ------------- |
 | Host     | `127.0.0.1`   |
 | Port     | `2222`        |
-| Username | `skiff`    |
-| Password | `password`   |
+| Username | `skiff`       |
+| Password | `password`    |
 
 Login lands in the chroot root and shows a single `data/` directory — that's your `${HOME}` (macOS / Linux) or `D:/` (Windows) on the host. The chroot wrapper requires the user's home itself to stay root-owned, so the host folder is mounted one level deeper. In Skiff Files, expand `data/` to browse your files.
+
+### SFTP — private key
+
+Same `skiff` user, same `data/` layout, but on port **`2223`** and password auth is disabled. The compose file mounts `~/.ssh/id_rsa.pub` (macOS / Linux) or `%USERPROFILE%\.ssh\id_rsa.pub` (Windows) into the container, which `atmoz/sftp` installs as `authorized_keys` at startup.
+
+| Field      | Value                 |
+| ---------- | --------------------- |
+| Host       | `127.0.0.1`           |
+| Port       | `2223`                |
+| Username   | `skiff`               |
+| Auth       | Private key           |
+| Key file   | `~/.ssh/id_rsa`       |
+
+Sanity check from the terminal:
+
+```bash
+sftp -P 2223 -i ~/.ssh/id_rsa skiff@127.0.0.1            # no password prompt
+```
+
+If your local key lives somewhere other than `~/.ssh/id_rsa.pub`, edit the `volumes:` mount in `docker/docker-compose.yml` (the second mount on `skiff-sftp-key`) and recreate the container with `docker compose -f docker/docker-compose.yml up -d --force-recreate skiff-sftp-key`.
 
 ### FTP
 
