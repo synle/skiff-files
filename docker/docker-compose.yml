@@ -8,8 +8,9 @@
 # Mirrors the one-shot `docker run` recipes in docker/docker.md.
 # Windows equivalent: docker-compose.windows.yml (mounts D:/).
 #
-# Credentials are deliberately weak ("skiffpass") and the boxes only
-# bind to 127.0.0.1 — never expose this stack to a public network.
+# Credentials are deliberately weak ("skiff" / "password") and the
+# boxes only bind to 127.0.0.1 — never expose this stack to a public
+# network.
 
 services:
   # SFTP / SSH. linuxserver/openssh-server ships a real shell + modern
@@ -21,8 +22,8 @@ services:
       PUID: "1000"
       PGID: "1000"
       TZ: "UTC"
-      USER_NAME: "testuser"
-      USER_PASSWORD: "skiffpass"
+      USER_NAME: "skiff"
+      USER_PASSWORD: "password"
       PASSWORD_ACCESS: "true"
       SUDO_ACCESS: "false"
     ports:
@@ -42,7 +43,7 @@ services:
     image: delfer/alpine-ftp-server:latest
     container_name: skiff-ftp
     environment:
-      USERS: "testuser|skiffpass|/home/testuser|1000"
+      USERS: "skiff|password|/home/skiff|1000"
       ADDRESS: "127.0.0.1"
       MIN_PORT: "21000"
       MAX_PORT: "21009"
@@ -50,7 +51,7 @@ services:
       - "127.0.0.1:2121:21"
       - "127.0.0.1:21000-21009:21000-21009"
     volumes:
-      - ${HOME}:/home/testuser
+      - ${HOME}:/home/skiff
     ulimits:
       nofile:
         soft: 64000
@@ -61,8 +62,8 @@ services:
     image: dperson/samba:latest
     container_name: skiff-smb
     command: >
-      -u "testuser;skiffpass"
-      -s "testshare;/share;yes;no;no;testuser;testuser"
+      -u "skiff;password"
+      -s "testshare;/share;yes;no;no;skiff;skiff"
       -p
     ports:
       - "127.0.0.1:1445:445"
