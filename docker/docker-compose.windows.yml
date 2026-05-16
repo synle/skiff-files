@@ -36,6 +36,23 @@ services:
         soft: 64000
         hard: 64000
 
+  # SFTP — key-auth variant on port 2223. Mounts %USERPROFILE%\.ssh\
+  # id_rsa.pub from the Windows host; atmoz/sftp installs it as
+  # authorized_keys at startup. Connect with the matching private key.
+  skiff-sftp-key:
+    image: atmoz/sftp:alpine
+    container_name: skiff-sftp-key
+    command: skiff::1001
+    ports:
+      - "127.0.0.1:2223:22"
+    volumes:
+      - D:/:/home/skiff/data
+      - ${USERPROFILE}/.ssh/id_rsa.pub:/home/skiff/.ssh/keys/id_rsa.pub:ro
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
   skiff-ftp:
     image: delfer/alpine-ftp-server:latest
     container_name: skiff-ftp

@@ -84,6 +84,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { onDone } from "../api/sync";
 import { runPaste } from "../util/pasteFlow";
 import { resolveBulkActionBarDense } from "../util/bulkActionBarMode";
+import UnreachableFolderPlaceholder from "../components/UnreachableFolderPlaceholder";
 
 interface Props {
   /** Optional initial path. Defaults to home dir on first load. */
@@ -357,6 +358,14 @@ export default function Browser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Sticky "this folder is unreachable" flag. Distinguishes
+   *  "list_dir failed" from "the folder is genuinely empty", so the
+   *  FileList can render an actionable placeholder + Toolbar /
+   *  BulkActionBar can collapse to just back/fwd/up/refresh.
+   *  Carries the underlying error message so the placeholder can
+   *  show it. Cleared on a successful refresh. */
+  const [listFailure, setListFailure] = useState<string | null>(null);
+
   /** Fetch the directory listing for `path` and update local state.
    *  Routes through the unified client so remote paths (`sftp://...`)
    *  hit the registry instead of the local fs. */
@@ -370,9 +379,12 @@ export default function Browser({
         });
         setEntries(list);
         setError(null);
+        setListFailure(null);
       } catch (e) {
         setEntries([]);
-        setError(String(e));
+        const msg = String(e);
+        setError(msg);
+        setListFailure(msg);
       } finally {
         setIsRefreshing(false);
       }
@@ -1522,6 +1534,11 @@ export default function Browser({
         onBack={goBack}
         onForward={goForward}
         onUp={goUp}
+        // When the current folder failed to load (broken pipe / bad
+        // creds / disconnected remote), collapse the toolbar to just
+        // back / forward / up / refresh. Refresh becomes the "retry"
+        // affordance. See `listFailure` in the refresh() callback.
+        disabled={listFailure != null}
         // Slice off the current path (top of `back`) so the menu only
         // lists destinations the user could actually go back to.
         backHistory={history.back.slice(0, -1)}
@@ -1638,7 +1655,10 @@ export default function Browser({
           onClose={() => setKindFilterOpen(false)}
         />
       )}
-      <BulkActionBar
+      {/* New folder / New file / Cut / Copy / Delete / Compress /
+       *  Rename actions all need a working listing to make sense.
+       *  Hide the entire bar when the folder failed to load. */}
+      {listFailure == null && <BulkActionBar
         count={selectedPaths.length}
         // Dense (icon-only + tooltip) vs labeled (icon + text) is
         // resolved from `bulkActionBarLabels`:
@@ -1743,8 +1763,20 @@ export default function Browser({
           if (next.length > 50) next.splice(0, next.length - 50);
           update("savedSelections", next);
         }}
-      />
+      />}
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {listFailure != null ? (
+          // Render an actionable error placeholder instead of the
+          // misleading "Empty folder" line + a full FileList header
+          // that pretends the listing exists. The Toolbar above
+          // stays mounted so back / up / refresh remain the way out.
+          <UnreachableFolderPlaceholder
+            path={path}
+            error={listFailure}
+            onRetry={() => path && void refresh(path)}
+            onUp={goUp}
+          />
+        ) : (
         <FileList
           entries={visibleEntries}
           sortKey={sortKey}
@@ -1822,7 +1854,8 @@ export default function Browser({
             }
           }}
         />
-        {effectivePreviewOpen && (
+        )}
+        {effectivePreviewOpen && listFailure == null && (
           <PreviewPane
             selected={primarySelected}
             width={settings.previewWidth}

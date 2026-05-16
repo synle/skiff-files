@@ -58,8 +58,14 @@ describe("Browser smoke", () => {
     await act(async () => {
       r({ initialPath: "sftp://test-conn-id/home" });
     });
+    // No live registry under jsdom → listDir rejects, the Browser
+    // enters the unreachable-folder placeholder state. The
+    // navigation cluster (Back / Forward / Up / Refresh) is what
+    // stays mounted; the search input is hidden by the Toolbar's
+    // disabled collapse. Smoke just confirms the Browser doesn't
+    // throw and renders the placeholder's Retry button.
     expect(
-      screen.getByLabelText(/Search current folder/i),
+      screen.getByRole("button", { name: /Retry connection/i }),
     ).toBeInTheDocument();
   });
 
