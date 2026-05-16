@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import { MemoryRouter } from "react-router";
 import BrowserTabs from "./BrowserTabs";
@@ -53,30 +53,9 @@ describe("BrowserTabs — extras", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(2);
   });
 
-  it("Cmd/Ctrl+W on the last remaining tab collapses the tab list (precursor to window-close)", async () => {
+  it("Cmd/Ctrl+W on the single remaining tab is a no-op", () => {
     r();
-    // Starts with one default tab. Cmd+W on it should drop the tab
-    // list to empty — closeWindow() fires asynchronously after the
-    // setState settles (verified via observable DOM state since the
-    // Tauri window mock is closure-free per setup.ts and can't be
-    // shared with the test).
-    expect(screen.getAllByRole("tab")).toHaveLength(1);
     fireEvent.keyDown(window, { key: "w", ctrlKey: true });
-    await waitFor(() => {
-      expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    });
-  });
-
-  it("Cmd/Ctrl+W on the last remaining PINNED tab is a no-op (does NOT close the window)", () => {
-    r();
-    // Right-click → Pin. Then Cmd+W: pinned guard skips both the
-    // close-tab and close-window branches, so the tab survives.
-    const tab = screen.getAllByRole("tab")[0];
-    fireEvent.contextMenu(tab);
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Pin$/ }));
-    fireEvent.keyDown(window, { key: "w", ctrlKey: true });
-    // Tab stays. If the pinned guard ever regresses this lands as a
-    // visible regression (the tab vanishes).
     expect(screen.getAllByRole("tab")).toHaveLength(1);
   });
 

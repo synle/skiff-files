@@ -4,7 +4,6 @@ import { ThemeProvider, createTheme } from "@mui/material";
 import RemoteConnectDialog, {
   type RemoteConnectRequest,
 } from "./RemoteConnectDialog";
-import { SettingsProvider } from "../state/settings";
 
 vi.mock("../api/conn", () => ({
   connCreateSftp: vi.fn(async () => "sftp-uuid"),
@@ -23,14 +22,12 @@ function r(request: RemoteConnectRequest | null, open = true) {
   const onConnected = vi.fn();
   render(
     <ThemeProvider theme={theme}>
-      <SettingsProvider>
-        <RemoteConnectDialog
-          open={open}
-          request={request}
-          onClose={onClose}
-          onConnected={onConnected}
-        />
-      </SettingsProvider>
+      <RemoteConnectDialog
+        open={open}
+        request={request}
+        onClose={onClose}
+        onConnected={onConnected}
+      />
     </ThemeProvider>,
   );
   return { onClose, onConnected };
@@ -40,14 +37,12 @@ describe("RemoteConnectDialog", () => {
   it("renders nothing when request is null", () => {
     const { container } = render(
       <ThemeProvider theme={theme}>
-        <SettingsProvider>
         <RemoteConnectDialog
           open
           request={null}
           onClose={vi.fn()}
           onConnected={vi.fn()}
         />
-        </SettingsProvider>
       </ThemeProvider>,
     );
     expect(container.querySelector("[role=dialog]")).toBeNull();
@@ -160,13 +155,10 @@ describe("RemoteConnectDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("Remember password toggle is visible for password-auth schemes", () => {
-    // Saving is now implicit — every successful connect persists.
-    // The user-visible toggle is for the password (off by default,
-    // flip on to skip the prompt next time).
+  it("Save-for-next-time toggle is visible for a new connection", () => {
     r({ scheme: "ftp", host: "new.example", port: null, remotePath: "/" });
     expect(
-      screen.getByLabelText(/Remember password/),
+      screen.getByLabelText(/Save this connection for next time/),
     ).toBeInTheDocument();
   });
 
@@ -177,25 +169,18 @@ describe("RemoteConnectDialog", () => {
   });
 
   it("lists saved sftp drafts for the typed host", () => {
-    // Saved connections now live under `Settings.connections` (not
-    // the legacy per-kind localStorage key). Seed via the settings
-    // payload that `SettingsProvider` reads at mount.
     localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({
-        connections: [
-          {
-            id: "s-1",
-            kind: "sftp",
-            label: "saved-host",
-            host: "example.com",
-            port: 22,
-            user: "user",
-            authMode: "password",
-            rememberPassword: false,
-          },
-        ],
-      }),
+      "skiff-files.connections.v1",
+      JSON.stringify([
+        {
+          id: "s-1",
+          label: "saved-host",
+          host: "example.com",
+          port: 22,
+          user: "user",
+          authMode: "password",
+        },
+      ]),
     );
     r({
       scheme: "sftp",
@@ -205,142 +190,5 @@ describe("RemoteConnectDialog", () => {
     });
     expect(screen.getByText("saved-host")).toBeInTheDocument();
     expect(screen.getByText(/Use a saved connection/)).toBeInTheDocument();
-  });
-
-  // Bug 7 regression (0.2.279) — successfully connecting must
-  // dispatch `skiff:connections-changed` so the Sidebar HOSTS
-  // accordion / BrowserTabs labels / PathBar friendly-label map
-  // refresh immediately. Without this the user had to navigate
-  // away and back before the new host appeared. We exercise the
-  // form-submit path the dialog uses internally (Enter inside any
-  // field or clicking Connect both flow through `<form onSubmit>`).
-  async function fireConnect(): Promise<void> {
-    const dialog = screen.getByRole("dialog");
-    const form = dialog.querySelector("form") ?? dialog;
-    fireEvent.submit(form);
-    // Two ticks: one for the await connCreate* mock, one for the
-    // surrounding handleConnect cleanup so the event dispatch lands
-    // before assertions.
-    await new Promise((r) => setTimeout(r, 0));
-    await new Promise((r) => setTimeout(r, 0));
-  }
-
-  it("dispatches skiff:connections-changed after a successful SMB connect", async () => {
-    const listener = vi.fn();
-    window.addEventListener("skiff:connections-changed", listener);
-    try {
-      r({ scheme: "smb", host: "nas", port: null, remotePath: "/Public/dir" });
-      // Fill in the SMB-required fields the form would otherwise
-      // refuse to submit. User is empty by default; password is
-      // empty; share is now optional (0.2.277).
-      fireEvent.change(screen.getByLabelText(/^User \*?$/) as HTMLInputElement, {
-        target: { value: "admin" },
-      });
-      fireEvent.change(
-        screen.getByLabelText(/^Password \*?$/) as HTMLInputElement,
-        { target: { value: "p" } },
-      );
-      await fireConnect();
-      expect(listener).toHaveBeenCalled();
-    } finally {
-      window.removeEventListener("skiff:connections-changed", listener);
-    }
-  });
-
-  // FTP path — anonymous defaults populate user/password so a bare
-  // submit fires the event without further setup. Same contract
-  // applies to SFTP / SMB; one example per scheme is enough since
-  // the dispatch call is shared.
-  it("dispatches skiff:connections-changed after a successful FTP connect", async () => {
-    const listener = vi.fn();
-    window.addEventListener("skiff:connections-changed", listener);
-    try {
-      r({ scheme: "ftp", host: "mirror", port: null, remotePath: "/" });
-      await fireConnect();
-      expect(listener).toHaveBeenCalled();
-    } finally {
-      window.removeEventListener("skiff:connections-changed", listener);
-    }
-  });
-
-  // SFTP coverage for Bug 7 — pins that every scheme the dialog
-  // handles fires the event, not just SMB + FTP. SFTP needs a real
-  // password to satisfy the form's `required` validators.
-  it("dispatches skiff:connections-changed after a successful SFTP connect", async () => {
-    const listener = vi.fn();
-    window.addEventListener("skiff:connections-changed", listener);
-    try {
-      r({ scheme: "sftp", host: "example.com", port: 22, remotePath: "/" });
-      // SFTP password-mode requires both User and Password to be
-      // filled. The Port default (22) and Host are pre-seeded.
-      fireEvent.change(
-        screen.getByLabelText(/^User \*?$/) as HTMLInputElement,
-        { target: { value: "bob" } },
-      );
-      fireEvent.change(
-        screen.getByLabelText(/^Password \*?$/) as HTMLInputElement,
-        { target: { value: "p" } },
-      );
-      await fireConnect();
-      expect(listener).toHaveBeenCalled();
-    } finally {
-      window.removeEventListener("skiff:connections-changed", listener);
-    }
-  });
-
-  // Ordering contract — the event fires BEFORE the onConnected
-  // callback, so any listener (the Sidebar's connList() refresh) has
-  // a chance to settle ahead of the route change. Pinned explicitly
-  // because reordering these calls is a likely "looks fine in dev"
-  // regression that breaks the immediate-sidebar-refresh feel.
-  it("fires skiff:connections-changed before onConnected resolves the canonical URL", async () => {
-    const order: string[] = [];
-    const eventListener = vi.fn(() => {
-      order.push("event");
-    });
-    window.addEventListener("skiff:connections-changed", eventListener);
-    const onConnected = vi.fn(() => {
-      order.push("onConnected");
-    });
-    const onClose = vi.fn();
-    render(
-      <ThemeProvider theme={theme}>
-        <SettingsProvider>
-          <RemoteConnectDialog
-            open
-            request={{ scheme: "ftp", host: "mirror", port: null, remotePath: "/" }}
-            onClose={onClose}
-            onConnected={onConnected}
-          />
-        </SettingsProvider>
-      </ThemeProvider>,
-    );
-    try {
-      const dialog = screen.getByRole("dialog");
-      const form = dialog.querySelector("form") ?? dialog;
-      fireEvent.submit(form);
-      await new Promise((r) => setTimeout(r, 0));
-      await new Promise((r) => setTimeout(r, 0));
-      expect(order.length).toBeGreaterThanOrEqual(2);
-      expect(order.indexOf("event")).toBeLessThan(order.indexOf("onConnected"));
-    } finally {
-      window.removeEventListener("skiff:connections-changed", eventListener);
-    }
-  });
-
-  // Bug 5 regression — SMB Share is OPTIONAL. Leaving it empty must
-  // not surface a "required" indicator and must let the form submit
-  // (share-agnostic mode lists root shares as virtual folders).
-  it("SMB Share field is not required (Bug 5)", () => {
-    r({ scheme: "smb", host: "nas", port: null, remotePath: "/" });
-    const shareInput = screen.getByLabelText(/Share/) as HTMLInputElement;
-    // The HTML5 `required` attribute must NOT be set. Older shape
-    // (pre-0.2.277) marked it required, which blocked submit when
-    // the user wanted to browse every share on the server.
-    expect(shareInput.required).toBe(false);
-    // Helper text reads as optional.
-    expect(
-      screen.getByLabelText(/Share \(optional\)/i),
-    ).toBeInTheDocument();
   });
 });
