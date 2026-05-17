@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material";
+import { SettingsProvider } from "../state/settings";
 import RemoteConnectDialog, {
   type RemoteConnectRequest,
 } from "./RemoteConnectDialog";
@@ -17,18 +18,28 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+function wrap(ui: React.ReactElement) {
+  return (
+    <ThemeProvider theme={theme}>
+      <SettingsProvider>
+        {ui}
+      </SettingsProvider>
+    </ThemeProvider>
+  );
+}
+
 function r(request: RemoteConnectRequest | null, open = true) {
   const onClose = vi.fn();
   const onConnected = vi.fn();
   render(
-    <ThemeProvider theme={theme}>
+    wrap(
       <RemoteConnectDialog
         open={open}
         request={request}
         onClose={onClose}
         onConnected={onConnected}
-      />
-    </ThemeProvider>,
+      />,
+    ),
   );
   return { onClose, onConnected };
 }
@@ -36,14 +47,14 @@ function r(request: RemoteConnectRequest | null, open = true) {
 describe("RemoteConnectDialog", () => {
   it("renders nothing when request is null", () => {
     const { container } = render(
-      <ThemeProvider theme={theme}>
+      wrap(
         <RemoteConnectDialog
           open
           request={null}
           onClose={vi.fn()}
           onConnected={vi.fn()}
-        />
-      </ThemeProvider>,
+        />,
+      ),
     );
     expect(container.querySelector("[role=dialog]")).toBeNull();
   });
@@ -155,10 +166,10 @@ describe("RemoteConnectDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("Save-for-next-time toggle is visible for a new connection", () => {
+  it("Remember-password toggle is visible for a new connection", () => {
     r({ scheme: "ftp", host: "new.example", port: null, remotePath: "/" });
     expect(
-      screen.getByLabelText(/Save this connection for next time/),
+      screen.getByLabelText(/Remember password/),
     ).toBeInTheDocument();
   });
 
