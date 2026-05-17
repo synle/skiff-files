@@ -629,15 +629,15 @@ export default function RemoteConnectDialog({
 
               {scheme === "smb" && (
                 <Stack direction="row" spacing={1}>
-                  {/* Share is required by SMB at session-setup, but the
-                      user shouldn't have to remember the name. Once
-                      host/user/password are filled the dialog opens a
-                      one-shot session and lists the disk shares the
-                      creds can see (admin shares are filtered by the
-                      smb2 crate); the result populates this dropdown.
-                      freeSolo keeps manual typing open for cases where
-                      the share isn't enumerable (some NAS firmwares
-                      hide it from NetShareEnumAll). */}
+                  {/* Share is optional for SMB. Empty share enters
+                      share-agnostic mode — the root lists the server's
+                      disk shares as virtual folders. When host/user/
+                      password are filled the dialog opens a one-shot
+                      session and lists the disk shares the creds can
+                      see (admin shares are filtered by the smb2 crate);
+                      the result populates this dropdown. freeSolo keeps
+                      manual typing open for cases where the share isn't
+                      enumerable (some NAS firmwares hide it). */}
                   <Autocomplete
                     freeSolo
                     size="small"
@@ -658,8 +658,7 @@ export default function RemoteConnectDialog({
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        required
-                        label="Share"
+                        label="Share (optional)"
                         helperText={
                           smbShareLoading
                             ? "Listing shares…"
