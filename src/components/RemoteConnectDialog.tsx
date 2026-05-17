@@ -45,20 +45,47 @@ import {
   connCreateSmb,
   smbListShares,
 } from "../api/conn";
+import PathPickerField from "./PathPickerField";
+import { useSettings } from "../state/settings";
 import {
-  loadFtpDrafts,
-  loadSftpDrafts,
-  loadSmbDrafts,
-  matchFtpDraftsForHost,
-  matchSftpDraftsForHost,
-  matchSmbDraftsForHost,
-  saveFtpDrafts,
-  saveSftpDrafts,
-  saveSmbDrafts,
-  type FtpDraft,
-  type SftpDraft,
-  type SmbDraft,
+  addOrUpdateConnection,
+  connToFtpDraft,
+  connToSftpDraft,
+  connToSmbDraft,
+  matchConnectionsForHost,
+  type SavedConnection,
+} from "../state/connectionStore";
+import type {
+  FtpDraft,
+  SftpDraft,
+  SmbDraft,
 } from "../state/connectionDrafts";
+
+/** Build the friendly registry label. Mirrors the Rust-side
+ *  `conn_create_*` label format so sidebar tooltip / tab strip /
+ *  saved-row label all read identically. */
+function computeLabel(args: {
+  scheme: "sftp" | "ftp" | "smb";
+  host: string;
+  port: number;
+  user: string;
+  smbShare: string;
+  smbDomain: string;
+}): string {
+  const { scheme, host, port, user, smbShare, smbDomain } = args;
+  if (scheme === "smb") {
+    const base = smbDomain
+      ? `${smbDomain}\\${user}@${host}:${port}`
+      : `${user || "guest"}@${host}:${port}`;
+    return smbShare ? `${base}/${smbShare}` : base;
+  }
+  if (scheme === "ftp") {
+    return user && user !== "anonymous"
+      ? `${user}@${host}:${port}`
+      : `${host}:${port}`;
+  }
+  return `${user || "user"}@${host}:${port}`;
+}
 
 export interface RemoteConnectRequest {
   /** "sftp", "ftp", or "smb" — picked from the URL prefix. */
@@ -82,6 +109,12 @@ interface Props {
    *  `<scheme>://<uuid>/<remotePath>` URL the caller should navigate
    *  to. */
   onConnected: (canonicalUrl: string) => void;
+  /** When set, the dialog opens in edit mode: it pre-fills from the
+   *  matching `Settings.connections` entry, and a successful connect
+   *  updates that entry (same id) instead of inserting a new row.
+   *  When unset, the dialog runs in add-mode and inserts a fresh
+   *  entry with a new id. */
+  editingConnectionId?: string;
 }
 
 type SftpAuth = "password" | "privateKey" | "agent";
@@ -91,7 +124,9 @@ export default function RemoteConnectDialog({
   request,
   onClose,
   onConnected,
+  editingConnectionId,
 }: Props) {
+  const { settings, update } = useSettings();
   const [scheme, setScheme] = useState<"sftp" | "ftp" | "smb">("ftp");
   const [host, setHost] = useState("");
   const [port, setPort] = useState(21);
@@ -114,7 +149,16 @@ export default function RemoteConnectDialog({
    *  identifies an in-flight share-list request so a stale response
    *  doesn't overwrite the options for a subsequent attempt. */
   const smbProbeSeq = useRef(0);
-  const [saveDraft, setSaveDraft] = useState(false);
+  // Saving is implicit now — every successful connect inserts (or
+  // updates) an entry in `Settings.connections`. The old "Save this
+  // connection for next time" toggle has been retired.
+  /** Toggle for plaintext-password persistence. Defaults to OFF so
+   *  existing users and brand-new connections both default to
+   *  prompt-every-time (no silent password capture). When ON, the
+   *  saved connection includes `password` and the row connects
+   *  silently next time. Phase 2 will swap the storage for the OS
+   *  keychain — see CHANGELOG. */
+  const [rememberPassword, setRememberPassword] = useState(false);
   /** Tracks which saved draft (if any) is pre-filling the form, so
    *  switching back to "new" is a single click and the "Save for
    *  later" checkbox flips appropriately. */
@@ -122,17 +166,16 @@ export default function RemoteConnectDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reload drafts every open — localStorage may have changed in
-  // another window (multi-window settings sync).
-  const [sftpDrafts, setSftpDrafts] = useState<SftpDraft[]>([]);
-  const [ftpDrafts, setFtpDrafts] = useState<FtpDraft[]>([]);
-  const [smbDrafts, setSmbDrafts] = useState<SmbDraft[]>([]);
+  // Drafts now flow through `Settings.connections` (unified store).
+  // Project per-kind views for the autocomplete + match helpers
+  // that still consume the old shapes; they stay in sync because
+  // settings is the single source of truth.
+  // Per-kind projections kept locally so the existing `applyDraft`
+  // type-discriminator keeps working; we read them through
+  // `matched.map(connTo<Kind>Draft)` in the matched-drafts memo.
 
   useEffect(() => {
     if (!open || !request) return;
-    setSftpDrafts(loadSftpDrafts());
-    setFtpDrafts(loadFtpDrafts());
-    setSmbDrafts(loadSmbDrafts());
     setScheme(request.scheme);
     setHost(request.host);
     setPort(
@@ -162,11 +205,38 @@ export default function RemoteConnectDialog({
     setSmbDomain("");
     setSmbShareOptions([]);
     setSmbShareLoading(false);
-    setSaveDraft(false);
+    setRememberPassword(false);
     setSelectedDraftId(null);
     setError(null);
     setBusy(false);
-  }, [open, request]);
+    // Edit mode — pre-fill every field from the saved entry. We do
+    // this after the request-default seeding above so the saved
+    // values win for fields the request didn't carry. The id is
+    // tracked via `selectedDraftId` so the connect flow knows to
+    // update-in-place vs. insert.
+    if (editingConnectionId) {
+      const saved = settings.connections.find(
+        (c) => c.id === editingConnectionId,
+      );
+      if (saved) {
+        setScheme(saved.kind);
+        setHost(saved.host);
+        setPort(saved.port);
+        setUser(saved.user);
+        setPassword(saved.password ?? "");
+        setRememberPassword(!!saved.rememberPassword);
+        if (saved.kind === "sftp") {
+          setAuthMode(saved.authMode ?? "password");
+          setPrivateKeyPath(saved.privateKeyPath ?? "");
+        }
+        if (saved.kind === "smb") {
+          setSmbShare(saved.share ?? "");
+          setSmbDomain(saved.domain ?? "");
+        }
+        setSelectedDraftId(saved.id);
+      }
+    }
+  }, [open, request, editingConnectionId, settings.connections]);
 
   /** Manually trigger the SMB share-list probe with the form's
    *  current host / user / password / port / domain. Fires
@@ -229,22 +299,32 @@ export default function RemoteConnectDialog({
       | { kind: "smb"; draft: SmbDraft }
     >;
     // Only surface drafts matching the URL's scheme — typing `ftp://`
-    // shouldn't suggest SSH credentials and vice-versa.
+    // shouldn't suggest SSH credentials and vice-versa. Source of
+    // truth is now `Settings.connections`; we project to the legacy
+    // per-kind shape for the applyDraft path.
+    const matched = matchConnectionsForHost(
+      settings.connections,
+      request.scheme,
+      request.host,
+      request.port,
+    );
     if (request.scheme === "sftp") {
-      const sftp = matchSftpDraftsForHost(
-        sftpDrafts,
-        request.host,
-        request.port,
-      );
-      return sftp.map((d) => ({ kind: "sftp" as const, draft: d }));
+      return matched
+        .map(connToSftpDraft)
+        .filter((d): d is SftpDraft => d != null)
+        .map((draft) => ({ kind: "sftp" as const, draft }));
     }
     if (request.scheme === "smb") {
-      const smb = matchSmbDraftsForHost(smbDrafts, request.host, request.port);
-      return smb.map((d) => ({ kind: "smb" as const, draft: d }));
+      return matched
+        .map(connToSmbDraft)
+        .filter((d): d is SmbDraft => d != null)
+        .map((draft) => ({ kind: "smb" as const, draft }));
     }
-    const ftp = matchFtpDraftsForHost(ftpDrafts, request.host, request.port);
-    return ftp.map((d) => ({ kind: "ftp" as const, draft: d }));
-  }, [request, sftpDrafts, ftpDrafts, smbDrafts]);
+    return matched
+      .map(connToFtpDraft)
+      .filter((d): d is FtpDraft => d != null)
+      .map((draft) => ({ kind: "ftp" as const, draft }));
+  }, [request, settings.connections]);
 
   const applyDraft = (
     entry:
@@ -257,7 +337,16 @@ export default function RemoteConnectDialog({
     setPort(entry.draft.port);
     setUser(entry.draft.user);
     setSelectedDraftId(entry.draft.id);
-    setSaveDraft(false); // already saved
+    // Pre-fill the password + Remember toggle from the saved entry
+    // when present. We look up the full SavedConnection from
+    // settings (the draft projections drop the password field).
+    const saved = settings.connections.find((c) => c.id === entry.draft.id);
+    if (saved?.rememberPassword && saved.password != null) {
+      setPassword(saved.password);
+      setRememberPassword(true);
+    } else {
+      setRememberPassword(false);
+    }
     if (entry.kind === "sftp") {
       setAuthMode(entry.draft.authMode);
       setPrivateKeyPath(entry.draft.privateKeyPath ?? "");
@@ -292,21 +381,6 @@ export default function RemoteConnectDialog({
             authMode === "privateKey" ? privateKeyPassphrase : undefined,
           useAgent: authMode === "agent",
         });
-        if (saveDraft && selectedDraftId == null) {
-          const next: SftpDraft = {
-            id: `sftp-${Date.now()}`,
-            label: `${user || "user"}@${host}:${port}`,
-            host,
-            port,
-            user,
-            authMode,
-            privateKeyPath:
-              authMode === "privateKey" ? privateKeyPath : undefined,
-          };
-          const merged = [...sftpDrafts, next];
-          saveSftpDrafts(merged);
-          setSftpDrafts(merged);
-        }
       } else if (scheme === "smb") {
         uuid = await connCreateSmb({
           host,
@@ -316,22 +390,6 @@ export default function RemoteConnectDialog({
           password,
           domain: smbDomain || undefined,
         });
-        if (saveDraft && selectedDraftId == null) {
-          const next: SmbDraft = {
-            id: `smb-${Date.now()}`,
-            label: smbDomain
-              ? `${smbDomain}\\${user}@${host}:${port}/${smbShare}`
-              : `${user || "guest"}@${host}:${port}/${smbShare}`,
-            host,
-            port,
-            share: smbShare,
-            user,
-            domain: smbDomain,
-          };
-          const merged = [...smbDrafts, next];
-          saveSmbDrafts(merged);
-          setSmbDrafts(merged);
-        }
       } else {
         uuid = await connCreateFtp({
           host,
@@ -339,34 +397,69 @@ export default function RemoteConnectDialog({
           user: user || undefined,
           password: password || undefined,
         });
-        if (saveDraft && selectedDraftId == null) {
-          const next: FtpDraft = {
-            id: `ftp-${Date.now()}`,
-            label:
-              user && user !== "anonymous"
-                ? `${user}@${host}:${port}`
-                : `${host}:${port}`,
-            host,
-            port,
-            user: user || "anonymous",
-          };
-          const merged = [...ftpDrafts, next];
-          saveFtpDrafts(merged);
-          setFtpDrafts(merged);
-        }
       }
-      // For SMB the share is bound to the connection, so the URL's
-      // share segment is dropped from the canonical path (everything
-      // after `smb://<uuid>/` is now share-relative). For SFTP/FTP
-      // the full remotePath survives as-is.
+      // Saving is implicit now — every successful connect persists
+      // an entry in `Settings.connections`. Add-mode inserts a new
+      // row with a fresh id; edit-mode (selectedDraftId set) updates
+      // in place. Password is included only when the user opted in
+      // via the Remember-password toggle.
+      const isEditing = selectedDraftId != null;
+      const label = computeLabel({
+        scheme,
+        host,
+        port,
+        user,
+        smbShare,
+        smbDomain,
+      });
+      const newConn: SavedConnection = {
+        id: isEditing ? selectedDraftId : `${scheme}-${Date.now()}`,
+        kind: scheme,
+        label,
+        host,
+        port,
+        user: user || (scheme === "ftp" ? "anonymous" : ""),
+        authMode: scheme === "sftp" ? authMode : undefined,
+        privateKeyPath:
+          scheme === "sftp" && authMode === "privateKey"
+            ? privateKeyPath
+            : undefined,
+        share: scheme === "smb" ? smbShare : undefined,
+        domain: scheme === "smb" ? smbDomain : undefined,
+        rememberPassword,
+        password: rememberPassword ? password : undefined,
+      };
+      update(
+        "connections",
+        addOrUpdateConnection(settings.connections, newConn),
+      );
+      // For SMB the path tail depends on whether the user picked a
+      // specific share. With a non-empty share, the connection binds
+      // it at session-setup so the URL drops the share segment
+      // (everything after `smb://<uuid>/` is share-relative). With an
+      // empty share (0.2.277 share-agnostic mode), the connection
+      // routes per-share at access time, so the URL must preserve
+      // the share segment — `smb://<uuid>/<share-name>/<rel>`. For
+      // SFTP / FTP the full remotePath survives as-is.
       let tail: string;
-      if (scheme === "smb") {
+      if (scheme === "smb" && smbShare) {
         const trimmed = (request.remotePath || "/").replace(/^\/+/, "");
         const slash = trimmed.indexOf("/");
         tail = slash >= 0 ? `/${trimmed.slice(slash + 1)}` : "/";
       } else {
         tail = request.remotePath || "/";
       }
+      // Bug 7 (0.2.279) — surface the new connection to every listener
+      // (Sidebar HOSTS accordion, BrowserTabs tab labels, PathBar
+      // friendly-label map) immediately. `ConnectionsPage` already
+      // dispatches this on its inline-flow connects; the address-bar /
+      // RemoteConnectDialog path was missing it, so newly-added SMB
+      // (and SFTP / FTP) hosts only appeared in the sidebar after the
+      // user navigated away and back. Fire BEFORE `onConnected` so the
+      // Sidebar's `connList()` refresh wins the race with the route
+      // change. Local-storage drafts are persisted above; that's a
+      // separate channel.
+      window.dispatchEvent(new CustomEvent("skiff:connections-changed"));
       onConnected(`${scheme}://${uuid}${tail}`);
       onClose();
     } catch (e) {
@@ -563,13 +656,22 @@ export default function RemoteConnectDialog({
               )}
               {authMode === "privateKey" && (
                 <>
-                  <TextField
-                    size="small"
+                  <PathPickerField
                     required
                     label="Private key path"
                     value={privateKeyPath}
-                    onChange={(e) => setPrivateKeyPath(e.target.value)}
+                    onChange={setPrivateKeyPath}
                     placeholder="~/.ssh/id_ed25519"
+                    filters={[
+                      // SSH key files typically have no extension
+                      // (`id_rsa`, `id_ed25519`), so we include the
+                      // "All files" filter alongside the common
+                      // exported / converted formats so a user with
+                      // a PuTTY-style `.ppk` or PEM-exported key can
+                      // still pick it via the dialog.
+                      { name: "SSH keys", extensions: ["pem", "key", "ppk"] },
+                      { name: "All files", extensions: ["*"] },
+                    ]}
                   />
                   <TextField
                     size="small"
@@ -629,15 +731,17 @@ export default function RemoteConnectDialog({
 
               {scheme === "smb" && (
                 <Stack direction="row" spacing={1}>
-                  {/* Share is optional for SMB. Empty share enters
-                      share-agnostic mode — the root lists the server's
-                      disk shares as virtual folders. When host/user/
-                      password are filled the dialog opens a one-shot
-                      session and lists the disk shares the creds can
-                      see (admin shares are filtered by the smb2 crate);
-                      the result populates this dropdown. freeSolo keeps
-                      manual typing open for cases where the share isn't
-                      enumerable (some NAS firmwares hide it). */}
+                  {/* Share is now OPTIONAL (0.2.277, Bug 5). Leave it
+                      empty and the connection enters share-agnostic
+                      mode: the address bar form becomes
+                      `smb://<uuid>/<share-name>/<path>` and listing
+                      the root URL returns the server's shares as
+                      virtual folders. Filling Share keeps the older
+                      "bind one share at session-setup" shape, which
+                      avoids a round-trip per share if you only care
+                      about one. freeSolo keeps manual typing open
+                      for NAS firmwares that hide their shares from
+                      NetShareEnumAll. */}
                   <Autocomplete
                     freeSolo
                     size="small"
@@ -663,8 +767,8 @@ export default function RemoteConnectDialog({
                           smbShareLoading
                             ? "Listing shares…"
                             : smbShareOptions.length > 0
-                              ? `${smbShareOptions.length} share${smbShareOptions.length === 1 ? "" : "s"} available — type to filter or pick one`
-                              : "Fill host / user / password to list shares, or type one"
+                              ? `${smbShareOptions.length} share${smbShareOptions.length === 1 ? "" : "s"} available — pick one or leave empty to browse all`
+                              : "Leave empty to browse every share, or pick one"
                         }
                       />
                     )}
@@ -682,18 +786,36 @@ export default function RemoteConnectDialog({
             </>
           )}
 
-          {/* Save-as-draft toggle. Off when a saved draft is the
-              source (already persisted); on by default for new
-              connections so re-typing the host later reuses it. */}
-          {selectedDraftId == null && (
+          {/* Saving the connection is implicit — every successful
+              connect persists into `Settings.connections`. The
+              user-visible toggle here is for the *password*. Off by
+              default so existing users + new connections both
+              default to prompt-every-time; flipping it on stores
+              the password alongside the entry so the next connect
+              is silent. Phase 1 storage is plaintext in
+              `settings.json` (under `app_data_dir`); phase 2 will
+              swap to the OS keychain. */}
+          {(authMode === "password" || scheme !== "sftp") && (
             <FormControlLabel
               control={
                 <Switch
-                  checked={saveDraft}
-                  onChange={(e) => setSaveDraft(e.target.checked)}
+                  checked={rememberPassword}
+                  onChange={(e) => setRememberPassword(e.target.checked)}
                 />
               }
-              label="Save this connection for next time"
+              label={
+                <Box>
+                  <Box>Remember password</Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block" }}
+                  >
+                    Stored in your app settings. OS Keychain support is
+                    coming.
+                  </Typography>
+                </Box>
+              }
             />
           )}
 
