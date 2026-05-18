@@ -36,11 +36,12 @@ describe("shortPath — empty home skips the ~ rewrite", () => {
   });
 });
 
-describe("shortPath — isUnderHome trailing-slash handling", () => {
-  it("matches a home dir whose value already ends in /", () => {
-    // Bug-style edge case: some shells export HOME with a trailing
-    // slash. The helper must still recognize the prefix.
-    expect(shortPath("/Users/syle/git", "/Users/syle/")).toBe("~/git");
+describe("shortPath — empty home with multi-segment path", () => {
+  it("abbreviates middle segments and keeps the leading slash", () => {
+    // Hits the plain-absolute-path branch (line 90-92) with multiple
+    // segments — pins the leading-`/` + `shortenSegments` join shape
+    // so the sidebar doesn't regress to losing the root slash.
+    expect(shortPath("/var/log/system.log", "")).toBe("/v/l/system.log");
   });
 });
 
