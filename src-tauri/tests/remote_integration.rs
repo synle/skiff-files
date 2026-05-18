@@ -128,7 +128,11 @@ async fn connect_smb() -> Arc<SmbConnection> {
 async fn sftp_basic_roundtrip() {
     gate!();
     let c = connect_sftp().await;
-    let dir = "/config";
+    // atmoz/sftp chroots the user to `/home/<user>`, so the writable
+    // subdir mounted at `/home/<user>/data` is visible to clients as
+    // `/data`. The CI compose (`docker/docker-compose.ci.yml`) puts a
+    // tmpfs there owned by the user; see DEV.md → Integration tests.
+    let dir = "/data";
     let file = format!("{dir}/skiff_sftp_test.txt");
     // Write
     write_text(BackendRef::Sftp(&c), &file, b"hello sftp").await;
@@ -198,7 +202,7 @@ async fn cross_mode_sftp_to_smb() {
     gate!();
     let src = connect_sftp().await;
     let dst = connect_smb().await;
-    let src_path = "/config/skiff_xmode_src.txt";
+    let src_path = "/data/skiff_xmode_src.txt";
     let dst_path = "/skiff_xmode_sftp_to_smb.txt";
     let payload = b"cross-mode sftp -> smb";
     write_text(BackendRef::Sftp(&src), src_path, payload).await;
@@ -236,7 +240,7 @@ async fn cross_mode_smb_to_sftp() {
     let src = connect_smb().await;
     let dst = connect_sftp().await;
     let src_path = "/skiff_xmode_src.txt";
-    let dst_path = "/config/skiff_xmode_smb_to_sftp.txt";
+    let dst_path = "/data/skiff_xmode_smb_to_sftp.txt";
     let payload = b"cross-mode smb -> sftp";
     write_text(BackendRef::Smb(&src), src_path, payload).await;
     let body = src.read_text(src_path, 4096).await.unwrap();

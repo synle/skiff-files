@@ -53,12 +53,12 @@ jobs:
 
       - name: Spin up remote backends
         run: |
-          docker compose -f docker/docker-compose.yml up -d
+          docker compose -f docker/docker-compose.ci.yml up -d
           # Give the slowest container (openssh-server) a moment to
           # finish first-boot user provisioning before the suite
           # starts retrying connects.
           sleep 10
-          docker compose -f docker/docker-compose.yml ps
+          docker compose -f docker/docker-compose.ci.yml ps
 
       - name: Run integration suite
         env:
@@ -73,15 +73,15 @@ jobs:
         if: failure()
         run: |
           echo "::group::sftp logs"
-          docker logs skiff-sftp || true
+          docker logs skiff-ci-sftp || true
           echo "::endgroup::"
           echo "::group::ftp logs"
-          docker logs skiff-ftp || true
+          docker logs skiff-ci-ftp || true
           echo "::endgroup::"
           echo "::group::smb logs"
-          docker logs skiff-smb || true
+          docker logs skiff-ci-smb || true
           echo "::endgroup::"
 
       - name: Tear down
         if: always()
-        run: docker compose -f docker/docker-compose.yml down -v
+        run: docker compose -f docker/docker-compose.ci.yml down -v

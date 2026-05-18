@@ -1,0 +1,90 @@
+# Integration-test stack — used by `.github/workflows/integration.yml`
+# and anyone running `cargo test --test remote_integration` locally.
+#
+# Differs from the dev `docker-compose.yml` in two important ways:
+#
+#   1. NO host bind-mounts. The dev compose mounts ${HOME} into every
+#      container so you can browse your real files over SFTP/FTP/SMB
+#      from inside Skiff. The dperson/samba and atmoz/sftp images
+#      both chown / chmod the mounted root on startup; doing that to
+#      ${HOME} on a GitHub Actions runner strips the runner's exec bit
+#      on its own ~/.cargo/bin/cargo and the integration job fails
+#      with "Permission denied" before any test runs. Here we back
+#      every writable path with a `tmpfs` instead, so the host FS is
+#      untouched.
+#
+#   2. Credentials and writable paths match the integration test
+#      fixtures (USER / PASS / per-backend root constants in
+#      `src-tauri/tests/remote_integration.rs`). The dev compose uses
+#      `skiff / password`; the integration suite uses
+#      `testuser / skiffpass`. Keep these in sync if either side
+#      changes.
+#
+# Spin up:    docker compose -f docker/docker-compose.ci.yml up -d
+# Run tests:  cd src-tauri && SKIFF_INTEGRATION=1 \
+#               cargo test --no-default-features --test remote_integration \
+#               -- --test-threads=1
+# Tear down:  docker compose -f docker/docker-compose.ci.yml down -v
+#
+# All ports bind to 127.0.0.1 only — never expose this stack to a
+# public network.
+
+services:
+  # SFTP. atmoz/sftp chroots the user to /home/<user>, so a writable
+  # subdir mounted underneath shows up to clients as `/<dirname>` —
+  # the test code uses `/data` to match the volume name below.
+  # tmpfs gives us a clean dir owned by the right uid:gid without a
+  # bind-mount.
+  skiff-ci-sftp:
+    image: atmoz/sftp:alpine
+    container_name: skiff-ci-sftp
+    command: testuser:skiffpass:1001
+    ports:
+      - "127.0.0.1:2222:22"
+    tmpfs:
+      - /home/testuser/data:uid=1001,gid=100,mode=755
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  # FTP. delfer/alpine-ftp-server uses uid 1000 from the USERS env
+  # entry; tmpfs is created with that ownership so the user can
+  # write into /home/testuser directly.
+  skiff-ci-ftp:
+    image: delfer/alpine-ftp-server:latest
+    container_name: skiff-ci-ftp
+    environment:
+      USERS: "testuser|skiffpass|/home/testuser|1000"
+      ADDRESS: "127.0.0.1"
+      MIN_PORT: "21000"
+      MAX_PORT: "21009"
+    ports:
+      - "127.0.0.1:2121:21"
+      - "127.0.0.1:21000-21009:21000-21009"
+    tmpfs:
+      - /home/testuser:uid=1000,gid=1000,mode=755
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  # SMB 2/3. dperson/samba runs as its own internal smbuser:smb and
+  # acts on behalf of the configured share user (testuser) — so the
+  # tmpfs mode just needs to be writable by the samba process. The
+  # share definition is `name;path;browse;readonly;guest;users;admins`.
+  skiff-ci-smb:
+    image: dperson/samba:latest
+    container_name: skiff-ci-smb
+    command: >
+      -u "testuser;skiffpass"
+      -s "testshare;/share;yes;no;no;testuser;testuser"
+      -p
+    ports:
+      - "127.0.0.1:1445:445"
+    tmpfs:
+      - /share:mode=777
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000

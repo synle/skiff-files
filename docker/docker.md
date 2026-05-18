@@ -15,19 +15,27 @@ Credentials are deliberately weak and the servers only bind to `127.0.0.1` — n
 
 ## Option A — docker compose
 
-Two variants — pick the one matching your host:
+Three variants — pick the one matching your use case:
 
 ```bash
-# macOS / Linux — mounts ${HOME} into every server
+# macOS / Linux — mounts ${HOME} into every server (browse real files)
 docker compose -f docker/docker-compose.yml up -d
 docker compose -f docker/docker-compose.yml down
 
 # Windows (PowerShell / cmd) — mounts D:/ into every server
 docker compose -f docker/docker-compose.windows.yml up -d
 docker compose -f docker/docker-compose.windows.yml down
+
+# Integration tests — no host mounts, isolated tmpfs, `testuser` / `skiffpass`
+docker compose -f docker/docker-compose.ci.yml up -d
+cd src-tauri && SKIFF_INTEGRATION=1 cargo test --no-default-features \
+    --test remote_integration -- --test-threads=1
+docker compose -f docker/docker-compose.ci.yml down -v
 ```
 
-Both files mount a real host folder (no named volumes) so anything you read / write through the protocols hits the live filesystem.
+The first two mount a real host folder (no named volumes) so anything you read / write through the protocols hits the live filesystem; they use `skiff` / `password`.
+
+The CI variant is what `.github/workflows/integration.yml` runs — it uses tmpfs-backed writable dirs (no host mount) and the `testuser` / `skiffpass` credentials the integration suite expects. Use this if you want to reproduce a CI failure locally without touching your `${HOME}`.
 
 ## Option B — docker run with a host folder mounted
 
