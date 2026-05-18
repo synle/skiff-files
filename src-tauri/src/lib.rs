@@ -13,6 +13,7 @@ pub mod commands;
 pub mod crash;
 pub mod creds;
 pub mod fs;
+pub mod health;
 pub mod sync;
 pub mod win_cmd;
 
@@ -58,6 +59,9 @@ pub fn run() {
         .manage(Arc::new(ResolverHub::new()))
         .manage(Arc::new(FsWatchState::new(None)))
         .setup(|app| {
+            // Start the health-check HTTP server on port 39871.
+            health::start_health_server();
+
             // Opt-in panic-hook installation. We read the user's
             // `crashReportsEnabled` flag straight out of the
             // settings.json on disk because it has to be decided
