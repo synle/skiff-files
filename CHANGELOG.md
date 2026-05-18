@@ -6,6 +6,8 @@ For higher-level context (project goals, phase exit criteria, conventions, footg
 
 ## Phase 0.2.x — cross-protocol Skiffsync, multi-window, polish
 
+- **0.2.297** — ✅ **Sidebar icon-only / expand-toggle**. Adds a `sidebarIconOnly` setting that collapses the sidebar to a ~52 px icon strip with labels hidden. A toggle button at the bottom of the sidebar (double-arrow icon) switches between modes; the setting is also configurable from Settings → Sidebar ("Icon-only sidebar (hide labels)"). Section headers render as a thin divider line; the resize handle is hidden in icon-only mode. Tooltips on the bottom nav icons reveal their labels when collapsed.
+
 - **0.2.296** — ✅ **Health-check button in Settings → Advanced**. Adds an outlined "Health check" button that opens `http://127.0.0.1:39871/ping` in the default browser. Grouped alongside the existing Check for updates / Reveal app data folder / Open settings.json debug utilities.
 
 - **0.2.295** — ✅ **Health-check HTTP endpoint (GET /ping and GET /health) on port 39871**. Adds a lightweight health-server module (`src-tauri/src/health.rs`) that listens on `127.0.0.1:39871` in a background thread and responds with `{"status":"ok"}` to `GET /ping` or `GET /health` requests. Any other request returns 404. Zero new crate dependencies — uses `std::net::TcpListener` only. Started during the Tauri `setup()` hook so the endpoint is live shortly after the app launches.

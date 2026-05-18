@@ -34,6 +34,8 @@ import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import EditIcon from "@mui/icons-material/Edit";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import KeyboardDoubleArrowLeftIcon from "@mui/icons-material/KeyboardDoubleArrowLeft";
+import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArrowRight";
 import SidebarContextMenu, {
   type SidebarContextState,
 } from "./SidebarContextMenu";
@@ -59,6 +61,7 @@ import { formatBytes } from "../util/format";
 import { onDone, onError, onProgress, syncList } from "../api/sync";
 import {
   SIDEBAR_SECTION_DEFAULT_ORDER,
+  SIDEBAR_WIDTH_ICON,
   SIDEBAR_WIDTH_MAX,
   SIDEBAR_WIDTH_MIN,
   useSettings,
@@ -105,6 +108,7 @@ function SectionHeader({
   collapsed,
   onToggle,
   onHide,
+  iconOnly,
 }: {
   id: string;
   label: string;
@@ -114,6 +118,7 @@ function SectionHeader({
    *  the clicked one. */
   onToggle: (modifier: boolean) => void;
   onHide?: () => void;
+  iconOnly?: boolean;
 }) {
   return (
     <Box
@@ -123,7 +128,12 @@ function SectionHeader({
         alignItems: "center",
         // Reveal the hide button on hover only — full-time visibility
         // is too easy to mis-click with the section header just above.
-        "&:hover .sidebar-section-hide": { opacity: 1 },
+        "&:hover .sidebar-section-hide": { opacity: iconOnly ? 0 : 1 },
+        ...(iconOnly && {
+          justifyContent: "center",
+          pt: 0.25,
+          pb: 0.25,
+        }),
       }}
     >
       <Box
@@ -142,34 +152,47 @@ function SectionHeader({
           display: "flex",
           alignItems: "center",
           gap: 0.5,
-          flex: 1,
-          textAlign: "left",
-          px: 2,
-          pt: 1.5,
-          pb: 0.25,
+          flex: iconOnly ? 0 : 1,
+          textAlign: iconOnly ? "center" : "left",
+          px: iconOnly ? 0 : 2,
+          pt: iconOnly ? 0 : 1.5,
+          pb: iconOnly ? 0 : 0.25,
           color: "text.secondary",
           fontSize: "0.6875rem",
           fontWeight: 500,
           letterSpacing: "0.08333em",
           textTransform: "uppercase",
           "&:hover": { color: "text.primary" },
+          ...(iconOnly && {
+            width: 20,
+            height: 20,
+            justifyContent: "center",
+            borderRadius: 1,
+          }),
         }}
       >
-        {collapsed ? (
+        {iconOnly ? (
+          <Box
+            sx={{
+              width: 14,
+              height: 1,
+              bgcolor: "divider",
+              borderRadius: 1,
+            }}
+          />
+        ) : collapsed ? (
           <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
         ) : (
           <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
         )}
-        {label}
+        {!iconOnly && label}
       </Box>
-      {onHide && (
+      {!iconOnly && onHide && (
         <Tooltip title="Hide section (re-enable in Settings → Sidebar)">
           <IconButton
             className="sidebar-section-hide"
             size="small"
             onClick={(e) => {
-              // Stop the parent header click from also firing the
-              // collapse toggle.
               e.stopPropagation();
               onHide();
             }}
@@ -390,6 +413,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       collapsed={isCollapsed(id)}
       onToggle={(modifier) => toggleSection(id, modifier)}
       onHide={() => hideSection(id)}
+      iconOnly={settings.sidebarIconOnly}
     />
   );
 
@@ -522,7 +546,9 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
    *  with the listener's reloadFromDisk and leave the sidebar
    *  "snapping back" after a resize. */
   const [dragWidth, setDragWidth] = useState<number | null>(null);
-  const effectiveWidth = dragWidth ?? settings.sidebarWidth;
+  const effectiveWidth = settings.sidebarIconOnly
+    ? SIDEBAR_WIDTH_ICON
+    : (dragWidth ?? settings.sidebarWidth);
   /** Bookmark filter input — only shown when there are enough
    *  bookmarks that scrolling becomes painful (>= 10). Substring
    *  match against label, case-insensitive. Empty = show all. */
@@ -578,11 +604,18 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         sx={{
           flex: 1,
           overflow: "auto",
-          // Flex column so each section's `order` prop drives its
-          // visual stacking. Source order stays unchanged — the
-          // user's `sidebarSectionOrder` array decides what wins.
-          display: "flex",
           flexDirection: "column",
+          display: "flex",
+          ...(settings.sidebarIconOnly && {
+            "& .MuiListItemText-root": { display: "none" },
+            "& .MuiListItemButton-root": {
+              justifyContent: "center",
+              px: 0,
+            },
+            "& .MuiListItemIcon-root": {
+              minWidth: "unset !important",
+            },
+          }),
         }}
       >
         <Box style={{ order: orderOf("favorites") }}>
@@ -1981,30 +2014,98 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
 
       <List dense disablePadding sx={{ borderTop: 1, borderColor: "divider" }}>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => onSwitchPage("transfers")} selected={page === "transfers"}>
-            <ListItemIcon sx={{ minWidth: 32 }}>
-              <Badge
-                badgeContent={activeJobs.size}
-                color="primary"
-                invisible={activeJobs.size === 0}
-                overlap="circular"
+          <Tooltip
+            title={settings.sidebarIconOnly ? t("sidebar.nav.transfers") : ""}
+            placement="right"
+          >
+            <ListItemButton
+              onClick={() => onSwitchPage("transfers")}
+              selected={page === "transfers"}
+              sx={{
+                justifyContent: settings.sidebarIconOnly ? "center" : undefined,
+                px: settings.sidebarIconOnly ? 0 : undefined,
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: settings.sidebarIconOnly ? undefined : 32,
+                }}
               >
-                <SwapHorizIcon fontSize="small" />
-              </Badge>
-            </ListItemIcon>
-            <ListItemText primary={t("sidebar.nav.transfers")} />
-          </ListItemButton>
+                <Badge
+                  badgeContent={activeJobs.size}
+                  color="primary"
+                  invisible={activeJobs.size === 0}
+                  overlap="circular"
+                >
+                  <SwapHorizIcon fontSize="small" />
+                </Badge>
+              </ListItemIcon>
+              <ListItemText primary={t("sidebar.nav.transfers")} />
+            </ListItemButton>
+          </Tooltip>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton
-            selected={page === "settings"}
-            onClick={() => onSwitchPage("settings")}
+          <Tooltip
+            title={settings.sidebarIconOnly ? t("sidebar.nav.settings") : ""}
+            placement="right"
           >
-            <ListItemIcon sx={{ minWidth: 32 }}>
-              <SettingsIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary={t("sidebar.nav.settings")} />
-          </ListItemButton>
+            <ListItemButton
+              selected={page === "settings"}
+              onClick={() => onSwitchPage("settings")}
+              sx={{
+                justifyContent: settings.sidebarIconOnly ? "center" : undefined,
+                px: settings.sidebarIconOnly ? 0 : undefined,
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: settings.sidebarIconOnly ? undefined : 32,
+                }}
+              >
+                <SettingsIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary={t("sidebar.nav.settings")} />
+            </ListItemButton>
+          </Tooltip>
+        </ListItem>
+        <ListItem disablePadding>
+          <Tooltip
+            title={
+              settings.sidebarIconOnly
+                ? "Expand sidebar"
+                : "Collapse sidebar"
+            }
+            placement="right"
+          >
+            <ListItemButton
+              onClick={() =>
+                update("sidebarIconOnly", !settings.sidebarIconOnly)
+              }
+              sx={{
+                justifyContent: settings.sidebarIconOnly ? "center" : undefined,
+                px: settings.sidebarIconOnly ? 0 : undefined,
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: settings.sidebarIconOnly ? undefined : 32,
+                }}
+              >
+                {settings.sidebarIconOnly ? (
+                  <KeyboardDoubleArrowRightIcon fontSize="small" />
+                ) : (
+                  <KeyboardDoubleArrowLeftIcon fontSize="small" />
+                )}
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  settings.sidebarIconOnly
+                    ? "Expand"
+                    : "Collapse"
+                }
+              />
+            </ListItemButton>
+          </Tooltip>
         </ListItem>
       </List>
 
@@ -2023,11 +2124,10 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
           bottom: 0,
           width: 6,
           cursor: "col-resize",
-          // Light primary tint on hover so the user discovers the
-          // handle. Stays invisible at rest.
           transition: "background-color 120ms",
           "&:hover": { backgroundColor: "primary.light" },
           zIndex: 1,
+          ...(settings.sidebarIconOnly && { display: "none" }),
         }}
       />
       {/* Per-section context menu. Sidebar rows set up their own

@@ -1474,6 +1474,18 @@ export default function SettingsPage() {
             label="Show connection-status dots"
           />
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.sidebarIconOnly}
+                onChange={(e) =>
+                  update("sidebarIconOnly", e.target.checked)
+                }
+              />
+            }
+            label="Icon-only sidebar (hide labels)"
+          />
+
           <TextField
             label="Recent paths shown in sidebar"
             size="small"

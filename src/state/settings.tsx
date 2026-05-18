@@ -184,6 +184,11 @@ export interface Settings {
   /** Sidebar width in pixels. Drag-resize persists into here, clamped
    *  to SIDEBAR_WIDTH_MIN..SIDEBAR_WIDTH_MAX. */
   sidebarWidth: number;
+  /** When true, the sidebar renders as a narrow icon-only strip
+   *  (~52 px wide). Only section icons and the bottom nav icons are
+   *  visible; labels and section headers are hidden. Toggled from
+   *  the sidebar's own bottom nav. Default false. */
+  sidebarIconOnly: boolean;
   /** Per-section collapsed state for the Sidebar. Keys are
    *  ad-hoc section ids ("favorites" / "bookmarks" / "recent" /
    *  "hosts" / "devices"); missing key = expanded (default). */
@@ -455,6 +460,7 @@ export const TABS_MAX = 20;
 export const SIDEBAR_WIDTH_MIN = 180;
 export const SIDEBAR_WIDTH_MAX = 400;
 export const SIDEBAR_WIDTH_DEFAULT = 220;
+export const SIDEBAR_WIDTH_ICON = 52;
 
 /** Preview pane width clamps. Below the min the image fits in a
  *  postage stamp; above the max the file list gets cramped. */
@@ -565,6 +571,7 @@ export const DEFAULTS: Settings = {
   showFullPathInTitle: false,
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
+  sidebarIconOnly: false,
   sidebarCollapsed: {},
   // Recent is hidden by default — the Recent section was visually
   // heavy in 0.2.272's sidebar (double-line entries, full paths) and
