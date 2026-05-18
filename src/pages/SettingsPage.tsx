@@ -1842,6 +1842,17 @@ export default function SettingsPage() {
             <Button
               variant="outlined"
               size="small"
+              onClick={() => {
+                void fsOpenWithDefault(
+                  "http://127.0.0.1:39871/ping",
+                );
+              }}
+            >
+              Health check
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
               disabled={settings.recentPaths.length === 0}
               onClick={() => update("recentPaths", [])}
             >
