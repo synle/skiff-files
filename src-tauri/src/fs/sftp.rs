@@ -664,7 +664,7 @@ mod tests {
             "host": "example.com",
             "port": 2222,
             "user": "alice",
-            "password": "hunter2",
+            "password": "DUMMY-PW",
             "privateKeyPath": null,
             "privateKeyPassphrase": null
         }"#;
@@ -672,7 +672,7 @@ mod tests {
         assert_eq!(cfg.host, "example.com");
         assert_eq!(cfg.port, 2222);
         assert_eq!(cfg.user, "alice");
-        assert_eq!(cfg.password.as_deref(), Some("hunter2"));
+        assert_eq!(cfg.password.as_deref(), Some("DUMMY-PW"));
         assert!(cfg.private_key_path.is_none());
     }
 

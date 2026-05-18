@@ -2505,4 +2505,636 @@ mod tests {
 
         std::fs::remove_dir_all(&dir).ok();
     }
+
+    // ---------- archive_format ----------
+
+    /// `archive_format` drives both `fs_archive_list` and `fs_archive_extract_one`.
+    /// The match is case-insensitive (Windows users often have .ZIP), and `.tgz`
+    /// must alias `.tar.gz` because both spellings are common in the wild.
+    #[test]
+    fn archive_format_recognises_every_supported_extension() {
+        assert_eq!(archive_format("foo.zip"), "zip");
+        assert_eq!(archive_format("foo.ZIP"), "zip");
+        assert_eq!(archive_format("foo.tar"), "tar");
+        assert_eq!(archive_format("foo.TAR"), "tar");
+        assert_eq!(archive_format("foo.tar.gz"), "tar.gz");
+        assert_eq!(archive_format("foo.TAR.GZ"), "tar.gz");
+        assert_eq!(archive_format("foo.tgz"), "tar.gz");
+        assert_eq!(archive_format("foo.7z"), "7z");
+        // Unrecognised — caller surfaces "unsupported archive format".
+        assert_eq!(archive_format("foo.txt"), "");
+        assert_eq!(archive_format("foo.rar"), "");
+        assert_eq!(archive_format(""), "");
+    }
+
+    // ---------- fs_list_dir / fs_stat / fs_mkdir / fs_rename / fs_remove ----------
+
+    /// Smoke-test the local-fs adapters. Each command is a one-liner over
+    /// `crate::fs::local` but they're the single largest function bucket in
+    /// commands.rs by count, so wiring even a happy path here pays off in
+    /// function coverage.
+    #[test]
+    fn local_fs_command_round_trip() {
+        let dir = uniq("local-roundtrip");
+        let dir_str = dir.to_string_lossy().into_owned();
+
+        // mkdir on a child
+        let child = dir.join("child");
+        fs_mkdir(child.to_string_lossy().into_owned()).unwrap();
+        assert!(child.is_dir());
+
+        // create_empty_file
+        let f = child.join("a.txt");
+        fs_create_empty_file(f.to_string_lossy().into_owned()).unwrap();
+        assert!(f.is_file());
+
+        // create_empty_file second time errors (already exists)
+        let err = fs_create_empty_file(f.to_string_lossy().into_owned()).unwrap_err();
+        assert!(err.contains("already exists"), "got: {err}");
+
+        // stat the file we just made
+        let entry = fs_stat(f.to_string_lossy().into_owned()).unwrap();
+        assert_eq!(entry.name, "a.txt");
+        assert!(!entry.is_dir);
+
+        // list_dir shows the file
+        let entries = fs_list_dir(child.to_string_lossy().into_owned(), None).unwrap();
+        assert!(entries.iter().any(|e| e.name == "a.txt"));
+
+        // list_dir with show_hidden=true on a dir with a dotfile
+        let dotfile = child.join(".hidden");
+        std::fs::write(&dotfile, b"x").unwrap();
+        let visible = fs_list_dir(
+            child.to_string_lossy().into_owned(),
+            Some(crate::fs::types::ListOptions { show_hidden: false }),
+        )
+        .unwrap();
+        assert!(!visible.iter().any(|e| e.name == ".hidden"));
+        let all = fs_list_dir(
+            child.to_string_lossy().into_owned(),
+            Some(crate::fs::types::ListOptions { show_hidden: true }),
+        )
+        .unwrap();
+        assert!(all.iter().any(|e| e.name == ".hidden"));
+
+        // rename
+        let renamed = child.join("b.txt");
+        fs_rename(
+            f.to_string_lossy().into_owned(),
+            renamed.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert!(!f.exists());
+        assert!(renamed.is_file());
+
+        // remove
+        fs_remove(renamed.to_string_lossy().into_owned()).unwrap();
+        assert!(!renamed.exists());
+
+        std::fs::remove_dir_all(&dir_str).ok();
+    }
+
+    // ---------- fs_hash_sha256 ----------
+
+    /// Hash a file with known contents. Pinning the exact digest catches both
+    /// off-by-one buffer bugs and accidental algorithm changes (we'd silently
+    /// flip from sha256 to sha512 otherwise).
+    #[test]
+    fn sha256_matches_known_digest() {
+        let dir = uniq("sha");
+        let p = dir.join("a.txt");
+        std::fs::write(&p, b"hello").unwrap();
+        let got = fs_hash_sha256(p.to_string_lossy().into_owned()).unwrap();
+        // sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+        assert_eq!(
+            got,
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- fs_copy_file / fs_copy_recursive / copy_dir_recursive ----------
+
+    /// Single-file copy returns the byte count, and the destination matches
+    /// the source byte-for-byte. The shape mirrors `fs::copy` but we're
+    /// exercising the FsResult adapter.
+    #[test]
+    fn copy_file_returns_byte_count_and_copies_contents() {
+        let dir = uniq("copyfile");
+        let src = dir.join("src.bin");
+        std::fs::write(&src, b"abcdef").unwrap();
+        let dest = dir.join("dest.bin");
+        let n = fs_copy_file(
+            src.to_string_lossy().into_owned(),
+            dest.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert_eq!(n, 6);
+        assert_eq!(std::fs::read(&dest).unwrap(), b"abcdef");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Recursive copy of a small nested tree. Verifies that the directory
+    /// structure is mirrored and file contents preserved. Also covers the
+    /// "destination exists" guard path.
+    #[test]
+    fn copy_recursive_mirrors_a_nested_tree() {
+        let dir = uniq("copyrec");
+        let src = dir.join("from");
+        std::fs::create_dir_all(src.join("inner")).unwrap();
+        std::fs::write(src.join("top.txt"), b"top").unwrap();
+        std::fs::write(src.join("inner/nested.txt"), b"nested").unwrap();
+
+        let dest = dir.join("to");
+        fs_copy_recursive(
+            src.to_string_lossy().into_owned(),
+            dest.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(dest.join("top.txt")).unwrap(), b"top");
+        assert_eq!(
+            std::fs::read(dest.join("inner/nested.txt")).unwrap(),
+            b"nested"
+        );
+
+        // Second call rejects because destination now exists.
+        let err = fs_copy_recursive(
+            src.to_string_lossy().into_owned(),
+            dest.to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+        assert!(err.contains("already exists"), "got: {err}");
+
+        // Single-file recursive copy path.
+        let single_src = dir.join("single.txt");
+        std::fs::write(&single_src, b"single").unwrap();
+        let single_dest = dir.join("single-copy.txt");
+        fs_copy_recursive(
+            single_src.to_string_lossy().into_owned(),
+            single_dest.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&single_dest).unwrap(), b"single");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- fs_canonicalize ----------
+
+    /// `fs_canonicalize` resolves `..` segments. Going up + back down to the
+    /// same dir should round-trip to the original absolute path.
+    #[test]
+    fn canonicalize_resolves_dot_dot_segments() {
+        let dir = uniq("canon");
+        let child = dir.join("child");
+        std::fs::create_dir_all(&child).unwrap();
+        let weird = child.join("..").join("child");
+        let canonical = fs_canonicalize(weird.to_string_lossy().into_owned()).unwrap();
+        // On macOS /tmp is a symlink to /private/tmp; we just need the
+        // resolved path to point to the same directory.
+        assert!(std::path::Path::new(&canonical).is_dir());
+        assert!(canonical.ends_with("child"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- fs_read_text / fs_read_base64 ----------
+
+    /// Read a small text + binary file through the preview commands. The
+    /// 256 KB / 16 MB caps aren't exercised here — they're enforced inside
+    /// `crate::fs::local`, so a tiny file just round-trips.
+    #[test]
+    fn preview_read_text_and_base64() {
+        let dir = uniq("preview");
+        let p = dir.join("hi.txt");
+        std::fs::write(&p, b"hi there").unwrap();
+
+        let text = fs_read_text(p.to_string_lossy().into_owned()).unwrap();
+        assert_eq!(text, "hi there");
+
+        let b64 = fs_read_base64(p.to_string_lossy().into_owned()).unwrap();
+        // base64("hi there") = aGkgdGhlcmU=
+        assert_eq!(b64, "aGkgdGhlcmU=");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- fs_dir_summary ----------
+
+    /// Folder summary: total entries (files + dirs) and total bytes. The 10
+    /// matches the small test tree we built so a future change to the
+    /// counting model trips here.
+    #[test]
+    fn dir_summary_counts_entries_and_bytes() {
+        let dir = uniq("dirsum");
+        std::fs::create_dir_all(dir.join("inner")).unwrap();
+        std::fs::write(dir.join("a.txt"), b"aaa").unwrap(); // 3 bytes
+        std::fs::write(dir.join("b.txt"), b"bb").unwrap(); // 2 bytes
+        std::fs::write(dir.join("inner/c.txt"), b"c").unwrap(); // 1 byte
+
+        let sum = fs_dir_summary(dir.to_string_lossy().into_owned()).unwrap();
+        // 3 files + 1 inner directory = 4 entries.
+        assert_eq!(sum.entries, 4);
+        // 3 + 2 + 1 = 6 file bytes.
+        assert_eq!(sum.total_size, 6);
+        assert!(!sum.truncated);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- fs_find ----------
+
+    /// Substring find — happy path. Defaults (regex=None, case_sensitive=None)
+    /// should match "alpha.txt" when querying "alp".
+    #[test]
+    fn find_substring_default_options() {
+        let dir = uniq("find");
+        std::fs::write(dir.join("alpha.txt"), b"").unwrap();
+        std::fs::write(dir.join("BETA.txt"), b"").unwrap();
+        std::fs::write(dir.join("gamma.md"), b"").unwrap();
+
+        let hits = fs_find(
+            dir.to_string_lossy().into_owned(),
+            "alp".into(),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(hits.iter().any(|e| e.name == "alpha.txt"));
+        // Case-insensitive by default.
+        let hits = fs_find(
+            dir.to_string_lossy().into_owned(),
+            "beta".into(),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(hits.iter().any(|e| e.name == "BETA.txt"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Regex find — anchor + alternation. Confirms the regex flag flips the
+    /// matcher from substring to regex mode.
+    #[test]
+    fn find_regex_mode_matches_anchored_alternation() {
+        let dir = uniq("findre");
+        std::fs::write(dir.join("foo.rs"), b"").unwrap();
+        std::fs::write(dir.join("bar.rs"), b"").unwrap();
+        std::fs::write(dir.join("baz.md"), b"").unwrap();
+        let hits = fs_find(
+            dir.to_string_lossy().into_owned(),
+            r"^(foo|bar)\.rs$".into(),
+            Some(true),
+            None,
+        )
+        .unwrap();
+        assert_eq!(hits.len(), 2);
+        assert!(hits.iter().all(|e| e.name == "foo.rs" || e.name == "bar.rs"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Case-sensitive substring find — confirms the flag isn't silently
+    /// ignored. "B" must NOT match "BETA" with case_sensitive=false on the
+    /// previous test, but WITH case_sensitive=true it should only match the
+    /// uppercase entry.
+    #[test]
+    fn find_case_sensitive_flag_is_honored() {
+        let dir = uniq("findcase");
+        std::fs::write(dir.join("ALPHA.txt"), b"").unwrap();
+        std::fs::write(dir.join("alpha.txt"), b"").unwrap();
+        let hits = fs_find(
+            dir.to_string_lossy().into_owned(),
+            "ALPHA".into(),
+            None,
+            Some(true),
+        )
+        .unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "ALPHA.txt");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Empty query returns an empty Vec (avoids walking the whole tree for
+    /// nothing). The frontend depends on this — the search overlay sets
+    /// query="" while typing.
+    #[test]
+    fn find_empty_query_returns_no_results() {
+        let dir = uniq("findempty");
+        std::fs::write(dir.join("a.txt"), b"").unwrap();
+        let hits = fs_find(
+            dir.to_string_lossy().into_owned(),
+            "".into(),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(hits.is_empty());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- fs_mounts ----------
+
+    /// At least one mounted volume should be reported on every developer
+    /// machine — the root volume on macOS/Linux, the system drive on
+    /// Windows. We don't pin specific labels because the test runs across
+    /// every supported OS.
+    #[test]
+    fn mounts_returns_at_least_one_volume() {
+        let mounts = fs_mounts().unwrap();
+        assert!(!mounts.is_empty(), "expected at least one mount on host");
+    }
+
+    // ---------- fs_disk_space ----------
+
+    /// Disk space against the system tempdir should give plausible non-zero
+    /// totals (every supported host has more than 0 bytes of total + free).
+    #[test]
+    fn disk_space_for_tempdir_is_plausible() {
+        let tmp = std::env::temp_dir().to_string_lossy().into_owned();
+        let ds = fs_disk_space(tmp).unwrap();
+        assert!(ds.total > 0, "total should be > 0");
+        assert!(ds.free <= ds.total, "free should never exceed total");
+    }
+
+    // ---------- fs_trash_path ----------
+
+    /// Platform-specific: macOS / Linux return Some(...), Windows returns
+    /// None. The frontend conditionally hides the Trash favorite when None.
+    #[test]
+    fn trash_path_matches_platform() {
+        let res = fs_trash_path().unwrap();
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            let s = res.expect("trash path should exist on macOS/Linux");
+            assert!(!s.is_empty());
+            assert!(std::path::Path::new(&s).is_absolute());
+        }
+        #[cfg(target_os = "windows")]
+        {
+            assert!(res.is_none(), "windows shouldn't return a path");
+        }
+        // Touch `res` on other unixes to silence unused warning.
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+        {
+            let _ = res;
+        }
+    }
+
+    // ---------- fs_image_exif ----------
+
+    /// PNG has no EXIF — `fs_image_exif` should return all-None rather than
+    /// erroring out (so the preview pane stays quiet for screenshots etc.).
+    #[test]
+    fn image_exif_for_plain_png_is_default_all_none() {
+        let dir = uniq("exif");
+        let p = dir.join("plain.png");
+        image::RgbImage::new(2, 2)
+            .save_with_format(&p, image::ImageFormat::Png)
+            .unwrap();
+        let exif = fs_image_exif(p.to_string_lossy().into_owned()).unwrap();
+        assert!(exif.date_taken.is_none());
+        assert!(exif.camera_make.is_none());
+        assert!(exif.camera_model.is_none());
+        assert!(exif.lens.is_none());
+        assert!(exif.iso.is_none());
+        assert!(exif.exposure.is_none());
+        assert!(exif.aperture.is_none());
+        assert!(exif.focal_length.is_none());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- Zip round-trip: compress → list → extract_one → extract ----------
+
+    /// Compress a file + folder into a zip, then list the entries, then
+    /// extract one named entry, then extract the whole archive. Covers
+    /// `fs_compress_zip`, `fs_archive_list` (zip arm), `fs_archive_extract_one`
+    /// (zip arm), and `fs_extract_zip`.
+    #[test]
+    fn zip_round_trip_compress_list_extract() {
+        let dir = uniq("zip");
+        std::fs::write(dir.join("a.txt"), b"AAA").unwrap();
+        std::fs::create_dir_all(dir.join("folder")).unwrap();
+        std::fs::write(dir.join("folder/inner.txt"), b"BBB").unwrap();
+
+        let zip_path = dir.join("out.zip");
+        fs_compress_zip(
+            vec![
+                dir.join("a.txt").to_string_lossy().into_owned(),
+                dir.join("folder").to_string_lossy().into_owned(),
+            ],
+            zip_path.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert!(zip_path.is_file());
+
+        // List confirms both entries landed under their basenames.
+        let entries = fs_archive_list(zip_path.to_string_lossy().into_owned()).unwrap();
+        assert!(entries.iter().any(|e| e.name == "a.txt" && e.size == 3));
+        assert!(entries.iter().any(|e| e.name == "folder/inner.txt"));
+
+        // Extract one — pull `a.txt` out to a fresh location.
+        let one_dest = dir.join("extracted-a.txt");
+        fs_archive_extract_one(
+            zip_path.to_string_lossy().into_owned(),
+            "a.txt".into(),
+            one_dest.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&one_dest).unwrap(), b"AAA");
+
+        // Path-traversal entry name should be rejected.
+        let err = fs_archive_extract_one(
+            zip_path.to_string_lossy().into_owned(),
+            "../escape.txt".into(),
+            dir.join("escape.txt").to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+        assert!(err.contains("traverses parent"), "got: {err}");
+
+        // Extract-already-exists guard.
+        let err = fs_archive_extract_one(
+            zip_path.to_string_lossy().into_owned(),
+            "a.txt".into(),
+            one_dest.to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+        assert!(err.contains("destination exists"), "got: {err}");
+
+        // Full extract into a fresh dir.
+        let out_dir = dir.join("extracted-all");
+        fs_extract_zip(
+            zip_path.to_string_lossy().into_owned(),
+            out_dir.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(out_dir.join("a.txt")).unwrap(), b"AAA");
+        assert_eq!(
+            std::fs::read(out_dir.join("folder/inner.txt")).unwrap(),
+            b"BBB"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// `fs_compress_zip` rejects empty input + already-existing destination.
+    /// Those are the two pre-flight checks the right-click Compress action
+    /// depends on for "use a unique destination name" feedback.
+    #[test]
+    fn compress_zip_rejects_empty_inputs_and_existing_dest() {
+        let dir = uniq("zipreject");
+        let dest = dir.join("z.zip");
+        let err = fs_compress_zip(vec![], dest.to_string_lossy().into_owned()).unwrap_err();
+        assert!(err.contains("no paths"), "got: {err}");
+
+        std::fs::write(&dest, b"already there").unwrap();
+        let src = dir.join("x.txt");
+        std::fs::write(&src, b"x").unwrap();
+        let err = fs_compress_zip(
+            vec![src.to_string_lossy().into_owned()],
+            dest.to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+        assert!(err.contains("already exists"), "got: {err}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// `fs_archive_list` rejects archives with an extension we don't
+    /// recognise (anything outside zip/tar/tar.gz/tgz/7z).
+    #[test]
+    fn archive_list_rejects_unsupported_format() {
+        let dir = uniq("archfmt");
+        let p = dir.join("a.rar");
+        std::fs::write(&p, b"fake").unwrap();
+        // ArchiveEntry has no Debug impl; pattern match to extract err.
+        let err = match fs_archive_list(p.to_string_lossy().into_owned()) {
+            Ok(_) => panic!("expected error"),
+            Err(e) => e,
+        };
+        assert!(err.contains("unsupported archive format"), "got: {err}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- tar.gz list + extract_one ----------
+
+    /// Build a `.tar.gz`, list its contents, and extract one named entry.
+    /// Hits `list_tar` + `extract_one_tar` through both `fs_archive_list`
+    /// and `fs_archive_extract_one`'s tar.gz arms.
+    #[test]
+    fn targz_list_and_extract_one_round_trip() {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use std::io::Write;
+
+        let dir = uniq("targz");
+        let tgz = dir.join("bundle.tar.gz");
+
+        {
+            // Build a 2-file tar inside a gzip wrapper.
+            let f = std::fs::File::create(&tgz).unwrap();
+            let gz = GzEncoder::new(f, Compression::default());
+            let mut builder = tar::Builder::new(gz);
+            let mut header = tar::Header::new_gnu();
+            header.set_size(4);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "a.txt", &b"AAAA"[..])
+                .unwrap();
+            let mut h2 = tar::Header::new_gnu();
+            h2.set_size(3);
+            h2.set_cksum();
+            builder
+                .append_data(&mut h2, "b.txt", &b"BBB"[..])
+                .unwrap();
+            let gz = builder.into_inner().unwrap();
+            gz.finish().unwrap().flush().unwrap();
+        }
+
+        let entries = fs_archive_list(tgz.to_string_lossy().into_owned()).unwrap();
+        assert!(entries.iter().any(|e| e.name == "a.txt" && e.size == 4));
+        assert!(entries.iter().any(|e| e.name == "b.txt" && e.size == 3));
+
+        let dest = dir.join("extracted-b.txt");
+        fs_archive_extract_one(
+            tgz.to_string_lossy().into_owned(),
+            "b.txt".into(),
+            dest.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"BBB");
+
+        // Missing entry name → error.
+        let err = fs_archive_extract_one(
+            tgz.to_string_lossy().into_owned(),
+            "no-such.txt".into(),
+            dir.join("nope.txt").to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+        assert!(err.contains("entry not found"), "got: {err}");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---------- backend_kind / resolve_backend ----------
+
+    /// `backend_kind` is a debug-only label used in `[sync_start_cross]`
+    /// traces. The three variants must each get a distinct string so
+    /// support logs are unambiguous.
+    #[test]
+    fn backend_kind_labels_local_variant() {
+        assert_eq!(backend_kind(&Backend::Local), "local");
+    }
+
+    /// `resolve_backend` for a plain local path returns `(Local, path)`
+    /// unchanged. The Skiffsync engine relies on the path being unmodified
+    /// so symlinks etc. aren't surprise-resolved.
+    #[test]
+    fn resolve_backend_returns_local_for_plain_path() {
+        let reg = Registry::new();
+        let (backend, path) = resolve_backend("/tmp/foo", &reg).unwrap();
+        assert!(matches!(backend, Backend::Local));
+        assert_eq!(path, "/tmp/foo");
+    }
+
+    /// `resolve_backend` rejects `ftp://` URLs with a clear message so the
+    /// frontend can surface the "FTP transfers not supported yet" hint.
+    /// Silent fall-through would treat the URL as a local path and produce
+    /// a confusing no-such-file error.
+    #[test]
+    fn resolve_backend_rejects_ftp_with_actionable_message() {
+        let reg = Registry::new();
+        // Backend lacks Debug, so we can't unwrap_err(); pattern-match.
+        let err = match resolve_backend("ftp://host/path", &reg) {
+            Ok(_) => panic!("expected error"),
+            Err(e) => e,
+        };
+        assert!(
+            err.contains("FTP") && err.contains("aren't supported yet"),
+            "got: {err}"
+        );
+    }
+
+    /// `resolve_backend` against a non-existent SFTP connection id surfaces
+    /// the registry's not-found error (rather than panicking or silently
+    /// treating the URL as a path).
+    #[test]
+    fn resolve_backend_unknown_sftp_id_surfaces_registry_error() {
+        let reg = Registry::new();
+        let err = match resolve_backend("sftp://nonexistent-id/foo", &reg) {
+            Ok(_) => panic!("expected error"),
+            Err(e) => e,
+        };
+        assert!(!err.is_empty(), "expected non-empty error, got: {err}");
+    }
+
+    /// Same shape for SMB — unknown connection id, error not panic.
+    #[test]
+    fn resolve_backend_unknown_smb_id_surfaces_registry_error() {
+        let reg = Registry::new();
+        let err = match resolve_backend("smb://nonexistent-id/share/path", &reg) {
+            Ok(_) => panic!("expected error"),
+            Err(e) => e,
+        };
+        assert!(!err.is_empty(), "expected non-empty error, got: {err}");
+    }
 }

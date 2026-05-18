@@ -241,3 +241,240 @@ pub struct JobInfo {
     pub dest: String,
     pub state: JobState,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `is_apply_to_all` is the gate the command layer uses to cache a
+    /// non-All version of the decision in `sticky`. Every All-variant
+    /// must return true; every per-file variant (including CancelJob)
+    /// must return false. If a new variant lands and forgets to wire
+    /// itself in, this test fails loudly.
+    #[test]
+    fn is_apply_to_all_covers_every_variant() {
+        use ConflictPromptDecision::*;
+        assert!(OverwriteAll.is_apply_to_all());
+        assert!(SkipAll.is_apply_to_all());
+        assert!(KeepBothAll.is_apply_to_all());
+        assert!(!Overwrite.is_apply_to_all());
+        assert!(!Skip.is_apply_to_all());
+        assert!(!KeepBoth.is_apply_to_all());
+        assert!(!CancelJob.is_apply_to_all());
+    }
+
+    /// `normalized` is what the sticky cache stores so subsequent
+    /// conflicts get a per-file decision back. All-variants map to
+    /// their per-file equivalent; everything else passes through.
+    #[test]
+    fn normalized_maps_all_variants_to_per_file_equivalents() {
+        use ConflictPromptDecision::*;
+        assert_eq!(OverwriteAll.normalized(), Overwrite);
+        assert_eq!(SkipAll.normalized(), Skip);
+        assert_eq!(KeepBothAll.normalized(), KeepBoth);
+        // Pass-through cases (no-op).
+        assert_eq!(Overwrite.normalized(), Overwrite);
+        assert_eq!(Skip.normalized(), Skip);
+        assert_eq!(KeepBoth.normalized(), KeepBoth);
+        assert_eq!(CancelJob.normalized(), CancelJob);
+    }
+
+    /// `ConflictPolicy::default()` is the safest choice — leaves the
+    /// destination alone. The engine relies on this when no policy is
+    /// specified in JobOptions (see `#[serde(default)]` on
+    /// `conflict_policy`).
+    #[test]
+    fn conflict_policy_default_is_skip() {
+        assert_eq!(ConflictPolicy::default(), ConflictPolicy::Skip);
+    }
+
+    /// JobOptions has serde defaults for every field except none —
+    /// passing an empty `{}` should give a fully populated struct
+    /// with the documented defaults (1 GB cap, 7-day lookback,
+    /// Skip policy, dry-run off, unlimited bandwidth, no verify).
+    #[test]
+    fn job_options_serde_defaults_match_documented_values() {
+        let opts: JobOptions = serde_json::from_str("{}").unwrap();
+        assert_eq!(opts.max_size_gb, 1);
+        assert_eq!(opts.lookback_days, 7);
+        assert_eq!(opts.conflict_policy, ConflictPolicy::Skip);
+        assert!(!opts.dry_run);
+        assert_eq!(opts.bandwidth_kbps, 0);
+        assert!(!opts.verify_after_copy);
+    }
+
+    /// Frontend-supplied JobOptions roundtrips when every field is
+    /// specified, including the camelCase rename for `maxSizeGb` etc.
+    #[test]
+    fn job_options_deserializes_full_camelcase_payload() {
+        let json = r#"{
+            "maxSizeGb": 50,
+            "lookbackDays": 30,
+            "conflictPolicy": "overwrite",
+            "dryRun": true,
+            "bandwidthKbps": 1024,
+            "verifyAfterCopy": true
+        }"#;
+        let opts: JobOptions = serde_json::from_str(json).unwrap();
+        assert_eq!(opts.max_size_gb, 50);
+        assert_eq!(opts.lookback_days, 30);
+        assert_eq!(opts.conflict_policy, ConflictPolicy::Overwrite);
+        assert!(opts.dry_run);
+        assert_eq!(opts.bandwidth_kbps, 1024);
+        assert!(opts.verify_after_copy);
+    }
+
+    /// Every ConflictPolicy variant must roundtrip as camelCase JSON.
+    /// `replaceIfSizeDifferent` in particular has bitten us before
+    /// (renamed in the middle of Phase 4) — pin every variant so
+    /// future renames trip CI.
+    #[test]
+    fn conflict_policy_roundtrips_every_variant() {
+        for variant in [
+            ConflictPolicy::Skip,
+            ConflictPolicy::Overwrite,
+            ConflictPolicy::KeepBoth,
+            ConflictPolicy::OverwriteOlder,
+            ConflictPolicy::ReplaceSmaller,
+            ConflictPolicy::ReplaceIfSizeDifferent,
+            ConflictPolicy::RenameTarget,
+            ConflictPolicy::RenameOlderTarget,
+            ConflictPolicy::Prompt,
+        ] {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: ConflictPolicy = serde_json::from_str(&s).unwrap();
+            assert_eq!(variant, back, "roundtrip changed {variant:?} via {s}");
+        }
+    }
+
+    /// Same pin for ConflictPromptDecision — the All variants are
+    /// load-bearing for the sticky-cache logic and a silent rename
+    /// would deadlock the conflict loop.
+    #[test]
+    fn conflict_prompt_decision_roundtrips_every_variant() {
+        for variant in [
+            ConflictPromptDecision::Overwrite,
+            ConflictPromptDecision::Skip,
+            ConflictPromptDecision::KeepBoth,
+            ConflictPromptDecision::OverwriteAll,
+            ConflictPromptDecision::SkipAll,
+            ConflictPromptDecision::KeepBothAll,
+            ConflictPromptDecision::CancelJob,
+        ] {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: ConflictPromptDecision = serde_json::from_str(&s).unwrap();
+            assert_eq!(variant, back, "roundtrip changed {variant:?} via {s}");
+        }
+    }
+
+    /// JobState variants are Serialize-only (no Deserialize derive) so
+    /// we just check the wire shape. The frontend keys off these
+    /// strings to pick the right queue-row icon — renaming any of them
+    /// silently is a UI regression we'd never notice from compiler
+    /// errors alone.
+    #[test]
+    fn job_state_serializes_as_documented_camelcase() {
+        assert_eq!(serde_json::to_string(&JobState::Planning).unwrap(), "\"planning\"");
+        assert_eq!(serde_json::to_string(&JobState::Running).unwrap(), "\"running\"");
+        assert_eq!(serde_json::to_string(&JobState::Paused).unwrap(), "\"paused\"");
+        assert_eq!(serde_json::to_string(&JobState::Cancelled).unwrap(), "\"cancelled\"");
+        assert_eq!(serde_json::to_string(&JobState::Done).unwrap(), "\"done\"");
+        assert_eq!(serde_json::to_string(&JobState::Failed).unwrap(), "\"failed\"");
+    }
+
+    /// FileOutcome uses `#[serde(tag = "kind")]` for the discriminator.
+    /// The frontend's queue widget switches on `kind` so we pin the
+    /// four wire-string variants here.
+    #[test]
+    fn file_outcome_serializes_with_kind_discriminator() {
+        let copied = FileOutcome::Copied {
+            src: "/a".into(),
+            dest: "/b".into(),
+            bytes: 42,
+        };
+        let s = serde_json::to_string(&copied).unwrap();
+        assert!(s.contains("\"kind\":\"copied\""), "got: {s}");
+        assert!(s.contains("\"bytes\":42"), "got: {s}");
+
+        let skipped = FileOutcome::Skipped {
+            src: "/a".into(),
+            dest: "/b".into(),
+            reason: "same-size".into(),
+        };
+        let s = serde_json::to_string(&skipped).unwrap();
+        assert!(s.contains("\"kind\":\"skipped\""), "got: {s}");
+
+        let conflict = FileOutcome::Conflict {
+            src: "/a".into(),
+            dest: "/b".into(),
+            reason: "policy=skip".into(),
+        };
+        let s = serde_json::to_string(&conflict).unwrap();
+        assert!(s.contains("\"kind\":\"conflict\""), "got: {s}");
+
+        let error = FileOutcome::Error {
+            src: "/a".into(),
+            dest: "/b".into(),
+            error: "boom".into(),
+        };
+        let s = serde_json::to_string(&error).unwrap();
+        assert!(s.contains("\"kind\":\"error\""), "got: {s}");
+    }
+
+    /// Progress / Summary / ConflictPrompt / JobInfo are pure data
+    /// shapes. We just exercise the camelCase serialization so a
+    /// silent field rename trips here before the frontend silently
+    /// breaks.
+    #[test]
+    fn aggregate_payloads_use_camelcase_field_names() {
+        let p = Progress {
+            job_id: "j".into(),
+            files_total: 10,
+            files_done: 3,
+            bytes_total: 1024,
+            bytes_done: 256,
+            last: None,
+        };
+        let s = serde_json::to_string(&p).unwrap();
+        assert!(s.contains("\"jobId\":\"j\""), "got: {s}");
+        assert!(s.contains("\"filesTotal\":10"), "got: {s}");
+        assert!(s.contains("\"bytesDone\":256"), "got: {s}");
+
+        let sum = Summary {
+            job_id: "j".into(),
+            copied: 5,
+            skipped: 1,
+            conflicts: 0,
+            errors: 0,
+            bytes_copied: 999,
+            cancelled: false,
+        };
+        let s = serde_json::to_string(&sum).unwrap();
+        assert!(s.contains("\"bytesCopied\":999"), "got: {s}");
+        assert!(s.contains("\"cancelled\":false"), "got: {s}");
+
+        let cp = ConflictPrompt {
+            job_id: "j".into(),
+            conflict_id: "c".into(),
+            src: "/x".into(),
+            dest: "/y".into(),
+            src_size: 100,
+            dest_size: 200,
+            src_mtime: Some(1),
+            dest_mtime: Some(2),
+        };
+        let s = serde_json::to_string(&cp).unwrap();
+        assert!(s.contains("\"conflictId\":\"c\""), "got: {s}");
+        assert!(s.contains("\"srcSize\":100"), "got: {s}");
+        assert!(s.contains("\"destMtime\":2"), "got: {s}");
+
+        let info = JobInfo {
+            id: "j".into(),
+            src: "/x".into(),
+            dest: "/y".into(),
+            state: JobState::Running,
+        };
+        let s = serde_json::to_string(&info).unwrap();
+        assert!(s.contains("\"state\":\"running\""), "got: {s}");
+    }
+}

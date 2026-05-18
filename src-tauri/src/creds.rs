@@ -134,4 +134,49 @@ mod tests {
         // existing user's saved credentials orphan.
         assert_eq!(SERVICE, "com.synle.skiff-files");
     }
+
+    /// Pin the `SecretKind::prefix` mapping directly. `account_for`
+    /// indirectly exercises it but a future refactor that introduces
+    /// a new variant + forgets to update `prefix()` would collide on
+    /// the empty-prefix default and silently merge two secret kinds.
+    #[test]
+    fn prefix_is_unique_per_secret_kind() {
+        assert_eq!(SecretKind::Auth.prefix(), "auth");
+        assert_eq!(SecretKind::KeyPassphrase.prefix(), "key");
+        assert_ne!(
+            SecretKind::Auth.prefix(),
+            SecretKind::KeyPassphrase.prefix(),
+            "secret-kind prefixes must be unique so accounts don't collide"
+        );
+    }
+
+    /// `entry()` is the keychain-`Entry::new` wrapper that every public
+    /// store/load/delete goes through. Constructing one for a valid
+    /// (service, account) pair must succeed on every supported platform
+    /// — the keyring backend rejects on `Entry::new` only for malformed
+    /// service strings (which our constant isn't). The returned Entry
+    /// is dropped without ever calling get/set, so this stays a
+    /// pure-logic test and never touches the user's real keychain.
+    #[test]
+    fn entry_constructs_for_valid_inputs() {
+        // Use an obviously-fake connection id so even if a buggy
+        // future change wrote during construction (it doesn't), the
+        // resulting account name wouldn't conflict with real saved
+        // credentials.
+        let res = entry(SecretKind::Auth, "skiff-coverage-test-id");
+        assert!(res.is_ok(), "entry() failed for valid inputs: {res:?}");
+        let res = entry(SecretKind::KeyPassphrase, "skiff-coverage-test-id");
+        assert!(res.is_ok(), "entry() failed for valid inputs: {res:?}");
+    }
+
+    /// `SecretKind` is Deserialize via serde; the frontend posts
+    /// `"auth"` / `"keyPassphrase"`. Pin the wire shape so a rename
+    /// trips here before it silently breaks the dialog.
+    #[test]
+    fn secret_kind_deserializes_from_camelcase() {
+        let kind: SecretKind = serde_json::from_str("\"auth\"").unwrap();
+        assert_eq!(kind.prefix(), "auth");
+        let kind: SecretKind = serde_json::from_str("\"keyPassphrase\"").unwrap();
+        assert_eq!(kind.prefix(), "key");
+    }
 }
