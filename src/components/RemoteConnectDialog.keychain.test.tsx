@@ -143,8 +143,16 @@ describe("RemoteConnectDialog — Remember password store routing", () => {
     });
     expect(credsStore.mock.calls[0][1]).toBe("auth");
     expect(credsStore.mock.calls[0][2]).toBe("hunter2");
+    // 0.2.307 — wrapped in waitFor to match the other three tests
+    // in this file. CI runners sometimes commit the React state
+    // update from `update("connections", ...)` AFTER the credsStore
+    // promise resolves; reading parseConnections synchronously
+    // raced the re-render and produced an empty list. The store
+    // call ordering is unchanged — only the test polls longer.
+    await waitFor(() => {
+      expect(parseConnections()).toHaveLength(1);
+    });
     const rows = parseConnections();
-    expect(rows).toHaveLength(1);
     expect(rows[0].password).toBeUndefined();
     expect(rows[0].rememberPassword).toBe(true);
   });
