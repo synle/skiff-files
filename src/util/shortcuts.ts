@@ -174,6 +174,24 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         defaultCombo: "cmd+0",
       },
       {
+        keys: "Cmd / Ctrl + Shift + =",
+        description: "View zoom in (larger cells / rows in the file list)",
+        actionId: "app.viewZoomIn",
+        defaultCombo: "cmd+shift+=",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + -",
+        description: "View zoom out (smaller cells / rows in the file list)",
+        actionId: "app.viewZoomOut",
+        defaultCombo: "cmd+shift+-",
+      },
+      {
+        keys: "Cmd / Ctrl + Shift + 0",
+        description: "Reset view zoom to 100 %",
+        actionId: "app.viewZoomReset",
+        defaultCombo: "cmd+shift+0",
+      },
+      {
         keys: "Cmd / Ctrl + Shift + .",
         description: "Toggle hidden files (dotfiles)",
         actionId: "app.toggleHidden",

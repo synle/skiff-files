@@ -53,4 +53,21 @@ describe("SHORTCUT_GROUPS", () => {
     }
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  // viewZoom shortcuts (0.2.300) drive the `- 100% +` widget at the
+  // bottom-right of FileList. Pin the action IDs + default combos so
+  // the App.tsx keydown handler stays in lockstep with the catalog.
+  it("includes the three view-zoom rebindable shortcuts", () => {
+    const view = SHORTCUT_GROUPS.find((g) => g.title === "View")!;
+    const ids = view.items.map((i) => i.actionId);
+    expect(ids).toContain("app.viewZoomIn");
+    expect(ids).toContain("app.viewZoomOut");
+    expect(ids).toContain("app.viewZoomReset");
+    const byId = new Map(
+      view.items.filter((i) => i.actionId).map((i) => [i.actionId!, i]),
+    );
+    expect(byId.get("app.viewZoomIn")?.defaultCombo).toBe("cmd+shift+=");
+    expect(byId.get("app.viewZoomOut")?.defaultCombo).toBe("cmd+shift+-");
+    expect(byId.get("app.viewZoomReset")?.defaultCombo).toBe("cmd+shift+0");
+  });
 });

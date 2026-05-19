@@ -198,6 +198,49 @@ export default function App() {
       } else if (
         matchesCombo(
           e,
+          activeCombo(
+            "app.viewZoomIn",
+            "cmd+shift+=",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
+        // Cmd/Ctrl+Shift+= drives the same 0.25-step / [0.5, 2.0]
+        // clamp the `- 100% +` widget at the bottom-right uses (see
+        // Browser.tsx's onZoomStep). Picked Shift+= rather than bare
+        // `=` so it doesn't collide with the existing font-size
+        // shortcut on Cmd+=.
+        e.preventDefault();
+        const next = Math.min(2, (settings.viewZoom ?? 1) + 0.25);
+        update("viewZoom", Math.round(next * 100) / 100);
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "app.viewZoomOut",
+            "cmd+shift+-",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
+        e.preventDefault();
+        const next = Math.max(0.5, (settings.viewZoom ?? 1) - 0.25);
+        update("viewZoom", Math.round(next * 100) / 100);
+      } else if (
+        matchesCombo(
+          e,
+          activeCombo(
+            "app.viewZoomReset",
+            "cmd+shift+0",
+            settings.shortcutOverrides,
+          ),
+        )
+      ) {
+        e.preventDefault();
+        update("viewZoom", 1);
+      } else if (
+        matchesCombo(
+          e,
           activeCombo("app.toggleHidden", "cmd+shift+.", settings.shortcutOverrides),
         )
       ) {
@@ -214,6 +257,7 @@ export default function App() {
     settings.sidebarVisible,
     settings.twoPaneMode,
     settings.fontSize,
+    settings.viewZoom,
     settings.showHidden,
     settings.shortcutOverrides,
     update,
