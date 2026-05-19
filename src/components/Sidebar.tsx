@@ -47,11 +47,11 @@ import { connList, type ConnectionInfo } from "../api/conn";
 import {
   fsMounts,
   fsOpenWithDefault,
-  fsRevealInOs,
   fsTrashMany,
   fsTrashPath,
   type MountedVolume,
 } from "../api/fs";
+import { osReveal } from "../util/osHandoff";
 import LaunchIcon from "@mui/icons-material/Launch";
 import SortByAlphaIcon from "@mui/icons-material/SortByAlpha";
 import ViewWeekIcon from "@mui/icons-material/ViewWeek";
@@ -931,19 +931,20 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                         section: "bookmarks",
                         itemId: b.id,
                         actions: [
-                          ...(b.path.startsWith("sftp://")
-                            ? []
-                            : [
-                                {
-                                  key: "reveal",
-                                  icon: <LaunchIcon fontSize="small" />,
-                                  label: "Show in Finder/Explorer",
-                                  dividerAfter: true,
-                                  onClick: () => {
-                                    void fsRevealInOs(b.path).catch(() => {});
-                                  },
-                                },
-                              ]),
+                          {
+                            key: "reveal",
+                            icon: <LaunchIcon fontSize="small" />,
+                            label: "Show in Finder/Explorer",
+                            dividerAfter: true,
+                            // `osReveal` translates internal SMB URLs to the
+                            // OS-native form and refuses SFTP / FTP (no
+                            // native handler) — the menu item stays visible
+                            // either way; refusal surfaces a silent no-op
+                            // here since the bookmark menu has no toast.
+                            onClick: () => {
+                              void osReveal(b.path, settings.connections);
+                            },
+                          },
                           {
                             key: "rename",
                             icon: <EditIcon fontSize="small" />,
@@ -1720,19 +1721,20 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                               section: "recent",
                               itemId: p,
                               actions: [
-                                ...(p.startsWith("sftp://")
-                                  ? []
-                                  : [
-                                      {
-                                        key: "reveal",
-                                        icon: <LaunchIcon fontSize="small" />,
-                                        label: "Show in Finder/Explorer",
-                                        dividerAfter: true,
-                                        onClick: () => {
-                                          void fsRevealInOs(p).catch(() => {});
-                                        },
-                                      },
-                                    ]),
+                                {
+                                  key: "reveal",
+                                  icon: <LaunchIcon fontSize="small" />,
+                                  label: "Show in Finder/Explorer",
+                                  dividerAfter: true,
+                                  // See bookmarks menu above — `osReveal`
+                                  // translates SMB UUID URLs to native form
+                                  // before the IPC call so macOS Finder
+                                  // doesn't try to resolve the UUID as a
+                                  // hostname.
+                                  onClick: () => {
+                                    void osReveal(p, settings.connections);
+                                  },
+                                },
                                 {
                                   key: "bookmark",
                                   icon: <BookmarkIcon fontSize="small" />,

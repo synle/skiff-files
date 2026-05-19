@@ -39,8 +39,6 @@ import {
   fsExtractZip,
   fsHomeDir,
   fsOpenInTerminal,
-  fsOpenWithDefault,
-  fsRevealInOs,
   fsStat,
   fsWatchClear,
   fsWatchSet,
@@ -69,6 +67,7 @@ import ArchiveViewerDialog from "../components/ArchiveViewerDialog";
 import NewEntryDialog from "../components/NewEntryDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { parentPath } from "../util/format";
+import { osOpen, osReveal } from "../util/osHandoff";
 import { useSettings } from "../state/settings";
 import { isImage } from "../util/mime";
 import { uniqueDuplicateName } from "../util/duplicateName";
@@ -899,9 +898,15 @@ export default function Browser({
         e.preventDefault();
         if (primarySelected.isDir) {
           navigate(primarySelected.path);
-        } else if (!primarySelected.path.startsWith("sftp://")) {
-          void fsOpenWithDefault(primarySelected.path).catch((err) =>
-            setError(String(err)),
+        } else {
+          // Internal remote URLs (`<scheme>://<uuid>/...`) are not
+          // OS-resolvable — the UUID is a routing key, not a host.
+          // `osOpen` translates SMB to `smb://[user@]host[:port]/share/...`
+          // and refuses SFTP / FTP (no native handler).
+          void osOpen(
+            primarySelected.path,
+            settings.connections,
+            (msg) => setError(msg),
           );
         }
       }
@@ -1781,11 +1786,11 @@ export default function Browser({
             }
           }}
           onOpenFile={(e) => {
-            // Hand off to the OS default app. Skipped for remote
-            // entries since the local OS can't open them without
-            // download.
-            if (e.path.startsWith("sftp://")) return;
-            void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
+            // Hand off to the OS default app. `osOpen` translates the
+            // internal `<scheme>://<uuid>/...` URL to the OS-native form
+            // (smb:// only — SFTP / FTP route to the error toast since
+            // no OS has a usable native handler for them).
+            void osOpen(e.path, settings.connections, (msg) => setError(msg));
           }}
           onOpenDirInNewTab={(e) => {
             window.dispatchEvent(
@@ -2026,10 +2031,10 @@ export default function Browser({
           }
         }}
         onOpenWithDefault={(e) => {
-          void fsOpenWithDefault(e.path).catch((err) => setError(String(err)));
+          void osOpen(e.path, settings.connections, (msg) => setError(msg));
         }}
         onRevealInOs={(e) => {
-          void fsRevealInOs(e.path).catch((err) => setError(String(err)));
+          void osReveal(e.path, settings.connections, (msg) => setError(msg));
         }}
         onOpenInTerminal={(e) => {
           void fsOpenInTerminal(e.path).catch((err) => setError(String(err)));

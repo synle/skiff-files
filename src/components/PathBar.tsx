@@ -20,6 +20,7 @@ import { fsCanonicalize, fsRevealInOs } from "../api/fs";
 import { parseRemoteUrl } from "../util/remoteResolve";
 import { listDir } from "../api/client";
 import { pathSegments } from "../util/format";
+import { humanizeRemoteUrl } from "../util/humanizeRemoteUrl";
 import { isRemote, parseLocation } from "../util/location";
 import { completePath, splitForCompletion } from "../util/autocomplete";
 import { OPEN_IN_TAB_EVENT } from "../App";
@@ -39,6 +40,11 @@ interface Props {
 /** Two modes: breadcrumb (default) and editable text. Toggle via the pencil. */
 export default function PathBar({ path, onNavigate, onHome, focusRequest }: Props) {
   const [editing, setEditing] = useState(false);
+  // `draft` always holds the *humanized* form (`smb://admin@host:445/G`)
+  // when the current path is remote — never the raw `smb://<uuid>/`
+  // routing key. UUIDs are an internal-only routing key and would
+  // confuse the user if they ever ended up in the address bar (and
+  // copy-pasting one elsewhere would send the UUID instead of the host).
   const [draft, setDraft] = useState(path);
   /** Per-segment right-click menu state. `null` = closed. */
   const [segMenu, setSegMenu] = useState<{
@@ -46,35 +52,6 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
     y: number;
     segPath: string;
   } | null>(null);
-
-  // External "please focus me" pulses (Cmd/Ctrl+L from Browser). The
-  // counter pattern means repeated presses re-fire even when we're
-  // already in edit mode; the autoFocus on the TextField handles the
-  // first transition and the explicit focus() the subsequent ones.
-  useEffect(() => {
-    if (focusRequest === undefined || focusRequest === 0) return;
-    setEditing(true);
-    setDraft(path);
-    // Wait a tick so the TextField mounts before we focus / select.
-    queueMicrotask(() => {
-      const el = document.querySelector<HTMLInputElement>(
-        'input[aria-label="Path"]',
-      );
-      el?.focus();
-      el?.select();
-    });
-    // Intentionally don't depend on `path` — only fire when the
-    // counter changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusRequest]);
-  /** Cache of the last parent listing, keyed by parent path. Avoids
-   *  re-issuing list_dir on every Tab press. Cleared when the parent
-   *  changes (the next Tab refetches). */
-  const cacheRef = useRef<{ parent: string; entries: { name: string; isDir: boolean }[] } | null>(null);
-
-  // Keep the draft in sync with the current path so typing in edit mode
-  // starts from the latest value, not the value when the component mounted.
-  useEffect(() => setDraft(path), [path]);
 
   // Connection-id → registry label map. Lets us swap the raw UUID at
   // the start of an `smb://<uuid>/…` / `sftp://<uuid>/…` breadcrumb
@@ -96,6 +73,58 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
     return () =>
       window.removeEventListener("skiff:connections-changed", refresh);
   }, []);
+
+  // `id → label` view of the connMap that `humanizeRemoteUrl` consumes
+  // directly. Recomputed when `connMap` changes; cheap enough to skip
+  // a useMemo cache.
+  const labelMap = new Map(
+    Array.from(connMap.entries(), ([id, info]) => [id, info.label]),
+  );
+  /** Always return the user-facing form of a path. Remote paths get
+   *  their UUID prefix swapped for the friendly host label so the
+   *  address bar reads `smb://admin@host:445/G/sub` instead of
+   *  `smb://<uuid>/sub` — UUIDs are an internal routing key the user
+   *  should never see (clicking the pencil used to leak them into the
+   *  draft, which then surfaced macOS Finder's "df204a67-… server not
+   *  found" toast when the URL was forwarded to the OS). */
+  const humanize = (p: string) => humanizeRemoteUrl(p, labelMap);
+
+  // External "please focus me" pulses (Cmd/Ctrl+L from Browser). The
+  // counter pattern means repeated presses re-fire even when we're
+  // already in edit mode; the autoFocus on the TextField handles the
+  // first transition and the explicit focus() the subsequent ones.
+  useEffect(() => {
+    if (focusRequest === undefined || focusRequest === 0) return;
+    setEditing(true);
+    setDraft(humanize(path));
+    // Wait a tick so the TextField mounts before we focus / select.
+    queueMicrotask(() => {
+      const el = document.querySelector<HTMLInputElement>(
+        'input[aria-label="Path"]',
+      );
+      el?.focus();
+      el?.select();
+    });
+    // Intentionally don't depend on `path` — only fire when the
+    // counter changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest]);
+  /** Cache of the last parent listing, keyed by parent path. Avoids
+   *  re-issuing list_dir on every Tab press. Cleared when the parent
+   *  changes (the next Tab refetches). */
+  const cacheRef = useRef<{ parent: string; entries: { name: string; isDir: boolean }[] } | null>(null);
+
+  // Keep the draft in sync with the current path so the next edit-mode
+  // opening starts from the latest value. We deliberately skip the sync
+  // while the user is editing — otherwise the connMap-resolved
+  // re-humanize would clobber a half-typed value (the autocomplete
+  // tests regressed exactly here when connList resolved mid-Tab).
+  useEffect(() => {
+    if (editing) return;
+    setDraft(humanize(path));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, connMap, editing]);
+
 
   const segments = pathSegments(path);
   // Remote-aware breadcrumb shape: when the path is `smb://<uuid>/…`
@@ -128,7 +157,30 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
     // Remote paths are already absolute — there's no `~` expansion in
     // `sftp://` and we don't have a remote canonicalize endpoint yet.
     if (isRemote(target)) {
-      // FTP/SFTP host-form URLs (e.g. `ftp://192.168.1.1/pub`,
+      // Friendly-form roundtrip: the address bar now SHOWS
+      // `smb://admin@host:445/G/sub` (humanized) when the underlying
+      // path is `smb://<uuid>/sub`. If the user commits that same
+      // friendly form against a connection that's already live, we
+      // can skip the connect dialog and go straight to the canonical
+      // `<scheme>://<id>/...` URL. Sort by label-length DESCENDING so
+      // bound-share labels (`...:445/G`) win over the bare-host
+      // label (`...:445`) for the same connection — otherwise the
+      // shorter prefix would match `/G/sub` as the remote path tail
+      // and we'd lose the share binding.
+      const sorted = [...connMap.entries()].sort(
+        (a, b) => b[1].label.length - a[1].label.length,
+      );
+      for (const [id, info] of sorted) {
+        const friendlyPrefix = `${info.kind}://${info.label}`;
+        if (target === friendlyPrefix || target.startsWith(friendlyPrefix + "/")) {
+          const tail = target.slice(friendlyPrefix.length) || "/";
+          onNavigate(`${info.kind}://${id}${tail}`);
+          setEditing(false);
+          return;
+        }
+      }
+      // No active connection matches — fall back to the host-form
+      // resolver. FTP/SFTP host-form URLs (e.g. `ftp://192.168.1.1/pub`,
       // `sftp://example.com:2222/`) need to be resolved against the
       // saved-drafts list — and possibly prompt the user for
       // credentials — before we can navigate to a canonical
