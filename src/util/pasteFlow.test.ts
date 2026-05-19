@@ -237,6 +237,37 @@ describe("runPaste", () => {
     expect(startSync).toHaveBeenCalledWith("/src/good", "/dest");
   });
 
+  // Fallback path: `onDone` subscription itself fails (e.g. Tauri
+  // event API unavailable in a test/browser-dev context). The
+  // orchestrator must NOT block forever on the per-job await — it
+  // detects the absent listener and resolves the waiter immediately
+  // so the loop drains. Pins the catch + `unlisten = null` fallback
+  // at pasteFlow.ts:100-105 / waitForJob's no-listener early-return.
+  it("falls back to non-blocking dispatch when onDone subscription throws", async () => {
+    const onDone = vi.fn(async () => {
+      throw new Error("event API unavailable");
+    });
+    const { deps, startSync, refresh, removeOrTrashMany, onError, startedJobIds } = makeDeps({
+      onDone,
+    });
+    const { jobIds } = await runPaste(
+      { paths: ["/src/a", "/src/b"], operation: "copy" },
+      "/dest",
+      deps,
+    );
+    // Both syncs still fired despite the broken listener — fallback
+    // path resolves the waiter immediately rather than hanging.
+    expect(startSync).toHaveBeenCalledTimes(2);
+    expect(startedJobIds).toHaveLength(2);
+    expect(jobIds.size).toBe(2);
+    // Final belt-and-braces refresh of the copy path still lands.
+    expect(refresh).toHaveBeenCalledWith("/dest");
+    expect(removeOrTrashMany).not.toHaveBeenCalled();
+    // The broken-listener failure is swallowed (it's already a
+    // tolerated degraded mode); per-source errors aren't synthesised.
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("per-job watchdog unblocks the loop when sync:done never fires", async () => {
     // Defensive — if the engine crashes mid-job and never emits
     // sync:done, the orchestrator must NOT block the rest of the
