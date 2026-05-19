@@ -58,6 +58,7 @@ import {
   connToFtpDraft,
   connToSftpDraft,
   connToSmbDraft,
+  findExistingConnection,
   matchConnectionsForHost,
   type SavedConnection,
 } from "../state/connectionStore";
@@ -165,6 +166,10 @@ export default function RemoteConnectDialog({
    *  silently next time. Phase 2 will swap the storage for the OS
    *  keychain — see CHANGELOG. */
   const [rememberPassword, setRememberPassword] = useState(false);
+  /** Reconnect this row on every app start. Disabled in the UI when
+   *  `rememberPassword` is off — without a stored password we can't
+   *  dial silently. Pre-filled from the saved row in edit-mode. */
+  const [autoConnect, setAutoConnect] = useState(false);
   /** Whether the OS keychain backend is actually reachable on this
    *  install. `credsCapable()` probes once per dialog open; on Linux
    *  it returns false when secret-service isn't running, on macOS /
@@ -220,6 +225,7 @@ export default function RemoteConnectDialog({
     setSmbShareOptions([]);
     setSmbShareLoading(false);
     setRememberPassword(false);
+    setAutoConnect(false);
     setSelectedDraftId(null);
     setError(null);
     setBusy(false);
@@ -245,6 +251,7 @@ export default function RemoteConnectDialog({
         setPort(saved.port);
         setUser(saved.user);
         setRememberPassword(!!saved.rememberPassword);
+        setAutoConnect(!!saved.autoConnect);
         // Keychain wins when present — pre-0.2.306 plaintext entries
         // still load via `saved.password` so existing data keeps
         // working. Either path triggers the password field's
@@ -378,6 +385,7 @@ export default function RemoteConnectDialog({
     } else {
       setRememberPassword(false);
     }
+    setAutoConnect(!!saved?.autoConnect);
     if (entry.kind === "sftp") {
       setAuthMode(entry.draft.authMode);
       setPrivateKeyPath(entry.draft.privateKeyPath ?? "");
@@ -399,35 +407,71 @@ export default function RemoteConnectDialog({
     setBusy(true);
     setError(null);
     try {
+      // Resolve the saved-row id BEFORE handing off to the backend.
+      // The registry now adopts caller-supplied ids so saved.id ===
+      // live.id, which means we have to lock the id in here.
+      //
+      // Resolution order:
+      //   1. Edit-mode → existing draft id (unchanged).
+      //   2. Existing saved row with the same identity tuple
+      //      (kind/host/port/user/share/domain) → reuse its id.
+      //      That collapses "Connect twice to the same NAS" into a
+      //      single sidebar entry + a single saved row instead of
+      //      two near-identical copies racing each other.
+      //   3. Otherwise → mint a fresh id (`${scheme}-${Date.now()}`)
+      //      and let the backend adopt it.
+      const isEditing = selectedDraftId != null;
+      const dedupMatch = isEditing
+        ? undefined
+        : findExistingConnection(settings.connections, {
+            kind: scheme,
+            host,
+            port,
+            user: user || (scheme === "ftp" ? "anonymous" : ""),
+            share: scheme === "smb" ? smbShare : undefined,
+            domain: scheme === "smb" ? smbDomain : undefined,
+          });
+      const connId = isEditing
+        ? selectedDraftId
+        : (dedupMatch?.id ?? `${scheme}-${Date.now()}`);
       let uuid: string;
       if (scheme === "sftp") {
-        uuid = await connCreateSftp({
-          host,
-          port,
-          user,
-          password: authMode === "password" ? password : undefined,
-          privateKeyPath:
-            authMode === "privateKey" ? privateKeyPath : undefined,
-          privateKeyPassphrase:
-            authMode === "privateKey" ? privateKeyPassphrase : undefined,
-          useAgent: authMode === "agent",
-        });
+        uuid = await connCreateSftp(
+          {
+            host,
+            port,
+            user,
+            password: authMode === "password" ? password : undefined,
+            privateKeyPath:
+              authMode === "privateKey" ? privateKeyPath : undefined,
+            privateKeyPassphrase:
+              authMode === "privateKey" ? privateKeyPassphrase : undefined,
+            useAgent: authMode === "agent",
+          },
+          connId,
+        );
       } else if (scheme === "smb") {
-        uuid = await connCreateSmb({
-          host,
-          port,
-          share: smbShare,
-          user,
-          password,
-          domain: smbDomain || undefined,
-        });
+        uuid = await connCreateSmb(
+          {
+            host,
+            port,
+            share: smbShare,
+            user,
+            password,
+            domain: smbDomain || undefined,
+          },
+          connId,
+        );
       } else {
-        uuid = await connCreateFtp({
-          host,
-          port,
-          user: user || undefined,
-          password: password || undefined,
-        });
+        uuid = await connCreateFtp(
+          {
+            host,
+            port,
+            user: user || undefined,
+            password: password || undefined,
+          },
+          connId,
+        );
       }
       // Saving is implicit now — every successful connect persists
       // an entry in `Settings.connections`. Add-mode inserts a new
@@ -439,7 +483,6 @@ export default function RemoteConnectDialog({
       //   - rememberPassword off             → no persistence.
       // We always delete from the OPPOSITE store on save so flipping
       // the setting never leaves an orphaned secret behind.
-      const isEditing = selectedDraftId != null;
       const label = computeLabel({
         scheme,
         host,
@@ -448,7 +491,6 @@ export default function RemoteConnectDialog({
         smbShare,
         smbDomain,
       });
-      const connId = isEditing ? selectedDraftId : `${scheme}-${Date.now()}`;
       const useKeychain =
         rememberPassword && keychainAvailable && settings.saveCredentialsToKeychain;
       const newConn: SavedConnection = {
@@ -470,6 +512,11 @@ export default function RemoteConnectDialog({
         // The keychain arm omits it so a future settings.json leak
         // can't surface the secret.
         password: rememberPassword && !useKeychain ? password : undefined,
+        // Auto-connect is honored only when the password is
+        // recoverable. Persist the user's intent regardless — they
+        // can toggle Remember on later without re-opening the
+        // dialog and the next launch will dial automatically.
+        autoConnect,
       };
       update(
         "connections",
@@ -882,6 +929,44 @@ export default function RemoteConnectDialog({
               }
             />
           )}
+
+          {/* Auto-connect on app launch. Requires a recoverable
+              password — without one, the connect would prompt and
+              that defeats the silent-on-startup intent. Disabling
+              the switch (rather than hiding it) keeps the option
+              discoverable: the user sees that flipping Remember
+              first will unlock it. The SSH-agent / private-key
+              SFTP arms also qualify (no password needed) — we let
+              those through regardless of `rememberPassword`. */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={autoConnect}
+                onChange={(e) => setAutoConnect(e.target.checked)}
+                disabled={
+                  scheme === "sftp" && authMode !== "password"
+                    ? false
+                    : !rememberPassword
+                }
+              />
+            }
+            label={
+              <Box>
+                <Box>Auto-connect on app start</Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block" }}
+                >
+                  {scheme === "sftp" && authMode !== "password"
+                    ? "Reconnects silently on every launch using the saved key / agent."
+                    : rememberPassword
+                      ? "Reconnects silently on every launch using the saved credential."
+                      : "Turn on credential storage above first — auto-connect needs a stored secret."}
+                </Typography>
+              </Box>
+            }
+          />
 
           {error && (
             <Typography variant="caption" color="error">

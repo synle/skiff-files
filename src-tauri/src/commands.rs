@@ -1511,9 +1511,17 @@ pub fn fs_find(
 /// sidebar is `user@host:port`. The known-hosts file lives next to
 /// settings.json so TOFU survives reinstalls + can be inspected via
 /// "Reveal app data folder".
+///
+/// `connection_id` is the stable saved-row id from the frontend. When
+/// supplied, the registry slot adopts it instead of minting a fresh
+/// UUID, and any prior slot under the same id is replaced atomically.
+/// Keeps `saved.id === live.id` so dedup, "open with default", and
+/// `toNativeRemoteUrl` lookups all work off a single identifier.
+/// `None` retains the old behavior for backwards compat.
 #[tauri::command]
 pub async fn conn_create_sftp(
     config: SftpConfig,
+    connection_id: Option<String>,
     registry: State<'_, Arc<Registry>>,
     app: tauri::AppHandle,
 ) -> FsResult<String> {
@@ -1526,7 +1534,8 @@ pub async fn conn_create_sftp(
     let label = format!("{}@{}:{}", config.user, config.host, config.port);
     let known_hosts_path = known_hosts_path(&app).ok();
     let client = SftpClient::connect(config, known_hosts_path).await?;
-    let id = registry.insert(
+    let id = registry.upsert(
+        connection_id,
         ConnectionKind::Sftp,
         label,
         Connection::Sftp(Arc::new(client)),
@@ -1539,9 +1548,11 @@ pub async fn conn_create_sftp(
 /// mirrors; the form on the Connections page exposes user /
 /// password fields for authenticated drops. FTPS isn't supported
 /// yet (Phase 3b).
+/// `connection_id`: see `conn_create_sftp` — stable id from the frontend.
 #[tauri::command]
 pub async fn conn_create_ftp(
     config: FtpConfig,
+    connection_id: Option<String>,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<String> {
     let label = if config.user == "anonymous" {
@@ -1550,7 +1561,8 @@ pub async fn conn_create_ftp(
         format!("{}@{}:{}", config.user, config.host, config.port)
     };
     let client = FtpClient::connect(config).await?;
-    let id = registry.insert(
+    let id = registry.upsert(
+        connection_id,
         ConnectionKind::Ftp,
         label,
         // FtpClient::connect already wraps in Arc<>, but
@@ -1564,9 +1576,11 @@ pub async fn conn_create_ftp(
 /// `conn_create_smb` for the same host with a different share spins
 /// up a second slot. Mirrors the SFTP / FTP shape so the frontend
 /// can treat all three remote backends uniformly.
+/// `connection_id`: see `conn_create_sftp` — stable id from the frontend.
 #[tauri::command]
 pub async fn conn_create_smb(
     config: crate::fs::smb::SmbConfig,
+    connection_id: Option<String>,
     registry: State<'_, Arc<Registry>>,
 ) -> FsResult<String> {
     // Friendly registry label. Share suffix is omitted in
@@ -1591,7 +1605,8 @@ pub async fn conn_create_smb(
         format!("{}/{}", base_label, config.share)
     };
     let client = crate::fs::smb::SmbConnection::connect(config).await?;
-    let id = registry.insert(
+    let id = registry.upsert(
+        connection_id,
         ConnectionKind::Smb,
         label,
         Connection::Smb(client),
