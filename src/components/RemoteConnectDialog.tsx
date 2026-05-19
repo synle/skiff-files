@@ -45,6 +45,12 @@ import {
   connCreateSmb,
   smbListShares,
 } from "../api/conn";
+import {
+  credsCapable,
+  credsDelete,
+  credsLoad,
+  credsStore,
+} from "../api/creds";
 import PathPickerField from "./PathPickerField";
 import { useSettings } from "../state/settings";
 import {
@@ -159,6 +165,14 @@ export default function RemoteConnectDialog({
    *  silently next time. Phase 2 will swap the storage for the OS
    *  keychain — see CHANGELOG. */
   const [rememberPassword, setRememberPassword] = useState(false);
+  /** Whether the OS keychain backend is actually reachable on this
+   *  install. `credsCapable()` probes once per dialog open; on Linux
+   *  it returns false when secret-service isn't running, on macOS /
+   *  Windows it's almost always true. Used to decide where to store
+   *  the password (keychain vs settings.json) AND to drive the
+   *  Remember-password helper text so the user can see which store
+   *  is active. */
+  const [keychainAvailable, setKeychainAvailable] = useState(false);
   /** Tracks which saved draft (if any) is pre-filling the form, so
    *  switching back to "new" is a single click and the "Save for
    *  later" checkbox flips appropriately. */
@@ -209,6 +223,13 @@ export default function RemoteConnectDialog({
     setSelectedDraftId(null);
     setError(null);
     setBusy(false);
+    // Probe the OS keychain once per dialog open. Cheap (a single
+    // sentinel get_password) and lets the storage-target decision +
+    // helper text run synchronously off `keychainAvailable` from
+    // here on.
+    void credsCapable()
+      .then((ok) => setKeychainAvailable(!!ok))
+      .catch(() => setKeychainAvailable(false));
     // Edit mode — pre-fill every field from the saved entry. We do
     // this after the request-default seeding above so the saved
     // values win for fields the request didn't carry. The id is
@@ -223,8 +244,14 @@ export default function RemoteConnectDialog({
         setHost(saved.host);
         setPort(saved.port);
         setUser(saved.user);
-        setPassword(saved.password ?? "");
         setRememberPassword(!!saved.rememberPassword);
+        // Keychain wins when present — pre-0.2.306 plaintext entries
+        // still load via `saved.password` so existing data keeps
+        // working. Either path triggers the password field's
+        // pre-fill.
+        void credsLoad(saved.id, "auth")
+          .then((kc) => setPassword(kc ?? saved.password ?? ""))
+          .catch(() => setPassword(saved.password ?? ""));
         if (saved.kind === "sftp") {
           setAuthMode(saved.authMode ?? "password");
           setPrivateKeyPath(saved.privateKeyPath ?? "");
@@ -339,11 +366,15 @@ export default function RemoteConnectDialog({
     setSelectedDraftId(entry.draft.id);
     // Pre-fill the password + Remember toggle from the saved entry
     // when present. We look up the full SavedConnection from
-    // settings (the draft projections drop the password field).
+    // settings (the draft projections drop the password field). The
+    // password may live in the OS keychain (0.2.306+) OR the legacy
+    // plaintext slot, so try keychain first and fall through.
     const saved = settings.connections.find((c) => c.id === entry.draft.id);
-    if (saved?.rememberPassword && saved.password != null) {
-      setPassword(saved.password);
+    if (saved?.rememberPassword) {
       setRememberPassword(true);
+      void credsLoad(saved.id, "auth")
+        .then((kc) => setPassword(kc ?? saved.password ?? ""))
+        .catch(() => setPassword(saved.password ?? ""));
     } else {
       setRememberPassword(false);
     }
@@ -401,8 +432,13 @@ export default function RemoteConnectDialog({
       // Saving is implicit now — every successful connect persists
       // an entry in `Settings.connections`. Add-mode inserts a new
       // row with a fresh id; edit-mode (selectedDraftId set) updates
-      // in place. Password is included only when the user opted in
-      // via the Remember-password toggle.
+      // in place. The Remember-password toggle picks WHICH store
+      // owns the password:
+      //   - keychain available + setting on  → OS keychain.
+      //   - either of those false            → plaintext in settings.
+      //   - rememberPassword off             → no persistence.
+      // We always delete from the OPPOSITE store on save so flipping
+      // the setting never leaves an orphaned secret behind.
       const isEditing = selectedDraftId != null;
       const label = computeLabel({
         scheme,
@@ -412,8 +448,11 @@ export default function RemoteConnectDialog({
         smbShare,
         smbDomain,
       });
+      const connId = isEditing ? selectedDraftId : `${scheme}-${Date.now()}`;
+      const useKeychain =
+        rememberPassword && keychainAvailable && settings.saveCredentialsToKeychain;
       const newConn: SavedConnection = {
-        id: isEditing ? selectedDraftId : `${scheme}-${Date.now()}`,
+        id: connId,
         kind: scheme,
         label,
         host,
@@ -427,12 +466,32 @@ export default function RemoteConnectDialog({
         share: scheme === "smb" ? smbShare : undefined,
         domain: scheme === "smb" ? smbDomain : undefined,
         rememberPassword,
-        password: rememberPassword ? password : undefined,
+        // Password is recorded inline only on the file-fallback arm.
+        // The keychain arm omits it so a future settings.json leak
+        // can't surface the secret.
+        password: rememberPassword && !useKeychain ? password : undefined,
       };
       update(
         "connections",
         addOrUpdateConnection(settings.connections, newConn),
       );
+      // Cross-store cleanup — fire-and-forget. Errors here are
+      // non-fatal: a missing keychain entry returns Ok() silently,
+      // anything else just means the orphan stays for now and the
+      // next save retries.
+      if (useKeychain) {
+        void credsStore(connId, "auth", password).catch(() => {});
+      } else if (rememberPassword) {
+        // Plaintext arm — clear any prior keychain entry so the
+        // settings.json copy is the only live copy.
+        void credsDelete(connId, "auth").catch(() => {});
+      } else {
+        // Toggle flipped off — clear BOTH stores. `addOrUpdateConnection`
+        // already stripped the plaintext password above (since
+        // `rememberPassword` is false); the keychain side needs an
+        // explicit delete.
+        void credsDelete(connId, "auth").catch(() => {});
+      }
       // For SMB the path tail depends on whether the user picked a
       // specific share. With a non-empty share, the connection binds
       // it at session-setup so the URL drops the share segment
@@ -790,11 +849,11 @@ export default function RemoteConnectDialog({
               connect persists into `Settings.connections`. The
               user-visible toggle here is for the *password*. Off by
               default so existing users + new connections both
-              default to prompt-every-time; flipping it on stores
-              the password alongside the entry so the next connect
-              is silent. Phase 1 storage is plaintext in
-              `settings.json` (under `app_data_dir`); phase 2 will
-              swap to the OS keychain. */}
+              default to prompt-every-time. The storage target is
+              picked by `settings.saveCredentialsToKeychain` (default
+              on → OS keychain; off → plaintext in settings.json);
+              the helper text below shows which arm is live so the
+              user knows what's about to be persisted. */}
           {(authMode === "password" || scheme !== "sftp") && (
             <FormControlLabel
               control={
@@ -811,8 +870,13 @@ export default function RemoteConnectDialog({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    Stored in your app settings. OS Keychain support is
-                    coming.
+                    {rememberPassword
+                      ? settings.saveCredentialsToKeychain && keychainAvailable
+                        ? "Stored in the OS keychain."
+                        : settings.saveCredentialsToKeychain
+                          ? "OS keychain unavailable on this system — falling back to plaintext in settings.json."
+                          : "Stored as plaintext in settings.json (OS keychain disabled in Settings → Network)."
+                      : "Never persisted."}
                   </Typography>
                 </Box>
               }

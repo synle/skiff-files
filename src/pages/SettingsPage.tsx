@@ -1776,6 +1776,42 @@ export default function SettingsPage() {
         <Divider />
 
         <Section
+          title="Network"
+          description="Where saved-connection passwords get persisted when Remember password is enabled."
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.saveCredentialsToKeychain}
+                onChange={(e) =>
+                  update("saveCredentialsToKeychain", e.target.checked)
+                }
+              />
+            }
+            label={
+              <Box>
+                <Box>Use the OS keychain for saved passwords</Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block" }}
+                >
+                  When on, Remember-password values ride in macOS
+                  Keychain / Windows Credential Manager / Linux
+                  libsecret instead of <code>settings.json</code>. When
+                  off, they fall back to plaintext alongside the rest
+                  of the connection row. Existing entries migrate to
+                  the new store the next time you save them from the
+                  connect dialog.
+                </Typography>
+              </Box>
+            }
+          />
+        </Section>
+
+        <Divider />
+
+        <Section
           title="Transfers"
           description="Defaults applied to new Skiffsync jobs. Saved templates keep their own values regardless."
         >

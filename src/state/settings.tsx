@@ -246,11 +246,20 @@ export interface Settings {
    *  localStorage keys (`.connections.v1` / `.ftp.v1` / `.smb.v1`).
    *  Persisted as part of settings.json (mirrored from localStorage)
    *  so users see the same list across devices once cloud-sync
-   *  lands. Phase 1: passwords stored here in plaintext when
-   *  `rememberPassword` is true. Phase 2 (planned): swap to OS
-   *  keychain (macOS Keychain / Windows Credential Manager / Linux
-   *  libsecret) via the `keyring` Rust crate. */
+   *  lands. When `saveCredentialsToKeychain` is true (the default)
+   *  passwords ride in the OS keychain instead of this row. */
   connections: import("./connectionStore").SavedConnection[];
+  /** When true (default), the connect dialog persists saved
+   *  Remember-password values in the OS keychain (macOS Keychain /
+   *  Windows Credential Manager / Linux libsecret via the `keyring`
+   *  Rust crate). When false, the password is written into
+   *  `settings.json` alongside the rest of the connection row
+   *  (the legacy "Phase 1" plaintext path). The dialog falls back to
+   *  the plaintext arm automatically when the keychain probe
+   *  (`credsCapable`) fails — e.g. headless Linux without
+   *  secret-service — so flipping this off is only required when
+   *  the user wants the file-on-disk fallback unconditionally. */
+  saveCredentialsToKeychain: boolean;
   /** Ratio (0..1) of horizontal space allocated to the LEFT pane in
    *  two-pane mode. The right pane gets `1 - ratio`. Drag the divider
    *  between the panes to update. Clamped to [0.15, 0.85] so neither
@@ -594,6 +603,7 @@ export const DEFAULTS: Settings = {
   twoPaneMode: false,
   bulkActionBarLabels: "auto",
   connections: [],
+  saveCredentialsToKeychain: true,
   twoPaneSplitRatio: 0.5,
   listColumnWidths: { size: 96, modified: 180, kind: 120 },
   savedTabsRight: [],

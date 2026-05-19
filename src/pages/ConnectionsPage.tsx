@@ -44,6 +44,7 @@ import RemoteConnectDialog, {
   type RemoteConnectRequest,
 } from "../components/RemoteConnectDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { credsDelete } from "../api/creds";
 import { useSettings } from "../state/settings";
 import {
   moveConnection,
@@ -166,6 +167,11 @@ export default function ConnectionsPage() {
       }
     }
     update("connections", removeConnection(settings.connections, id));
+    // Drop any matching OS-keychain entry. Idempotent — a missing
+    // entry returns Ok() silently — so it's safe to fire on every
+    // delete regardless of whether the password actually lived in
+    // the keychain or in the legacy plaintext slot.
+    void credsDelete(id, "auth").catch(() => {});
     setPendingDelete(null);
     await refreshLive();
     window.dispatchEvent(new CustomEvent("skiff:connections-changed"));
