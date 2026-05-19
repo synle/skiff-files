@@ -10,6 +10,7 @@ Guidance for Claude Code in this repo.
 
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — module map, IPC flow, saved-data parity, per-layer conventions.
 - [`DEV.md`](./DEV.md) — setup, commands, project layout, **footguns** (read before touching shared infra), where-to-look table.
+- [`COVERAGE.md`](./COVERAGE.md) — how coverage is measured + where the floors live.
 - [`TODO.md`](./TODO.md) — phased roadmap + deferred backlog.
 - [`CHANGELOG.md`](./CHANGELOG.md) — per-patch notes. Append on every patch ship.
 
@@ -19,7 +20,15 @@ Guidance for Claude Code in this repo.
 - New code gets tests: React → `*.test.tsx` (Vitest + Testing Library), Rust → `#[cfg(test)] mod tests`.
 - Theme tokens live in `src/theme/{light,dark}.ts` — never hardcode colors.
 - **Performance is a feature.** Never block the UI thread; never `read_to_end` on user files; virtualize lists; cancel inflight scans on nav.
-- Versioning: only `src-tauri/tauri.conf.json#version` matters. Leave `package.json` and `Cargo.toml` versions at `0.1.0` / `0.0.0`.
+- Versioning: **only `src-tauri/tauri.conf.json#version` matters.** Never bump `package.json` or `src-tauri/Cargo.toml` versions — they're intentionally pinned (currently `0.1.1` / `0.0.0`) and `build.rs` pulls `APP_VERSION` from `tauri.conf.json` for Rust.
+
+## Coverage gate
+
+Both frontend and Rust coverage are gated in CI. **Don't hardcode the floor numbers here — they ratchet up over time. Read them from the source of truth:**
+
+- **Frontend (Vitest, v8)** — thresholds live in [`vite.config.ts`](./vite.config.ts) under `test.coverage.thresholds` (`lines` / `statements` / `branches` / `functions`). `npm run test:coverage` enforces them locally; the `coverage` job in [`.github/workflows/build.yml`](./.github/workflows/build.yml) enforces them in CI.
+- **Rust (`cargo-llvm-cov`)** — floors are passed inline to `cargo llvm-cov` as `--fail-under-lines` / `--fail-under-functions` / `--fail-under-regions` in [`.github/workflows/build.yml`](./.github/workflows/build.yml) (search `fail-under`). Local: `cd src-tauri && cargo llvm-cov --lib --summary-only`.
+- **Policy lives in [`COVERAGE.md`](./COVERAGE.md)** — floors stay 1pt below baseline, never lowered to pass CI, raised as coverage improves.
 
 ## Secrets & env hygiene — non-negotiable
 
@@ -68,5 +77,6 @@ UI affordances: smoke-test in `npx tauri dev` and watch the pixels change. Typec
 
 ## Git / PR
 
-- Squash-merge. Rebase before push.
+- Squash-merge PRs only (`gh pr merge --squash`). Sync branches with `git merge origin/main`, never rebase shared branches.
 - GitHub raw URLs: `https://github.com/{owner}/{repo}/blob/head/{path}?raw=1`. Never `api.github.com/.../contents/` or `raw.githubusercontent.com`.
+- Remote is `synle/skiff-files` (local folder name `skiff-file-explorer` differs — always resolve via `git remote get-url origin`).

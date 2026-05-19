@@ -38,6 +38,7 @@ Two layers, one IPC channel:
 | `src-tauri/` | Rust backend + Tauri config |
 | `src-tauri/src/fs/` | `local.rs` (std::fs), `sftp.rs` (russh + russh-sftp), `ftp.rs` (suppaftp), `smb.rs` (smb2 — pure-Rust SMB 2/3), `registry.rs` (connection map), `ssh_config.rs`, `known_hosts.rs`, `watch.rs` (notify-based), `thumbnail.rs` (SQLite cache), `types.rs`, `icons.rs` |
 | `src-tauri/src/sync/` | `plan.rs`, `engine.rs` (local, sync), `cross_engine.rs` + `backend.rs` (async tokio), `resolver.rs`, `stamp.rs`, `dedup.rs`, `repo.rs`, `registry.rs` (jobs), `types.rs` |
+| `src-tauri/src/{creds,crash,health,permissions,win_cmd}.rs` | OS keychain wrapper (`creds`), opt-in local crash log hook (`crash`), `127.0.0.1:39871` ping server (`health`), macOS Full Disk Access TCC probe + System Settings deep-link (`permissions`), Windows `CREATE_NO_WINDOW` spawn helper (`win_cmd`) |
 | `src-tauri/capabilities/` | Tauri v2 capability allowlists |
 | `.github/workflows/` | `build.yml`, `integration.yml`, `release-official.yml`, `release-beta.yml`, `automerge.yml` |
 | `docker/` | Local test fixtures (SFTP / FTP / SMB servers) |
