@@ -1,7 +1,7 @@
 // Root layout — sidebar on the left, route content on the right. Both are
 // inside the HashRouter (set up in main.tsx), so the sidebar can use the
 // navigation hooks directly.
-import { Box } from "@mui/material";
+import { Box, Button, Snackbar } from "@mui/material";
 import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import ShortcutsModal from "./components/ShortcutsModal";
@@ -20,6 +20,10 @@ import {
   windowSetAlwaysOnTop,
 } from "./api/fs";
 import { listen } from "@tauri-apps/api/event";
+import {
+  macosCheckFullDiskAccess,
+  macosOpenFullDiskAccessSettings,
+} from "./api/permissions";
 import { loadSettingsFromDisk } from "./state/settings";
 import { useSettings } from "./state/settings";
 import { pruneStaleBookmarks, pruneStalePaths } from "./util/pruneStale";
@@ -53,6 +57,12 @@ export default function App() {
   const [home, setHome] = useState("");
   const [quickJumpOpen, setQuickJumpOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  /** macOS Full Disk Access prompt — set once at app start when the
+   *  Rust probe says we lack FDA AND the user hasn't dismissed the
+   *  prompt previously. The snackbar's "Don't show again" action
+   *  flips `settings.macosFdaPromptDismissed`; "Dismiss" only clears
+   *  it for this session. */
+  const [fdaPromptOpen, setFdaPromptOpen] = useState(false);
   /** Active page. Replaces react-router's Routes-based switching. */
   const [page, setPage] = useState<Page>("browser");
   // Which pane the next sidebar / quick-jump / palette navigation
@@ -273,6 +283,45 @@ export default function App() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // macOS Full Disk Access auto-prompt. On app start, probe whether
+  // the running process can read a canonical TCC-gated path (e.g.
+  // ~/Library/Safari). If denied AND the user hasn't already opted
+  // out via "Don't show again", we both:
+  //   (a) auto-open System Settings → Privacy & Security → Full Disk
+  //       Access via `x-apple.systempreferences:` so the user lands
+  //       directly on the right pane (instead of hunting for it).
+  //   (b) surface a non-blocking Snackbar that explains *why* System
+  //       Settings just popped up and exposes "Don't show again" /
+  //       "Dismiss" actions.
+  // Off-platform the Rust probe always returns `true` (no equivalent
+  // gate on Windows / Linux), so this effect is a no-op there.
+  // Intentionally not in the dep array so it only runs on mount —
+  // re-checking on every settings change would re-fire the prompt
+  // after the user grants FDA + relaunches.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let cancelled = false;
+    if (settings.macosFdaPromptDismissed) return;
+    macosCheckFullDiskAccess()
+      .then((granted) => {
+        if (cancelled || granted) return;
+        // Open the settings pane first so the surface the user needs
+        // is already visible by the time their eye drifts back to
+        // Skiff and reads the Snackbar.
+        void macosOpenFullDiskAccessSettings().catch(() => {
+          /* non-fatal — the snackbar still surfaces the request */
+        });
+        setFdaPromptOpen(true);
+      })
+      .catch(() => {
+        /* running outside Tauri (tests / browser dev) — skip */
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: see comment above.
   }, []);
 
   // Apply the always-on-top setting on every change. Calling the
@@ -557,6 +606,37 @@ export default function App() {
           sync from any page, so closing the Transfers tab doesn't
           hide an active operation. */}
       <OperationsDrawer />
+      {/* macOS Full Disk Access prompt. Fires once per launch when
+          the Rust probe says we lack FDA AND the user hasn't already
+          opted out. Auto-open of System Settings happens upstream in
+          the mount effect — this snackbar just explains *why* System
+          Settings popped up and exposes the dismiss controls. */}
+      <Snackbar
+        open={fdaPromptOpen}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        message="Skiff Files needs Full Disk Access to read protected folders (~/Library, ~/Documents, etc.). System Settings is open to the right pane — toggle Skiff Files on and relaunch."
+        action={
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              size="small"
+              color="inherit"
+              onClick={() => {
+                update("macosFdaPromptDismissed", true);
+                setFdaPromptOpen(false);
+              }}
+            >
+              Don't show again
+            </Button>
+            <Button
+              size="small"
+              color="inherit"
+              onClick={() => setFdaPromptOpen(false)}
+            >
+              Dismiss
+            </Button>
+          </Box>
+        }
+      />
     </Box>
   );
 }

@@ -164,6 +164,15 @@ export interface Settings {
    *  on the next app launch (Settings → Advanced surfaces that
    *  caveat). */
   crashReportsEnabled: boolean;
+  /** macOS-only: when true, the app skips the auto-open of System
+   *  Settings → Privacy & Security → Full Disk Access on launch even
+   *  if the FDA probe says access is denied. Flipped on by the
+   *  Snackbar's "Don't show again" action so the user isn't pestered
+   *  every launch after they've decided not to grant access (e.g.
+   *  they only use local FS paths and don't care about ~/Library).
+   *  Has no effect on non-macOS targets — the probe always returns
+   *  granted there. */
+  macosFdaPromptDismissed: boolean;
   /** Console log threshold. `off` drops every call routed through
    *  `util/log`; the standard hierarchy `error > warn > info > debug`
    *  controls what passes through. Default `warn`. */
@@ -568,6 +577,7 @@ export const DEFAULTS: Settings = {
   showStatusBar: true,
   language: "en",
   crashReportsEnabled: false,
+  macosFdaPromptDismissed: false,
   showFullPathInTitle: false,
   sidebarVisible: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,

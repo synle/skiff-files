@@ -1124,6 +1124,25 @@ pub fn creds_capable() -> bool {
     crate::creds::capable()
 }
 
+/// macOS-only — probe whether the running process has Full Disk
+/// Access (TCC). Always `true` off-platform. Frontend uses this on
+/// app start to decide whether to surface the one-time prompt that
+/// deep-links System Settings → Privacy & Security → Full Disk Access.
+/// See `crate::permissions` for the probe algorithm.
+#[tauri::command]
+pub fn macos_check_full_disk_access() -> bool {
+    crate::permissions::has_full_disk_access()
+}
+
+/// macOS-only — open System Settings to the Full Disk Access pane via
+/// the documented `x-apple.systempreferences:` URL. Returns `Err` on
+/// non-macOS targets (rather than silently no-op'ing) so a misrouted
+/// call surfaces an actionable error in the UI.
+#[tauri::command]
+pub fn macos_open_full_disk_access_settings() -> Result<(), String> {
+    crate::permissions::open_full_disk_access_settings()
+}
+
 /// Settings → Advanced "Reveal app data directory" button so power
 /// users can manually inspect settings.json + see whatever else
 /// future versions stash there (thumbnail cache, job DB, etc.).
