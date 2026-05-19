@@ -27,6 +27,8 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import LinkIcon from "@mui/icons-material/Link";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -44,6 +46,7 @@ import RemoteConnectDialog, {
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useSettings } from "../state/settings";
 import {
+  moveConnection,
   removeConnection,
   type SavedConnection,
 } from "../state/connectionStore";
@@ -179,6 +182,19 @@ export default function ConnectionsPage() {
     openEdit(c);
   };
 
+  /** Reorder a saved row up or down in the list. The persisted array
+   *  order is what every "list of connections" surface (sidebar
+   *  Network section, the Add-connection dialog's "Use a saved
+   *  connection" suggestions) reads, so reordering here propagates
+   *  everywhere. No-op when the row is already at the boundary —
+   *  `moveConnection` returns the same array reference so the
+   *  shallow-equal in `useSettings.update` won't dirty the store. */
+  const reorder = (id: string, dir: -1 | 1) => {
+    const next = moveConnection(settings.connections, id, dir);
+    if (next === settings.connections) return;
+    update("connections", next);
+  };
+
   return (
     <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
       <Box sx={{ maxWidth: 760, mx: "auto" }}>
@@ -223,8 +239,10 @@ export default function ConnectionsPage() {
             </Typography>
           ) : (
             <List dense disablePadding>
-              {settings.connections.map((c) => {
+              {settings.connections.map((c, idx) => {
                 const isLive = liveById.has(c.id);
+                const isFirst = idx === 0;
+                const isLast = idx === settings.connections.length - 1;
                 return (
                   <ListItem
                     key={c.id}
@@ -241,6 +259,34 @@ export default function ConnectionsPage() {
                           alignItems: "center",
                         }}
                       >
+                        {/* Reorder arrows. Disabled at the boundaries
+                            so the user gets visual feedback that the
+                            row is already top/bottom rather than a
+                            silent no-op click. */}
+                        <Tooltip title={isFirst ? "Already at the top" : "Move up"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => reorder(c.id, -1)}
+                              disabled={isFirst}
+                              aria-label={`Move ${c.label} up`}
+                            >
+                              <KeyboardArrowUpIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={isLast ? "Already at the bottom" : "Move down"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => reorder(c.id, 1)}
+                              disabled={isLast}
+                              aria-label={`Move ${c.label} down`}
+                            >
+                              <KeyboardArrowDownIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                         <Tooltip
                           title={
                             isLive
@@ -330,7 +376,15 @@ export default function ConnectionsPage() {
                               "& .MuiChip-label": { px: 0.6 },
                             }}
                           />
-                          {c.rememberPassword && (
+                          {/* "Saved password" only when a password is
+                              actually persisted alongside the entry —
+                              not just `rememberPassword: true`. Legacy
+                              data from pre-0.2.286 / aborted-save flows
+                              can leave the flag set with the password
+                              slot empty; rendering the chip in that
+                              case lies (the user expects silent
+                              reconnect; the dialog still prompts). */}
+                          {c.rememberPassword && !!c.password && (
                             <Tooltip title="Password is remembered in your app settings">
                               <Chip
                                 size="small"

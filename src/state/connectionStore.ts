@@ -264,6 +264,25 @@ export function removeConnection(
   return list.filter((c) => c.id !== id);
 }
 
+/** Move a connection one slot up (`dir = -1`) or down (`dir = +1`).
+ *  Returns the same array reference (not a copy) when the move is a
+ *  no-op — first row moving up, last row moving down, or the id isn't
+ *  in the list — so callers can cheaply skip the `update()` write.
+ *  Used by the Manage Connections page's reorder arrows. */
+export function moveConnection(
+  list: SavedConnection[],
+  id: string,
+  dir: -1 | 1,
+): SavedConnection[] {
+  const idx = list.findIndex((c) => c.id === id);
+  if (idx < 0) return list;
+  const target = idx + dir;
+  if (target < 0 || target >= list.length) return list;
+  const out = [...list];
+  [out[idx], out[target]] = [out[target], out[idx]];
+  return out;
+}
+
 /** Find by id. Returns `undefined` when the id isn't present. */
 export function findConnectionById(
   list: SavedConnection[],

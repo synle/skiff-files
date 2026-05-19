@@ -15,6 +15,7 @@ import {
   findConnectionById,
   matchConnectionsForHost,
   migrateLegacyDrafts,
+  moveConnection,
   removeConnection,
   type SavedConnection,
 } from "./connectionStore";
@@ -218,5 +219,43 @@ describe("matchConnectionsForHost", () => {
     expect(
       matchConnectionsForHost([sftp], "sftp", "HOST", 22),
     ).toHaveLength(1);
+  });
+});
+
+describe("moveConnection", () => {
+  const a: SavedConnection = { ...sftp, id: "a" };
+  const b: SavedConnection = { ...sftp, id: "b" };
+  const c: SavedConnection = { ...sftp, id: "c" };
+
+  it("swaps with the previous row when dir = -1", () => {
+    const out = moveConnection([a, b, c], "b", -1);
+    expect(out.map((x) => x.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("swaps with the next row when dir = +1", () => {
+    const out = moveConnection([a, b, c], "b", 1);
+    expect(out.map((x) => x.id)).toEqual(["a", "c", "b"]);
+  });
+
+  it("returns the same array reference when moving the first row up", () => {
+    const list = [a, b, c];
+    expect(moveConnection(list, "a", -1)).toBe(list);
+  });
+
+  it("returns the same array reference when moving the last row down", () => {
+    const list = [a, b, c];
+    expect(moveConnection(list, "c", 1)).toBe(list);
+  });
+
+  it("returns the same array reference when the id isn't present", () => {
+    const list = [a, b];
+    expect(moveConnection(list, "missing", 1)).toBe(list);
+  });
+
+  it("never mutates the input array", () => {
+    const list = [a, b, c];
+    const before = list.map((x) => x.id);
+    moveConnection(list, "b", 1);
+    expect(list.map((x) => x.id)).toEqual(before);
   });
 });
