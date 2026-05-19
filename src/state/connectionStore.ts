@@ -67,6 +67,13 @@ export interface SavedConnection {
    *  `rememberPassword === true`. Stripped on read when the toggle
    *  is off, so we don't leak through stale settings. */
   password?: string;
+  /** When true, the connection is re-opened automatically on app
+   *  start. Only honored when `rememberPassword` is also true (or
+   *  the kind doesn't require a password — e.g. SSH-agent SFTP),
+   *  because we can't reconnect silently without credentials. New
+   *  rows default to false; users opt in from the connect dialog or
+   *  the Manage Connections row. */
+  autoConnect?: boolean;
 }
 
 const LEGACY_SFTP_KEY = "skiff-files.connections.v1";
@@ -307,4 +314,47 @@ export function matchConnectionsForHost(
     if (port == null) return true;
     return c.port === port;
   });
+}
+
+/** Connection "identity" fingerprint. Two saved rows count as the
+ *  same connection iff every routing field matches: protocol +
+ *  host:port + user + (SMB only) share + domain. Used by the
+ *  Connect dialog to dedup new entries: instead of appending a
+ *  second row for the same target, we reuse the existing row's id.
+ *
+ *  Why include share/domain in addition to the existing `connKey`
+ *  triple: SMB lets a single host:port:user mount multiple distinct
+ *  shares, each of which is a real, separate "connection" the user
+ *  thinks of independently. Lumping them under one row breaks the
+ *  dedup the user actually wants (per-mount, not per-host). */
+function connIdentity(c: SavedConnection): string {
+  const share = (c.share ?? "").toLowerCase();
+  const domain = (c.domain ?? "").toLowerCase();
+  return `${c.kind}:${c.host.toLowerCase()}:${c.port}:${c.user.toLowerCase()}:${share}:${domain}`;
+}
+
+/** Find an existing saved row that matches the supplied connection's
+ *  identity (kind/host/port/user/share/domain). Returns the matched
+ *  row or `undefined`. The Connect dialog calls this BEFORE
+ *  generating a fresh `${kind}-${Date.now()}` id so a re-connect to
+ *  the same target reuses the same saved row + the same live-registry
+ *  id — no duplicate sidebar entries, no orphaned saved rows.
+ *
+ *  Self-match is excluded so edit-mode (where we already know the
+ *  draft id) doesn't false-positive against its own row. */
+export function findExistingConnection(
+  list: SavedConnection[],
+  probe: Pick<
+    SavedConnection,
+    "kind" | "host" | "port" | "user" | "share" | "domain"
+  >,
+  excludeId?: string,
+): SavedConnection | undefined {
+  const wanted = connIdentity({
+    id: "",
+    label: "",
+    rememberPassword: false,
+    ...probe,
+  });
+  return list.find((c) => c.id !== excludeId && connIdentity(c) === wanted);
 }

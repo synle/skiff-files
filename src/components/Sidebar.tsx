@@ -109,6 +109,7 @@ function SectionHeader({
   onToggle,
   onHide,
   iconOnly,
+  hideInIconOnly,
 }: {
   id: string;
   label: string;
@@ -119,7 +120,76 @@ function SectionHeader({
   onToggle: (modifier: boolean) => void;
   onHide?: () => void;
   iconOnly?: boolean;
+  /** In icon-only (collapsed-rail) mode, suppress the divider
+   *  bubble entirely. Used by callers whose section body would
+   *  render nothing in the rail (devices with zero mounts — the
+   *  "No mounted volumes" Typography is `display: none` under
+   *  iconOnly so the floating header reads as a dead grey blob).
+   *  No-op in the expanded sidebar — the header label is still
+   *  useful even when the body is empty. */
+  hideInIconOnly?: boolean;
 }) {
+  // 0.2.307 — in the collapsed rail, sections are always expanded
+  // (the toggle has no body to show/hide because the rail has no
+  // room for a tree), and we drop the header for empty sections so
+  // the user doesn't see a row of meaningless grey bubbles. The
+  // tooltip surfaces the section label on hover so the dividers
+  // remain discoverable identity markers.
+  if (iconOnly && hideInIconOnly) return null;
+  const button = (
+    <Box
+      component="button"
+      type="button"
+      onClick={(e: React.MouseEvent) =>
+        onToggle(e.metaKey || e.ctrlKey)
+      }
+      aria-expanded={!collapsed}
+      aria-controls={`sidebar-section-${id}`}
+      aria-label={iconOnly ? label : undefined}
+      sx={{
+        appearance: "none",
+        background: "transparent",
+        border: 0,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 0.5,
+        flex: iconOnly ? 0 : 1,
+        textAlign: iconOnly ? "center" : "left",
+        px: iconOnly ? 0 : 2,
+        pt: iconOnly ? 0 : 1.5,
+        pb: iconOnly ? 0 : 0.25,
+        color: "text.secondary",
+        fontSize: "0.6875rem",
+        fontWeight: 500,
+        letterSpacing: "0.08333em",
+        textTransform: "uppercase",
+        "&:hover": { color: "text.primary" },
+        ...(iconOnly && {
+          width: 20,
+          height: 20,
+          justifyContent: "center",
+          borderRadius: 1,
+        }),
+      }}
+    >
+      {iconOnly ? (
+        <Box
+          sx={{
+            width: 14,
+            height: 1,
+            bgcolor: "divider",
+            borderRadius: 1,
+          }}
+        />
+      ) : collapsed ? (
+        <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
+      ) : (
+        <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
+      )}
+      {!iconOnly && label}
+    </Box>
+  );
   return (
     <Box
       sx={{
@@ -136,57 +206,13 @@ function SectionHeader({
         }),
       }}
     >
-      <Box
-        component="button"
-        type="button"
-        onClick={(e: React.MouseEvent) =>
-          onToggle(e.metaKey || e.ctrlKey)
-        }
-        aria-expanded={!collapsed}
-        aria-controls={`sidebar-section-${id}`}
-        sx={{
-          appearance: "none",
-          background: "transparent",
-          border: 0,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 0.5,
-          flex: iconOnly ? 0 : 1,
-          textAlign: iconOnly ? "center" : "left",
-          px: iconOnly ? 0 : 2,
-          pt: iconOnly ? 0 : 1.5,
-          pb: iconOnly ? 0 : 0.25,
-          color: "text.secondary",
-          fontSize: "0.6875rem",
-          fontWeight: 500,
-          letterSpacing: "0.08333em",
-          textTransform: "uppercase",
-          "&:hover": { color: "text.primary" },
-          ...(iconOnly && {
-            width: 20,
-            height: 20,
-            justifyContent: "center",
-            borderRadius: 1,
-          }),
-        }}
-      >
-        {iconOnly ? (
-          <Box
-            sx={{
-              width: 14,
-              height: 1,
-              bgcolor: "divider",
-              borderRadius: 1,
-            }}
-          />
-        ) : collapsed ? (
-          <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
-        ) : (
-          <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
-        )}
-        {!iconOnly && label}
-      </Box>
+      {iconOnly ? (
+        <Tooltip title={label} placement="right">
+          {button}
+        </Tooltip>
+      ) : (
+        button
+      )}
       {!iconOnly && onHide && (
         <Tooltip title="Hide section (re-enable in Settings → Sidebar)">
           <IconButton
@@ -275,9 +301,13 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
     );
   };
 
-  /** Are we currently collapsed for a section? Missing key = expanded. */
+  /** Are we currently collapsed for a section? Missing key = expanded.
+   *  In icon-only (collapsed-rail) mode, every section is forced
+   *  expanded — the rail can't show a tree, so the per-section
+   *  collapse toggle is meaningless. We honor the persisted state
+   *  again the moment the user expands the sidebar back. */
   const isCollapsed = (id: string): boolean =>
-    !!settings.sidebarCollapsed[id];
+    !settings.sidebarIconOnly && !!settings.sidebarCollapsed[id];
   const toggleSection = (id: string, allSections = false) => {
     const ALL_IDS = [
       "favorites",
@@ -406,7 +436,11 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
    *  child component (defined outside this function so React doesn't
    *  recreate the type on every parent render — that was breaking
    *  the click handler in some renders). */
-  const renderSectionHeader = (id: string, label: string) => (
+  const renderSectionHeader = (
+    id: string,
+    label: string,
+    hideInIconOnly?: boolean,
+  ) => (
     <SectionHeader
       id={id}
       label={label}
@@ -414,6 +448,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       onToggle={(modifier) => toggleSection(id, modifier)}
       onHide={() => hideSection(id)}
       iconOnly={settings.sidebarIconOnly}
+      hideInIconOnly={hideInIconOnly}
     />
   );
 
@@ -619,7 +654,17 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         }}
       >
         <Box style={{ order: orderOf("favorites") }}>
-        {isVisible("favorites") && renderSectionHeader("favorites", t("sidebar.section.favorites"))}
+        {isVisible("favorites") &&
+          renderSectionHeader(
+            "favorites",
+            t("sidebar.section.favorites"),
+            // Suppress the divider bubble in the collapsed rail
+            // when every favorite (including Trash) is hidden — no
+            // icons would render below it, so the lone bubble would
+            // read as a dead grey blob.
+            FAVORITES.every((f) => settings.hiddenFavorites.includes(f.rel)) &&
+              (!trashPath || settings.hiddenFavorites.includes("trash")),
+          )}
         {isVisible("favorites") && !isCollapsed("favorites") && (
           <List dense disablePadding id="sidebar-section-favorites">
             {FAVORITES.filter(
@@ -1964,7 +2009,17 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         </Box>
 
         <Box style={{ order: orderOf("devices") }}>
-        {isVisible("devices") && renderSectionHeader("devices", t("sidebar.section.devices"))}
+        {isVisible("devices") &&
+          renderSectionHeader(
+            "devices",
+            t("sidebar.section.devices"),
+            // Empty-mounts case renders only a Typography that's
+            // hidden by the iconOnly CSS scope above, so the header
+            // would float over empty space. Suppress the bubble.
+            // While the mount list is still loading we keep the
+            // bubble (the spinner shows up below it).
+            mounts != null && mounts.length === 0,
+          )}
         {isVisible("devices") && !isCollapsed("devices") && (
           mounts == null ? (
             <Box sx={{ px: 2, py: 0.5 }} id="sidebar-section-devices">

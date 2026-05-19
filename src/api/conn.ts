@@ -42,8 +42,15 @@ export interface SftpConfig {
   useAgent?: boolean;
 }
 
-export const connCreateSftp = (config: SftpConfig): Promise<string> =>
-  invoke<string>("conn_create_sftp", { config });
+/** Open / reopen an SFTP session. When `connectionId` is supplied
+ *  the backend registry slot adopts it instead of minting a fresh
+ *  UUID, keeping `saved.id === live.id`. Omit for a brand-new
+ *  connection with no saved row yet. */
+export const connCreateSftp = (
+  config: SftpConfig,
+  connectionId?: string,
+): Promise<string> =>
+  invoke<string>("conn_create_sftp", { config, connectionId });
 
 /** Mirror of `crate::fs::ftp::FtpConfig`. Phase 3a (0.2.246) ships
  *  plain FTP only — FTPS toggle lands later. `user` / `password`
@@ -56,8 +63,13 @@ export interface FtpConfig {
   password?: string;
 }
 
-export const connCreateFtp = (config: FtpConfig): Promise<string> =>
-  invoke<string>("conn_create_ftp", { config });
+/** See `connCreateSftp` — pass `connectionId` to align the live slot
+ *  with an existing saved row. */
+export const connCreateFtp = (
+  config: FtpConfig,
+  connectionId?: string,
+): Promise<string> =>
+  invoke<string>("conn_create_ftp", { config, connectionId });
 
 /** Mirror of `crate::fs::smb::SmbConfig` (0.2.265 Phase 3c).
  *  Per-share connection — opening a second share on the same host
@@ -72,8 +84,13 @@ export interface SmbConfig {
   domain?: string;
 }
 
-export const connCreateSmb = (config: SmbConfig): Promise<string> =>
-  invoke<string>("conn_create_smb", { config });
+/** See `connCreateSftp` — pass `connectionId` to align the live slot
+ *  with an existing saved row. */
+export const connCreateSmb = (
+  config: SmbConfig,
+  connectionId?: string,
+): Promise<string> =>
+  invoke<string>("conn_create_smb", { config, connectionId });
 
 /** Probe an SMB server for the list of disk shares the supplied
  *  credentials can see. Used by the Connect dialog's Share-field

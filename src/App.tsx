@@ -14,6 +14,12 @@ import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
 import {
+  connCreateFtp,
+  connCreateSftp,
+  connCreateSmb,
+} from "./api/conn";
+import { credsLoad } from "./api/creds";
+import {
   fsHomeDir,
   fsStat,
   windowOpenNew,
@@ -375,6 +381,93 @@ export default function App() {
       window.removeEventListener("focus", onFocus);
     };
   }, [setSettings]);
+
+  // One-shot auto-connect pass on mount. For every saved connection
+  // with `autoConnect: true`, dial it in the background. We can only
+  // do this when the password is recoverable — keychain (preferred)
+  // or the plaintext fallback on the row. Rows missing both are
+  // skipped silently; the user can still connect manually. Errors
+  // are swallowed (best-effort; surfacing them as a toast on app
+  // launch would be more noise than signal — the row stays in the
+  // sidebar marked Disconnected).
+  //
+  // We rely on the registry's caller-supplied id (0.2.307) so the
+  // live slot adopts the saved row's id verbatim; the existing
+  // sidebar/connList machinery picks it up via the
+  // `skiff:connections-changed` broadcast at the end of the loop.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const candidates = settings.connections.filter((c) => c.autoConnect);
+      if (candidates.length === 0) return;
+      for (const c of candidates) {
+        if (cancelled) return;
+        try {
+          // Recover the password — keychain first (post-0.2.306) then
+          // the legacy plaintext slot. Some kinds don't require one
+          // (SFTP agent / private-key) but the SMB / FTP / SFTP-password
+          // arms all need it.
+          let password = c.password ?? "";
+          if (!password) {
+            const fromKeychain = await credsLoad(c.id, "auth").catch(
+              () => null,
+            );
+            if (fromKeychain) password = fromKeychain;
+          }
+          if (c.kind === "sftp") {
+            const authMode = c.authMode ?? "password";
+            if (authMode === "password" && !password) continue;
+            await connCreateSftp(
+              {
+                host: c.host,
+                port: c.port,
+                user: c.user,
+                password: authMode === "password" ? password : undefined,
+                privateKeyPath:
+                  authMode === "privateKey" ? c.privateKeyPath : undefined,
+                useAgent: authMode === "agent",
+              },
+              c.id,
+            );
+          } else if (c.kind === "smb") {
+            if (!password) continue;
+            await connCreateSmb(
+              {
+                host: c.host,
+                port: c.port,
+                share: c.share ?? "",
+                user: c.user,
+                password,
+                domain: c.domain || undefined,
+              },
+              c.id,
+            );
+          } else if (c.kind === "ftp") {
+            await connCreateFtp(
+              {
+                host: c.host,
+                port: c.port,
+                user: c.user || undefined,
+                password: password || undefined,
+              },
+              c.id,
+            );
+          }
+        } catch {
+          /* swallow — the row stays Disconnected */
+        }
+      }
+      if (!cancelled) {
+        window.dispatchEvent(new CustomEvent("skiff:connections-changed"));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Run once on mount only — we don't want toggling the flag
+    // inside settings to immediately try to dial.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // One-shot prune pass on mount: drop recent paths + bookmarks
   // whose target no longer exists. Local paths only — remote
