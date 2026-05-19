@@ -38,11 +38,13 @@ describe("SettingsPage smoke", () => {
     expect(screen.getByText("Appearance")).toBeInTheDocument();
   });
 
-  it("renders the version caption with the test get_app_version fallback", async () => {
+  it("renders the About block with Version / Latest rows", async () => {
     renderSettings();
-    // The Tauri mock returns "0.1.0-test"; the page waits a tick to fill
-    // it in, but the "Skiff Files v" prefix is rendered synchronously.
-    expect(await screen.findByText(/Skiff Files v/)).toBeInTheDocument();
+    // The Tauri mock returns "0.1.0-test" for both get_app_version and
+    // get_build_timestamp; only the labels are synchronously rendered.
+    expect(await screen.findByText(/Skiff Files/)).toBeInTheDocument();
+    expect(await screen.findByText(/^Version:/)).toBeInTheDocument();
+    expect(await screen.findByText(/^Latest:/)).toBeInTheDocument();
   });
 
   it("includes the keyboard shortcut search field placeholder", () => {

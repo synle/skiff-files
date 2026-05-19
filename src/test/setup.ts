@@ -16,6 +16,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     // Default mock: enough to keep components from throwing during smoke tests.
     // Individual tests override per-call via vi.mocked(invoke).mockImplementation.
     if (cmd === "get_app_version") return "0.1.0-test";
+    if (cmd === "get_build_timestamp") return "2026-05-15 12:37";
     if (cmd === "fs_home_dir") return "/home/test";
     if (cmd === "fs_list_dir") return [];
     if (cmd === "fs_canonicalize") return _args?.path ?? "/";
@@ -130,6 +131,18 @@ vi.mock("@tauri-apps/api/window", () => ({
     close: vi.fn(async () => {}),
   }),
 }));
+
+// Default-stub `fetch` to a network failure so tests that mount
+// components which fire-and-forget HTTP (e.g. SettingsPage hitting
+// GitHub releases for the update check) don't depend on real
+// connectivity or jsdom's fetch implementation. Individual tests
+// override per-call via `vi.spyOn(globalThis, "fetch")`.
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async () => {
+    throw new TypeError("Failed to fetch (test default stub)");
+  }),
+);
 
 vi.mock("@tauri-apps/api/event", () => ({
   // listen returns an unlisten fn; default to a no-op so mount/unmount

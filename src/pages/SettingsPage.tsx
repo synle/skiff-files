@@ -5,6 +5,7 @@
 import {
   Box,
   Button,
+  Chip,
   Dialog,
   Divider,
   FormControl,
@@ -148,7 +149,13 @@ const PRESETS: PalettePreset[] = [
     textSecondary: "#858585",
   },
 ];
-import { fsOpenWithDefault, fsRevealInOs, getAppVersion } from "../api/fs";
+import {
+  fetchLatestRelease,
+  fsOpenWithDefault,
+  fsRevealInOs,
+  getAppVersion,
+  getBuildTimestamp,
+} from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
 import {
   activeCombo,
@@ -828,6 +835,52 @@ function SavedDataEditor() {
   );
 }
 
+/**
+ * Normalize a version string for comparison — strip a leading `v` (the
+ * GitHub Releases tag convention) and any trailing ` [DEV]` marker that
+ * `build.rs` appends in non-release builds. Returns the bare semver
+ * triple as a string, e.g. `"0.2.302"`.
+ */
+function normalizeVersion(v: string): string {
+  return v.replace(/^v/, "").replace(/\s*\[DEV\]\s*$/, "").trim();
+}
+
+/**
+ * Compare two semver-ish strings (`a` vs `b`). Returns -1 / 0 / 1 in the
+ * usual cmp ordering. Non-numeric segments fall back to a 0 component so
+ * a stray pre-release suffix doesn't crash the comparison. Used to drive
+ * the Up-to-date / Update-available badge in Settings → About.
+ */
+function compareVersions(a: string, b: string): number {
+  const pa = normalizeVersion(a).split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const pb = normalizeVersion(b).split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const n = Math.max(pa.length, pb.length);
+  for (let i = 0; i < n; i++) {
+    const ai = pa[i] ?? 0;
+    const bi = pb[i] ?? 0;
+    if (ai > bi) return 1;
+    if (ai < bi) return -1;
+  }
+  return 0;
+}
+
+/**
+ * Format a GitHub `published_at` ISO-8601 timestamp into the same
+ * `YYYY-MM-DD HH:MM` UTC shape used for the local build timestamp, so
+ * the Version and Latest rows line up visually. Returns null for null
+ * / malformed inputs so the caller can omit the timestamp gracefully.
+ */
+function formatReleaseTimestamp(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return (
+    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
+    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+  );
+}
+
 export default function SettingsPage() {
   console.log("[SettingsPage] rendering");
   const { settings, setSettings, update, reset } = useSettings();
@@ -835,11 +888,68 @@ export default function SettingsPage() {
   // `get_app_version` Tauri command. Tests / browser-mode dev see
   // the fallback string.
   const [version, setVersion] = useState<string>("unknown");
+  // Build timestamp from `get_build_timestamp` — UTC `YYYY-MM-DD HH:MM`.
+  const [builtAt, setBuiltAt] = useState<string>("");
+  // Latest released version from GitHub. `null` = not yet fetched /
+  // fetch failed (offline, rate limit, etc.); the About row falls back
+  // to "unknown" rather than rendering an error chip.
+  const [latestTag, setLatestTag] = useState<string | null>(null);
+  const [latestPublishedAt, setLatestPublishedAt] = useState<string | null>(
+    null,
+  );
+  const [latestStatus, setLatestStatus] = useState<
+    "checking" | "up-to-date" | "behind" | "ahead" | "error"
+  >("checking");
+
   useEffect(() => {
     getAppVersion()
       .then(setVersion)
       .catch(() => setVersion("unknown"));
+    getBuildTimestamp()
+      .then(setBuiltAt)
+      .catch(() => setBuiltAt(""));
   }, []);
+
+  useEffect(() => {
+    // Fire-and-forget the GH release check. `version` arrives async, so
+    // re-run once it lands. Skip while still "unknown" — we'd compare
+    // garbage and report bogus status.
+    if (version === "unknown") return;
+    let cancelled = false;
+    setLatestStatus("checking");
+    void fetchLatestRelease().then((rel) => {
+      if (cancelled) return;
+      if (!rel) {
+        setLatestStatus("error");
+        return;
+      }
+      setLatestTag(rel.tagName);
+      setLatestPublishedAt(rel.publishedAt);
+      const cmp = compareVersions(version, rel.tagName);
+      setLatestStatus(cmp >= 0 ? (cmp === 0 ? "up-to-date" : "ahead") : "behind");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [version]);
+
+  const latestVersionLabel = latestTag ? normalizeVersion(latestTag) : "unknown";
+  const latestPublishedLabel = formatReleaseTimestamp(latestPublishedAt);
+  const statusBadge = (() => {
+    switch (latestStatus) {
+      case "checking":
+        return <Chip size="small" label="Checking…" />;
+      case "up-to-date":
+        return <Chip size="small" color="success" label="Up to date" />;
+      case "behind":
+        return <Chip size="small" color="warning" label="Update available" />;
+      case "ahead":
+        return <Chip size="small" color="info" label="Ahead of latest" />;
+      case "error":
+      default:
+        return <Chip size="small" label="Update check failed" />;
+    }
+  })();
 
   return (
     <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
@@ -847,9 +957,22 @@ export default function SettingsPage() {
       <Typography variant="h4" gutterBottom>
         Settings
       </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-        Skiff Files v{version}
-      </Typography>
+      <Box sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={1} sx={{ mb: 0.5, alignItems: "center" }}>
+          <Typography variant="caption" color="text.secondary">
+            Skiff Files
+          </Typography>
+          {statusBadge}
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+          Version: {normalizeVersion(version)}
+          {builtAt ? ` (${builtAt})` : ""}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+          Latest: {latestVersionLabel}
+          {latestPublishedLabel ? ` (${latestPublishedLabel})` : ""}
+        </Typography>
+      </Box>
 
       <Stack spacing={4}>
         <Section

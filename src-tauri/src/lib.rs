@@ -33,7 +33,7 @@ use commands::{
     fs_trash_path,
     creds_capable, creds_delete, creds_load, creds_store,
     macos_check_full_disk_access, macos_open_full_disk_access_settings,
-    fs_stat, fs_trash, fs_trash_many, fs_trash_restore, get_app_version, settings_app_data_dir, settings_load,
+    fs_stat, fs_trash, fs_trash_many, fs_trash_restore, get_app_version, get_build_timestamp, settings_app_data_dir, settings_load,
     settings_save, window_open_at, window_open_new, window_set_always_on_top,
     fs_watch_clear, fs_watch_set, FsWatchState,
     smb_list_shares, ssh_config_hosts, sync_cancel, sync_cpstamp, sync_dedup,
@@ -97,6 +97,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // local
             get_app_version,
+            get_build_timestamp,
             fs_home_dir,
             fs_list_dir,
             fs_stat,
@@ -189,6 +190,21 @@ mod tests {
     #[test]
     fn app_version_is_non_empty() {
         assert!(!get_app_version().is_empty());
+    }
+
+    #[test]
+    fn build_timestamp_has_expected_shape() {
+        // `build.rs` emits BUILD_TIMESTAMP as `YYYY-MM-DD HH:MM` UTC. The
+        // About-page row in Settings parses no fields out of it, but if the
+        // format drifts (e.g. someone swaps to RFC3339 with a trailing `Z`)
+        // it'll change how the row renders, so pin the shape here.
+        let ts = get_build_timestamp();
+        assert_eq!(ts.len(), 16, "expected `YYYY-MM-DD HH:MM` (16 chars), got {ts:?}");
+        let bytes = ts.as_bytes();
+        assert_eq!(bytes[4], b'-');
+        assert_eq!(bytes[7], b'-');
+        assert_eq!(bytes[10], b' ');
+        assert_eq!(bytes[13], b':');
     }
 
     #[test]

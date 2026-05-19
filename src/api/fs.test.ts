@@ -33,7 +33,9 @@ import {
   fsTrashPath,
   fsWatchClear,
   fsWatchSet,
+  fetchLatestRelease,
   getAppVersion,
+  getBuildTimestamp,
   windowOpenAt,
   windowOpenNew,
   windowSetAlwaysOnTop,
@@ -49,6 +51,9 @@ describe("api/fs typed wrappers", () => {
   it("invokes the documented Tauri command names", async () => {
     await getAppVersion();
     expect(mocked).toHaveBeenLastCalledWith("get_app_version");
+
+    await getBuildTimestamp();
+    expect(mocked).toHaveBeenLastCalledWith("get_build_timestamp");
 
     await fsHomeDir();
     expect(mocked).toHaveBeenLastCalledWith("fs_home_dir");
@@ -207,6 +212,59 @@ describe("api/fs typed wrappers", () => {
       query: "n.*",
       regex: true,
       caseSensitive: true,
+    });
+  });
+});
+
+describe("fetchLatestRelease", () => {
+  // Pin global.fetch per test so we don't leak mocks between cases.
+  // Real network is never hit — every test stubs the response shape.
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+  });
+
+  it("hits the public releases/latest endpoint with the GitHub Accept header", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ tag_name: "v0.2.302", published_at: "2026-05-15T12:37:00Z" }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    const out = await fetchLatestRelease();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.github.com/repos/synle/skiff-files/releases/latest",
+      { headers: { Accept: "application/vnd.github+json" } },
+    );
+    expect(out).toEqual({ tagName: "v0.2.302", publishedAt: "2026-05-15T12:37:00Z" });
+  });
+
+  it("returns null on non-200 (rate limit, gone, etc.) without throwing", async () => {
+    fetchSpy.mockResolvedValueOnce(new Response("rate limited", { status: 403 }));
+    expect(await fetchLatestRelease()).toBeNull();
+  });
+
+  it("returns null on network failure (offline)", async () => {
+    fetchSpy.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    expect(await fetchLatestRelease()).toBeNull();
+  });
+
+  it("returns null on malformed JSON (missing tag_name)", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ published_at: "2026-05-15T12:37:00Z" }), {
+        status: 200,
+      }),
+    );
+    expect(await fetchLatestRelease()).toBeNull();
+  });
+
+  it("normalizes a missing publishedAt to null rather than undefined", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ tag_name: "v0.2.302" }), { status: 200 }),
+    );
+    expect(await fetchLatestRelease()).toEqual({
+      tagName: "v0.2.302",
+      publishedAt: null,
     });
   });
 });

@@ -50,6 +50,15 @@ pub fn get_app_version() -> &'static str {
     env!("APP_VERSION")
 }
 
+/// Build timestamp baked in at compile time by `build.rs`. Formatted as
+/// `YYYY-MM-DD HH:MM` in UTC. Surfaced in Settings → About so a user can tell
+/// at a glance when their installed binary was built and whether they're on a
+/// stale local build.
+#[tauri::command]
+pub fn get_build_timestamp() -> &'static str {
+    env!("BUILD_TIMESTAMP")
+}
+
 /// Returns the user's home directory as a string. The frontend uses this as
 /// the default landing path on first launch and as the target of a "Home"
 /// favorite.

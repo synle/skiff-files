@@ -52,6 +52,58 @@ export interface ListOptions {
 export const getAppVersion = (): Promise<string> =>
   invoke<string>("get_app_version");
 
+/** UTC build timestamp formatted as `YYYY-MM-DD HH:MM`. Baked in by
+ *  `src-tauri/build.rs` so it reflects when the installed binary was
+ *  compiled, not when it was launched. Surfaced in Settings → About. */
+export const getBuildTimestamp = (): Promise<string> =>
+  invoke<string>("get_build_timestamp");
+
+/** Shape we keep from the GitHub Releases API for the "Latest" row in
+ *  Settings → About. We only need the tag and the published-at — the
+ *  full release JSON includes uploader info, asset URLs, etc. that we
+ *  don't surface. */
+export interface LatestRelease {
+  /** Release tag (e.g. `"v0.2.302"`) — display strips the leading `v`. */
+  tagName: string;
+  /** ISO-8601 publish timestamp. May be `null` for drafts (the API
+   *  hides drafts from unauthenticated callers, so this is rare). */
+  publishedAt: string | null;
+}
+
+/**
+ * Fetch the latest released version of Skiff Files from GitHub.
+ *
+ * Hits the public `releases/latest` endpoint — unauthenticated, no
+ * secrets involved. Used by Settings → About to render the Latest row
+ * and the Up-to-date / Update-available badge.
+ *
+ * Returns `null` on any non-200 or network error (offline, GH down,
+ * rate limit) so the UI can silently fall back to "unknown" rather
+ * than panic-rendering an error chip. The owner/repo string is
+ * hard-coded — matches the in-app Check-for-updates handoff target.
+ */
+export async function fetchLatestRelease(): Promise<LatestRelease | null> {
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/synle/skiff-files/releases/latest",
+      { headers: { Accept: "application/vnd.github+json" } },
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      tag_name?: unknown;
+      published_at?: unknown;
+    };
+    if (typeof json.tag_name !== "string") return null;
+    return {
+      tagName: json.tag_name,
+      publishedAt:
+        typeof json.published_at === "string" ? json.published_at : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const fsHomeDir = (): Promise<string> => invoke<string>("fs_home_dir");
 
 /** Spawn a new top-level Skiff Files window. Used by the Cmd/Ctrl+N
