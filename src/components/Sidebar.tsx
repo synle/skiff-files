@@ -2012,7 +2012,32 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         </Box>
       </Box>
 
-      <List dense disablePadding sx={{ borderTop: 1, borderColor: "divider" }}>
+      {/* Bottom nav. Lives outside the scrollable section, so the
+          icon-only CSS scope on that parent Box (which hides
+          .MuiListItemText-root via a single `display: none` rule)
+          doesn't reach these three rows. Mirror that scope here so
+          Transfers / Settings / Collapse all collapse to icon-only
+          tooltips in lockstep with the top section instead of
+          rendering truncated "Tra…" / "Se…" / "Expa…" labels that
+          overflow into the status bar. */}
+      <List
+        dense
+        disablePadding
+        sx={{
+          borderTop: 1,
+          borderColor: "divider",
+          ...(settings.sidebarIconOnly && {
+            "& .MuiListItemText-root": { display: "none" },
+            "& .MuiListItemButton-root": {
+              justifyContent: "center",
+              px: 0,
+            },
+            "& .MuiListItemIcon-root": {
+              minWidth: "unset !important",
+            },
+          }),
+        }}
+      >
         <ListItem disablePadding>
           <Tooltip
             title={settings.sidebarIconOnly ? t("sidebar.nav.transfers") : ""}
@@ -2021,10 +2046,6 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             <ListItemButton
               onClick={() => onSwitchPage("transfers")}
               selected={page === "transfers"}
-              sx={{
-                justifyContent: settings.sidebarIconOnly ? "center" : undefined,
-                px: settings.sidebarIconOnly ? 0 : undefined,
-              }}
             >
               <ListItemIcon
                 sx={{
@@ -2052,10 +2073,6 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             <ListItemButton
               selected={page === "settings"}
               onClick={() => onSwitchPage("settings")}
-              sx={{
-                justifyContent: settings.sidebarIconOnly ? "center" : undefined,
-                px: settings.sidebarIconOnly ? 0 : undefined,
-              }}
             >
               <ListItemIcon
                 sx={{
@@ -2081,10 +2098,6 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               onClick={() =>
                 update("sidebarIconOnly", !settings.sidebarIconOnly)
               }
-              sx={{
-                justifyContent: settings.sidebarIconOnly ? "center" : undefined,
-                px: settings.sidebarIconOnly ? 0 : undefined,
-              }}
             >
               <ListItemIcon
                 sx={{
