@@ -44,6 +44,11 @@ import {
   type ThumbnailCacheStats,
 } from "../api/fs";
 import { credsDelete } from "../api/creds";
+import {
+  macosCheckFullDiskAccess,
+  macosOpenFullDiskAccessSettings,
+} from "../api/permissions";
+import { isMacOs } from "../util/platform";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { SUPPORTED_LOCALES, type LocaleCode } from "../i18n";
 
@@ -883,6 +888,112 @@ function formatReleaseTimestamp(iso: string | null): string | null {
   );
 }
 
+/**
+ * Settings → macOS permissions section. macOS gates apps from reading
+ * a long list of user-data folders behind the TCC "Full Disk Access"
+ * privacy permission; without it, the user sees silently-empty
+ * folders from inside Skiff and has no obvious cue that the OS is
+ * blocking it. The auto-prompt in `App.tsx` opens System Settings
+ * once on app launch when the permission is missing — this section
+ * lets the user re-check at any time (e.g. after they granted the
+ * permission and want to verify before relaunching) and re-open the
+ * Settings pane on demand. Only mounted on macOS (`isMacOs()` gate
+ * in the parent) because Windows / Linux have no equivalent
+ * system-wide privacy gate.
+ *
+ * Status states:
+ *   - "checking" — probe in flight (initial mount or after a refresh).
+ *   - "granted"  — Rust probe found at least one TCC-protected path
+ *                  it could `read_dir`. Skiff has the permission.
+ *   - "denied"   — every probe path rejected with PermissionDenied.
+ *                  Skiff needs the user to flip the toggle in System
+ *                  Settings → Privacy & Security → Full Disk Access
+ *                  and relaunch.
+ *   - "error"    — IPC failed (running outside Tauri, for example).
+ */
+function MacosPermissionsSection() {
+  const [status, setStatus] = useState<
+    "checking" | "granted" | "denied" | "error"
+  >("checking");
+  const refresh = () => {
+    setStatus("checking");
+    macosCheckFullDiskAccess()
+      .then((granted) => setStatus(granted ? "granted" : "denied"))
+      .catch(() => setStatus("error"));
+  };
+  useEffect(() => {
+    // Mount-only probe. The refresh button re-runs the same call.
+    let cancelled = false;
+    macosCheckFullDiskAccess()
+      .then((granted) => {
+        if (cancelled) return;
+        setStatus(granted ? "granted" : "denied");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const statusChip = (() => {
+    switch (status) {
+      case "checking":
+        return <Chip size="small" label="Checking…" />;
+      case "granted":
+        return <Chip size="small" color="success" label="Granted" />;
+      case "denied":
+        return <Chip size="small" color="warning" label="Not granted" />;
+      case "error":
+      default:
+        return <Chip size="small" label="Status unknown" />;
+    }
+  })();
+  return (
+    <Section
+      title="macOS permissions"
+      description="Skiff Files needs Full Disk Access to read protected folders like ~/Library, ~/Documents, and ~/Desktop. Without it, macOS silently rejects directory reads and Skiff renders those folders as empty."
+    >
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          Full Disk Access
+        </Typography>
+        {statusChip}
+      </Stack>
+      <Stack direction="row" spacing={1}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={refresh}
+          disabled={status === "checking"}
+        >
+          Refresh status
+        </Button>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => {
+            void macosOpenFullDiskAccessSettings().catch(() => {
+              /* IPC may be unavailable in tests / browser dev — the
+               * status chip already surfaces the degraded state. */
+            });
+          }}
+        >
+          Open System Settings
+        </Button>
+      </Stack>
+      {status === "denied" && (
+        <Typography variant="caption" color="text.secondary">
+          Toggle <strong>Skiff Files</strong> on in System Settings → Privacy &
+          Security → Full Disk Access, then relaunch the app. Click{" "}
+          <strong>Refresh status</strong> after relaunch to confirm.
+        </Typography>
+      )}
+    </Section>
+  );
+}
+
 export default function SettingsPage() {
   console.log("[SettingsPage] rendering");
   const { settings, setSettings, update, reset } = useSettings();
@@ -1310,6 +1421,13 @@ export default function SettingsPage() {
             );
           })}
         </Section>
+
+        {isMacOs() && (
+          <>
+            <Divider />
+            <MacosPermissionsSection />
+          </>
+        )}
 
         <Divider />
 

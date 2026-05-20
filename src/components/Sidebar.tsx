@@ -131,11 +131,24 @@ function SectionHeader({
 }) {
   // 0.2.307 — in the collapsed rail, sections are always expanded
   // (the toggle has no body to show/hide because the rail has no
-  // room for a tree), and we drop the header for empty sections so
-  // the user doesn't see a row of meaningless grey bubbles. The
-  // tooltip surfaces the section label on hover so the dividers
-  // remain discoverable identity markers.
-  if (iconOnly && hideInIconOnly) return null;
+  // room for a tree), and we dropped the header for empty sections
+  // so the user didn't see a row of meaningless grey bubbles.
+  // 0.2.310 — go one step further and drop the bubble for EVERY
+  // section in the rail. The 14×1 px divider read as a stray
+  // empty grey square (user feedback) and the tooltip on each
+  // icon row already surfaces what the section is — the bubble
+  // added no identity, only noise. `hideInIconOnly` is preserved
+  // as a no-op flag at the call sites so future expanded-sidebar
+  // tweaks can still suppress the header for empty bodies.
+  if (iconOnly) return null;
+  void hideInIconOnly;
+  // Past this guard `iconOnly` is always false, so the iconOnly
+  // branches in the JSX below are dead. They're preserved as
+  // straight-line "expanded mode" code paths rather than ternaries
+  // gated on a value that can never be true — the TS narrowing on
+  // the early-return turns `...(iconOnly && {...})` into a spread
+  // over `false` and the typechecker (correctly) refuses to spread
+  // a non-object.
   const button = (
     <Box
       component="button"
@@ -145,7 +158,6 @@ function SectionHeader({
       }
       aria-expanded={!collapsed}
       aria-controls={`sidebar-section-${id}`}
-      aria-label={iconOnly ? label : undefined}
       sx={{
         appearance: "none",
         background: "transparent",
@@ -154,40 +166,25 @@ function SectionHeader({
         display: "flex",
         alignItems: "center",
         gap: 0.5,
-        flex: iconOnly ? 0 : 1,
-        textAlign: iconOnly ? "center" : "left",
-        px: iconOnly ? 0 : 2,
-        pt: iconOnly ? 0 : 1.5,
-        pb: iconOnly ? 0 : 0.25,
+        flex: 1,
+        textAlign: "left",
+        px: 2,
+        pt: 1.5,
+        pb: 0.25,
         color: "text.secondary",
         fontSize: "0.6875rem",
         fontWeight: 500,
         letterSpacing: "0.08333em",
         textTransform: "uppercase",
         "&:hover": { color: "text.primary" },
-        ...(iconOnly && {
-          width: 20,
-          height: 20,
-          justifyContent: "center",
-          borderRadius: 1,
-        }),
       }}
     >
-      {iconOnly ? (
-        <Box
-          sx={{
-            width: 14,
-            height: 1,
-            bgcolor: "divider",
-            borderRadius: 1,
-          }}
-        />
-      ) : collapsed ? (
+      {collapsed ? (
         <KeyboardArrowRightIcon sx={{ fontSize: 14 }} />
       ) : (
         <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
       )}
-      {!iconOnly && label}
+      {label}
     </Box>
   );
   return (
@@ -198,22 +195,11 @@ function SectionHeader({
         alignItems: "center",
         // Reveal the hide button on hover only — full-time visibility
         // is too easy to mis-click with the section header just above.
-        "&:hover .sidebar-section-hide": { opacity: iconOnly ? 0 : 1 },
-        ...(iconOnly && {
-          justifyContent: "center",
-          pt: 0.25,
-          pb: 0.25,
-        }),
+        "&:hover .sidebar-section-hide": { opacity: 1 },
       }}
     >
-      {iconOnly ? (
-        <Tooltip title={label} placement="right">
-          {button}
-        </Tooltip>
-      ) : (
-        button
-      )}
-      {!iconOnly && onHide && (
+      {button}
+      {onHide && (
         <Tooltip title="Hide section (re-enable in Settings → Sidebar)">
           <IconButton
             className="sidebar-section-hide"
@@ -671,37 +657,49 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               (f) => !settings.hiddenFavorites.includes(f.rel),
             ).map((f) => (
               <ListItem key={f.label} disablePadding>
-                <ListItemButton
-                  disabled={!home}
-                  onClick={() => onNavigate(join(f.rel))}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setContextMenu({
-                      x: e.clientX,
-                      y: e.clientY,
-                      section: "favorites",
-                      itemId: f.rel,
-                      actions: [
-                        {
-                          key: "bookmark",
-                          icon: <BookmarkIcon fontSize="small" />,
-                          label: "Add to bookmarks",
-                          onClick: () =>
-                            bookmarkPath(join(f.rel), f.label),
-                        },
-                        {
-                          key: "hide",
-                          icon: <VisibilityOffIcon fontSize="small" />,
-                          label: `Hide "${f.label}"`,
-                          onClick: () => hideFavorite(f.rel),
-                        },
-                      ],
-                    });
-                  }}
+                {/* In iconOnly (collapsed-rail) mode the row's
+                    ListItemText is hidden via the parent CSS scope,
+                    so the user has no in-line label to read. Surface
+                    the favorite name via a right-anchored Tooltip
+                    instead — mirrors the pattern the bottom nav
+                    (Transfers / Settings / Collapse) uses. Empty
+                    title in expanded mode = no tooltip rendered. */}
+                <Tooltip
+                  title={settings.sidebarIconOnly ? f.label : ""}
+                  placement="right"
                 >
-                  <ListItemIcon sx={{ minWidth: 32 }}>{f.icon}</ListItemIcon>
-                  <ListItemText primary={f.label} />
-                </ListItemButton>
+                  <ListItemButton
+                    disabled={!home}
+                    onClick={() => onNavigate(join(f.rel))}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        section: "favorites",
+                        itemId: f.rel,
+                        actions: [
+                          {
+                            key: "bookmark",
+                            icon: <BookmarkIcon fontSize="small" />,
+                            label: "Add to bookmarks",
+                            onClick: () =>
+                              bookmarkPath(join(f.rel), f.label),
+                          },
+                          {
+                            key: "hide",
+                            icon: <VisibilityOffIcon fontSize="small" />,
+                            label: `Hide "${f.label}"`,
+                            onClick: () => hideFavorite(f.rel),
+                          },
+                        ],
+                      });
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 32 }}>{f.icon}</ListItemIcon>
+                    <ListItemText primary={f.label} />
+                  </ListItemButton>
+                </Tooltip>
               </ListItem>
             ))}
             {trashPath && !settings.hiddenFavorites.includes("trash") && (
@@ -710,6 +708,10 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                  *  "Operation not permitted" without Full Disk Access. Reveal
                  *  it in Finder instead, which has the entitlement and a
                  *  better Trash UI (Empty Trash / Put Back) anyway. */}
+                <Tooltip
+                  title={settings.sidebarIconOnly ? "Trash" : ""}
+                  placement="right"
+                >
                 <ListItemButton
                   onClick={() => {
                     void fsOpenWithDefault(trashPath).catch(() => {});
@@ -774,6 +776,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   </ListItemIcon>
                   <ListItemText primary="Trash" />
                 </ListItemButton>
+                </Tooltip>
               </ListItem>
             )}
           </List>
@@ -1857,15 +1860,24 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         ) : connections.length === 0 ? (
           <List dense disablePadding>
             <ListItem disablePadding>
-              <ListItemButton onClick={() => onSwitchPage("connections")}>
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <HubIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Manage connections…"
-                  slotProps={{ primary: { variant: "body2" } }}
-                />
-              </ListItemButton>
+              {/* In iconOnly mode the ListItemText is hidden by the
+                  parent CSS scope, so the bare HubIcon needs a
+                  Tooltip to convey its purpose. Mirrors the favorites
+                  pattern — empty title in expanded mode = no tooltip. */}
+              <Tooltip
+                title={settings.sidebarIconOnly ? "Manage connections" : ""}
+                placement="right"
+              >
+                <ListItemButton onClick={() => onSwitchPage("connections")}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <HubIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Manage connections…"
+                    slotProps={{ primary: { variant: "body2" } }}
+                  />
+                </ListItemButton>
+              </Tooltip>
             </ListItem>
           </List>
         ) : (
@@ -1992,15 +2004,24 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
               );
             })}
             <ListItem disablePadding>
-              <ListItemButton onClick={() => onSwitchPage("connections")}>
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <HubIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Manage connections…"
-                  slotProps={{ primary: { variant: "body2" } }}
-                />
-              </ListItemButton>
+              {/* In iconOnly mode the ListItemText is hidden by the
+                  parent CSS scope, so the bare HubIcon needs a
+                  Tooltip to convey its purpose. Mirrors the favorites
+                  pattern — empty title in expanded mode = no tooltip. */}
+              <Tooltip
+                title={settings.sidebarIconOnly ? "Manage connections" : ""}
+                placement="right"
+              >
+                <ListItemButton onClick={() => onSwitchPage("connections")}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <HubIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Manage connections…"
+                    slotProps={{ primary: { variant: "body2" } }}
+                  />
+                </ListItemButton>
+              </Tooltip>
             </ListItem>
           </List>
         )}
@@ -2037,6 +2058,14 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             <List dense disablePadding id="sidebar-section-devices">
               {mounts.map((m) => (
                 <ListItem key={m.mountPoint} disablePadding>
+                  <Tooltip
+                    title={
+                      settings.sidebarIconOnly
+                        ? `${m.name}${m.total > 0 ? ` · ${formatBytes(m.free)} free of ${formatBytes(m.total)}` : ""}`
+                        : ""
+                    }
+                    placement="right"
+                  >
                   <ListItemButton
                     onClick={() => onNavigate(m.mountPoint)}
                     title={`${m.mountPoint}${m.total > 0 ? ` · ${formatBytes(m.free)} free of ${formatBytes(m.total)}` : ""}`}
@@ -2061,6 +2090,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                       }}
                     />
                   </ListItemButton>
+                  </Tooltip>
                 </ListItem>
               ))}
             </List>
