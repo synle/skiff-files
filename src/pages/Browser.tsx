@@ -30,7 +30,8 @@ import StatusBar from "../components/StatusBar";
 import RemoteConnectDialog, {
   type RemoteConnectRequest,
 } from "../components/RemoteConnectDialog";
-import PreviewPane from "../components/PreviewPane";
+import PreviewPane, { isPreviewableEntry } from "../components/PreviewPane";
+import PreviewModal from "../components/PreviewModal";
 import {
   fsDiskSpace,
   fsFind,
@@ -131,6 +132,14 @@ export default function Browser({
   const [sortDir, setSortDir] = useState<SortDir>(settings.defaultSortDir);
   /** Last-clicked entry — drives the preview pane. */
   const [primarySelected, setPrimarySelected] = useState<Entry | null>(null);
+  /** Entry currently being shown in the in-app PreviewModal. `null`
+   *  = modal closed. Opening surfaces: Spacebar on a single previewable
+   *  selection, the inline pane's "Open preview window" button, and
+   *  the network-drive `onOpenFile` fallback (when osOpen has no
+   *  native handler for the backend). */
+  const [previewModalEntry, setPreviewModalEntry] = useState<Entry | null>(
+    null,
+  );
   /** Multi-select set, reported by FileList. We compute aggregate stats
    *  here so the StatusBar can render N of M selected · total size. */
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
@@ -749,6 +758,34 @@ export default function Browser({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isActive, primarySelected, selectedPaths, entries, settings.shortcutOverrides]);
+
+  // Spacebar on a single previewable selection → open the in-app
+  // PreviewModal. Finder convention (Quick Look). Works across every
+  // backend (local / SMB / SFTP / FTP) because the modal renders via
+  // our own Body — no OS handoff, no UUID-routing leak. Skipped on
+  // multi-select (ambiguous which file to preview), on directories
+  // (not previewable), and on input focus (don't hijack typing).
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Bail on modifier combos so we don't fight Cmd+Space / Alt+Space
+      // / Ctrl+Space bindings the user (or OS) may own.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== " " && e.code !== "Space") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
+      // Single-selection requirement. Multi-select makes "which file
+      // is this previewing?" ambiguous; we'd rather no-op than guess.
+      if (selectedPaths.length > 1) return;
+      if (!primarySelected || primarySelected.isDir) return;
+      if (!isPreviewableEntry(primarySelected)) return;
+      e.preventDefault();
+      setPreviewModalEntry(primarySelected);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isActive, primarySelected, selectedPaths]);
 
   // Cmd/Ctrl+R → refresh the current folder. F5 is also a refresh
   // alias (Windows Explorer muscle memory; takes no modifier).
@@ -1882,9 +1919,14 @@ export default function Browser({
           <PreviewPane
             selected={primarySelected}
             width={settings.previewWidth}
+            onOpenInModal={(entry) => setPreviewModalEntry(entry)}
           />
         )}
       </Box>
+      <PreviewModal
+        entry={previewModalEntry}
+        onClose={() => setPreviewModalEntry(null)}
+      />
       {settings.showStatusBar && <StatusBar
         totalEntries={
           searchRecursive && findResults && search

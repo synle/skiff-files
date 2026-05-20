@@ -24,6 +24,7 @@ import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import { useEffect, useRef, useState } from "react";
 import {
   fsImageExif,
@@ -53,6 +54,11 @@ interface Props {
   selected: Entry | null;
   /** Pane width in pixels. The parent owns resize; we just consume the value. */
   width: number;
+  /** Callback fired when the user clicks the "Open in preview window"
+   *  button. The Browser-level parent owns the modal state; this pane
+   *  just signals intent. Omit to hide the button (e.g. tests that
+   *  don't care about modal wiring). */
+  onOpenInModal?: (entry: Entry) => void;
 }
 
 /** Stretchy "label: value" row, used for the properties block. */
@@ -777,17 +783,24 @@ function FolderBody({ entry }: { entry: Entry }) {
   );
 }
 
-/** Decide which body component to render based on the selected entry's kind. */
-function Body({
+/** Decide which body component to render based on the selected entry's
+ *  kind. Forwards the `mode` prop ("inline" vs "modal") to the
+ *  image / text bodies so they can size their containers + toolbars
+ *  appropriately. */
+export function Body({
   entry,
   onImageDimensions,
+  mode = "inline",
 }: {
   entry: Entry;
   onImageDimensions: (d: { w: number; h: number } | null) => void;
+  mode?: "inline" | "modal";
 }) {
   if (entry.isDir) return <FolderBody entry={entry} />;
   if (isImage(entry.path)) {
-    return <ImageBody entry={entry} onDimensions={onImageDimensions} />;
+    return (
+      <ImageBody entry={entry} onDimensions={onImageDimensions} mode={mode} />
+    );
   }
   if (entry.kind === "audio" || entry.kind === "video") {
     return <AVBody entry={entry} />;
@@ -817,7 +830,27 @@ function Body({
   );
 }
 
-export default function PreviewPane({ selected, width }: Props) {
+/** Predicate: does this entry have a useful inline preview body? Used
+ *  by callers (PreviewPane "Open preview window" button gate, Browser
+ *  spacebar handler, network-drive open routing) to decide whether to
+ *  surface the in-app preview affordances vs. falling back to OS
+ *  handoff / properties-only. Returns false for directories. */
+export function isPreviewableEntry(entry: Entry): boolean {
+  if (entry.isDir) return false;
+  if (isImage(entry.path)) return true;
+  return (
+    entry.kind === "audio" ||
+    entry.kind === "video" ||
+    entry.kind === "pdf" ||
+    entry.kind === "text" ||
+    entry.kind === "markdown" ||
+    entry.kind === "code" ||
+    entry.kind === "binary" ||
+    entry.kind === "unknown"
+  );
+}
+
+export default function PreviewPane({ selected, width, onOpenInModal }: Props) {
   const { settings, update } = useSettings();
   /** Natural pixel dimensions of the currently-rendered image, if any.
    *  Reset on selection change by ImageBody so a stale value from the
@@ -956,6 +989,22 @@ export default function PreviewPane({ selected, width }: Props) {
             >
               {selected.name}
             </Typography>
+            {onOpenInModal && !selected.isDir && isPreviewableEntry(selected) && (
+              <Tooltip title="Open in preview window">
+                {/* In-app preview modal. Routes through the same Body
+                 *  used inline, so it works on every backend including
+                 *  SMB / SFTP / FTP where `fsOpenWithDefault` can't
+                 *  reach (Finder / Explorer can't resolve the routing
+                 *  UUID in our internal URL form). */}
+                <IconButton
+                  size="small"
+                  onClick={() => onOpenInModal(selected)}
+                  aria-label="Open in preview window"
+                >
+                  <OpenInFullIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             {parseLocation(selected.path).backend.kind === "local" && (
               <Tooltip title="Reveal in Finder/Explorer">
                 <IconButton
