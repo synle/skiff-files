@@ -70,13 +70,24 @@ describe("SettingsPage smoke", () => {
     ).toBeInTheDocument();
   });
 
-  it("clicking Reset all settings confirms then calls reset", () => {
+  it("clicking Reset all settings opens the confirm modal", () => {
     renderSettings();
     fireEvent.click(screen.getByRole("button", { name: /Reset all settings/i }));
-    // The window.confirm stub returned true — the reset path ran without
-    // throwing. We just confirm the button is still in the DOM (no
-    // crash) and the confirm got called.
-    expect(window.confirm).toHaveBeenCalled();
+    // 0.2.309: `window.confirm` was replaced by a real modal —
+    // Tauri's webview suppresses native dialogs (footgun in
+    // CLAUDE.md). The modal renders the destructive copy and a
+    // confirm button labelled "Reset to defaults".
+    expect(
+      screen.getByText(/Reset all settings to defaults\?/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Reset to defaults/i }),
+    ).toBeInTheDocument();
+    // Cancel button (autoFocus by default in ConfirmDialog) is also
+    // present so the modal can be dismissed without action.
+    expect(
+      screen.getByRole("button", { name: /^Cancel$/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders Transfers section conflict policy and limits", () => {

@@ -13,7 +13,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   addOrUpdateConnection,
   findConnectionById,
-  findExistingConnection,
   matchConnectionsForHost,
   migrateLegacyDrafts,
   moveConnection,
@@ -223,95 +222,12 @@ describe("matchConnectionsForHost", () => {
   });
 });
 
-describe("findExistingConnection", () => {
-  // 0.2.307 — Connect dialog uses this to dedupe a re-connect against
-  // an existing saved row. Without dedup, re-typing the same SMB
-  // host/user/share spawns a second row + a second live registry
-  // slot, which shows as two near-identical rows in the sidebar.
-  const smbA: SavedConnection = {
-    id: "smb-existing",
-    kind: "smb",
-    label: "admin@192.168.1.1:445",
-    host: "192.168.1.1",
-    port: 445,
-    user: "admin",
-    share: "G",
-    domain: "",
-    rememberPassword: false,
-  };
+// 0.2.309: `findExistingConnection` / `connIdentity` were removed.
+// Dedup is now implicit via URL-form ids — two saves with the same
+// routing tuple compute the same id and `addOrUpdateConnection`
+// replaces in place. See `src/util/connectionUrl.test.ts` and the
+// "addOrUpdateConnection" suite above for the new contract.
 
-  it("matches by kind/host/port/user/share/domain — case-insensitive host + user", () => {
-    expect(
-      findExistingConnection([smbA], {
-        kind: "smb",
-        host: "192.168.1.1",
-        port: 445,
-        user: "ADMIN",
-        share: "G",
-        domain: "",
-      }),
-    ).toBe(smbA);
-  });
-
-  it("treats undefined share/domain as equivalent to empty string", () => {
-    // Real RemoteConnectDialog calls pass `undefined` for SFTP/FTP
-    // (no share concept) and empty string for SMB no-share-bound
-    // mode. They should not be distinct identities.
-    expect(
-      findExistingConnection([smbA], {
-        kind: "smb",
-        host: "192.168.1.1",
-        port: 445,
-        user: "admin",
-        share: undefined,
-        domain: undefined,
-      }),
-    ).toBeUndefined(); // share differs ("G" vs "")
-  });
-
-  it("different share on same host:port:user is a separate identity", () => {
-    expect(
-      findExistingConnection([smbA], {
-        kind: "smb",
-        host: "192.168.1.1",
-        port: 445,
-        user: "admin",
-        share: "OtherShare",
-        domain: "",
-      }),
-    ).toBeUndefined();
-  });
-
-  it("excludes a row by id (edit-mode shouldn't self-match)", () => {
-    expect(
-      findExistingConnection(
-        [smbA],
-        {
-          kind: smbA.kind,
-          host: smbA.host,
-          port: smbA.port,
-          user: smbA.user,
-          share: smbA.share,
-          domain: smbA.domain,
-        },
-        smbA.id,
-      ),
-    ).toBeUndefined();
-  });
-
-  it("returns undefined when no row matches", () => {
-    expect(
-      findExistingConnection([smbA], {
-        kind: "ftp",
-        host: "192.168.1.1",
-        port: 445,
-        user: "admin",
-        share: undefined,
-        domain: undefined,
-      }),
-    ).toBeUndefined();
-  });
-});
 
 describe("moveConnection", () => {
   const a: SavedConnection = { ...sftp, id: "a" };

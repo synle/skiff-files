@@ -24,6 +24,7 @@ import {
   migrateLegacyDrafts,
   type SavedConnection,
 } from "./connectionStore";
+import { connectionId } from "../util/connectionUrl";
 
 /** What rendering style the file list uses. Per-folder overrides land later. */
 export type ViewMode = "list" | "tile" | "gallery" | "column";
@@ -643,13 +644,76 @@ export const DEFAULTS: Settings = {
 
 const STORAGE_KEY = "skiff-files.settings.v1";
 
+/** Rewrite any occurrence of `<scheme>://<oldId>/...` to use the new
+ *  id. Walks the path once for each renamed connection. No-op when
+ *  `renamed` is empty (the common steady-state case after the first
+ *  post-upgrade run). Pure helper — exported for tests. */
+export function rewritePathIds(
+  path: string,
+  renamed: Map<string, string>,
+): string {
+  if (!path || renamed.size === 0) return path;
+  for (const [oldId, newId] of renamed) {
+    // Match `<scheme>://<oldId>` followed by `/` or end-of-string.
+    // Anchoring on `/` keeps us from rewriting an id that happens to
+    // be a prefix of another id. Schemes are fixed (sftp / ftp / smb).
+    for (const scheme of ["sftp", "ftp", "smb"] as const) {
+      const needle = `${scheme}://${oldId}`;
+      if (path.startsWith(needle)) {
+        const tail = path.slice(needle.length);
+        if (tail === "" || tail.startsWith("/")) {
+          return `${scheme}://${newId}${tail}`;
+        }
+      }
+    }
+  }
+  return path;
+}
+
+/** Migrate connection ids from synthetic (`smb-1779235589933`, UUIDs)
+ *  to canonical URL identity (`admin@host:445`). Returns the rewritten
+ *  list plus a `renamed` map old→new so caller can fix up any path
+ *  references in other settings surfaces. Idempotent — entries whose
+ *  id is already the canonical form pass through unchanged. */
+export function migrateConnectionIds(
+  list: SavedConnection[],
+): { connections: SavedConnection[]; renamed: Map<string, string> } {
+  const renamed = new Map<string, string>();
+  const seen = new Set<string>();
+  const out: SavedConnection[] = [];
+  for (const c of list) {
+    const desired = connectionId({
+      kind: c.kind,
+      host: c.host,
+      port: c.port,
+      user: c.user || (c.kind === "ftp" ? "anonymous" : c.kind === "smb" ? "guest" : "user"),
+    });
+    if (c.id !== desired) renamed.set(c.id, desired);
+    // Collapse duplicates that map to the same canonical id —
+    // last-write-wins matches the runtime upsert behaviour.
+    if (seen.has(desired)) {
+      const idx = out.findIndex((x) => x.id === desired);
+      if (idx >= 0) out[idx] = { ...c, id: desired };
+    } else {
+      out.push({ ...c, id: desired });
+      seen.add(desired);
+    }
+  }
+  return { connections: out, renamed };
+}
+
 /** Migrate a parsed payload from older schema shapes. Currently:
  *  - `showExtensions` was a `boolean` until 0.2.65; coerce it to the
  *    new enum so Settings.json round-trips cleanly across versions.
  *  - `connections` was three separate localStorage keys (per-kind
  *    drafts) until the merged Connections list landed; fold those
  *    into a unified array on first read. Idempotent — running
- *    against an already-migrated payload is a no-op. */
+ *    against an already-migrated payload is a no-op.
+ *  - `connections[].id` was a synthetic timestamp / uuid until 0.2.309;
+ *    rewrite to canonical URL identity (`user@host:port`) so the
+ *    internal URL matches the OS-native URL. Path-bearing surfaces
+ *    (`recentPaths`, `bookmarks`, `savedTabs`, …) are walked to swap
+ *    any `<scheme>://<oldId>/...` references for the new id. */
 function migrate(parsed: Record<string, unknown>): Partial<Settings> {
   if (typeof parsed.showExtensions === "boolean") {
     parsed.showExtensions = parsed.showExtensions ? "always" : "never";
@@ -657,7 +721,92 @@ function migrate(parsed: Record<string, unknown>): Partial<Settings> {
   const existing = Array.isArray(parsed.connections)
     ? (parsed.connections as SavedConnection[])
     : [];
-  parsed.connections = migrateLegacyDrafts(existing);
+  const folded = migrateLegacyDrafts(existing);
+  const { connections, renamed } = migrateConnectionIds(folded);
+  parsed.connections = connections;
+  if (renamed.size > 0) {
+    // Walk every path-bearing surface in settings and rewrite stale
+    // `<scheme>://<oldId>/...` prefixes. Each surface is handled
+    // defensively (typeof guards) because a corrupt/older payload
+    // may not have every key in the expected shape.
+    const rewriteStr = (p: unknown): unknown =>
+      typeof p === "string" ? rewritePathIds(p, renamed) : p;
+    const rewriteArr = (arr: unknown): unknown =>
+      Array.isArray(arr) ? arr.map(rewriteStr) : arr;
+    parsed.recentPaths = rewriteArr(parsed.recentPaths);
+    parsed.searchHistory = rewriteArr(parsed.searchHistory);
+    if (typeof parsed.startPath === "string") {
+      parsed.startPath = rewritePathIds(parsed.startPath, renamed);
+    }
+    if (Array.isArray(parsed.bookmarks)) {
+      parsed.bookmarks = (parsed.bookmarks as unknown[]).map((b) => {
+        if (b && typeof b === "object" && "path" in b) {
+          return { ...b, path: rewriteStr((b as { path: unknown }).path) };
+        }
+        return b;
+      });
+    }
+    const rewriteTabs = (tabs: unknown): unknown =>
+      Array.isArray(tabs)
+        ? tabs.map((t) => {
+            if (t && typeof t === "object" && "initialPath" in t) {
+              return {
+                ...t,
+                initialPath: rewriteStr(
+                  (t as { initialPath: unknown }).initialPath,
+                ),
+              };
+            }
+            return t;
+          })
+        : tabs;
+    parsed.savedTabs = rewriteTabs(parsed.savedTabs);
+    parsed.savedTabsRight = rewriteTabs(parsed.savedTabsRight);
+    parsed.recentlyClosedTabs = rewriteTabs(parsed.recentlyClosedTabs);
+    if (Array.isArray(parsed.tabWorkspaces)) {
+      parsed.tabWorkspaces = (parsed.tabWorkspaces as unknown[]).map((w) => {
+        if (w && typeof w === "object" && "tabs" in w) {
+          return { ...w, tabs: rewriteTabs((w as { tabs: unknown }).tabs) };
+        }
+        return w;
+      });
+    }
+    if (Array.isArray(parsed.savedSyncJobs)) {
+      parsed.savedSyncJobs = (parsed.savedSyncJobs as unknown[]).map((j) => {
+        if (j && typeof j === "object") {
+          const job = j as { src?: unknown; dest?: unknown };
+          return { ...j, src: rewriteStr(job.src), dest: rewriteStr(job.dest) };
+        }
+        return j;
+      });
+    }
+    if (Array.isArray(parsed.savedSelections)) {
+      parsed.savedSelections = (parsed.savedSelections as unknown[]).map((s) => {
+        if (s && typeof s === "object" && "paths" in s) {
+          return {
+            ...s,
+            paths: rewriteArr((s as { paths: unknown }).paths),
+          };
+        }
+        return s;
+      });
+    }
+    // Path-keyed object maps — rebuild with new keys.
+    const rewriteKeys = (obj: unknown): unknown => {
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+        out[rewritePathIds(k, renamed)] = v;
+      }
+      return out;
+    };
+    parsed.fileTags = rewriteKeys(parsed.fileTags);
+    parsed.folderViewMode = rewriteKeys(parsed.folderViewMode);
+    parsed.folderSort = rewriteKeys(parsed.folderSort);
+    parsed.folderKindFilter = rewriteKeys(parsed.folderKindFilter);
+    parsed.folderTagFilter = rewriteKeys(parsed.folderTagFilter);
+    parsed.folderRecencyFilter = rewriteKeys(parsed.folderRecencyFilter);
+  }
   return parsed as Partial<Settings>;
 }
 
