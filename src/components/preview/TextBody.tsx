@@ -803,7 +803,7 @@ function VirtualizedTextView({
  *  and emit our own escaped+marked HTML using the source positions
  *  directly. Loses syntax colors while searching; gains correct
  *  match highlighting. Worth the tradeoff. */
-function overlayMatches(
+export function overlayMatches(
   text: string,
   _highlightedHtml: string,
   matches: Array<[number, number]>,
@@ -825,7 +825,7 @@ function overlayMatches(
 
 /** Per-line variant of `overlayMatches` for the virtualized branch.
  *  Hits are already translated to line-local offsets by the caller. */
-function overlayMatchesInLine(
+export function overlayMatchesInLine(
   line: string,
   hits: Array<[number, number, number]>,
   activeHit: number,
@@ -851,7 +851,7 @@ function overlayMatchesInLine(
 /** Binary-search line index for a character offset using the
  *  precomputed line-start offsets. Returns -1 when the offset is
  *  past end-of-text. */
-function lineIndexForOffset(lineStarts: number[], offset: number): number {
+export function lineIndexForOffset(lineStarts: number[], offset: number): number {
   if (lineStarts.length === 0) return -1;
   let lo = 0;
   let hi = lineStarts.length - 1;
