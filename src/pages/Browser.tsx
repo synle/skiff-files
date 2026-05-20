@@ -847,6 +847,50 @@ export default function Browser({
         ]);
         return;
       }
+      // Windows Explorer navigation keys: Alt+Left = Back, Alt+Right =
+      // Forward, Alt+Up = Up. Hardcoded aliases (the same way ArrowLeft
+      // alone is a hardcoded Back alias) so Windows users get the
+      // native convention without rebinding. The macOS/Linux primary
+      // chord (Cmd/Ctrl + arrow) still works via the matchesCombo
+      // path below — these are additive aliases, not replacements.
+      // Routed BEFORE the `!(metaKey || ctrlKey) return` gate because
+      // Alt is neither.
+      if (
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.shiftKey &&
+        e.key === "ArrowLeft"
+      ) {
+        if (history.back.length <= 1) return;
+        e.preventDefault();
+        goBack();
+        return;
+      }
+      if (
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.shiftKey &&
+        e.key === "ArrowRight"
+      ) {
+        if (history.forward.length === 0) return;
+        e.preventDefault();
+        goForward();
+        return;
+      }
+      if (
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.shiftKey &&
+        e.key === "ArrowUp"
+      ) {
+        if (!path || parentPath(path) === path) return;
+        e.preventDefault();
+        goUp();
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey)) return;
       const k = e.key.toLowerCase();
       if (k === "v" && !e.shiftKey) {

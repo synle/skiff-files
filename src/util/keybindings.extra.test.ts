@@ -106,6 +106,46 @@ describe("matchesCombo — null event combo path", () => {
   });
 });
 
+describe("matchesCombo — Windows ↔ macOS cross-platform aliases", () => {
+  // These pin the contract the user reported on 0.2.310: the
+  // shortcuts they use on macOS (Cmd+T, Cmd+W, Cmd+Arrow for nav)
+  // must trigger off the same KeyboardEvent shapes Windows produces
+  // (ctrlKey=true, metaKey=false) without per-platform branching at
+  // the call site. Each case below is a Windows-style keypress
+  // checked against the macOS-style stored combo.
+  it("matches Ctrl+T on Windows against the stored cmd+t binding", () => {
+    const e = ev({ key: "t", code: "KeyT", ctrlKey: true });
+    expect(matchesCombo(e, "cmd+t")).toBe(true);
+  });
+  it("matches Ctrl+W on Windows against the stored cmd+w binding", () => {
+    const e = ev({ key: "w", code: "KeyW", ctrlKey: true });
+    expect(matchesCombo(e, "cmd+w")).toBe(true);
+  });
+  it("matches Ctrl+ArrowLeft on Windows against the stored cmd+arrowleft binding", () => {
+    const e = ev({ key: "ArrowLeft", ctrlKey: true });
+    expect(matchesCombo(e, "cmd+arrowleft")).toBe(true);
+  });
+  it("matches Ctrl+ArrowRight on Windows against the stored cmd+arrowright binding", () => {
+    const e = ev({ key: "ArrowRight", ctrlKey: true });
+    expect(matchesCombo(e, "cmd+arrowright")).toBe(true);
+  });
+  it("matches Ctrl+ArrowUp on Windows against the stored cmd+arrowup binding", () => {
+    const e = ev({ key: "ArrowUp", ctrlKey: true });
+    expect(matchesCombo(e, "cmd+arrowup")).toBe(true);
+  });
+  it("matches Ctrl+ArrowDown on Windows against the stored cmd+arrowdown binding", () => {
+    const e = ev({ key: "ArrowDown", ctrlKey: true });
+    expect(matchesCombo(e, "cmd+arrowdown")).toBe(true);
+  });
+  it("emits alt+arrowleft for an Alt+Left press (Windows Explorer Back convention)", () => {
+    // The Browser uses this combo as a hardcoded alias for goBack
+    // so Windows users get the native chord without rebinding.
+    expect(keyEventToCombo(ev({ key: "ArrowLeft", altKey: true }))).toBe(
+      "alt+arrowleft",
+    );
+  });
+});
+
 describe("formatCombo — extras", () => {
   it("renders multi-modifier combos in left-to-right order", () => {
     expect(formatCombo("cmd+alt+shift+z")).toBe("Cmd+Alt+Shift+Z");
