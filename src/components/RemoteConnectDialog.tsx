@@ -25,6 +25,8 @@ import {
   Divider,
   FormControl,
   FormControlLabel,
+  IconButton,
+  InputAdornment,
   InputLabel,
   List,
   ListItemButton,
@@ -36,13 +38,17 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   connCreateFtp,
   connCreateSftp,
   connCreateSmb,
+  connDisconnect,
   smbListShares,
 } from "../api/conn";
 import {
@@ -58,10 +64,10 @@ import {
   connToFtpDraft,
   connToSftpDraft,
   connToSmbDraft,
-  findExistingConnection,
   matchConnectionsForHost,
   type SavedConnection,
 } from "../state/connectionStore";
+import { connectionId } from "../util/connectionUrl";
 import type {
   FtpDraft,
   SftpDraft,
@@ -126,6 +132,41 @@ interface Props {
 
 type SftpAuth = "password" | "privateKey" | "agent";
 
+/** Eye-icon adornment that toggles a TextField between
+ *  `type="password"` and `type="text"`. Declared at module scope so
+ *  it isn't recreated on every dialog render — defining components
+ *  inside other components is a footgun (see CLAUDE.md). */
+function PasswordVisibilityToggle({
+  visible,
+  onToggle,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <InputAdornment position="end">
+      <Tooltip title={visible ? "Hide password" : "Show password"}>
+        <IconButton
+          edge="end"
+          size="small"
+          onClick={onToggle}
+          // Don't take focus on click — the user is still typing in
+          // the password field and a focus steal would close the
+          // suggestions popover etc.
+          tabIndex={-1}
+          aria-label={visible ? "Hide password" : "Show password"}
+        >
+          {visible ? (
+            <VisibilityOffIcon fontSize="small" />
+          ) : (
+            <VisibilityIcon fontSize="small" />
+          )}
+        </IconButton>
+      </Tooltip>
+    </InputAdornment>
+  );
+}
+
 export default function RemoteConnectDialog({
   open,
   request,
@@ -184,6 +225,11 @@ export default function RemoteConnectDialog({
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Password-visibility toggles — one per field so the user can
+  // unmask the SFTP password without also revealing the passphrase.
+  // Reset on every dialog open so a re-open never starts unmasked.
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPassphrase, setShowPassphrase] = useState(false);
 
   // Drafts now flow through `Settings.connections` (unified store).
   // Project per-kind views for the autocomplete + match helpers
@@ -227,6 +273,8 @@ export default function RemoteConnectDialog({
     setRememberPassword(false);
     setAutoConnect(false);
     setSelectedDraftId(null);
+    setShowPassword(false);
+    setShowPassphrase(false);
     setError(null);
     setBusy(false);
     // Probe the OS keychain once per dialog open. Cheap (a single
@@ -408,32 +456,33 @@ export default function RemoteConnectDialog({
     setError(null);
     try {
       // Resolve the saved-row id BEFORE handing off to the backend.
-      // The registry now adopts caller-supplied ids so saved.id ===
-      // live.id, which means we have to lock the id in here.
+      // 0.2.309+: ids are canonical URL identity (`user@host:port`)
+      // rather than synthetic `smb-${Date.now()}` strings, so the
+      // internal URL `smb://<id>/<path>` is identical to the native
+      // `smb://[user@]host[:port]/<path>` URL the OS file manager
+      // resolves. Dedup is now implicit — two saves with the same
+      // routing tuple compute the same id and upsert in place.
       //
       // Resolution order:
-      //   1. Edit-mode → existing draft id (unchanged).
-      //   2. Existing saved row with the same identity tuple
-      //      (kind/host/port/user/share/domain) → reuse its id.
-      //      That collapses "Connect twice to the same NAS" into a
-      //      single sidebar entry + a single saved row instead of
-      //      two near-identical copies racing each other.
-      //   3. Otherwise → mint a fresh id (`${scheme}-${Date.now()}`)
-      //      and let the backend adopt it.
+      //   1. Edit-mode (user clicked "Use a saved connection" in the
+      //      list above, or arrived via Manage Connections → Edit)
+      //      → reuse the selected row's existing id. If the user
+      //      edited host/port/user, the id will be rotated to the
+      //      new identity by `addOrUpdateConnection` below.
+      //   2. Otherwise → compute the canonical URL id from the form
+      //      values. Collisions with existing saved rows replace in
+      //      place (last-write-wins) — that IS dedup.
       const isEditing = selectedDraftId != null;
-      const dedupMatch = isEditing
-        ? undefined
-        : findExistingConnection(settings.connections, {
-            kind: scheme,
-            host,
-            port,
-            user: user || (scheme === "ftp" ? "anonymous" : ""),
-            share: scheme === "smb" ? smbShare : undefined,
-            domain: scheme === "smb" ? smbDomain : undefined,
-          });
-      const connId = isEditing
-        ? selectedDraftId
-        : (dedupMatch?.id ?? `${scheme}-${Date.now()}`);
+      const computedId = connectionId({
+        kind: scheme,
+        host,
+        port,
+        user: user || (scheme === "ftp" ? "anonymous" : ""),
+      });
+      // Backend connection-id always matches the canonical URL — when
+      // edit-mode changed routing fields (host/user/port), the new id
+      // wins and the old slot is dropped below.
+      const connId = computedId;
       let uuid: string;
       if (scheme === "sftp") {
         uuid = await connCreateSftp(
@@ -518,26 +567,45 @@ export default function RemoteConnectDialog({
         // dialog and the next launch will dial automatically.
         autoConnect,
       };
+      // Edit-mode key rotation: when the user edited host/port/user
+      // in an existing saved row, the canonical URL id changes too.
+      // Drop the old row + delete the old keychain entry so we don't
+      // leave a stale copy behind. The new row is inserted below.
+      let nextConnections = settings.connections;
+      if (isEditing && selectedDraftId !== computedId) {
+        nextConnections = nextConnections.filter(
+          (c) => c.id !== selectedDraftId,
+        );
+        void credsDelete(selectedDraftId, "auth").catch(() => {});
+        // Drop the old live-registry slot too so the sidebar doesn't
+        // show a ghost entry for the pre-rename id. Fire-and-forget;
+        // a missing slot returns Ok() silently.
+        void connDisconnect(selectedDraftId).catch(() => {});
+      }
+      const rotatedConn: SavedConnection = { ...newConn, id: computedId };
       update(
         "connections",
-        addOrUpdateConnection(settings.connections, newConn),
+        addOrUpdateConnection(nextConnections, rotatedConn),
       );
+      const persistId = computedId;
       // Cross-store cleanup — fire-and-forget. Errors here are
       // non-fatal: a missing keychain entry returns Ok() silently,
       // anything else just means the orphan stays for now and the
-      // next save retries.
+      // next save retries. Reset-to-default in Settings enumerates
+      // `settings.connections` to wipe keychain entries — no
+      // separate tracking list needed.
       if (useKeychain) {
-        void credsStore(connId, "auth", password).catch(() => {});
+        void credsStore(persistId, "auth", password).catch(() => {});
       } else if (rememberPassword) {
         // Plaintext arm — clear any prior keychain entry so the
         // settings.json copy is the only live copy.
-        void credsDelete(connId, "auth").catch(() => {});
+        void credsDelete(persistId, "auth").catch(() => {});
       } else {
         // Toggle flipped off — clear BOTH stores. `addOrUpdateConnection`
         // already stripped the plaintext password above (since
         // `rememberPassword` is false); the keychain side needs an
         // explicit delete.
-        void credsDelete(connId, "auth").catch(() => {});
+        void credsDelete(persistId, "auth").catch(() => {});
       }
       // For SMB the path tail depends on whether the user picked a
       // specific share. With a non-empty share, the connection binds
@@ -754,10 +822,20 @@ export default function RemoteConnectDialog({
                   size="small"
                   required
                   label="Password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoFocus
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <PasswordVisibilityToggle
+                          visible={showPassword}
+                          onToggle={() => setShowPassword((v) => !v)}
+                        />
+                      ),
+                    },
+                  }}
                 />
               )}
               {authMode === "privateKey" && (
@@ -782,9 +860,19 @@ export default function RemoteConnectDialog({
                   <TextField
                     size="small"
                     label="Passphrase (optional)"
-                    type="password"
+                    type={showPassphrase ? "text" : "password"}
                     value={privateKeyPassphrase}
                     onChange={(e) => setPrivateKeyPassphrase(e.target.value)}
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <PasswordVisibilityToggle
+                            visible={showPassphrase}
+                            onToggle={() => setShowPassphrase((v) => !v)}
+                          />
+                        ),
+                      },
+                    }}
                   />
                 </>
               )}
@@ -823,14 +911,29 @@ export default function RemoteConnectDialog({
                   // password — pre-filled. SMB needs a real one.
                   required={scheme === "smb"}
                   label="Password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  // SMB helperText is intentionally undefined here —
+                  // the Remember-password toggle below already states
+                  // the persistence policy in plain language. The old
+                  // static "Never persisted." string was stale once
+                  // the keychain arm landed.
                   helperText={
                     scheme === "ftp"
                       ? "Leave as 'anonymous@' for public mirrors."
-                      : "Never persisted."
+                      : undefined
                   }
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <PasswordVisibilityToggle
+                          visible={showPassword}
+                          onToggle={() => setShowPassword((v) => !v)}
+                        />
+                      ),
+                    },
+                  }}
                   sx={{ flex: 1 }}
                 />
               </Stack>

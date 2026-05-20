@@ -316,45 +316,9 @@ export function matchConnectionsForHost(
   });
 }
 
-/** Connection "identity" fingerprint. Two saved rows count as the
- *  same connection iff every routing field matches: protocol +
- *  host:port + user + (SMB only) share + domain. Used by the
- *  Connect dialog to dedup new entries: instead of appending a
- *  second row for the same target, we reuse the existing row's id.
- *
- *  Why include share/domain in addition to the existing `connKey`
- *  triple: SMB lets a single host:port:user mount multiple distinct
- *  shares, each of which is a real, separate "connection" the user
- *  thinks of independently. Lumping them under one row breaks the
- *  dedup the user actually wants (per-mount, not per-host). */
-function connIdentity(c: SavedConnection): string {
-  const share = (c.share ?? "").toLowerCase();
-  const domain = (c.domain ?? "").toLowerCase();
-  return `${c.kind}:${c.host.toLowerCase()}:${c.port}:${c.user.toLowerCase()}:${share}:${domain}`;
-}
-
-/** Find an existing saved row that matches the supplied connection's
- *  identity (kind/host/port/user/share/domain). Returns the matched
- *  row or `undefined`. The Connect dialog calls this BEFORE
- *  generating a fresh `${kind}-${Date.now()}` id so a re-connect to
- *  the same target reuses the same saved row + the same live-registry
- *  id — no duplicate sidebar entries, no orphaned saved rows.
- *
- *  Self-match is excluded so edit-mode (where we already know the
- *  draft id) doesn't false-positive against its own row. */
-export function findExistingConnection(
-  list: SavedConnection[],
-  probe: Pick<
-    SavedConnection,
-    "kind" | "host" | "port" | "user" | "share" | "domain"
-  >,
-  excludeId?: string,
-): SavedConnection | undefined {
-  const wanted = connIdentity({
-    id: "",
-    label: "",
-    rememberPassword: false,
-    ...probe,
-  });
-  return list.find((c) => c.id !== excludeId && connIdentity(c) === wanted);
-}
+// `findExistingConnection` / `connIdentity` were removed in 0.2.309
+// when synthetic ids (`smb-<ts>`, UUIDs) were replaced by URL-form
+// ids (`user@host:port`). With URL identity, dedup falls out of
+// upsert-by-id: two saves with the same routing produce the same
+// id, and `addOrUpdateConnection` replaces in place. No separate
+// dedup pass needed.

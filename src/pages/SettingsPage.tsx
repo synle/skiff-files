@@ -43,6 +43,8 @@ import {
   fsThumbnailStats,
   type ThumbnailCacheStats,
 } from "../api/fs";
+import { credsDelete } from "../api/creds";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { SUPPORTED_LOCALES, type LocaleCode } from "../i18n";
 
 /** Display labels for the Language dropdown. Add a row here when
@@ -900,6 +902,12 @@ export default function SettingsPage() {
   const [latestStatus, setLatestStatus] = useState<
     "checking" | "up-to-date" | "behind" | "ahead" | "error"
   >("checking");
+  // "Reset all settings" lives behind a modal confirmation (no
+  // `window.confirm` — Tauri webview suppresses it; see footgun in
+  // CLAUDE.md). Closes after the keychain wipe + settings reset
+  // resolve so the user sees the destructive action complete before
+  // the dialog dismisses.
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   useEffect(() => {
     getAppVersion()
@@ -2228,15 +2236,7 @@ export default function SettingsPage() {
             <Button
               variant="outlined"
               color="warning"
-              onClick={() => {
-                // Confirm before nuking — this drops every persisted
-                // tweak (theme, sort defaults, bookmarks, recent
-                // paths, saved tabs) which is hard to recover from.
-                const ok = window.confirm(
-                  "Reset all settings to defaults? This drops your bookmarks, recent paths, saved tabs, and all per-folder overrides.",
-                );
-                if (ok) reset();
-              }}
+              onClick={() => setResetConfirmOpen(true)}
               size="small"
             >
               Reset all settings
@@ -2245,6 +2245,41 @@ export default function SettingsPage() {
         </Section>
       </Stack>
       </Box>
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        title="Reset all settings to defaults?"
+        message={[
+          "This will:",
+          "  • Erase every saved connection password from the OS keychain.",
+          "  • Drop bookmarks, recent paths, saved tabs, sync jobs.",
+          "  • Forget per-folder view + sort overrides and file tags.",
+          "  • Reset theme, palette, shortcuts, sidebar layout.",
+          "",
+          "Cannot be undone.",
+        ].join("\n")}
+        confirmLabel="Reset to defaults"
+        destructive
+        onCancel={() => setResetConfirmOpen(false)}
+        onConfirm={async () => {
+          // 1. Wipe keychain entries FIRST — once `setSettings` lands
+          //    we lose the connection ids needed to address each
+          //    keychain entry. Each delete is idempotent server-side
+          //    so missing entries return Ok() silently; one stuck
+          //    entry doesn't block the rest of the loop.
+          const conns = settings.connections;
+          await Promise.all(
+            conns.flatMap((c) => [
+              credsDelete(c.id, "auth").catch(() => {}),
+              credsDelete(c.id, "keyPassphrase").catch(() => {}),
+            ]),
+          );
+          // 2. Reset every setting to its compile-time default. The
+          //    underlying provider persists synchronously, so the next
+          //    render sees the empty connections list.
+          reset();
+          setResetConfirmOpen(false);
+        }}
+      />
     </Box>
   );
 }

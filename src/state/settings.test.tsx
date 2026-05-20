@@ -5,6 +5,8 @@ import {
   SettingsProvider,
   loadSettings,
   loadSettingsFromDisk,
+  migrateConnectionIds,
+  rewritePathIds,
   saveSettings,
   saveSettingsToDisk,
   useSettings,
@@ -40,6 +42,100 @@ describe("loadSettings / saveSettings", () => {
   it("falls back to DEFAULTS on corrupt JSON", () => {
     localStorage.setItem("skiff-files.settings.v1", "{not json");
     expect(loadSettings()).toEqual(DEFAULTS);
+  });
+
+  // 0.2.309: connection ids switched from synthetic `smb-<ts>` / UUID
+  // form to canonical URL identity (`user@host:port`). Stale payloads
+  // get rewritten on load + every path-bearing surface gets its old
+  // id prefix swapped to the new one.
+  it("migrates stale connection ids and rewrites path references", () => {
+    localStorage.setItem(
+      "skiff-files.settings.v1",
+      JSON.stringify({
+        connections: [
+          {
+            id: "smb-1779235589933",
+            kind: "smb",
+            label: "admin@192.168.1.1:445",
+            host: "192.168.1.1",
+            port: 445,
+            user: "admin",
+            rememberPassword: false,
+          },
+        ],
+        recentPaths: [
+          "smb://smb-1779235589933/G/folder",
+          "/Users/syle/Desktop",
+        ],
+        bookmarks: [
+          {
+            id: "b1",
+            label: "G drive",
+            path: "smb://smb-1779235589933/G",
+          },
+        ],
+        fileTags: {
+          "smb://smb-1779235589933/G/file.png": "red",
+        },
+      }),
+    );
+    const s = loadSettings();
+    expect(s.connections[0].id).toBe("admin@192.168.1.1");
+    expect(s.recentPaths).toEqual([
+      "smb://admin@192.168.1.1/G/folder",
+      "/Users/syle/Desktop",
+    ]);
+    expect(s.bookmarks[0].path).toBe("smb://admin@192.168.1.1/G");
+    expect(s.fileTags["smb://admin@192.168.1.1/G/file.png"]).toBe("red");
+  });
+
+  it("migration is idempotent — canonical ids pass through unchanged", () => {
+    const conn = {
+      id: "admin@192.168.1.1",
+      kind: "smb" as const,
+      label: "admin@192.168.1.1:445",
+      host: "192.168.1.1",
+      port: 445,
+      user: "admin",
+      rememberPassword: false,
+    };
+    const { connections, renamed } = migrateConnectionIds([conn]);
+    expect(connections).toEqual([conn]);
+    expect(renamed.size).toBe(0);
+  });
+});
+
+describe("rewritePathIds", () => {
+  it("rewrites `<scheme>://<oldId>/...` to use the new id", () => {
+    const r = new Map([["smb-old", "admin@host"]]);
+    expect(rewritePathIds("smb://smb-old/share/file", r)).toBe(
+      "smb://admin@host/share/file",
+    );
+  });
+
+  it("rewrites a bare `<scheme>://<oldId>` with no trailing path", () => {
+    const r = new Map([["smb-old", "admin@host"]]);
+    expect(rewritePathIds("smb://smb-old", r)).toBe("smb://admin@host");
+  });
+
+  it("leaves local paths untouched", () => {
+    const r = new Map([["smb-old", "admin@host"]]);
+    expect(rewritePathIds("/Users/syle/Desktop", r)).toBe("/Users/syle/Desktop");
+  });
+
+  it("is a no-op when renamed map is empty", () => {
+    expect(rewritePathIds("smb://anything/path", new Map())).toBe(
+      "smb://anything/path",
+    );
+  });
+
+  it("doesn't rewrite an id that's a prefix of a different id", () => {
+    // `smb-old` mustn't match `smb-older` in the URL — the `/`
+    // anchor guards against this.
+    const r = new Map([["smb-old", "admin@host"]]);
+    expect(rewritePathIds("smb://smb-older/path", r)).toBe(
+      "smb://smb-older/path",
+    );
   });
 });
 

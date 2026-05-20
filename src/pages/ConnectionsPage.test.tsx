@@ -84,12 +84,17 @@ describe("ConnectionsPage (merged list)", () => {
   });
 
   it("marks a connection as Connected when it appears in the live registry", async () => {
+    // 0.2.309: ids are canonical URL form (`user@host`). The saved
+    // row + live registry slot must share the same id for the
+    // "Connected" pill to render — the migration loader rewrites
+    // any pre-0.2.309 synthetic id, so we author both ends with the
+    // post-migration shape.
     localStorage.setItem(
       "skiff-files.settings.v1",
       JSON.stringify({
         connections: [
           {
-            id: "live-1",
+            id: "user@host",
             kind: "sftp",
             label: "user@host:22",
             host: "host",
@@ -103,7 +108,7 @@ describe("ConnectionsPage (merged list)", () => {
     );
     mockedInvoke.mockImplementation(async (cmd) => {
       if (cmd === "conn_list") {
-        return [{ id: "live-1", kind: "sftp", label: "user@host:22" }];
+        return [{ id: "user@host", kind: "sftp", label: "user@host:22" }];
       }
       if (cmd === "conn_known_hosts_list") return [];
       return null;
