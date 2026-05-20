@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import PreviewPane from "./PreviewPane";
 import type { Entry } from "../api/fs";
@@ -134,6 +134,59 @@ describe("PreviewPane", () => {
     // Don't call vi.clearAllMocks — multiple invokes are fine, we just want
     // no crash and the new content visible.
     expect(true).toBe(true);
+  });
+});
+
+describe("PreviewPane — text body zoom + copy controls (0.2.315)", () => {
+  it("renders the Copy / Zoom-out / Reset / Zoom-in buttons for a text entry", async () => {
+    r({ selected: text });
+    await waitFor(() => {
+      expect(screen.getByText("preview text")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("button", { name: /Copy file contents/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Zoom text out/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Reset text zoom/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Zoom text in/i)).toBeInTheDocument();
+    // The percentage readout starts at 100%.
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
+  it("steps the font size and updates the percentage readout", async () => {
+    r({ selected: text });
+    await waitFor(() => {
+      expect(screen.getByText("preview text")).toBeInTheDocument();
+    });
+    // Default = 100%. Click Zoom in once → step is +2px on a 12px
+    // base = 14/12 ≈ 116.67 → rounded → 117%.
+    fireEvent.click(screen.getByLabelText(/Zoom text in/i));
+    expect(screen.getByText("117%")).toBeInTheDocument();
+    // Reset returns to 100%.
+    fireEvent.click(screen.getByLabelText(/Reset text zoom/i));
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    // Zoom out lands at 10/12 ≈ 83%.
+    fireEvent.click(screen.getByLabelText(/Zoom text out/i));
+    expect(screen.getByText("83%")).toBeInTheDocument();
+  });
+
+  it("writes file contents to the clipboard when Copy is clicked", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    // jsdom doesn't ship a clipboard API; override per test.
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    r({ selected: text });
+    await waitFor(() => {
+      expect(screen.getByText("preview text")).toBeInTheDocument();
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /Copy file contents/i }),
+    );
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("preview text");
+    });
   });
 });
 

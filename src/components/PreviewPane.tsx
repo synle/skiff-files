@@ -25,6 +25,7 @@ import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useEffect, useRef, useState } from "react";
 import {
   fsImageExif,
@@ -577,15 +578,44 @@ function AVBody({ entry }: { entry: Entry }) {
   );
 }
 
-/** Text-file preview body. Capped at the server-side limit. */
-function TextBody({ entry }: { entry: Entry }) {
+/** Text-file preview body. Capped at the server-side limit.
+ *
+ *  Toolbar exposes a discrete font-size zoom (Zoom Out / 100% / Zoom
+ *  In; the 100% anchor is `BASE_FONT_PX`) plus a Copy button that
+ *  pushes the entire visible text into the OS clipboard. Mode prop
+ *  drives the container max-height so the modal can take ~75vh
+ *  while the inline pane keeps the legacy 360 px cap. */
+function TextBody({
+  entry,
+  mode = "inline",
+}: {
+  entry: Entry;
+  mode?: "inline" | "modal";
+}) {
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Font size in pixels. 12px = "100%" anchor (matches the legacy
+   *  `0.75rem` at the default 16 px root). Bounded to keep the
+   *  rendered text readable + the container scrollable. Persists
+   *  across selection changes — most users prefer one zoom across
+   *  the session. */
+  const BASE_FONT_PX = 12;
+  const FONT_MIN = 8;
+  const FONT_MAX = 32;
+  const FONT_STEP = 2;
+  const [fontPx, setFontPx] = useState<number>(BASE_FONT_PX);
+  /** Copy-to-clipboard feedback. Briefly flips the button label to
+   *  "Copied!" so the user gets a confirmation without a separate
+   *  toast surface. Reset on next selection / next click. */
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
 
   useEffect(() => {
     let cancelled = false;
     setText(null);
     setError(null);
+    setCopyState("idle");
     readText(entry.path)
       .then((t) => !cancelled && setText(t))
       .catch((e) => !cancelled && setError(String(e)));
@@ -608,27 +638,131 @@ function TextBody({ entry }: { entry: Entry }) {
       </Typography>
     );
   }
+  const maxHeight = mode === "modal" ? "75vh" : 360;
+  const onCopy = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        // Older webviews / test envs without a clipboard API. We
+        // could fall back to a hidden textarea + execCommand("copy")
+        // but that's a brittle path; surfacing the failure state
+        // tells the user to try Cmd+A → Cmd+C instead.
+        setCopyState("error");
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      setCopyState("copied");
+      // Auto-clear the "Copied!" indicator after a short window so
+      // repeated clicks land on the same fresh "idle" baseline.
+      window.setTimeout(() => setCopyState("idle"), 1200);
+    } catch {
+      setCopyState("error");
+    }
+  };
   return (
-    <Box
-      component="pre"
-      // .skiff-selectable opts back into native text-selection,
-      // overriding the global user-select:none baseline. Without
-      // this the preview text would render but the user couldn't
-      // copy from it — a regression of the 0.2.167 baseline.
-      className="skiff-selectable"
-      sx={{
-        m: 0,
-        p: 1,
-        maxHeight: 360,
-        overflow: "auto",
-        bgcolor: "action.hover",
-        borderRadius: 1,
-        fontSize: "0.75rem",
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
-      }}
-    >
-      {text}
+    <Box>
+      <Box
+        component="pre"
+        // .skiff-selectable opts back into native text-selection,
+        // overriding the global user-select:none baseline. Without
+        // this the preview text would render but the user couldn't
+        // copy from it — a regression of the 0.2.167 baseline.
+        className="skiff-selectable"
+        sx={{
+          m: 0,
+          p: 1,
+          maxHeight,
+          overflow: "auto",
+          bgcolor: "action.hover",
+          borderRadius: 1,
+          fontSize: `${fontPx}px`,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {text}
+      </Box>
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{ mt: 0.5, flexWrap: "wrap", alignItems: "center" }}
+      >
+        <Tooltip
+          title={
+            copyState === "copied"
+              ? "Copied to clipboard"
+              : copyState === "error"
+                ? "Clipboard unavailable — select text and copy manually"
+                : "Copy file contents to clipboard"
+          }
+        >
+          <span>
+            <IconButton
+              size="small"
+              onClick={onCopy}
+              aria-label="Copy file contents"
+            >
+              <ContentCopyIcon
+                fontSize="small"
+                color={
+                  copyState === "copied"
+                    ? "success"
+                    : copyState === "error"
+                      ? "error"
+                      : undefined
+                }
+              />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Box sx={{ flex: 1 }} />
+        <Tooltip title="Zoom out (smaller text)">
+          <span>
+            <IconButton
+              size="small"
+              onClick={() =>
+                setFontPx((p) => Math.max(FONT_MIN, p - FONT_STEP))
+              }
+              disabled={fontPx <= FONT_MIN}
+              aria-label="Zoom text out"
+            >
+              <ZoomOutIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Reset to default size (100%)">
+          <span>
+            <IconButton
+              size="small"
+              onClick={() => setFontPx(BASE_FONT_PX)}
+              disabled={fontPx === BASE_FONT_PX}
+              aria-label="Reset text zoom"
+            >
+              <RestartAltIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Zoom in (larger text)">
+          <span>
+            <IconButton
+              size="small"
+              onClick={() =>
+                setFontPx((p) => Math.min(FONT_MAX, p + FONT_STEP))
+              }
+              disabled={fontPx >= FONT_MAX}
+              aria-label="Zoom text in"
+            >
+              <ZoomInIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Typography
+          variant="caption"
+          sx={{ minWidth: 36, textAlign: "right", color: "text.secondary" }}
+          aria-live="polite"
+        >
+          {Math.round((fontPx / BASE_FONT_PX) * 100)}%
+        </Typography>
+      </Stack>
     </Box>
   );
 }
@@ -815,7 +949,7 @@ export function Body({
     entry.kind === "markdown" ||
     entry.kind === "code"
   ) {
-    return <TextBody entry={entry} />;
+    return <TextBody entry={entry} mode={mode} />;
   }
   // Hex dump for unrecognized binary content — handy for spotting
   // file magic ("PK\x03\x04" zip, "%PDF" PDF, "\x7FELF" ELF) when
