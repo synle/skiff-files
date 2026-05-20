@@ -17,8 +17,17 @@
 #      fixtures (USER / PASS / per-backend root constants in
 #      `src-tauri/tests/remote_integration.rs`). The dev compose uses
 #      `skiff / password`; the integration suite uses
-#      `testuser / skiffpass`. Keep these in sync if either side
-#      changes.
+#      `testuser / Sk1ffCI!Pass2026`. Keep these in sync if either
+#      side changes.
+#
+#      The CI password is deliberately mixed-case + digit + symbol
+#      because the `delfer/alpine-ftp-server:latest` container runs
+#      `passwd` under PAM at first boot; as of 2026-05 PAM rejects
+#      pure-lowercase / dictionary fixtures (`Sk1ffCI!Pass2026` failed with
+#      `Bad password: too weak` and the FTP daemon never started).
+#      The image is unpinned (`:latest`) and the registry publishes
+#      no version-pinnable tags, so the only robust fix is a stronger
+#      fixture password.
 #
 # Spin up:    docker compose -f docker/docker-compose.ci.yml up -d
 # Run tests:  cd src-tauri && SKIFF_INTEGRATION=1 \
@@ -38,7 +47,7 @@ services:
   skiff-ci-sftp:
     image: atmoz/sftp:alpine
     container_name: skiff-ci-sftp
-    command: testuser:skiffpass:1001
+    command: testuser:Sk1ffCI!Pass2026:1001
     ports:
       - "127.0.0.1:2222:22"
     tmpfs:
@@ -55,7 +64,7 @@ services:
     image: delfer/alpine-ftp-server:latest
     container_name: skiff-ci-ftp
     environment:
-      USERS: "testuser|skiffpass|/home/testuser|1000"
+      USERS: "testuser|Sk1ffCI!Pass2026|/home/testuser|1000"
       ADDRESS: "127.0.0.1"
       MIN_PORT: "21000"
       MAX_PORT: "21009"
@@ -77,7 +86,7 @@ services:
     image: dperson/samba:latest
     container_name: skiff-ci-smb
     command: >
-      -u "testuser;skiffpass"
+      -u "testuser;Sk1ffCI!Pass2026"
       -s "testshare;/share;yes;no;no;testuser;testuser"
       -p
     ports:

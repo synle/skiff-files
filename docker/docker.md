@@ -26,7 +26,7 @@ docker compose -f docker/docker-compose.yml down
 docker compose -f docker/docker-compose.windows.yml up -d
 docker compose -f docker/docker-compose.windows.yml down
 
-# Integration tests — no host mounts, isolated tmpfs, `testuser` / `skiffpass`
+# Integration tests — no host mounts, isolated tmpfs, `testuser` / `Sk1ffCI!Pass2026`
 docker compose -f docker/docker-compose.ci.yml up -d
 cd src-tauri && SKIFF_INTEGRATION=1 cargo test --no-default-features \
     --test remote_integration -- --test-threads=1
@@ -35,7 +35,7 @@ docker compose -f docker/docker-compose.ci.yml down -v
 
 The first two mount a real host folder (no named volumes) so anything you read / write through the protocols hits the live filesystem; they use `skiff` / `password`.
 
-The CI variant is what `.github/workflows/integration.yml` runs — it uses tmpfs-backed writable dirs (no host mount) and the `testuser` / `skiffpass` credentials the integration suite expects. Use this if you want to reproduce a CI failure locally without touching your `${HOME}`.
+The CI variant is what `.github/workflows/integration.yml` runs — it uses tmpfs-backed writable dirs (no host mount) and the `testuser` / `Sk1ffCI!Pass2026` credentials the integration suite expects. Use this if you want to reproduce a CI failure locally without touching your `${HOME}`. (The mixed-case + digit + symbol shape exists because `delfer/alpine-ftp-server:latest` runs `passwd` under PAM at first boot; the prior fixture `skiffpass` was rejected as "too weak" by a 2026-05 upstream PAM tightening and the FTP daemon never started.)
 
 ## Option B — docker run with a host folder mounted
 

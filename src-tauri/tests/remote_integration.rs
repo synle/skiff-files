@@ -37,7 +37,15 @@ macro_rules! gate {
 }
 
 const USER: &str = "testuser";
-const PASS: &str = "skiffpass";
+// Keep in lockstep with the `USERS` env / `-u` flag in
+// `docker/docker-compose.ci.yml`. The CI compose's
+// `delfer/alpine-ftp-server:latest` container calls `passwd` under
+// PAM at first boot; a 2026-05 upstream push tightened PAM's
+// strength policy and now rejects pure-lowercase / dictionary
+// passwords like the previous fixture `skiffpass` with
+// `Bad password: too weak`, which kept the FTP daemon from ever
+// starting. Mixed case + digit + symbol passes PAM cleanly.
+const PASS: &str = "Sk1ffCI!Pass2026";
 
 // ── Connection helpers ────────────────────────────────────────────────────
 
