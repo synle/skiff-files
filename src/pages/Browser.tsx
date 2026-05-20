@@ -32,6 +32,7 @@ import RemoteConnectDialog, {
 } from "../components/RemoteConnectDialog";
 import PreviewPane, { isPreviewableEntry } from "../components/PreviewPane";
 import PreviewModal from "../components/PreviewModal";
+import { parseLocation } from "../util/location";
 import {
   fsDiskSpace,
   fsFind,
@@ -246,6 +247,34 @@ export default function Browser({
   const [diffOther, setDiffOther] = useState<string | null>(null);
 
   const path = history.back[history.back.length - 1] ?? "";
+
+  /**
+   * Open a file entry — the single canonical dispatch every open
+   * surface (double-click, Enter, Cmd+↓, right-click → Open) routes
+   * through. Decision tree:
+   *   - Remote backend (SMB / SFTP / FTP) + previewable kind →
+   *     in-app PreviewModal. The OS can't resolve our internal
+   *     `<scheme>://<uuid>/...` routing URLs (SFTP / FTP have no
+   *     native handler at all, SMB needs a translated URL), so for
+   *     images / text / PDF / etc we render in Skiff itself.
+   *   - Otherwise (local file, OR remote non-previewable kind) →
+   *     OS default app via `osOpen`. Local files want the user's
+   *     real editor / viewer; remote non-previewable files fall
+   *     through to osOpen's translation + "no native handler"
+   *     error toast for SFTP / FTP.
+   *
+   * Lives at component scope (not inside a useCallback) because
+   * setError + settings + setPreviewModalEntry are stable enough and
+   * a memo would just add ceremony for a one-call-per-action helper.
+   */
+  const openEntry = (e: Entry) => {
+    const isRemote = parseLocation(e.path).backend.kind !== "local";
+    if (isRemote && isPreviewableEntry(e)) {
+      setPreviewModalEntry(e);
+      return;
+    }
+    void osOpen(e.path, settings.connections, (msg) => setError(msg));
+  };
 
   // Per-folder kind filter — read from settings keyed by current path
   // so the active chips persist across navigation. Setter writes back
@@ -980,15 +1009,11 @@ export default function Browser({
         if (primarySelected.isDir) {
           navigate(primarySelected.path);
         } else {
-          // Internal remote URLs (`<scheme>://<uuid>/...`) are not
-          // OS-resolvable — the UUID is a routing key, not a host.
-          // `osOpen` translates SMB to `smb://[user@]host[:port]/share/...`
-          // and refuses SFTP / FTP (no native handler).
-          void osOpen(
-            primarySelected.path,
-            settings.connections,
-            (msg) => setError(msg),
-          );
+          // Route through openEntry so remote-backend + previewable
+          // kinds (images / text / PDF on SMB / SFTP / FTP) land in
+          // the in-app PreviewModal instead of the OS handoff (which
+          // can't resolve our internal `<scheme>://<uuid>/...` URLs).
+          openEntry(primarySelected);
         }
       }
     };
@@ -1867,11 +1892,12 @@ export default function Browser({
             }
           }}
           onOpenFile={(e) => {
-            // Hand off to the OS default app. `osOpen` translates the
-            // internal `<scheme>://<uuid>/...` URL to the OS-native form
-            // (smb:// only — SFTP / FTP route to the error toast since
-            // no OS has a usable native handler for them).
-            void osOpen(e.path, settings.connections, (msg) => setError(msg));
+            // Single canonical dispatch — local files go through the
+            // OS default app, remote-backend previewable files open
+            // in the in-app PreviewModal so SFTP / FTP / SMB users
+            // can actually view their files (Finder / Explorer can't
+            // resolve the internal routing-UUID URLs).
+            openEntry(e);
           }}
           onOpenDirInNewTab={(e) => {
             window.dispatchEvent(
@@ -2117,7 +2143,11 @@ export default function Browser({
           }
         }}
         onOpenWithDefault={(e) => {
-          void osOpen(e.path, settings.connections, (msg) => setError(msg));
+          // "Open with default" from the right-click context menu
+          // routes through the same dispatch as double-click and
+          // Cmd+↓ so previewable files on network backends land in
+          // Skiff's modal instead of failing at OS handoff.
+          openEntry(e);
         }}
         onRevealInOs={(e) => {
           void osReveal(e.path, settings.connections, (msg) => setError(msg));
