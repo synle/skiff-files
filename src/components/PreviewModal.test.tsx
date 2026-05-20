@@ -99,9 +99,55 @@ describe("PreviewModal", () => {
     r({ entry: txt });
     expect(screen.getByText("notes.md")).toBeInTheDocument();
   });
+
+  it("shows prev/next sibling buttons when more than one previewable sibling is given", () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <SettingsProvider>
+          <PreviewModal
+            entry={png}
+            onClose={() => {}}
+            siblings={[png, txt]}
+            view={{ kind: "list" }}
+          />
+        </SettingsProvider>
+      </ThemeProvider>,
+    );
+    expect(screen.getByLabelText(/Previous file/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Next file/i)).toBeInTheDocument();
+    // Index counter renders too — "1 / 2" for the first item.
+    expect(screen.getByText(/1 \/ 2/)).toBeInTheDocument();
+  });
+
+  it("invokes onNavigate when the Next button is clicked", () => {
+    const onNavigate = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <SettingsProvider>
+          <PreviewModal
+            entry={png}
+            onClose={() => {}}
+            siblings={[png, txt]}
+            view={{ kind: "list" }}
+            onNavigate={onNavigate}
+          />
+        </SettingsProvider>
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByLabelText(/Next file/i));
+    expect(onNavigate).toHaveBeenCalledWith(txt);
+  });
+
+  it("renders the Open-in-window button", () => {
+    r({ entry: png });
+    expect(screen.getByLabelText(/Open in new window/i)).toBeInTheDocument();
+  });
 });
 
 describe("isPreviewableEntry", () => {
+  // 0.2.316: the predicate collapsed to "anything-not-folder is
+  // previewable" because the fallback is now TextBody (plain text)
+  // for every non-image / non-AV / non-PDF kind.
   it("returns true for images", () => {
     expect(isPreviewableEntry(png)).toBe(true);
   });
@@ -119,7 +165,7 @@ describe("isPreviewableEntry", () => {
     expect(isPreviewableEntry({ ...txt, kind: "video" })).toBe(true);
     expect(isPreviewableEntry({ ...txt, kind: "pdf" })).toBe(true);
   });
-  it("returns true for binary / unknown (hex dump fallback)", () => {
+  it("returns true for binary / unknown (plain-text fallback)", () => {
     expect(isPreviewableEntry({ ...txt, kind: "binary" })).toBe(true);
     expect(isPreviewableEntry({ ...txt, kind: "unknown" })).toBe(true);
   });

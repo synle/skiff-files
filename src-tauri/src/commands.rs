@@ -824,6 +824,14 @@ pub struct ImageExif {
     pub exposure: Option<String>,
     pub aperture: Option<String>,
     pub focal_length: Option<String>,
+    // EXIF orientation tag (1–8). 1 = upright, 3 = 180°, 6 = 90°CW,
+    // 8 = 90°CCW; 2/4/5/7 are mirror variants. Surfaced to the
+    // frontend so ImageBody can pre-apply a CSS transform that
+    // matches what every other photo viewer shows for the file —
+    // most modern phone cameras write rotated sensors instead of
+    // rotating pixels, so without this an iPhone landscape shot
+    // would land here sideways.
+    pub orientation: Option<u32>,
 }
 
 /// Read EXIF from `path`. Returns an empty struct (all `None`) when
@@ -844,6 +852,13 @@ pub fn fs_image_exif(path: String) -> FsResult<ImageExif> {
             f.display_value().with_unit(&exif).to_string()
         })
     };
+    // Orientation tag is a SHORT (u16) in EXIF; pull the raw integer
+    // instead of the human-readable display form so the frontend can
+    // map 1–8 to a CSS transform deterministically.
+    let orientation = exif
+        .get_field(exif::Tag::Orientation, exif::In::PRIMARY)
+        .and_then(|f| f.value.get_uint(0))
+        .filter(|v| (1..=8).contains(v));
     Ok(ImageExif {
         date_taken: pick(exif::Tag::DateTimeOriginal).or_else(|| pick(exif::Tag::DateTime)),
         camera_make: pick(exif::Tag::Make),
@@ -853,6 +868,7 @@ pub fn fs_image_exif(path: String) -> FsResult<ImageExif> {
         exposure: pick(exif::Tag::ExposureTime),
         aperture: pick(exif::Tag::FNumber),
         focal_length: pick(exif::Tag::FocalLength),
+        orientation,
     })
 }
 
@@ -1318,6 +1334,37 @@ pub fn window_open_at(path: String, app: tauri::AppHandle) -> Result<(), String>
         .title("Skiff Files")
         .inner_size(1200.0, 760.0)
         .min_inner_size(720.0, 480.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Spawn a dedicated preview window for a single file. The path is
+/// encoded in the URL fragment (`index.html#preview=<urlEncoded>`)
+/// so the frontend bootstrap can render the standalone preview
+/// surface (not the full Browser shell). Surfaced by the in-app
+/// PreviewModal's "Open in window" button + by the keyboard chord
+/// when the modal is already open. Window sizing is smaller than
+/// the main file-explorer window since a preview surface only
+/// needs to fit one file's content.
+#[tauri::command]
+pub fn window_open_preview(path: String, app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::WebviewUrl;
+    let label = format!("preview-{}", Uuid::new_v4().simple());
+    let encoded = urlencoding::encode(&path).into_owned();
+    let url = format!("index.html#preview={encoded}");
+    // Derive a title from the basename so each preview window
+    // surfaces "<filename> — Skiff Files" in the taskbar without
+    // the frontend needing a second IPC trip on load.
+    let basename = std::path::Path::new(&path)
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.clone());
+    let title = format!("{basename} — Skiff Files");
+    tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+        .title(&title)
+        .inner_size(960.0, 720.0)
+        .min_inner_size(480.0, 320.0)
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -2944,6 +2991,7 @@ mod tests {
         assert!(exif.exposure.is_none());
         assert!(exif.aperture.is_none());
         assert!(exif.focal_length.is_none());
+        assert!(exif.orientation.is_none());
         std::fs::remove_dir_all(&dir).ok();
     }
 

@@ -72,6 +72,7 @@ The GUI parent ships with `windows_subsystem = "windows"` (`src-tauri/src/main.r
 - Rebindable shortcuts go through `matchesCombo(e, activeCombo(...))`, not raw `e.key`.
 - Cross-component actions go through window CustomEvents (`skiff:*`), not prop-drilling.
 - New fs verbs go through `dispatchByLocation(path, { local, remote })` in `src/api/client.ts` — never hand-roll a `if (kind === "sftp" || …)` branch per verb. See ARCHITECTURE.md → "Routing model" for the contract.
+- Preview surfaces (pane / modal / standalone window) share one `<Body>` dispatch in `components/PreviewPane.tsx`. New file kinds route there; the fallback is `preview/TextBody` (plain text), not hex. The modifier-down chord `Cmd / Ctrl / Alt + ↓` is the only "open / preview" trigger — Spacebar belongs to FileList's row toggle.
 
 UI affordances: smoke-test in `npx tauri dev` and watch the pixels change. Typecheck + Vitest pass on bindings that don't flow through.
 

@@ -118,6 +118,15 @@ export const windowOpenNew = (): Promise<void> =>
 export const windowOpenAt = (path: string): Promise<void> =>
   invoke<void>("window_open_at", { path });
 
+/** Spawn a dedicated preview window for `path`. The Rust side
+ *  encodes the path into the URL fragment (`#preview=<urlEncoded>`)
+ *  so the fresh window's bootstrap renders `<PreviewWindow>` (a
+ *  standalone preview surface, no Browser shell). Used by the
+ *  in-app PreviewModal's "Open in window" button and by the
+ *  modifier-down keyboard chord when the modal is already open. */
+export const windowOpenPreview = (path: string): Promise<void> =>
+  invoke<void>("window_open_preview", { path });
+
 /** Re-target the local fs watcher at `path`. The Rust side emits
  *  debounced `fs:changed` events when anything inside changes, so the
  *  Browser can auto-refresh without polling. Call on every navigation
@@ -182,6 +191,12 @@ export interface ImageExif {
   exposure: string | null;
   aperture: string | null;
   focalLength: string | null;
+  /** EXIF Orientation tag value (1–8). 1 = upright; 3 = 180°;
+   *  6 = rotated 90° CW; 8 = rotated 90° CCW; 2/4/5/7 are mirror
+   *  variants. `null` when the file carries no orientation tag.
+   *  ImageBody consumes this to apply a sensor-correcting CSS
+   *  transform on first paint. */
+  orientation: number | null;
 }
 
 /** Create an empty file at `path`. Errors if the path already exists.

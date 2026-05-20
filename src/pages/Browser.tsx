@@ -44,6 +44,7 @@ import {
   fsStat,
   fsWatchClear,
   fsWatchSet,
+  windowOpenPreview,
   type DiskSpace,
   type Entry,
 } from "../api/fs";
@@ -134,13 +135,20 @@ export default function Browser({
   /** Last-clicked entry — drives the preview pane. */
   const [primarySelected, setPrimarySelected] = useState<Entry | null>(null);
   /** Entry currently being shown in the in-app PreviewModal. `null`
-   *  = modal closed. Opening surfaces: Spacebar on a single previewable
-   *  selection, the inline pane's "Open preview window" button, and
-   *  the network-drive `onOpenFile` fallback (when osOpen has no
-   *  native handler for the backend). */
+   *  = modal closed. Opening surfaces: the inline pane's "Open preview
+   *  window" button, the modifier-down keyboard chord, and the
+   *  network-drive `onOpenFile` fallback (when osOpen has no native
+   *  handler for the backend). */
   const [previewModalEntry, setPreviewModalEntry] = useState<Entry | null>(
     null,
   );
+  /** Ref-mirror of `previewModalEntry` so keyboard handlers can read
+   *  the live value inside their stable-closure useEffect bodies
+   *  without re-binding the handler on every modal-state flip. */
+  const previewModalRef = useRef<Entry | null>(null);
+  useEffect(() => {
+    previewModalRef.current = previewModalEntry;
+  }, [previewModalEntry]);
   /** Multi-select set, reported by FileList. We compute aggregate stats
    *  here so the StatusBar can render N of M selected · total size. */
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
@@ -788,33 +796,10 @@ export default function Browser({
     return () => window.removeEventListener("keydown", onKey);
   }, [isActive, primarySelected, selectedPaths, entries, settings.shortcutOverrides]);
 
-  // Spacebar on a single previewable selection → open the in-app
-  // PreviewModal. Finder convention (Quick Look). Works across every
-  // backend (local / SMB / SFTP / FTP) because the modal renders via
-  // our own Body — no OS handoff, no UUID-routing leak. Skipped on
-  // multi-select (ambiguous which file to preview), on directories
-  // (not previewable), and on input focus (don't hijack typing).
-  useEffect(() => {
-    if (!isActive) return;
-    const onKey = (e: KeyboardEvent) => {
-      // Bail on modifier combos so we don't fight Cmd+Space / Alt+Space
-      // / Ctrl+Space bindings the user (or OS) may own.
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key !== " " && e.code !== "Space") return;
-      const t = e.target as HTMLElement | null;
-      const tag = t?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
-      // Single-selection requirement. Multi-select makes "which file
-      // is this previewing?" ambiguous; we'd rather no-op than guess.
-      if (selectedPaths.length > 1) return;
-      if (!primarySelected || primarySelected.isDir) return;
-      if (!isPreviewableEntry(primarySelected)) return;
-      e.preventDefault();
-      setPreviewModalEntry(primarySelected);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isActive, primarySelected, selectedPaths]);
+  // (Spacebar quick-look was retired in 0.2.316 — the modifier-down
+  // shortcuts Cmd/Ctrl/Alt + ↓ remain the canonical "open / preview"
+  // chord. Spacebar belongs to FileList's selection toggle, which
+  // matches Finder's "tap space to toggle the focused row".)
 
   // Cmd/Ctrl+R → refresh the current folder. F5 is also a refresh
   // alias (Windows Explorer muscle memory; takes no modifier).
@@ -957,6 +942,39 @@ export default function Browser({
         goUp();
         return;
       }
+      // Alt+↓ alias for "open / preview the focused entry" — pairs
+      // with the Cmd/Ctrl+↓ binding below. Three modifier choices is
+      // intentional: Win/Linux muscle memory prefers Alt, Finder
+      // prefers Cmd, Vim-ish users sometimes hit Ctrl. Routed before
+      // the `!(metaKey || ctrlKey) return` gate because Alt is
+      // neither.
+      //
+      // Special case: when the in-app PreviewModal is already open
+      // for this same file, pressing the chord again pops the file
+      // out into its OWN dedicated preview window (via
+      // `windowOpenPreview`). Lets the user stack multiple previews
+      // side-by-side without juggling the single-modal slot.
+      if (
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.shiftKey &&
+        e.key === "ArrowDown"
+      ) {
+        if (!primarySelected) return;
+        e.preventDefault();
+        if (primarySelected.isDir) {
+          navigate(primarySelected.path);
+        } else if (
+          previewModalRef.current &&
+          previewModalRef.current.path === primarySelected.path
+        ) {
+          void windowOpenPreview(primarySelected.path).catch(() => {});
+        } else {
+          openEntry(primarySelected);
+        }
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey)) return;
       const k = e.key.toLowerCase();
       if (k === "v" && !e.shiftKey) {
@@ -1008,6 +1026,14 @@ export default function Browser({
         e.preventDefault();
         if (primarySelected.isDir) {
           navigate(primarySelected.path);
+        } else if (
+          previewModalRef.current &&
+          previewModalRef.current.path === primarySelected.path
+        ) {
+          // Modal already open for this same file → pop a dedicated
+          // preview window so the user can stack multiple previews.
+          // Same behavior as the Alt+↓ branch above.
+          void windowOpenPreview(primarySelected.path).catch(() => {});
         } else {
           // Route through openEntry so remote-backend + previewable
           // kinds (images / text / PDF on SMB / SFTP / FTP) land in
@@ -1952,6 +1978,22 @@ export default function Browser({
       <PreviewModal
         entry={previewModalEntry}
         onClose={() => setPreviewModalEntry(null)}
+        siblings={entries}
+        view={{
+          // Pass the active view so the modal can pick the right
+          // arrow-key semantics: list views collapse to ↑/↓; grid /
+          // gallery / column views get full 2-D ↑↓←→ traversal. The
+          // grid-cols hint is conservative — the actual rendered
+          // count depends on the pane width — but 4 is a good
+          // default for arrow-step granularity inside the modal,
+          // which doesn't see the underlying layout.
+          kind:
+            (settings.folderViewMode[path] ?? settings.defaultView) === "list"
+              ? "list"
+              : "grid",
+          gridCols: 4,
+        }}
+        onNavigate={(e) => setPreviewModalEntry(e)}
       />
       {settings.showStatusBar && <StatusBar
         totalEntries={

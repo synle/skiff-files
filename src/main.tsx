@@ -5,8 +5,18 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import App from "./App";
+import PreviewWindow from "./pages/PreviewWindow";
 import { initI18n } from "./i18n";
 import { loadSettings, SettingsProvider, useSettings } from "./state/settings";
+
+// Boot-time URL hash dispatch — when Tauri spawned us with
+// `#preview=<urlEncoded-path>` (via `window_open_preview`), render
+// the standalone PreviewWindow page instead of the full Browser
+// shell. The full app is heavy (sidebar, tabs, command palette,
+// settings store hydration); the preview window only needs to
+// render one file's body and a header.
+const isPreviewBoot =
+  typeof window !== "undefined" && /[#&]preview=/.test(window.location.hash);
 
 // Boot i18next BEFORE React mounts so `useTranslation` reads from a
 // populated bundle on the first render. We seed from the persisted
@@ -59,7 +69,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <SettingsProvider>
       <EffectiveThemeProvider>
         <CssBaseline />
-        <App />
+        {isPreviewBoot ? <PreviewWindow /> : <App />}
       </EffectiveThemeProvider>
     </SettingsProvider>
   </React.StrictMode>,

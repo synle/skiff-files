@@ -72,6 +72,28 @@ Two engines because local + cross-protocol benefit from different runtime models
 
 **`cpsync` family ports** (`stamp.rs`, `dedup.rs`, `repo.rs`): `cpstamp` (timestamp-suffixed single-file copy), `dedup` (size-group + MD5 compare → `_recycleBin/`, idempotent), `cprepo` (`git ls-files -z`-driven copy, skips untracked / ignored).
 
+## Preview Surfaces
+
+Three surfaces, one `<Body>` dispatch:
+
+- **`PreviewPane`** (right-hand pane). Renders the body inline with `mode="inline"` (compact heights) alongside a properties block.
+- **`PreviewModal`** (in-app 90vw × 90vh dialog). Renders the body with `mode="modal"` (taller heights) and adds sibling navigation + an "Open in new window" button. Spawned by `Cmd / Ctrl / Alt + ↓` against a previewable file (the modifier-down chord is the only opener — Spacebar belongs to FileList's row toggle, Finder convention).
+- **`PreviewWindow`** (standalone Tauri window). Same body, no Browser shell. Spawned by `window_open_preview` (the modal's button + the chord pressed twice).
+
+`Body` (in `components/PreviewPane.tsx`) routes by kind:
+
+| Kind | Body component |
+|---|---|
+| folder | `FolderBody` (recursive scan) |
+| image | `ImageBody` (EXIF auto-orient + rotate + zoom + drag-pan) |
+| audio / video | `preview/MediaBody` (custom seekbar + play / pause / volume) |
+| pdf | `PdfBody` (webview's native PDF viewer) |
+| **everything else** | `preview/TextBody` (lossy UTF-8 + Prism highlight + markdown toggle + in-body search + virtualized renderer for files > 64 KB) |
+
+`isPreviewableEntry` collapses to "anything-not-folder" — text fallback ensures every file kind has a useful preview.
+
+EXIF orientation rides through the Rust `ImageExif.orientation: Option<u32>` field; the frontend's `util/exifOrientation.ts` maps 1–8 to a CSS transform snippet and composes it with the user's rotation + zoom in one matrix.
+
 ## Cross-Cutting Conventions
 
 - **Tabs**: `BrowserTabs` keeps all tabs mounted, toggles `display: none`. Each `Browser` receives `isActive`; window listeners gate on it.

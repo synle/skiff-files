@@ -214,6 +214,151 @@ export function themeForFull(
             userSelect: "auto",
             WebkitUserSelect: "auto",
           },
+          // Prism token colors. Two palettes so the highlighted code
+          // contrasts on both backgrounds. Tokens that don't appear
+          // here fall through to the surrounding `color` (text.primary),
+          // which is the right default for things like punctuation.
+          // Selectors are `.token.<type>` per Prism's standard markup.
+          ...(effective === "dark"
+            ? {
+                ".token.comment, .token.prolog, .token.doctype, .token.cdata":
+                  { color: "#6a7280", fontStyle: "italic" },
+                ".token.punctuation": { color: "#cbd5e1" },
+                ".token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol, .token.deleted":
+                  { color: "#fca5a5" },
+                ".token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted":
+                  { color: "#86efac" },
+                ".token.operator, .token.entity, .token.url, .token.variable":
+                  { color: "#fcd34d" },
+                ".token.atrule, .token.attr-value, .token.keyword":
+                  { color: "#93c5fd" },
+                ".token.function, .token.class-name": { color: "#c4b5fd" },
+                ".token.regex, .token.important": { color: "#f9a8d4" },
+                ".token.important, .token.bold": { fontWeight: 600 },
+                ".token.italic": { fontStyle: "italic" },
+              }
+            : {
+                ".token.comment, .token.prolog, .token.doctype, .token.cdata":
+                  { color: "#6b7280", fontStyle: "italic" },
+                ".token.punctuation": { color: "#475569" },
+                ".token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol, .token.deleted":
+                  { color: "#b91c1c" },
+                ".token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted":
+                  { color: "#15803d" },
+                ".token.operator, .token.entity, .token.url, .token.variable":
+                  { color: "#a16207" },
+                ".token.atrule, .token.attr-value, .token.keyword":
+                  { color: "#1d4ed8" },
+                ".token.function, .token.class-name": { color: "#6d28d9" },
+                ".token.regex, .token.important": { color: "#be185d" },
+                ".token.important, .token.bold": { fontWeight: 600 },
+                ".token.italic": { fontStyle: "italic" },
+              }),
+          // Search-match highlight inside the preview text body.
+          // Picks the accent color from MUI's warning palette so it
+          // pops on both themes without re-deriving the hex inline.
+          ".skiff-search-hit": {
+            backgroundColor:
+              effective === "dark"
+                ? "rgba(250, 204, 21, 0.32)"
+                : "rgba(250, 204, 21, 0.55)",
+            borderRadius: 2,
+          },
+          ".skiff-search-hit-active": {
+            backgroundColor:
+              effective === "dark"
+                ? "rgba(249, 115, 22, 0.55)"
+                : "rgba(249, 115, 22, 0.75)",
+            outline:
+              effective === "dark"
+                ? "1px solid rgba(249, 115, 22, 0.85)"
+                : "1px solid rgba(194, 65, 12, 0.9)",
+          },
+          // Rendered-markdown styling for the preview body. Skips
+          // a full prose framework — just enough to make headings,
+          // code blocks, lists, and tables legible inside the
+          // pre-wrap container the preview body uses elsewhere.
+          ".skiff-markdown": {
+            fontFamily: baseTypography.fontFamily,
+            lineHeight: 1.55,
+            "& h1, & h2, & h3, & h4, & h5, & h6": {
+              fontWeight: 600,
+              marginTop: "1em",
+              marginBottom: "0.4em",
+              lineHeight: 1.25,
+            },
+            "& h1": { fontSize: "1.6em" },
+            "& h2": { fontSize: "1.35em" },
+            "& h3": { fontSize: "1.15em" },
+            "& h4, & h5, & h6": { fontSize: "1em" },
+            "& p": { margin: "0.6em 0" },
+            "& code": {
+              fontFamily:
+                "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              fontSize: "0.92em",
+              padding: "0.1em 0.3em",
+              borderRadius: 3,
+              backgroundColor:
+                effective === "dark"
+                  ? "rgba(148, 163, 184, 0.18)"
+                  : "rgba(15, 23, 42, 0.08)",
+            },
+            "& pre": {
+              fontFamily:
+                "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              fontSize: "0.9em",
+              padding: "0.75em",
+              borderRadius: 6,
+              overflowX: "auto",
+              backgroundColor:
+                effective === "dark"
+                  ? "rgba(15, 23, 42, 0.55)"
+                  : "rgba(15, 23, 42, 0.05)",
+            },
+            "& pre code": {
+              padding: 0,
+              backgroundColor: "transparent",
+            },
+            "& blockquote": {
+              borderLeft:
+                effective === "dark"
+                  ? "3px solid rgba(148, 163, 184, 0.5)"
+                  : "3px solid rgba(15, 23, 42, 0.25)",
+              margin: "0.6em 0",
+              padding: "0.2em 0 0.2em 0.8em",
+              color: effective === "dark" ? "#cbd5e1" : "#475569",
+            },
+            "& ul, & ol": {
+              margin: "0.6em 0",
+              paddingLeft: "1.6em",
+            },
+            "& li": { margin: "0.2em 0" },
+            "& table": {
+              borderCollapse: "collapse",
+              margin: "0.6em 0",
+            },
+            "& th, & td": {
+              border:
+                effective === "dark"
+                  ? "1px solid rgba(148, 163, 184, 0.3)"
+                  : "1px solid rgba(15, 23, 42, 0.15)",
+              padding: "0.3em 0.6em",
+            },
+            "& th": { fontWeight: 600 },
+            "& a": {
+              color: effective === "dark" ? "#93c5fd" : "#1d4ed8",
+              textDecoration: "underline",
+            },
+            "& img": { maxWidth: "100%" },
+            "& hr": {
+              border: 0,
+              borderTop:
+                effective === "dark"
+                  ? "1px solid rgba(148, 163, 184, 0.3)"
+                  : "1px solid rgba(15, 23, 42, 0.15)",
+              margin: "1em 0",
+            },
+          },
         },
       },
     },

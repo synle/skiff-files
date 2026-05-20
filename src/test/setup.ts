@@ -102,6 +102,7 @@ vi.mock("@tauri-apps/api/core", () => ({
         exposure: null,
         aperture: null,
         focalLength: null,
+        orientation: null,
       };
     }
     if (cmd === "fs_disk_space") {

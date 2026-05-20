@@ -98,13 +98,13 @@ describe("PreviewPane", () => {
     });
   });
 
-  it("kicks the hex preview for binary kinds", () => {
-    // 0.2.202 swapped the "no inline preview" message for an actual
-    // hex dump body. Initial render shows the loading hint until
-    // readBase64 resolves; the test just asserts we entered the
-    // hex-body code path rather than the fallthrough message.
+  it("renders the text body for binary kinds (plain-text fallback)", () => {
+    // 0.2.316 retired the hex-dump fallback. Binary / unknown kinds
+    // now route through TextBody and surface as lossy UTF-8 — the
+    // same loading hint the text body uses while readText is in
+    // flight is enough to assert the new code path.
     r({ selected: blob });
-    expect(screen.getByText(/Loading hex preview/i)).toBeInTheDocument();
+    expect(screen.getByText(/Loading…/i)).toBeInTheDocument();
   });
 
   it("cancels in-flight loads when selection changes", async () => {

@@ -135,7 +135,7 @@ The Phase 1 page already follows this approach (Appearance / Default View / Adva
 |---|---|---|
 | 0 — Scaffold & repo hygiene | ✅ shipped | Branding + CI workflows + public repo |
 | 1 — Core local file explorer | ✅ shipped | Browse / mkdir / rename / remove / copy; virtualized list; light/dark/system theme; settings page |
-| 1.5 — Preview pane | ✅ shipped | Image / text / markdown / folder summary at first slice; PDF (0.2.58); audio + video (0.2.38); hex preview for binaries (0.2.202) |
+| 1.5 — Preview pane | ✅ shipped | Image / text / markdown / folder summary at first slice; PDF (0.2.58); audio + video (0.2.38); hex preview for binaries (0.2.202, retired 0.2.316 for plain-text fallback); 0.2.316 ships Prism syntax highlight + markdown render toggle + in-body search + custom AV seekbar + EXIF auto-orient + sibling navigation in modal + dedicated preview window |
 | 2 — Connection abstraction & SFTP | ✅ shipped | `russh` + `russh-sftp` backend, registry as Tauri State, Connections page, sidebar live-host list, `sftp://` scheme + scheme-aware path utils, ssh-config import (0.2.12), known-hosts TOFU (0.2.76), SFTP write side (0.1.10), ssh-agent auth (0.2.85), streaming SHA-256 (0.2.102) |
 | 3 — FTP/FTPS + SMB | partial | Plain FTP shipped 0.2.246 (`suppaftp` backend, list/stat/read). FTP write ops (mkdir / rename / remove recursive) shipped 0.2.247. SMB / Samba via OS-native handler (0.2.141). Still pending: FTPS, FTP upload via Skiffsync, in-app SMB, docker-based integration tests. |
 | 4 — Skiffsync (cpsync-inspired) | ✅ shipped | 4a local-to-local: skip-if-unchanged + conflict policies (skip/overwrite/keepBoth) + dry-run + cancel + max-size guard + per-file events. 4b smart-batch policies (overwriteOlder / replaceSmaller / replaceIfSizeDifferent / renameTarget / renameOlderTarget), cross-protocol src/dest, interactive TeraCopy modal w/ apply-to-all, pause/resume, `cpstamp` / `dedup` / `cprepo` modes, saved-job templates persisted to settings.json |
@@ -232,17 +232,20 @@ Goal: a Finder-style "Get Info" / "Preview" pane that opens to the right of the 
 
 - [ ] Toggleable via Toolbar button (eye icon) and `⌘I` keyboard shortcut
 - [ ] Persisted preference: Settings → Default View → "Show preview pane" = off / images-only / always
-- [ ] **Image preview** — render directly inline; supports png, jpg/jpeg, gif, webp, bmp, svg, avif, heic/heif (heic via Rust-side decode if browser webview can't render natively)
-  - Fit-to-pane by default, click to zoom 100%, drag to pan when zoomed
+- [x] **Image preview** — render directly inline; supports png, jpg/jpeg, gif, webp, bmp, svg, avif, heic/heif (heic via Rust-side decode if browser webview can't render natively)
+  - Fit-to-pane by default, explicit zoom controls + drag to pan when zoomed
   - Show dimensions + EXIF date/camera if present (read via `kamadak-exif` crate)
-- [ ] **Text preview** — first 200 KB rendered with monospace font; longer files show a "show all" link that opens an external editor
-- [ ] **Markdown preview** — rendered (toggle to raw)
-- [ ] **PDF preview** — embed via webview's native PDF viewer
-- [ ] **Audio / video preview** — `<audio>` / `<video>` element, lazy-mounted on first frame
-- [ ] **Folder summary** — item count + total size (recursive, cancellable scan)
-- [ ] **Properties block** at the top of every preview: size, kind, mtime, mode, full path, "Open with…"
-- [ ] Resizable pane (drag the divider); width persisted
-- [ ] Cancel any in-flight preview render when selection changes
+  - EXIF auto-orientation honored on first paint (0.2.316)
+- [x] **Text preview** — first 256 KB; lossy-UTF-8 fallback for binary kinds; in-body search (contains / exact / regex, case toggle, match counter); Prism syntax highlighting (0.2.316); virtualized line list above 64 KB (0.2.316)
+- [x] **Markdown preview** — rendered via `marked` + sanitizer with a raw / rendered toggle (0.2.316)
+- [x] **PDF preview** — embed via webview's native PDF viewer
+- [x] **Audio / video preview** — custom seekbar + play/pause + volume (0.2.316); replaces the legacy native controls
+- [x] **Folder summary** — item count + total size (recursive, cancellable scan)
+- [x] **Properties block** at the top of every preview: size, kind, mtime, mode, full path, "Open with…"
+- [x] Resizable pane (drag the divider); width persisted
+- [x] Cancel any in-flight preview render when selection changes
+- [x] In-app PreviewModal with sibling nav + Open-in-new-window (0.2.313, 0.2.316)
+- [x] Standalone preview window (`window_open_preview`) — same Body, no Browser shell (0.2.316)
 
 **Exit criteria:** select a 4 K image, see it in the pane within 200 ms; select a folder, see recursive size within 1 s for 10k entries.
 
