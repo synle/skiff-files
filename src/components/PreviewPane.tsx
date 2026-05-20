@@ -20,6 +20,10 @@ import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
 import SaveIcon from "@mui/icons-material/Save";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
+import FitScreenIcon from "@mui/icons-material/FitScreen";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import { useEffect, useRef, useState } from "react";
 import {
   fsImageExif,
@@ -71,13 +75,32 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 /** Image-specific preview body. Loads on selection change; tracks cancel.
  *  Reports the natural pixel dimensions to the parent via `onDimensions`
- *  so the properties block can render them. */
-function ImageBody({
+ *  so the properties block can render them.
+ *
+ *  Two render modes:
+ *    - `"inline"` (default) — fits inside the right-hand preview pane.
+ *      Scrollable wrapper capped at 480 px tall when zoomed; image
+ *      max 360 px tall when fit-to-pane.
+ *    - `"modal"` — fills the in-app PreviewModal Dialog. Scrollable
+ *      wrapper takes ~70vh so the user has real estate to inspect.
+ *
+ *  Zoom semantics:
+ *    - `null` zoom = fit-to-container (default). Image clamped to
+ *      `maxWidth: 100%` + `maxHeight: <fitCap>` so it never exceeds
+ *      the pane; no scrollbars.
+ *    - numeric zoom = explicit scale factor (1.0 = 100%, 2.0 = 200%,
+ *      0.5 = 50%). Image renders at natural pixel size scaled by the
+ *      factor; wrapper scrolls when dimensions exceed container.
+ *      Step in/out via the toolbar's Zoom In / Zoom Out buttons.
+ */
+export function ImageBody({
   entry,
   onDimensions,
+  mode = "inline",
 }: {
   entry: Entry;
   onDimensions: (d: { w: number; h: number } | null) => void;
+  mode?: "inline" | "modal";
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,15 +119,15 @@ function ImageBody({
    *  the file (bypassing the previous data-URL state). The path
    *  alone isn't enough — same path before + after the rotate. */
   const [reloadKey, setReloadKey] = useState<number>(0);
-  /** Click-to-zoom toggle. Off = fit-to-pane (max 360 px tall);
-   *  on = native pixel size, scroll inside the pane to inspect.
-   *  Resets on selection change so each new image starts fitted. */
-  const [zoomed, setZoomed] = useState<boolean>(false);
+  /** Zoom factor. `null` = fit-to-container (default); a number =
+   *  explicit scale factor relative to natural pixel size. Bounded
+   *  in `[ZOOM_MIN, ZOOM_MAX]` by the step helpers below. Resets to
+   *  `null` on selection change so each new image starts fitted. */
+  const [zoom, setZoom] = useState<number | null>(null);
   /** Drag-to-pan when zoomed. The scrollable wrapper holds the ref;
    *  pointer-down captures the starting cursor + scroll offset, then
    *  pointermove updates scrollTop / scrollLeft by the delta until
-   *  pointerup. Suppresses the click-to-fit toggle when the drag
-   *  actually moved (>4px) so panning doesn't accidentally exit zoom. */
+   *  pointerup. */
   const panContainerRef = useRef<HTMLDivElement | null>(null);
   const panStateRef = useRef<{
     startX: number;
@@ -114,12 +137,39 @@ function ImageBody({
     moved: boolean;
   } | null>(null);
 
+  // Zoom bounds + step factor. ZOOM_MIN = 0.1 (10%) lets the user
+  // see a thumbnail of a huge image without scrolling; ZOOM_MAX = 8
+  // (800%) lets them pixel-peep without unbounded scaling. The step
+  // factor (1.25) gives ~7 clicks to traverse 100% → 800%.
+  const ZOOM_MIN = 0.1;
+  const ZOOM_MAX = 8;
+  const ZOOM_STEP = 1.25;
+  const stepIn = () => {
+    setZoom((prev) => {
+      // Stepping in from fit jumps to 100% — the natural anchor users
+      // expect ("zoom in" from fitted = show actual size). Subsequent
+      // steps multiply by ZOOM_STEP.
+      if (prev == null) return 1;
+      return Math.min(ZOOM_MAX, prev * ZOOM_STEP);
+    });
+  };
+  const stepOut = () => {
+    setZoom((prev) => {
+      // Stepping out from fit jumps to 50% so the user lands somewhere
+      // meaningful instead of toggling. Subsequent steps divide.
+      if (prev == null) return 0.5;
+      return Math.max(ZOOM_MIN, prev / ZOOM_STEP);
+    });
+  };
+  const zoomActual = () => setZoom(1);
+  const zoomFit = () => setZoom(null);
+
   useEffect(() => {
     let cancelled = false;
     setSrc(null);
     setError(null);
     setRotation(0);
-    setZoomed(false);
+    setZoom(null);
     onDimensions(null);
     readBase64(entry.path)
       .then((b64) => {
@@ -150,16 +200,39 @@ function ImageBody({
       </Typography>
     );
   }
+  const isZoomed = zoom != null;
+  // Container height when explicitly zoomed (need a fixed height so
+  // overflow:auto produces scrollbars when scaled dimensions exceed it).
+  // Inline lives next to a properties block — 480 px is the inherited
+  // 0.2.x value. Modal fills the dialog — 70vh gives the user real
+  // estate without crowding the toolbar.
+  const containerHeight = mode === "modal" ? "70vh" : 480;
+  // Max image dimension when fitted. Inline keeps the legacy 360 px
+  // cap so the properties block has room below; modal lets the image
+  // bloom to ~75vh.
+  const fittedMaxHeight = mode === "modal" ? "75vh" : 360;
   return (
     <Box>
       <Box
         ref={panContainerRef}
-        // When zoomed, wrap in a scrollable container so the user
-        // can pan inside the pane bounds without overflowing the
-        // properties block below.
+        // When zoomed, wrap in a fixed-height scrollable container so
+        // the user can scroll the scaled image inside the pane bounds
+        // without pushing the properties block off-screen. When fitted
+        // (zoom == null), no wrapper sizing — the image's own
+        // maxWidth/maxHeight do the constraining.
         sx={
-          zoomed
-            ? { maxHeight: 480, overflow: "auto", borderRadius: 1 }
+          isZoomed
+            ? {
+                height: containerHeight,
+                overflow: "auto",
+                borderRadius: 1,
+                bgcolor: "action.hover",
+                // Center the image when it's smaller than the
+                // container (e.g. user zoomed to 25% on a small image).
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "flex-start",
+              }
             : undefined
         }
       >
@@ -170,7 +243,7 @@ function ImageBody({
           // When NOT zoomed, allow drag-out to OS Finder / Desktop
           // via the native drag-source plugin. When zoomed, dragging
           // is reserved for pan, so we disable HTML5 drag entirely.
-          draggable={!zoomed && !entry.path.startsWith("sftp://")}
+          draggable={!isZoomed && !entry.path.startsWith("sftp://")}
           onDragStart={(e) => {
             // The HTML5 drag still fires inside our window for the
             // existing in-app drop targets (sidebar host items,
@@ -192,7 +265,7 @@ function ImageBody({
             }
           }}
           onPointerDown={(e) => {
-            if (!zoomed) return;
+            if (!isZoomed) return;
             const cont = panContainerRef.current;
             if (!cont) return;
             (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -217,45 +290,51 @@ function ImageBody({
             cont.scrollTop = s.scrollTop - dy;
           }}
           onPointerUp={(e) => {
-            const s = panStateRef.current;
             panStateRef.current = null;
             (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-            // Suppress the click-to-fit toggle when the user dragged.
-            if (s?.moved) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
           }}
-          onClick={(e) => {
-            // Pointerup already cleaned up panState; if it dragged
-            // (moved=true), we wouldn't reach here because preventDefault
-            // suppressed click. But pointerup fires before click in
-            // some browsers without click suppression — guard again.
-            if (panStateRef.current === null) {
-              setZoomed((z) => !z);
-            }
-            e.preventDefault();
-          }}
-          title={zoomed ? "Click to fit · drag to pan" : "Click to zoom 100%"}
+          title={
+            isZoomed
+              ? `Zoom ${Math.round((zoom ?? 1) * 100)}% · drag to pan`
+              : "Fit to pane"
+          }
           sx={{
-            maxWidth: zoomed ? "none" : "100%",
-            maxHeight: zoomed ? "none" : 360,
+            maxWidth: isZoomed ? "none" : "100%",
+            maxHeight: isZoomed ? "none" : fittedMaxHeight,
             borderRadius: 1,
             display: "block",
-            cursor: zoomed ? "grab" : "zoom-in",
-            "&:active": { cursor: zoomed ? "grabbing" : "zoom-in" },
-            transform: `rotate(${rotation}deg)`,
+            cursor: isZoomed ? "grab" : "default",
+            "&:active": { cursor: isZoomed ? "grabbing" : "default" },
+            // Combine rotation + zoom in a single transform so the
+            // browser applies them as one matrix (no compounding bugs
+            // when rotating a zoomed image).
+            transform:
+              isZoomed
+                ? `rotate(${rotation}deg) scale(${zoom})`
+                : `rotate(${rotation}deg)`,
             // Keep the rotated image inside the pane bounds — without
             // `transform-origin: center` rotation pivots from top-left
             // and the image walks off screen on quarter turns.
             transformOrigin: "center",
             transition: "transform 200ms",
             userSelect: "none",
+            // When zoomed via scale(), the rendered box still occupies
+            // natural pixel dimensions; CSS scale doesn't grow the box
+            // so the scrollable wrapper wouldn't know to scroll. Force
+            // the rendered box to scaled dimensions by setting width /
+            // height explicitly when zoomed.
+            ...(isZoomed && {
+              transformOrigin: "top left",
+            }),
           }}
         />
       </Box>
-      <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
-        <Tooltip title="Rotate left">
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{ mt: 0.5, flexWrap: "wrap", alignItems: "center" }}
+      >
+        <Tooltip title="Rotate left (90°)">
           <span>
             <IconButton
               size="small"
@@ -267,7 +346,7 @@ function ImageBody({
             </IconButton>
           </span>
         </Tooltip>
-        <Tooltip title="Rotate right">
+        <Tooltip title="Rotate right (90°)">
           <span>
             <IconButton
               size="small"
@@ -313,6 +392,61 @@ function ImageBody({
             </IconButton>
           </span>
         </Tooltip>
+        <Box sx={{ flex: 1 }} />
+        <Tooltip title="Zoom out">
+          <span>
+            <IconButton
+              size="small"
+              onClick={stepOut}
+              disabled={zoom != null && zoom <= ZOOM_MIN + 1e-6}
+              aria-label="Zoom out"
+            >
+              <ZoomOutIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Zoom 100%">
+          <span>
+            <IconButton
+              size="small"
+              onClick={zoomActual}
+              aria-label="Zoom to 100% (actual size)"
+            >
+              <RestartAltIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Fit to pane">
+          <span>
+            <IconButton
+              size="small"
+              onClick={zoomFit}
+              disabled={zoom == null}
+              aria-label="Fit image to pane"
+            >
+              <FitScreenIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Zoom in">
+          <span>
+            <IconButton
+              size="small"
+              onClick={stepIn}
+              disabled={zoom != null && zoom >= ZOOM_MAX - 1e-6}
+              aria-label="Zoom in"
+            >
+              <ZoomInIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Typography
+          variant="caption"
+          sx={{ minWidth: 36, textAlign: "right", color: "text.secondary" }}
+          aria-live="polite"
+        >
+          {zoom == null ? "Fit" : `${Math.round(zoom * 100)}%`}
+        </Typography>
       </Stack>
     </Box>
   );
