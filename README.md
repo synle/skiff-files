@@ -96,7 +96,7 @@ For deeper dives:
 - **[DEV.md](./DEV.md)** — local setup, day-to-day commands, project layout
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** — how the major modules fit together
 - **[TODO.md](./TODO.md)** — phased roadmap + deferred backlog
-- **[AGENTS](./CLAUDE.md)** — guidance for Claude Code working in this repo
+- **[AGENTS](./AGENTS.md)** — guidance for Claude Code working in this repo
 
 Useful scripts:
 
