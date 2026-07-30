@@ -190,14 +190,9 @@ export default function Toolbar(props: Props) {
     disabled = false,
   } = props;
 
-  const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(
-    null,
-  );
-  const [overflowAnchor, setOverflowAnchor] = useState<HTMLElement | null>(
-    null,
-  );
-  const [savedSearchAnchor, setSavedSearchAnchor] =
-    useState<HTMLElement | null>(null);
+  const [sortMenuAnchor, setSortMenuAnchor] = useState<HTMLElement | null>(null);
+  const [overflowAnchor, setOverflowAnchor] = useState<HTMLElement | null>(null);
+  const [savedSearchAnchor, setSavedSearchAnchor] = useState<HTMLElement | null>(null);
 
   /** Breakpoint at which we collapse the trailing controls into a ⋮
    *  menu. Below `md` (900px), the toolbar's preview / kind filter /
@@ -321,12 +316,7 @@ export default function Toolbar(props: Props) {
       </Menu>
       <Tooltip title={upTarget ? `Up to ${upTarget}` : "Up"}>
         <span>
-          <IconButton
-            size="small"
-            disabled={!canGoUp}
-            onClick={onUp}
-            aria-label="Up"
-          >
+          <IconButton size="small" disabled={!canGoUp} onClick={onUp} aria-label="Up">
             <ArrowUpwardIcon fontSize="small" />
           </IconButton>
         </span>
@@ -357,515 +347,496 @@ export default function Toolbar(props: Props) {
         <Box sx={{ flexGrow: 1 }} />
       ) : (
         <>
-      <Tooltip title="New folder">
-        <IconButton
-          size="small"
-          onClick={onNewFolder}
-          aria-label="New folder"
-        >
-          <CreateNewFolderIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-      {onNewFile && (
-        <Tooltip title="New file">
-          <IconButton size="small" onClick={onNewFile} aria-label="New file">
-            <NoteAddIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      )}
+          <Tooltip title="New folder">
+            <IconButton size="small" onClick={onNewFolder} aria-label="New folder">
+              <CreateNewFolderIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {onNewFile && (
+            <Tooltip title="New file">
+              <IconButton size="small" onClick={onNewFile} aria-label="New file">
+                <NoteAddIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
 
-      <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ flexGrow: 1 }} />
 
-      <Tooltip
-        title={
-          searchRecursive
-            ? "Searching subfolders (click to limit to current folder)"
-            : "Click to search subfolders"
-        }
-      >
-        <ToggleButton
-          size="small"
-          value="recursive"
-          selected={searchRecursive}
-          onChange={() => onSearchRecursiveChange(!searchRecursive)}
-          aria-label="Toggle recursive search"
-          aria-pressed={searchRecursive}
-          sx={{ p: 0.5, mr: 0.5 }}
-        >
-          <SearchIcon fontSize="small" />
-        </ToggleButton>
-      </Tooltip>
+          <Tooltip
+            title={
+              searchRecursive
+                ? "Searching subfolders (click to limit to current folder)"
+                : "Click to search subfolders"
+            }
+          >
+            <ToggleButton
+              size="small"
+              value="recursive"
+              selected={searchRecursive}
+              onChange={() => onSearchRecursiveChange(!searchRecursive)}
+              aria-label="Toggle recursive search"
+              aria-pressed={searchRecursive}
+              sx={{ p: 0.5, mr: 0.5 }}
+            >
+              <SearchIcon fontSize="small" />
+            </ToggleButton>
+          </Tooltip>
 
-      <TextField
-        size="small"
-        placeholder={searchRecursive ? "Find in subfolders…" : "Search…"}
-        value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            // Esc clears + blurs so the user can resume keyboard nav.
-            onSearchChange("");
-            (e.target as HTMLInputElement).blur();
-          } else if (e.key === "Enter" && search.trim()) {
-            // Push the committed query into history. Esc / clear are
-            // intentionally NOT history events — only "I'm running
-            // this search" qualifies.
-            onSearchCommit?.(search.trim());
-          }
-        }}
-        onBlur={() => {
-          if (search.trim()) onSearchCommit?.(search.trim());
-        }}
-        inputRef={searchInputRef}
-        sx={{ width: 200 }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-            endAdornment: search ? (
-              <InputAdornment position="end">
+          <TextField
+            size="small"
+            placeholder={searchRecursive ? "Find in subfolders…" : "Search…"}
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                // Esc clears + blurs so the user can resume keyboard nav.
+                onSearchChange("");
+                (e.target as HTMLInputElement).blur();
+              } else if (e.key === "Enter" && search.trim()) {
+                // Push the committed query into history. Esc / clear are
+                // intentionally NOT history events — only "I'm running
+                // this search" qualifies.
+                onSearchCommit?.(search.trim());
+              }
+            }}
+            onBlur={() => {
+              if (search.trim()) onSearchCommit?.(search.trim());
+            }}
+            inputRef={searchInputRef}
+            sx={{ width: 200 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+                endAdornment: search ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={() => onSearchChange("")}
+                      aria-label="Clear search"
+                      sx={{ p: 0.25 }}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              },
+              htmlInput: {
+                "aria-label": "Search current folder",
+                // HTML5 datalist gives us a native suggestion dropdown for
+                // free — no extra Menu wiring needed. Browser-native
+                // appearance, OS-themed.
+                list: searchHistory.length > 0 ? "skiff-search-history" : undefined,
+              },
+            }}
+          />
+          {searchHistory.length > 0 && (
+            <datalist id="skiff-search-history">
+              {searchHistory.map((q) => (
+                <option key={q} value={q} />
+              ))}
+            </datalist>
+          )}
+          {/* Search-mode toggles. Only render when both setters are
+           *  wired AND a query is present — they're noise when the user
+           *  isn't searching. `Aa` for case-sensitive, `.*` for regex
+           *  follows VS Code / IntelliJ convention. */}
+          {search && onSearchCaseSensitiveChange && (
+            <Tooltip title={searchCaseSensitive ? "Case sensitive" : "Match case"}>
+              <ToggleButton
+                size="small"
+                value="case"
+                selected={!!searchCaseSensitive}
+                onChange={() => onSearchCaseSensitiveChange(!searchCaseSensitive)}
+                aria-label="Toggle case-sensitive search"
+                aria-pressed={!!searchCaseSensitive}
+                sx={{ p: 0.5 }}
+              >
+                <Box
+                  component="span"
+                  sx={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1, fontWeight: 600 }}
+                >
+                  Aa
+                </Box>
+              </ToggleButton>
+            </Tooltip>
+          )}
+          {search && onSearchRegexChange && (
+            <Tooltip title={searchRegex ? "Regex on" : "Match as regex"}>
+              <ToggleButton
+                size="small"
+                value="regex"
+                selected={!!searchRegex}
+                onChange={() => onSearchRegexChange(!searchRegex)}
+                aria-label="Toggle regex search"
+                aria-pressed={!!searchRegex}
+                sx={{ p: 0.5 }}
+              >
+                <Box
+                  component="span"
+                  sx={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1, fontWeight: 600 }}
+                >
+                  .*
+                </Box>
+              </ToggleButton>
+            </Tooltip>
+          )}
+          {/* Saved searches menu — only renders when wiring + content is
+           *  available (a query to save OR existing saved entries to load). */}
+          {(savedSearches.length > 0 || (search && onSaveCurrentSearch)) && (
+            <>
+              <Tooltip title="Saved searches">
                 <IconButton
                   size="small"
-                  onClick={() => onSearchChange("")}
-                  aria-label="Clear search"
-                  sx={{ p: 0.25 }}
+                  onClick={(e) => setSavedSearchAnchor(e.currentTarget)}
+                  aria-label="Saved searches"
                 >
-                  <ClearIcon fontSize="small" />
+                  <BookmarkBorderIcon fontSize="small" />
                 </IconButton>
-              </InputAdornment>
-            ) : null,
-          },
-          htmlInput: {
-            "aria-label": "Search current folder",
-            // HTML5 datalist gives us a native suggestion dropdown for
-            // free — no extra Menu wiring needed. Browser-native
-            // appearance, OS-themed.
-            list: searchHistory.length > 0 ? "skiff-search-history" : undefined,
-          },
-        }}
-      />
-      {searchHistory.length > 0 && (
-        <datalist id="skiff-search-history">
-          {searchHistory.map((q) => (
-            <option key={q} value={q} />
-          ))}
-        </datalist>
-      )}
-      {/* Search-mode toggles. Only render when both setters are
-       *  wired AND a query is present — they're noise when the user
-       *  isn't searching. `Aa` for case-sensitive, `.*` for regex
-       *  follows VS Code / IntelliJ convention. */}
-      {search && onSearchCaseSensitiveChange && (
-        <Tooltip title={searchCaseSensitive ? "Case sensitive" : "Match case"}>
-          <ToggleButton
-            size="small"
-            value="case"
-            selected={!!searchCaseSensitive}
-            onChange={() => onSearchCaseSensitiveChange(!searchCaseSensitive)}
-            aria-label="Toggle case-sensitive search"
-            aria-pressed={!!searchCaseSensitive}
-            sx={{ p: 0.5 }}
-          >
-            <Box
-              component="span"
-              sx={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1, fontWeight: 600 }}
-            >
-              Aa
-            </Box>
-          </ToggleButton>
-        </Tooltip>
-      )}
-      {search && onSearchRegexChange && (
-        <Tooltip title={searchRegex ? "Regex on" : "Match as regex"}>
-          <ToggleButton
-            size="small"
-            value="regex"
-            selected={!!searchRegex}
-            onChange={() => onSearchRegexChange(!searchRegex)}
-            aria-label="Toggle regex search"
-            aria-pressed={!!searchRegex}
-            sx={{ p: 0.5 }}
-          >
-            <Box
-              component="span"
-              sx={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1, fontWeight: 600 }}
-            >
-              .*
-            </Box>
-          </ToggleButton>
-        </Tooltip>
-      )}
-      {/* Saved searches menu — only renders when wiring + content is
-       *  available (a query to save OR existing saved entries to load). */}
-      {(savedSearches.length > 0 || (search && onSaveCurrentSearch)) && (
-        <>
-          <Tooltip title="Saved searches">
-            <IconButton
-              size="small"
-              onClick={(e) => setSavedSearchAnchor(e.currentTarget)}
-              aria-label="Saved searches"
-            >
-              <BookmarkBorderIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Menu
-            open={savedSearchAnchor != null}
-            anchorEl={savedSearchAnchor}
-            onClose={() => setSavedSearchAnchor(null)}
-            slotProps={{ list: { dense: true } }}
-          >
-            {search && onSaveCurrentSearch && (
-              <MenuItem
-                onClick={() => {
-                  setSavedSearchAnchor(null);
-                  const label = window.prompt(
-                    "Name this search:",
-                    search.slice(0, 40),
-                  );
-                  if (label && label.trim()) {
-                    onSaveCurrentSearch(label.trim());
-                  }
-                }}
+              </Tooltip>
+              <Menu
+                open={savedSearchAnchor != null}
+                anchorEl={savedSearchAnchor}
+                onClose={() => setSavedSearchAnchor(null)}
+                slotProps={{ list: { dense: true } }}
               >
-                Save current search…
-              </MenuItem>
-            )}
-            {savedSearches.length > 0 && search && onSaveCurrentSearch && (
-              <Divider />
-            )}
-            {savedSearches.map((s) => (
-              <MenuItem
-                key={s.id}
-                onClick={() => {
-                  setSavedSearchAnchor(null);
-                  onLoadSavedSearch?.(s.id);
-                }}
-                sx={{ display: "flex", gap: 1, alignItems: "center" }}
+                {search && onSaveCurrentSearch && (
+                  <MenuItem
+                    onClick={() => {
+                      setSavedSearchAnchor(null);
+                      const label = window.prompt("Name this search:", search.slice(0, 40));
+                      if (label && label.trim()) {
+                        onSaveCurrentSearch(label.trim());
+                      }
+                    }}
+                  >
+                    Save current search…
+                  </MenuItem>
+                )}
+                {savedSearches.length > 0 && search && onSaveCurrentSearch && <Divider />}
+                {savedSearches.map((s) => (
+                  <MenuItem
+                    key={s.id}
+                    onClick={() => {
+                      setSavedSearchAnchor(null);
+                      onLoadSavedSearch?.(s.id);
+                    }}
+                    sx={{ display: "flex", gap: 1, alignItems: "center" }}
+                  >
+                    <Box sx={{ flex: 1 }}>
+                      <Box sx={{ fontSize: "0.875rem" }}>{s.label}</Box>
+                      <Box
+                        sx={{
+                          fontFamily: "monospace",
+                          fontSize: "0.7rem",
+                          color: "text.secondary",
+                        }}
+                      >
+                        {s.query}
+                        {s.regex ? " · regex" : ""}
+                        {s.caseSensitive ? " · case" : ""}
+                        {s.recursive ? " · recursive" : ""}
+                      </Box>
+                    </Box>
+                    {onDeleteSavedSearch && (
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteSavedSearch(s.id);
+                        }}
+                        aria-label={`Delete ${s.label}`}
+                      >
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </>
+          )}
+
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+          <Box sx={overflowOnlyBelowMd}>
+            <Tooltip title={previewOpen ? "Hide preview" : "Show preview"}>
+              <IconButton
+                size="small"
+                onClick={onTogglePreview}
+                aria-label={previewOpen ? "Hide preview" : "Show preview"}
+                aria-pressed={previewOpen}
               >
-                <Box sx={{ flex: 1 }}>
-                  <Box sx={{ fontSize: "0.875rem" }}>{s.label}</Box>
+                {previewOpen ? (
+                  <VisibilityIcon fontSize="small" />
+                ) : (
+                  <VisibilityOffIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          {/* Density toggle — flips between comfortable + compact. The
+           *  Settings → Appearance dropdown still owns the source of
+           *  truth; this button is a one-click toggle for power users. */}
+          {onDensityToggle && (
+            <Box sx={overflowOnlyBelowMd}>
+              <Tooltip title={density === "compact" ? "Compact rows" : "Comfortable rows"}>
+                <IconButton
+                  size="small"
+                  onClick={onDensityToggle}
+                  aria-label="Toggle density"
+                  aria-pressed={density === "compact"}
+                >
+                  {density === "compact" ? (
+                    <DensitySmallIcon fontSize="small" />
+                  ) : (
+                    <DensityMediumIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
+
+          {/* Kind-filter chip row toggle. Badge shows count of active
+           *  filter groups when the row is collapsed so the user notices
+           *  a filter is active even with the chips hidden. */}
+          {onKindFilterToggle && (
+            <Box sx={overflowOnlyBelowMd}>
+              <Tooltip
+                title={
+                  kindFilterActiveCount > 0
+                    ? `Filter (${kindFilterActiveCount} active)`
+                    : "Filter by kind"
+                }
+              >
+                <ToggleButton
+                  size="small"
+                  value="kindFilter"
+                  selected={!!kindFilterOpen || kindFilterActiveCount > 0}
+                  onChange={onKindFilterToggle}
+                  aria-label="Toggle kind filter row"
+                  aria-pressed={!!kindFilterOpen}
+                  sx={{ p: 0.5 }}
+                >
                   <Box
+                    component="span"
                     sx={{
                       fontFamily: "monospace",
-                      fontSize: "0.7rem",
-                      color: "text.secondary",
+                      fontSize: 11,
+                      lineHeight: 1,
+                      fontWeight: 600,
                     }}
                   >
-                    {s.query}
-                    {s.regex ? " · regex" : ""}
-                    {s.caseSensitive ? " · case" : ""}
-                    {s.recursive ? " · recursive" : ""}
+                    {kindFilterActiveCount > 0 ? `▤ ${kindFilterActiveCount}` : "▤"}
                   </Box>
-                </Box>
-                {onDeleteSavedSearch && (
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteSavedSearch(s.id);
-                    }}
-                    aria-label={`Delete ${s.label}`}
-                  >
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </MenuItem>
-            ))}
-          </Menu>
-        </>
-      )}
-
-      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-      <Box sx={overflowOnlyBelowMd}>
-        <Tooltip title={previewOpen ? "Hide preview" : "Show preview"}>
-          <IconButton
-            size="small"
-            onClick={onTogglePreview}
-            aria-label={previewOpen ? "Hide preview" : "Show preview"}
-            aria-pressed={previewOpen}
-          >
-            {previewOpen ? (
-              <VisibilityIcon fontSize="small" />
-            ) : (
-              <VisibilityOffIcon fontSize="small" />
-            )}
-          </IconButton>
-        </Tooltip>
-      </Box>
-
-      {/* Density toggle — flips between comfortable + compact. The
-       *  Settings → Appearance dropdown still owns the source of
-       *  truth; this button is a one-click toggle for power users. */}
-      {onDensityToggle && (
-        <Box sx={overflowOnlyBelowMd}>
-          <Tooltip
-            title={density === "compact" ? "Compact rows" : "Comfortable rows"}
-          >
-            <IconButton
-              size="small"
-              onClick={onDensityToggle}
-              aria-label="Toggle density"
-              aria-pressed={density === "compact"}
-            >
-              {density === "compact" ? (
-                <DensitySmallIcon fontSize="small" />
-              ) : (
-                <DensityMediumIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Tooltip>
-        </Box>
-      )}
-
-      {/* Kind-filter chip row toggle. Badge shows count of active
-       *  filter groups when the row is collapsed so the user notices
-       *  a filter is active even with the chips hidden. */}
-      {onKindFilterToggle && (
-        <Box sx={overflowOnlyBelowMd}>
-          <Tooltip
-            title={
-              kindFilterActiveCount > 0
-                ? `Filter (${kindFilterActiveCount} active)`
-                : "Filter by kind"
-            }
-          >
-            <ToggleButton
-              size="small"
-              value="kindFilter"
-              selected={!!kindFilterOpen || kindFilterActiveCount > 0}
-              onChange={onKindFilterToggle}
-              aria-label="Toggle kind filter row"
-              aria-pressed={!!kindFilterOpen}
-              sx={{ p: 0.5 }}
-            >
-              <Box
-                component="span"
-                sx={{
-                  fontFamily: "monospace",
-                  fontSize: 11,
-                  lineHeight: 1,
-                  fontWeight: 600,
-                }}
-              >
-                {kindFilterActiveCount > 0 ? `▤ ${kindFilterActiveCount}` : "▤"}
-              </Box>
-            </ToggleButton>
-          </Tooltip>
-        </Box>
-      )}
-
-      {/* Show-hidden-files toggle. Mirrors the Cmd+Shift+. shortcut
-       *  but as a discoverable affordance — power users who didn't
-       *  know about the keyboard binding still find it. */}
-      {onShowHiddenToggle && (
-        <Box sx={overflowOnlyBelowMd}>
-          <Tooltip
-            title={
-              showHidden ? "Hide dotfiles (Cmd+Shift+.)" : "Show dotfiles (Cmd+Shift+.)"
-            }
-          >
-            <ToggleButton
-              size="small"
-              value="showHidden"
-              selected={!!showHidden}
-              onChange={onShowHiddenToggle}
-              aria-label="Toggle hidden files"
-              aria-pressed={!!showHidden}
-              sx={{ p: 0.5 }}
-            >
-              <Box
-                component="span"
-                sx={{
-                  fontFamily: "monospace",
-                  fontSize: 13,
-                  lineHeight: 1,
-                }}
-              >
-                .*
-              </Box>
-            </ToggleButton>
-          </Tooltip>
-        </Box>
-      )}
-
-      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-      {/* Sort dropdown — primary affordance for changing sort in the
-       *  grid views (tile / gallery / column), which have no column
-       *  headers to click. List view keeps the column-header path so
-       *  this is a redundant-but-discoverable alternative there. */}
-      <Box sx={overflowOnlyBelowMd}>
-        <Tooltip
-          title={`Sort by ${sortLabel(sortKey)} (${sortDir === "asc" ? "↑" : "↓"})`}
-        >
-          <IconButton
-            size="small"
-            onClick={(e) => setSortMenuAnchor(e.currentTarget)}
-            aria-label="Sort"
-          >
-            <SortIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-      {/* Overflow menu — only renders below `md`, surfaces the same
-       *  controls that hide above the breakpoint. */}
-      <Box sx={inlineOnlyAboveMd}>
-        <Tooltip title="More toolbar options">
-          <IconButton
-            size="small"
-            onClick={(e) => setOverflowAnchor(e.currentTarget)}
-            aria-label="More toolbar options"
-          >
-            <MoreVertIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Menu
-          open={overflowAnchor != null}
-          anchorEl={overflowAnchor}
-          onClose={() => setOverflowAnchor(null)}
-          slotProps={{ list: { dense: true } }}
-        >
-          <MenuItem
-            onClick={() => {
-              onTogglePreview();
-              setOverflowAnchor(null);
-            }}
-          >
-            {previewOpen ? "Hide preview pane" : "Show preview pane"}
-          </MenuItem>
-          {onDensityToggle && (
-            <MenuItem
-              onClick={() => {
-                onDensityToggle();
-                setOverflowAnchor(null);
-              }}
-            >
-              {density === "compact"
-                ? "Switch to comfortable rows"
-                : "Switch to compact rows"}
-            </MenuItem>
+                </ToggleButton>
+              </Tooltip>
+            </Box>
           )}
-          {onKindFilterToggle && (
-            <MenuItem
-              onClick={() => {
-                onKindFilterToggle();
-                setOverflowAnchor(null);
-              }}
-            >
-              {kindFilterOpen ? "Hide filter row" : "Show filter row"}
-              {kindFilterActiveCount > 0
-                ? ` (${kindFilterActiveCount} active)`
-                : ""}
-            </MenuItem>
-          )}
+
+          {/* Show-hidden-files toggle. Mirrors the Cmd+Shift+. shortcut
+           *  but as a discoverable affordance — power users who didn't
+           *  know about the keyboard binding still find it. */}
           {onShowHiddenToggle && (
-            <MenuItem
-              onClick={() => {
-                onShowHiddenToggle();
-                setOverflowAnchor(null);
-              }}
-            >
-              {showHidden ? "Hide dotfiles" : "Show dotfiles"}
-            </MenuItem>
+            <Box sx={overflowOnlyBelowMd}>
+              <Tooltip
+                title={showHidden ? "Hide dotfiles (Cmd+Shift+.)" : "Show dotfiles (Cmd+Shift+.)"}
+              >
+                <ToggleButton
+                  size="small"
+                  value="showHidden"
+                  selected={!!showHidden}
+                  onChange={onShowHiddenToggle}
+                  aria-label="Toggle hidden files"
+                  aria-pressed={!!showHidden}
+                  sx={{ p: 0.5 }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      fontFamily: "monospace",
+                      fontSize: 13,
+                      lineHeight: 1,
+                    }}
+                  >
+                    .*
+                  </Box>
+                </ToggleButton>
+              </Tooltip>
+            </Box>
           )}
-          <Divider />
-          {(["name", "size", "mtime", "ctime", "kind", "tag"] as const).map((k) => {
-            const active = k === sortKey;
-            return (
+
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+          {/* Sort dropdown — primary affordance for changing sort in the
+           *  grid views (tile / gallery / column), which have no column
+           *  headers to click. List view keeps the column-header path so
+           *  this is a redundant-but-discoverable alternative there. */}
+          <Box sx={overflowOnlyBelowMd}>
+            <Tooltip title={`Sort by ${sortLabel(sortKey)} (${sortDir === "asc" ? "↑" : "↓"})`}>
+              <IconButton
+                size="small"
+                onClick={(e) => setSortMenuAnchor(e.currentTarget)}
+                aria-label="Sort"
+              >
+                <SortIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          {/* Overflow menu — only renders below `md`, surfaces the same
+           *  controls that hide above the breakpoint. */}
+          <Box sx={inlineOnlyAboveMd}>
+            <Tooltip title="More toolbar options">
+              <IconButton
+                size="small"
+                onClick={(e) => setOverflowAnchor(e.currentTarget)}
+                aria-label="More toolbar options"
+              >
+                <MoreVertIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              open={overflowAnchor != null}
+              anchorEl={overflowAnchor}
+              onClose={() => setOverflowAnchor(null)}
+              slotProps={{ list: { dense: true } }}
+            >
               <MenuItem
-                key={k}
-                selected={active}
                 onClick={() => {
-                  onSortChange(k);
+                  onTogglePreview();
                   setOverflowAnchor(null);
                 }}
               >
-                Sort by {sortLabel(k)}
-                {active ? (sortDir === "asc" ? "  ↑" : "  ↓") : ""}
+                {previewOpen ? "Hide preview pane" : "Show preview pane"}
               </MenuItem>
-            );
-          })}
-          <MenuItem
-            onClick={() => {
-              onSortDirToggle();
-              setOverflowAnchor(null);
-            }}
+              {onDensityToggle && (
+                <MenuItem
+                  onClick={() => {
+                    onDensityToggle();
+                    setOverflowAnchor(null);
+                  }}
+                >
+                  {density === "compact" ? "Switch to comfortable rows" : "Switch to compact rows"}
+                </MenuItem>
+              )}
+              {onKindFilterToggle && (
+                <MenuItem
+                  onClick={() => {
+                    onKindFilterToggle();
+                    setOverflowAnchor(null);
+                  }}
+                >
+                  {kindFilterOpen ? "Hide filter row" : "Show filter row"}
+                  {kindFilterActiveCount > 0 ? ` (${kindFilterActiveCount} active)` : ""}
+                </MenuItem>
+              )}
+              {onShowHiddenToggle && (
+                <MenuItem
+                  onClick={() => {
+                    onShowHiddenToggle();
+                    setOverflowAnchor(null);
+                  }}
+                >
+                  {showHidden ? "Hide dotfiles" : "Show dotfiles"}
+                </MenuItem>
+              )}
+              <Divider />
+              {(["name", "size", "mtime", "ctime", "kind", "tag"] as const).map((k) => {
+                const active = k === sortKey;
+                return (
+                  <MenuItem
+                    key={k}
+                    selected={active}
+                    onClick={() => {
+                      onSortChange(k);
+                      setOverflowAnchor(null);
+                    }}
+                  >
+                    Sort by {sortLabel(k)}
+                    {active ? (sortDir === "asc" ? "  ↑" : "  ↓") : ""}
+                  </MenuItem>
+                );
+              })}
+              <MenuItem
+                onClick={() => {
+                  onSortDirToggle();
+                  setOverflowAnchor(null);
+                }}
+              >
+                Reverse sort direction
+              </MenuItem>
+            </Menu>
+          </Box>
+          <Menu
+            open={sortMenuAnchor != null}
+            anchorEl={sortMenuAnchor}
+            onClose={() => setSortMenuAnchor(null)}
+            slotProps={{ list: { dense: true } }}
           >
-            Reverse sort direction
-          </MenuItem>
-        </Menu>
-      </Box>
-      <Menu
-        open={sortMenuAnchor != null}
-        anchorEl={sortMenuAnchor}
-        onClose={() => setSortMenuAnchor(null)}
-        slotProps={{ list: { dense: true } }}
-      >
-        {(["name", "size", "mtime", "ctime", "kind", "tag"] as const).map((k) => {
-          const active = k === sortKey;
-          return (
+            {(["name", "size", "mtime", "ctime", "kind", "tag"] as const).map((k) => {
+              const active = k === sortKey;
+              return (
+                <MenuItem
+                  key={k}
+                  selected={active}
+                  onClick={() => {
+                    onSortChange(k);
+                    setSortMenuAnchor(null);
+                  }}
+                >
+                  {sortLabel(k)}
+                  {active ? (sortDir === "asc" ? "  ↑" : "  ↓") : ""}
+                </MenuItem>
+              );
+            })}
+            <Divider />
             <MenuItem
-              key={k}
-              selected={active}
               onClick={() => {
-                onSortChange(k);
+                onSortDirToggle();
                 setSortMenuAnchor(null);
               }}
             >
-              {sortLabel(k)}
-              {active ? (sortDir === "asc" ? "  ↑" : "  ↓") : ""}
+              Reverse direction (currently {sortDir === "asc" ? "asc" : "desc"})
             </MenuItem>
-          );
-        })}
-        <Divider />
-        <MenuItem
-          onClick={() => {
-            onSortDirToggle();
-            setSortMenuAnchor(null);
-          }}
-        >
-          Reverse direction (currently {sortDir === "asc" ? "asc" : "desc"})
-        </MenuItem>
-      </Menu>
+          </Menu>
 
-      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-      <ToggleButtonGroup
-        size="small"
-        exclusive
-        value={view}
-        onChange={(_, v: ViewMode | null) => v && onViewChange(v)}
-        aria-label="View mode"
-      >
-        {/* Tooltips per button — the four icons aren't universally
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={view}
+            onChange={(_, v: ViewMode | null) => v && onViewChange(v)}
+            aria-label="View mode"
+          >
+            {/* Tooltips per button — the four icons aren't universally
             self-evident (especially Gallery vs Tile) and the rest of
             the toolbar's icon buttons all have hover hints, so this
             kept reading as the lone gap. */}
-        <Tooltip title="List view — rows with size / modified / kind columns">
-          <ToggleButton value="list" aria-label="List view">
-            <ViewListIcon fontSize="small" />
-          </ToggleButton>
-        </Tooltip>
-        <Tooltip title="Tile view — compact icon grid">
-          <ToggleButton value="tile" aria-label="Tile view">
-            <ViewModuleIcon fontSize="small" />
-          </ToggleButton>
-        </Tooltip>
-        <Tooltip title="Gallery view — large image thumbnails">
-          <ToggleButton value="gallery" aria-label="Gallery view">
-            <ViewCarouselIcon fontSize="small" />
-          </ToggleButton>
-        </Tooltip>
-        <Tooltip title="Column view — wide cells with metadata">
-          <ToggleButton value="column" aria-label="Column view">
-            <ViewColumnIcon fontSize="small" />
-          </ToggleButton>
-        </Tooltip>
-      </ToggleButtonGroup>
+            <Tooltip title="List view — rows with size / modified / kind columns">
+              <ToggleButton value="list" aria-label="List view">
+                <ViewListIcon fontSize="small" />
+              </ToggleButton>
+            </Tooltip>
+            <Tooltip title="Tile view — compact icon grid">
+              <ToggleButton value="tile" aria-label="Tile view">
+                <ViewModuleIcon fontSize="small" />
+              </ToggleButton>
+            </Tooltip>
+            <Tooltip title="Gallery view — large image thumbnails">
+              <ToggleButton value="gallery" aria-label="Gallery view">
+                <ViewCarouselIcon fontSize="small" />
+              </ToggleButton>
+            </Tooltip>
+            <Tooltip title="Column view — wide cells with metadata">
+              <ToggleButton value="column" aria-label="Column view">
+                <ViewColumnIcon fontSize="small" />
+              </ToggleButton>
+            </Tooltip>
+          </ToggleButtonGroup>
         </>
       )}
     </Box>

@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  activeCombo,
-  formatCombo,
-  keyEventToCombo,
-  matchesCombo,
-} from "./keybindings";
+import { activeCombo, formatCombo, keyEventToCombo, matchesCombo } from "./keybindings";
 
 function ev(init: Partial<KeyboardEvent>): KeyboardEvent {
   return new KeyboardEvent("keydown", init);
@@ -22,12 +17,8 @@ describe("keyEventToCombo", () => {
   });
 
   it("normalizes period via code (Shift+. on US emits >, both should match)", () => {
-    expect(keyEventToCombo(ev({ key: ">", code: "Period", shiftKey: true }))).toBe(
-      "shift+.",
-    );
-    expect(keyEventToCombo(ev({ key: ".", code: "Period", shiftKey: true }))).toBe(
-      "shift+.",
-    );
+    expect(keyEventToCombo(ev({ key: ">", code: "Period", shiftKey: true }))).toBe("shift+.");
+    expect(keyEventToCombo(ev({ key: ".", code: "Period", shiftKey: true }))).toBe("shift+.");
   });
 
   it("captures function keys + named keys", () => {

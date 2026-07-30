@@ -40,17 +40,11 @@ import {
   type ConnectionInfo,
   type KnownHostEntry,
 } from "../api/conn";
-import RemoteConnectDialog, {
-  type RemoteConnectRequest,
-} from "../components/RemoteConnectDialog";
+import RemoteConnectDialog, { type RemoteConnectRequest } from "../components/RemoteConnectDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { credsDelete } from "../api/creds";
 import { useSettings } from "../state/settings";
-import {
-  moveConnection,
-  removeConnection,
-  type SavedConnection,
-} from "../state/connectionStore";
+import { moveConnection, removeConnection, type SavedConnection } from "../state/connectionStore";
 
 /** Build the request payload the dialog needs to open in edit mode
  *  for a particular saved connection. Mirrors the typed-URL shape
@@ -80,9 +74,7 @@ export default function ConnectionsPage() {
     | null
   >(null);
   /** Delete-confirmation state. */
-  const [pendingDelete, setPendingDelete] = useState<SavedConnection | null>(
-    null,
-  );
+  const [pendingDelete, setPendingDelete] = useState<SavedConnection | null>(null);
 
   /** TOFU-pinned host fingerprints. Refreshed alongside live state. */
   const [knownHosts, setKnownHosts] = useState<KnownHostEntry[]>([]);
@@ -115,15 +107,11 @@ export default function ConnectionsPage() {
     // dialog completing a connect from the address bar).
     const onChange = () => void refreshLive();
     window.addEventListener("skiff:connections-changed", onChange);
-    return () =>
-      window.removeEventListener("skiff:connections-changed", onChange);
+    return () => window.removeEventListener("skiff:connections-changed", onChange);
   }, [refreshLive]);
 
   /** Index of live sessions by id — O(1) lookup while rendering rows. */
-  const liveById = useMemo(
-    () => new Map(live.map((c) => [c.id, c])),
-    [live],
-  );
+  const liveById = useMemo(() => new Map(live.map((c) => [c.id, c])), [live]);
 
   /** Disconnect a live session. Saved entry stays. */
   const disconnect = async (id: string) => {
@@ -224,8 +212,8 @@ export default function ConnectionsPage() {
           </Button>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Open SFTP, FTP, and SMB connections. All saved here — passwords
-          are kept only when you opt in.
+          Open SFTP, FTP, and SMB connections. All saved here — passwords are kept only when you opt
+          in.
         </Typography>
 
         {error && (
@@ -240,8 +228,7 @@ export default function ConnectionsPage() {
           </Typography>
           {settings.connections.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              No connections yet. Click <strong>Add connection</strong>{" "}
-              to set one up.
+              No connections yet. Click <strong>Add connection</strong> to set one up.
             </Typography>
           ) : (
             <List dense disablePadding>
@@ -295,19 +282,13 @@ export default function ConnectionsPage() {
                         </Tooltip>
                         <Tooltip
                           title={
-                            isLive
-                              ? "Disconnect (the saved entry stays)"
-                              : "Open this connection"
+                            isLive ? "Disconnect (the saved entry stays)" : "Open this connection"
                           }
                         >
                           <IconButton
                             size="small"
-                            onClick={() =>
-                              isLive ? void disconnect(c.id) : reconnect(c)
-                            }
-                            aria-label={
-                              isLive ? `Disconnect ${c.label}` : `Connect ${c.label}`
-                            }
+                            onClick={() => (isLive ? void disconnect(c.id) : reconnect(c))}
+                            aria-label={isLive ? `Disconnect ${c.label}` : `Connect ${c.label}`}
                             color={isLive ? "warning" : "primary"}
                           >
                             {isLive ? (
@@ -423,8 +404,8 @@ export default function ConnectionsPage() {
             Known hosts (TOFU)
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Server fingerprints captured on first connect. Delete an entry
-            to re-trust the host on the next connection.
+            Server fingerprints captured on first connect. Delete an entry to re-trust the host on
+            the next connection.
           </Typography>
           {knownHosts.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
@@ -436,10 +417,8 @@ export default function ConnectionsPage() {
                 // KnownHostEntry is a tuple `[host:port, fingerprint]`
                 // from the Tauri binding. Split for the remove call.
                 const lastColon = hostPort.lastIndexOf(":");
-                const host =
-                  lastColon > 0 ? hostPort.slice(0, lastColon) : hostPort;
-                const portStr =
-                  lastColon > 0 ? hostPort.slice(lastColon + 1) : "";
+                const host = lastColon > 0 ? hostPort.slice(0, lastColon) : hostPort;
+                const portStr = lastColon > 0 ? hostPort.slice(lastColon + 1) : "";
                 return (
                   <ListItem
                     key={hostPort}
@@ -453,9 +432,7 @@ export default function ConnectionsPage() {
                         <IconButton
                           size="small"
                           onClick={() => {
-                            void connKnownHostsRemove(`${host}:${portStr}`).then(
-                              refreshKnownHosts,
-                            );
+                            void connKnownHostsRemove(`${host}:${portStr}`).then(refreshKnownHosts);
                           }}
                           aria-label={`Delete fingerprint for ${hostPort}`}
                         >
@@ -485,19 +462,16 @@ export default function ConnectionsPage() {
         <Divider sx={{ my: 3 }} />
 
         <Typography variant="caption" color="text.secondary">
-          Passwords are stored only when the "Remember password" toggle in
-          the connect dialog is on, and currently live in the same{" "}
-          <code>settings.json</code> as the rest of the app. OS Keychain
-          support is on the roadmap.
+          Passwords are stored only when the "Remember password" toggle in the connect dialog is on,
+          and currently live in the same <code>settings.json</code> as the rest of the app. OS
+          Keychain support is on the roadmap.
         </Typography>
       </Box>
 
       <RemoteConnectDialog
         open={dialogState != null}
         request={dialogState?.request ?? null}
-        editingConnectionId={
-          dialogState?.mode === "edit" ? dialogState.editingId : undefined
-        }
+        editingConnectionId={dialogState?.mode === "edit" ? dialogState.editingId : undefined}
         onClose={() => setDialogState(null)}
         onConnected={() => {
           setDialogState(null);

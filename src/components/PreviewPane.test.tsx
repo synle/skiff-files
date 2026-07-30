@@ -143,9 +143,7 @@ describe("PreviewPane — text body zoom + copy controls (0.2.315)", () => {
     await waitFor(() => {
       expect(screen.getByText("preview text")).toBeInTheDocument();
     });
-    expect(
-      screen.getByRole("button", { name: /Copy file contents/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Copy file contents/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Zoom text out/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Reset text zoom/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Zoom text in/i)).toBeInTheDocument();
@@ -181,9 +179,7 @@ describe("PreviewPane — text body zoom + copy controls (0.2.315)", () => {
     await waitFor(() => {
       expect(screen.getByText("preview text")).toBeInTheDocument();
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: /Copy file contents/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /Copy file contents/i }));
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith("preview text");
     });

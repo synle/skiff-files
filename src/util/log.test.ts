@@ -13,10 +13,14 @@ async function freshLogWith(spies: {
   warn?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
 }): Promise<LogMod> {
-  if (spies.info) vi.spyOn(console, "info").mockImplementation(spies.info as (...args: unknown[]) => void);
-  if (spies.debug) vi.spyOn(console, "debug").mockImplementation(spies.debug as (...args: unknown[]) => void);
-  if (spies.warn) vi.spyOn(console, "warn").mockImplementation(spies.warn as (...args: unknown[]) => void);
-  if (spies.error) vi.spyOn(console, "error").mockImplementation(spies.error as (...args: unknown[]) => void);
+  if (spies.info)
+    vi.spyOn(console, "info").mockImplementation(spies.info as (...args: unknown[]) => void);
+  if (spies.debug)
+    vi.spyOn(console, "debug").mockImplementation(spies.debug as (...args: unknown[]) => void);
+  if (spies.warn)
+    vi.spyOn(console, "warn").mockImplementation(spies.warn as (...args: unknown[]) => void);
+  if (spies.error)
+    vi.spyOn(console, "error").mockImplementation(spies.error as (...args: unknown[]) => void);
   vi.resetModules();
   return await import("./log");
 }

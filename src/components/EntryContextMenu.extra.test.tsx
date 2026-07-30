@@ -114,9 +114,7 @@ describe("EntryContextMenu — extras", () => {
 
   it("Compare with reads 'Compare with this file' once a base is pending", () => {
     r({ entry: file, x: 0, y: 0 }, { comparePending: true });
-    expect(
-      screen.getByText("Compare with this file"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Compare with this file")).toBeInTheDocument();
   });
 
   it("Tag color dot click fires onSetTag with the picked color", () => {

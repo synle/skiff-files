@@ -38,9 +38,7 @@ describe("PathPickerField", () => {
   it("renders the text input + a Browse button", () => {
     r();
     expect(screen.getByLabelText(/Private key path/)).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/Browse for file/),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Browse for file/)).toBeInTheDocument();
   });
 
   it("typing into the input fires onChange with the new value", () => {
@@ -53,19 +51,13 @@ describe("PathPickerField", () => {
 
   it("surfaces a 'path doesn't exist' warning when fsStat rejects", async () => {
     const { fsStat } = await import("../api/fs");
-    (fsStat as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-      new Error("ENOENT"),
-    );
+    (fsStat as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("ENOENT"));
     r({ value: "/does/not/exist" });
     // Debounced by 350ms in the component; waitFor polls up to its
     // default 1s budget which is enough.
-    await waitFor(
-      () =>
-        expect(
-          screen.getByText(/doesn['']t exist/i),
-        ).toBeInTheDocument(),
-      { timeout: 1500 },
-    );
+    await waitFor(() => expect(screen.getByText(/doesn['']t exist/i)).toBeInTheDocument(), {
+      timeout: 1500,
+    });
   });
 
   it("hides the warning when fsStat resolves", async () => {
@@ -91,9 +83,7 @@ describe("PathPickerField", () => {
 
   it("directory mode swaps the Browse aria-label", () => {
     r({ mode: "directory" });
-    expect(
-      screen.getByLabelText(/Browse for folder/),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Browse for folder/)).toBeInTheDocument();
   });
 
   it("respects the required prop", () => {
@@ -111,28 +101,16 @@ describe("PathPickerField", () => {
     // Render once with a bad path so the warning fires.
     const { rerender } = render(
       <ThemeProvider theme={theme}>
-        <PathPickerField
-          label="Private key path"
-          value="/does/not/exist"
-          onChange={vi.fn()}
-        />
+        <PathPickerField label="Private key path" value="/does/not/exist" onChange={vi.fn()} />
       </ThemeProvider>,
     );
-    await waitFor(
-      () =>
-        expect(
-          screen.getByText(/doesn['']t exist/i),
-        ).toBeInTheDocument(),
-      { timeout: 1500 },
-    );
+    await waitFor(() => expect(screen.getByText(/doesn['']t exist/i)).toBeInTheDocument(), {
+      timeout: 1500,
+    });
     // Re-render with an empty value — warning must clear.
     rerender(
       <ThemeProvider theme={theme}>
-        <PathPickerField
-          label="Private key path"
-          value=""
-          onChange={vi.fn()}
-        />
+        <PathPickerField label="Private key path" value="" onChange={vi.fn()} />
       </ThemeProvider>,
     );
     await waitFor(() => {

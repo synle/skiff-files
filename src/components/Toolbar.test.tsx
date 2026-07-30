@@ -81,9 +81,7 @@ describe("Toolbar search", () => {
 
   it("placeholder text changes when recursive search is on", () => {
     r({ searchRecursive: true });
-    expect(
-      screen.getByPlaceholderText(/Find in subfolders/),
-    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Find in subfolders/)).toBeInTheDocument();
   });
 
   it("right-click on Back opens a history dropdown when entries exist", () => {
@@ -120,9 +118,7 @@ describe("Toolbar search", () => {
     r({ isRefreshing: true });
     // The spinner is a `progressbar` role from MUI's CircularProgress.
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("RefreshIcon"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("RefreshIcon")).not.toBeInTheDocument();
   });
 
   it("Refresh icon shows the static icon when not refreshing", () => {

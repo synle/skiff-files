@@ -4,9 +4,7 @@ import ProgressWidget from "./ProgressWidget";
 
 describe("ProgressWidget", () => {
   it("renders the files counter even with no byte data", () => {
-    render(
-      <ProgressWidget label="Copying" filesDone={3} filesTotal={10} />,
-    );
+    render(<ProgressWidget label="Copying" filesDone={3} filesTotal={10} />);
     expect(screen.getByText(/3 of 10 files/)).toBeInTheDocument();
   });
 
@@ -42,14 +40,7 @@ describe("ProgressWidget", () => {
 
   it("calls onPause when the pause button is clicked", () => {
     const onPause = vi.fn();
-    render(
-      <ProgressWidget
-        label="Copying"
-        filesDone={1}
-        filesTotal={10}
-        onPause={onPause}
-      />,
-    );
+    render(<ProgressWidget label="Copying" filesDone={1} filesTotal={10} onPause={onPause} />);
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     expect(onPause).toHaveBeenCalled();
   });
@@ -57,13 +48,7 @@ describe("ProgressWidget", () => {
   it("shows the resume button when paused", () => {
     const onResume = vi.fn();
     render(
-      <ProgressWidget
-        label="Copying"
-        filesDone={1}
-        filesTotal={10}
-        paused
-        onResume={onResume}
-      />,
+      <ProgressWidget label="Copying" filesDone={1} filesTotal={10} paused onResume={onResume} />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
     expect(onResume).toHaveBeenCalled();
@@ -83,12 +68,7 @@ describe("ProgressWidget", () => {
 
   it("shows error inline", () => {
     render(
-      <ProgressWidget
-        label="Copying"
-        filesDone={1}
-        filesTotal={10}
-        error="permission denied"
-      />,
+      <ProgressWidget label="Copying" filesDone={1} filesTotal={10} error="permission denied" />,
     );
     expect(screen.getByText("permission denied")).toBeInTheDocument();
   });

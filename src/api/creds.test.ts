@@ -5,12 +5,7 @@
 // frontend wiring.
 import { describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  credsCapable,
-  credsDelete,
-  credsLoad,
-  credsStore,
-} from "./creds";
+import { credsCapable, credsDelete, credsLoad, credsStore } from "./creds";
 
 const mockedInvoke = vi.mocked(invoke);
 

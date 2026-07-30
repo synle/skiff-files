@@ -63,23 +63,17 @@ describe("keyEventToCombo — shifted-symbol fallback (no `code`)", () => {
 
 describe("keyEventToCombo — modifier coverage", () => {
   it("treats Ctrl alone like Cmd alone (platform-neutral primary)", () => {
-    expect(keyEventToCombo(ev({ key: "k", code: "KeyK", ctrlKey: true }))).toBe(
-      "cmd+k",
-    );
+    expect(keyEventToCombo(ev({ key: "k", code: "KeyK", ctrlKey: true }))).toBe("cmd+k");
   });
 
   it("emits alt+key when only Alt is held", () => {
-    expect(keyEventToCombo(ev({ key: "k", code: "KeyK", altKey: true }))).toBe(
-      "alt+k",
-    );
+    expect(keyEventToCombo(ev({ key: "k", code: "KeyK", altKey: true }))).toBe("alt+k");
   });
 
   it("emits alt+shift+key when both are held without primary", () => {
-    expect(
-      keyEventToCombo(
-        ev({ key: "k", code: "KeyK", altKey: true, shiftKey: true }),
-      ),
-    ).toBe("alt+shift+k");
+    expect(keyEventToCombo(ev({ key: "k", code: "KeyK", altKey: true, shiftKey: true }))).toBe(
+      "alt+shift+k",
+    );
   });
 
   it("returns null when the event carries no key field at all", () => {
@@ -140,9 +134,7 @@ describe("matchesCombo — Windows ↔ macOS cross-platform aliases", () => {
   it("emits alt+arrowleft for an Alt+Left press (Windows Explorer Back convention)", () => {
     // The Browser uses this combo as a hardcoded alias for goBack
     // so Windows users get the native chord without rebinding.
-    expect(keyEventToCombo(ev({ key: "ArrowLeft", altKey: true }))).toBe(
-      "alt+arrowleft",
-    );
+    expect(keyEventToCombo(ev({ key: "ArrowLeft", altKey: true }))).toBe("alt+arrowleft");
   });
 });
 

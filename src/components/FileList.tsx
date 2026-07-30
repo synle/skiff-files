@@ -22,16 +22,9 @@ import { shouldStartRubberBand } from "../util/rubberBandHitTest";
 import type { Entry } from "../api/fs";
 import IconForKind from "./IconForKind";
 import GalleryThumb from "./GalleryThumb";
-import {
-  formatBytes,
-  formatMtimeAs,
-  formatMtimeRelative,
-} from "../util/format";
+import { formatBytes, formatMtimeAs, formatMtimeRelative } from "../util/format";
 import { setFileClipboard } from "../util/fileClipboard";
-import {
-  fetchFolderSize,
-  getCachedFolderSize,
-} from "../util/folderSizeCache";
+import { fetchFolderSize, getCachedFolderSize } from "../util/folderSizeCache";
 import { startNativeDrag } from "../api/drag";
 import { TAG_COLORS, tagColorHex } from "../util/tagColors";
 import type { TagColor } from "../state/settings";
@@ -154,10 +147,7 @@ interface Props {
 /** Resolve the icon-display kind for an entry: user override on the
  *  extension wins over the underlying Entry.kind. Folders + symlinks
  *  bypass the override since their kind isn't tied to an extension. */
-function resolveDisplayKind(
-  entry: Entry,
-  custom: Record<string, string>,
-): string {
+function resolveDisplayKind(entry: Entry, custom: Record<string, string>): string {
   if (entry.isDir || entry.isSymlink) return entry.kind;
   const dot = entry.name.lastIndexOf(".");
   if (dot < 1 || dot === entry.name.length - 1) return entry.kind;
@@ -608,9 +598,7 @@ function FileGridView(props: FileGridViewProps) {
   // user as a visible state.
   const usableWidth = Math.max(0, containerWidth - 16);
   const cellSlot = cellWidth + 8; // cellWidth + gap
-  const cols = containerWidth === 0
-    ? 1
-    : Math.max(1, Math.floor(usableWidth / cellSlot));
+  const cols = containerWidth === 0 ? 1 : Math.max(1, Math.floor(usableWidth / cellSlot));
   const rowCount = Math.ceil(sorted.length / cols);
 
   // Notify parent when cols changes so FileList's keyboard handler
@@ -689,15 +677,12 @@ function FileGridView(props: FileGridViewProps) {
      *  selection that never shrinks. */
     baseSelection: Set<string>;
   } | null>(null);
-  const [dragRect, setDragRect] = useState<
-    | {
-        left: number;
-        top: number;
-        width: number;
-        height: number;
-      }
-    | null
-  >(null);
+  const [dragRect, setDragRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   /** Convert a viewport-relative event into the container's
    *  local coordinate system (accounting for scroll position). */
@@ -751,16 +736,10 @@ function FileGridView(props: FileGridViewProps) {
         const r = el.getBoundingClientRect();
         if (lastClientY > r.bottom - SCROLL_EDGE_PX) {
           // Faster the closer to the edge.
-          const t = Math.min(
-            1,
-            (lastClientY - (r.bottom - SCROLL_EDGE_PX)) / SCROLL_EDGE_PX,
-          );
+          const t = Math.min(1, (lastClientY - (r.bottom - SCROLL_EDGE_PX)) / SCROLL_EDGE_PX);
           el.scrollTop += SCROLL_SPEED_PX * t;
         } else if (lastClientY < r.top + SCROLL_EDGE_PX) {
-          const t = Math.min(
-            1,
-            (r.top + SCROLL_EDGE_PX - lastClientY) / SCROLL_EDGE_PX,
-          );
+          const t = Math.min(1, (r.top + SCROLL_EDGE_PX - lastClientY) / SCROLL_EDGE_PX);
           el.scrollTop -= SCROLL_SPEED_PX * t;
         }
       }
@@ -795,12 +774,7 @@ function FileGridView(props: FileGridViewProps) {
       const hit = new Set<string>();
       for (let i = 0; i < sorted.length; i++) {
         const b = cellBox(i);
-        if (
-          b.right >= left &&
-          b.left <= right &&
-          b.bottom >= top &&
-          b.top <= bottom
-        ) {
+        if (b.right >= left && b.left <= right && b.bottom >= top && b.top <= bottom) {
           hit.add(sorted[i].path);
         }
       }
@@ -823,12 +797,8 @@ function FileGridView(props: FileGridViewProps) {
       // plain click, preserves on modifier).
       const el = containerRef.current;
       const r = el?.getBoundingClientRect();
-      const clampedX = r
-        ? Math.max(r.left, Math.min(r.right, e.clientX))
-        : e.clientX;
-      const clampedY = r
-        ? Math.max(r.top, Math.min(r.bottom, e.clientY))
-        : e.clientY;
+      const clampedX = r ? Math.max(r.left, Math.min(r.right, e.clientX)) : e.clientX;
+      const clampedY = r ? Math.max(r.top, Math.min(r.bottom, e.clientY)) : e.clientY;
       const localX = el && r ? clampedX - r.left + el.scrollLeft : 0;
       const localY = el && r ? clampedY - r.top + el.scrollTop : 0;
       const right = Math.max(dragRef.current.startX, localX);
@@ -946,11 +916,7 @@ function FileGridView(props: FileGridViewProps) {
         }}
       >
         {sorted.length === 0 ? (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ p: 2, textAlign: "center" }}
-          >
+          <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
             Empty folder
           </Typography>
         ) : (
@@ -974,8 +940,7 @@ function FileGridView(props: FileGridViewProps) {
                   top: dragRect.top - 8,
                   width: dragRect.width,
                   height: dragRect.height,
-                  bgcolor: (theme) =>
-                    `${theme.palette.primary.main}1f` /* 12% alpha */,
+                  bgcolor: (theme) => `${theme.palette.primary.main}1f` /* 12% alpha */,
                   border: 1,
                   borderColor: "primary.main",
                   borderStyle: "solid",
@@ -1016,15 +981,10 @@ function FileGridView(props: FileGridViewProps) {
                             selected.size > 0 && selected.has(e.path)
                               ? Array.from(selected)
                               : [e.path];
-                          evt.dataTransfer.setData(
-                            "application/x-skiff-paths",
-                            paths.join("\n"),
-                          );
+                          evt.dataTransfer.setData("application/x-skiff-paths", paths.join("\n"));
                           evt.dataTransfer.effectAllowed = "copy";
                           onDraggingChange(new Set(paths));
-                          const localPaths = paths.filter(
-                            (p) => !p.startsWith("sftp://"),
-                          );
+                          const localPaths = paths.filter((p) => !p.startsWith("sftp://"));
                           if (localPaths.length > 0) {
                             // onEnd is the only reliable
                             // end-of-drag signal once the OS drag
@@ -1064,9 +1024,7 @@ function FileGridView(props: FileGridViewProps) {
                           // gallery from tile when neither has an image.
                           ...(view === "gallery"
                             ? {
-                                bgcolor: isSel
-                                  ? "action.selected"
-                                  : "background.default",
+                                bgcolor: isSel ? "action.selected" : "background.default",
                                 boxShadow: isSel
                                   ? "none"
                                   : (theme: import("@mui/material/styles").Theme) =>
@@ -1075,9 +1033,7 @@ function FileGridView(props: FileGridViewProps) {
                                 borderColor: "divider",
                               }
                             : {
-                                bgcolor: isSel
-                                  ? "action.selected"
-                                  : "transparent",
+                                bgcolor: isSel ? "action.selected" : "transparent",
                               }),
                           // Focus / context-menu inset outline takes
                           // priority over the gallery card shadow.
@@ -1096,18 +1052,11 @@ function FileGridView(props: FileGridViewProps) {
                           // 0.4 opacity so the user can see what's
                           // being moved. Hidden-entry dim (0.55) is
                           // separate; the lower of the two wins.
-                          opacity: draggingPaths.has(e.path)
-                            ? 0.4
-                            : e.isHidden
-                              ? 0.55
-                              : 1,
+                          opacity: draggingPaths.has(e.path) ? 0.4 : e.isHidden ? 0.55 : 1,
                           "&:hover": {
                             bgcolor: isSel ? "action.selected" : "action.hover",
                           },
-                          textAlign:
-                            view === "column"
-                              ? ("left" as const)
-                              : ("center" as const),
+                          textAlign: view === "column" ? ("left" as const) : ("center" as const),
                           overflow: "hidden",
                           // Disable native text selection on cells so
                           // dragging / clicking doesn't accidentally
@@ -1173,7 +1122,9 @@ function FileGridView(props: FileGridViewProps) {
                                 "& svg": { fontSize: iconSize - 4 },
                               }}
                             >
-                              <IconForKind kind={resolveDisplayKind(e, customFileKinds) as typeof e.kind} />
+                              <IconForKind
+                                kind={resolveDisplayKind(e, customFileKinds) as typeof e.kind}
+                              />
                             </Box>
                           )}
                         </Box>
@@ -1184,7 +1135,10 @@ function FileGridView(props: FileGridViewProps) {
                             width: view === "column" ? "auto" : "100%",
                           }}
                         >
-                          {renamingPath === e.path && onCommitRename && onCancelRename && onRenameDraftChange ? (
+                          {renamingPath === e.path &&
+                          onCommitRename &&
+                          onCancelRename &&
+                          onRenameDraftChange ? (
                             <RenameInput
                               entry={e}
                               draft={renameDraft}
@@ -1198,16 +1152,11 @@ function FileGridView(props: FileGridViewProps) {
                               noWrap
                               sx={{
                                 textAlign:
-                                  view === "column"
-                                    ? ("left" as const)
-                                    : ("center" as const),
+                                  view === "column" ? ("left" as const) : ("center" as const),
                               }}
                               title={e.name}
                             >
-                              {renderHighlighted(
-                                displayName(e, showExtensions),
-                                highlightQuery,
-                              )}
+                              {renderHighlighted(displayName(e, showExtensions), highlightQuery)}
                               {e.isSymlink ? " ↪" : ""}
                             </Typography>
                           )}
@@ -1291,30 +1240,26 @@ export default function FileList(props: Props) {
    *  locked across the document for the duration so the mouse can
    *  leave the handle mid-drag without ending the drag.  */
   const startColumnResize = useCallback(
-    (column: "size" | "modified" | "kind") =>
-      (evt: ReactMouseEvent<HTMLDivElement>) => {
-        if (!onColumnResize) return;
-        const startX = evt.clientX;
-        const startWidth = colWidth[column];
-        const onMove = (e: MouseEvent) => {
-          const raw = startWidth + (e.clientX - startX);
-          const clamped = Math.max(
-            LIST_COL_WIDTH_MIN,
-            Math.min(LIST_COL_WIDTH_MAX, raw),
-          );
-          onColumnResize(column, clamped);
-        };
-        const onUp = () => {
-          window.removeEventListener("mousemove", onMove);
-          window.removeEventListener("mouseup", onUp);
-          document.body.style.userSelect = "";
-          document.body.style.cursor = "";
-        };
-        document.body.style.userSelect = "none";
-        document.body.style.cursor = "col-resize";
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp);
-      },
+    (column: "size" | "modified" | "kind") => (evt: ReactMouseEvent<HTMLDivElement>) => {
+      if (!onColumnResize) return;
+      const startX = evt.clientX;
+      const startWidth = colWidth[column];
+      const onMove = (e: MouseEvent) => {
+        const raw = startWidth + (e.clientX - startX);
+        const clamped = Math.max(LIST_COL_WIDTH_MIN, Math.min(LIST_COL_WIDTH_MAX, raw));
+        onColumnResize(column, clamped);
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+      };
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "col-resize";
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
     [colWidth, onColumnResize],
   );
 
@@ -1480,10 +1425,12 @@ export default function FileList(props: Props) {
     additive: boolean;
     baseSelection: Set<string>;
   } | null>(null);
-  const [listDragRect, setListDragRect] = useState<
-    | { left: number; top: number; width: number; height: number }
-    | null
-  >(null);
+  const [listDragRect, setListDragRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   // Path-change detector. Lets us distinguish navigation (reset
   // selection — stale paths from a previous folder are nonsense) from
@@ -1621,10 +1568,7 @@ export default function FileList(props: Props) {
       const moveFocus = (delta: number, shiftKey: boolean) => {
         setFocusedIdx((prev) => {
           const start = prev < 0 ? 0 : prev;
-          const next = Math.max(
-            0,
-            Math.min(sorted.length - 1, start + delta),
-          );
+          const next = Math.max(0, Math.min(sorted.length - 1, start + delta));
           if (shiftKey && next !== prev) {
             const lo = Math.min(start, next);
             const hi = Math.max(start, next);
@@ -1682,9 +1626,7 @@ export default function FileList(props: Props) {
           e.preventDefault();
           const rowsPerPage = density === "compact" ? 16 : 12;
           const page = view === "list" ? rowsPerPage : rowsPerPage * stepDown;
-          setFocusedIdx((i) =>
-            Math.min(sorted.length - 1, Math.max(0, i) + page),
-          );
+          setFocusedIdx((i) => Math.min(sorted.length - 1, Math.max(0, i) + page));
           break;
         }
         case "PageUp": {
@@ -1837,16 +1779,10 @@ export default function FileList(props: Props) {
       if (el && listDragRef.current) {
         const r = el.getBoundingClientRect();
         if (lastClientY > r.bottom - SCROLL_EDGE_PX) {
-          const t = Math.min(
-            1,
-            (lastClientY - (r.bottom - SCROLL_EDGE_PX)) / SCROLL_EDGE_PX,
-          );
+          const t = Math.min(1, (lastClientY - (r.bottom - SCROLL_EDGE_PX)) / SCROLL_EDGE_PX);
           el.scrollTop += SCROLL_SPEED_PX * t;
         } else if (lastClientY < r.top + SCROLL_EDGE_PX) {
-          const t = Math.min(
-            1,
-            (r.top + SCROLL_EDGE_PX - lastClientY) / SCROLL_EDGE_PX,
-          );
+          const t = Math.min(1, (r.top + SCROLL_EDGE_PX - lastClientY) / SCROLL_EDGE_PX);
           el.scrollTop -= SCROLL_SPEED_PX * t;
         }
       }
@@ -1894,12 +1830,8 @@ export default function FileList(props: Props) {
       }
       const el = parentRef.current;
       const r = el?.getBoundingClientRect();
-      const clampedX = r
-        ? Math.max(r.left, Math.min(r.right, e.clientX))
-        : e.clientX;
-      const clampedY = r
-        ? Math.max(r.top, Math.min(r.bottom, e.clientY))
-        : e.clientY;
+      const clampedX = r ? Math.max(r.left, Math.min(r.right, e.clientX)) : e.clientX;
+      const clampedY = r ? Math.max(r.top, Math.min(r.bottom, e.clientY)) : e.clientY;
       const localX = el && r ? clampedX - r.left + el.scrollLeft : 0;
       const localY = el && r ? clampedY - r.top + el.scrollTop : 0;
       const right = Math.max(listDragRef.current.startX, localX);
@@ -2066,9 +1998,7 @@ export default function FileList(props: Props) {
           <Checkbox
             size="small"
             checked={sorted.length > 0 && selected.size >= sorted.length}
-            indeterminate={
-              selected.size > 0 && selected.size < sorted.length
-            }
+            indeterminate={selected.size > 0 && selected.size < sorted.length}
             disabled={sorted.length === 0}
             onChange={() => {
               if (selected.size >= sorted.length) {
@@ -2105,9 +2035,7 @@ export default function FileList(props: Props) {
             dir={sortDir}
             onClick={() => onSortChange("mtime")}
             width={colWidth.modified}
-            onResizeStart={
-              onColumnResize ? startColumnResize("modified") : undefined
-            }
+            onResizeStart={onColumnResize ? startColumnResize("modified") : undefined}
           />
         )}
         {!hideColumns.kind && (
@@ -2186,11 +2114,7 @@ export default function FileList(props: Props) {
         }}
       >
         {sorted.length === 0 ? (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ p: 2, textAlign: "center" }}
-          >
+          <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
             Empty folder
           </Typography>
         ) : (
@@ -2205,26 +2129,24 @@ export default function FileList(props: Props) {
                 inside the scroll-tracking inner Box so it scrolls
                 with the rows. Coords are already in container-local
                 space (set by the mousedown / mousemove handlers). */}
-            {listDragRect &&
-              (listDragRect.width > 1 || listDragRect.height > 1) && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: listDragRect.left,
-                    top: listDragRect.top,
-                    width: listDragRect.width,
-                    height: listDragRect.height,
-                    bgcolor: (theme) =>
-                      `${theme.palette.primary.main}1f` /* 12% alpha */,
-                    border: 1,
-                    borderColor: "primary.main",
-                    borderStyle: "solid",
-                    pointerEvents: "none",
-                    zIndex: 2,
-                    borderRadius: 0.5,
-                  }}
-                />
-              )}
+            {listDragRect && (listDragRect.width > 1 || listDragRect.height > 1) && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: listDragRect.left,
+                  top: listDragRect.top,
+                  width: listDragRect.width,
+                  height: listDragRect.height,
+                  bgcolor: (theme) => `${theme.palette.primary.main}1f` /* 12% alpha */,
+                  border: 1,
+                  borderColor: "primary.main",
+                  borderStyle: "solid",
+                  pointerEvents: "none",
+                  zIndex: 2,
+                  borderRadius: 0.5,
+                }}
+              />
+            )}
             {rowVirtualizer.getVirtualItems().map((vi) => {
               const e = sorted[vi.index];
               const isSel = selected.has(e.path);
@@ -2248,21 +2170,14 @@ export default function FileList(props: Props) {
                     // is multi-selected). Sidebar host items consume
                     // this to start a Skiffsync.
                     const paths =
-                      selected.size > 0 && selected.has(e.path)
-                        ? Array.from(selected)
-                        : [e.path];
-                    evt.dataTransfer.setData(
-                      "application/x-skiff-paths",
-                      paths.join("\n"),
-                    );
+                      selected.size > 0 && selected.has(e.path) ? Array.from(selected) : [e.path];
+                    evt.dataTransfer.setData("application/x-skiff-paths", paths.join("\n"));
                     evt.dataTransfer.effectAllowed = "copy";
                     setDraggingPaths(new Set(paths));
                     // Also kick the OS-native drag so dropping into
                     // Finder / Explorer / Desktop works. Local paths
                     // only — sftp:// URLs aren't real OS file paths.
-                    const localPaths = paths.filter(
-                      (p) => !p.startsWith("sftp://"),
-                    );
+                    const localPaths = paths.filter((p) => !p.startsWith("sftp://"));
                     if (localPaths.length > 0) {
                       // onEnd is the only reliable end-of-drag
                       // signal once the OS drag takes over — HTML5
@@ -2282,9 +2197,7 @@ export default function FileList(props: Props) {
                     if (
                       e.isDir &&
                       onDropOntoFolder &&
-                      evt.dataTransfer.types.includes(
-                        "application/x-skiff-paths",
-                      )
+                      evt.dataTransfer.types.includes("application/x-skiff-paths")
                     ) {
                       evt.preventDefault();
                       evt.dataTransfer.dropEffect = "copy";
@@ -2296,9 +2209,7 @@ export default function FileList(props: Props) {
                   }}
                   onDrop={(evt) => {
                     if (!e.isDir || !onDropOntoFolder) return;
-                    const raw = evt.dataTransfer.getData(
-                      "application/x-skiff-paths",
-                    );
+                    const raw = evt.dataTransfer.getData("application/x-skiff-paths");
                     if (!raw) return;
                     evt.preventDefault();
                     setDragOverIdx(-1);
@@ -2339,18 +2250,13 @@ export default function FileList(props: Props) {
                     // Drag-source dim wins over hidden-entry dim — 0.4
                     // is enough darker that "in flight" reads at a
                     // glance distinct from "hidden but visible".
-                    opacity: draggingPaths.has(e.path)
-                      ? 0.4
-                      : e.isHidden
-                        ? 0.55
-                        : 1,
+                    opacity: draggingPaths.has(e.path) ? 0.4 : e.isHidden ? 0.55 : 1,
                     // Focus ring for keyboard users + drop-target
                     // ring while a drag is hovering. Inset so the row
                     // doesn't shift when either fires.
                     boxShadow:
                       vi.index === dragOverIdx
-                        ? (theme) =>
-                            `inset 0 0 0 2px ${theme.palette.success.main}`
+                        ? (theme) => `inset 0 0 0 2px ${theme.palette.success.main}`
                         : e.path === contextMenuPath
                           ? (theme) =>
                               // Cosmetic dashed outline showing which row
@@ -2358,8 +2264,7 @@ export default function FileList(props: Props) {
                               // tied to selection / focus — purely a hint.
                               `inset 0 0 0 1px ${theme.palette.text.secondary}`
                           : isFocused
-                            ? (theme) =>
-                                `inset 0 0 0 2px ${theme.palette.primary.main}`
+                            ? (theme) => `inset 0 0 0 2px ${theme.palette.primary.main}`
                             : "none",
                     "&:hover": { bgcolor: isSel ? "action.selected" : "action.hover" },
                     // Disable native text selection on rows so the
@@ -2397,9 +2302,7 @@ export default function FileList(props: Props) {
                         ) {
                           const lo = Math.min(focusedIdx, vi.index);
                           const hi = Math.max(focusedIdx, vi.index);
-                          const range = sorted
-                            .slice(lo, hi + 1)
-                            .map((s) => s.path);
+                          const range = sorted.slice(lo, hi + 1).map((s) => s.path);
                           setSelected((prev) => {
                             const next = new Set(prev);
                             for (const p of range) next.add(p);
@@ -2458,16 +2361,8 @@ export default function FileList(props: Props) {
                         />
                       </Box>
                     ) : (
-                      <Typography
-                        variant="body2"
-                        noWrap
-                        sx={{ flex: 1 }}
-                        title={e.name}
-                      >
-                        {renderHighlighted(
-                          displayName(e, showExtensions),
-                          highlightQuery,
-                        )}
+                      <Typography variant="body2" noWrap sx={{ flex: 1 }} title={e.name}>
+                        {renderHighlighted(displayName(e, showExtensions), highlightQuery)}
                         {e.isSymlink ? " ↪" : ""}
                       </Typography>
                     )}
@@ -2481,9 +2376,7 @@ export default function FileList(props: Props) {
                           height: 8,
                           borderRadius: "50%",
                           flexShrink: 0,
-                          backgroundColor: tagColorHex(
-                            fileTags[e.path] as TagColor,
-                          ),
+                          backgroundColor: tagColorHex(fileTags[e.path] as TagColor),
                         }}
                       />
                     )}

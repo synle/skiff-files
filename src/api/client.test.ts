@@ -93,26 +93,23 @@ describe("dispatchByLocation — the single URL → handler dispatch", () => {
   });
 
   it("throws a generic 'not supported on <kind>' error when `remote` is absent", async () => {
-    await expect(
-      dispatchByLocation("smb://x/y", { local: vi.fn() }),
-    ).rejects.toThrow(/not supported on smb/i);
+    await expect(dispatchByLocation("smb://x/y", { local: vi.fn() })).rejects.toThrow(
+      /not supported on smb/i,
+    );
   });
 
   it("uses the custom `unsupportedRemote` builder when provided", async () => {
     await expect(
       dispatchByLocation("ftp://x/y", {
         local: vi.fn(),
-        unsupportedRemote: (kind) =>
-          new Error(`custom: hash not available for ${kind}`),
+        unsupportedRemote: (kind) => new Error(`custom: hash not available for ${kind}`),
       }),
     ).rejects.toThrow(/custom: hash not available for ftp/);
   });
 
   it("does NOT call `local` when a remote URL falls through to the unsupported branch", async () => {
     const local = vi.fn();
-    await expect(
-      dispatchByLocation("smb://x/y", { local }),
-    ).rejects.toThrow();
+    await expect(dispatchByLocation("smb://x/y", { local })).rejects.toThrow();
     expect(local).not.toHaveBeenCalled();
   });
 });
@@ -244,12 +241,7 @@ describe("client.mkdir / removeOrTrashMany dispatch", () => {
     mocked.mockResolvedValueOnce(undefined); // conn_remove for /a
     mocked.mockResolvedValueOnce(undefined); // conn_remove for /b
     const { removeOrTrashMany } = await import("./client");
-    await removeOrTrashMany([
-      "/local/x",
-      "/local/y",
-      "sftp://abc/a",
-      "sftp://abc/b",
-    ]);
+    await removeOrTrashMany(["/local/x", "/local/y", "sftp://abc/a", "sftp://abc/b"]);
     expect(mocked).toHaveBeenCalledWith("fs_trash_many", {
       paths: ["/local/x", "/local/y"],
     });
@@ -326,16 +318,14 @@ describe("client.mkdir / removeOrTrashMany dispatch", () => {
 
   it("rename rejects cross-backend rename", async () => {
     const { rename } = await import("./client");
-    await expect(rename("/local", "sftp://abc/remote")).rejects.toThrow(
-      /across backends/,
-    );
+    await expect(rename("/local", "sftp://abc/remote")).rejects.toThrow(/across backends/);
   });
 
   it("rename rejects rename across different sftp connections", async () => {
     const { rename } = await import("./client");
-    await expect(
-      rename("sftp://abc/x", "sftp://def/x"),
-    ).rejects.toThrow(/different sftp connections/);
+    await expect(rename("sftp://abc/x", "sftp://def/x")).rejects.toThrow(
+      /different sftp connections/,
+    );
   });
 });
 
@@ -368,15 +358,11 @@ describe("client.listDir — every remote scheme reshapes entries", () => {
     "%s:// reshapes each entry into the correct scheme",
     async (kind) => {
       mocked.mockImplementation(async (cmd) => {
-        if (cmd === "conn_list_dir")
-          return [makeEntry("/srv/a"), makeEntry("/srv/b")];
+        if (cmd === "conn_list_dir") return [makeEntry("/srv/a"), makeEntry("/srv/b")];
         return null;
       });
       const list = await listDir(`${kind}://id/srv`);
-      expect(list.map((e) => e.path)).toEqual([
-        `${kind}://id/srv/a`,
-        `${kind}://id/srv/b`,
-      ]);
+      expect(list.map((e) => e.path)).toEqual([`${kind}://id/srv/a`, `${kind}://id/srv/b`]);
     },
   );
 });
@@ -393,17 +379,14 @@ describe("client.mkdir — every remote scheme hits conn_mkdir", () => {
 });
 
 describe("client.createEmptyFile — every remote scheme hits conn_create_empty_file", () => {
-  it.each(["sftp", "ftp", "smb"] as const)(
-    "%s:// → conn_create_empty_file",
-    async (kind) => {
-      mocked.mockImplementation(async () => null);
-      await createEmptyFile(`${kind}://id/dir/file.txt`);
-      expect(invoke).toHaveBeenCalledWith(
-        "conn_create_empty_file",
-        expect.objectContaining({ id: "id", path: "/dir/file.txt" }),
-      );
-    },
-  );
+  it.each(["sftp", "ftp", "smb"] as const)("%s:// → conn_create_empty_file", async (kind) => {
+    mocked.mockImplementation(async () => null);
+    await createEmptyFile(`${kind}://id/dir/file.txt`);
+    expect(invoke).toHaveBeenCalledWith(
+      "conn_create_empty_file",
+      expect.objectContaining({ id: "id", path: "/dir/file.txt" }),
+    );
+  });
 
   it("local → fs_create_empty_file", async () => {
     mocked.mockImplementation(async () => null);
@@ -415,57 +398,46 @@ describe("client.createEmptyFile — every remote scheme hits conn_create_empty_
 });
 
 describe("client.rename — same-backend dispatch for every remote scheme", () => {
-  it.each(["sftp", "ftp", "smb"] as const)(
-    "%s same-id: conn_rename",
-    async (kind) => {
-      mocked.mockImplementation(async () => null);
-      await rename(`${kind}://id-a/foo`, `${kind}://id-a/bar`);
-      expect(invoke).toHaveBeenCalledWith(
-        "conn_rename",
-        expect.objectContaining({ id: "id-a", from: "/foo", to: "/bar" }),
-      );
-    },
-  );
-
-  it("rejects cross-backend rename (sftp ↔ smb)", async () => {
-    await expect(rename("sftp://id/a", "smb://id/b")).rejects.toThrow(
-      /rename across backends/,
+  it.each(["sftp", "ftp", "smb"] as const)("%s same-id: conn_rename", async (kind) => {
+    mocked.mockImplementation(async () => null);
+    await rename(`${kind}://id-a/foo`, `${kind}://id-a/bar`);
+    expect(invoke).toHaveBeenCalledWith(
+      "conn_rename",
+      expect.objectContaining({ id: "id-a", from: "/foo", to: "/bar" }),
     );
   });
 
+  it("rejects cross-backend rename (sftp ↔ smb)", async () => {
+    await expect(rename("sftp://id/a", "smb://id/b")).rejects.toThrow(/rename across backends/);
+  });
+
   it("rejects same-kind but different-connection rename (smb)", async () => {
-    await expect(
-      rename("smb://id-a/foo", "smb://id-b/foo"),
-    ).rejects.toThrow(/rename across different smb connections/);
+    await expect(rename("smb://id-a/foo", "smb://id-b/foo")).rejects.toThrow(
+      /rename across different smb connections/,
+    );
   });
 });
 
 describe("client.readText / readBase64 — every remote scheme routes", () => {
-  it.each(["sftp", "ftp", "smb"] as const)(
-    "%s:// readText → conn_read_text",
-    async (kind) => {
-      mocked.mockImplementation(async () => "hello");
-      const txt = await readText(`${kind}://id/x.txt`);
-      expect(txt).toBe("hello");
-      expect(invoke).toHaveBeenCalledWith(
-        "conn_read_text",
-        expect.objectContaining({ id: "id", path: "/x.txt" }),
-      );
-    },
-  );
+  it.each(["sftp", "ftp", "smb"] as const)("%s:// readText → conn_read_text", async (kind) => {
+    mocked.mockImplementation(async () => "hello");
+    const txt = await readText(`${kind}://id/x.txt`);
+    expect(txt).toBe("hello");
+    expect(invoke).toHaveBeenCalledWith(
+      "conn_read_text",
+      expect.objectContaining({ id: "id", path: "/x.txt" }),
+    );
+  });
 
-  it.each(["sftp", "ftp", "smb"] as const)(
-    "%s:// readBase64 → conn_read_base64",
-    async (kind) => {
-      mocked.mockImplementation(async () => "dGVzdA==");
-      const b64 = await readBase64(`${kind}://id/x.png`);
-      expect(b64).toBe("dGVzdA==");
-      expect(invoke).toHaveBeenCalledWith(
-        "conn_read_base64",
-        expect.objectContaining({ id: "id", path: "/x.png" }),
-      );
-    },
-  );
+  it.each(["sftp", "ftp", "smb"] as const)("%s:// readBase64 → conn_read_base64", async (kind) => {
+    mocked.mockImplementation(async () => "dGVzdA==");
+    const b64 = await readBase64(`${kind}://id/x.png`);
+    expect(b64).toBe("dGVzdA==");
+    expect(invoke).toHaveBeenCalledWith(
+      "conn_read_base64",
+      expect.objectContaining({ id: "id", path: "/x.png" }),
+    );
+  });
 });
 
 describe("client.hashSha256 — SFTP-only remote support", () => {
@@ -548,17 +520,14 @@ describe("client.removeOrTrashMany — every remote scheme hits conn_remove (no 
 });
 
 describe("client.permanentlyDeleteMany — every remote scheme hits conn_remove", () => {
-  it.each(["sftp", "ftp", "smb"] as const)(
-    "%s:// path → conn_remove",
-    async (kind) => {
-      mocked.mockImplementation(async () => null);
-      await permanentlyDeleteMany([`${kind}://id/a`]);
-      expect(invoke).toHaveBeenCalledWith(
-        "conn_remove",
-        expect.objectContaining({ id: "id", path: "/a" }),
-      );
-    },
-  );
+  it.each(["sftp", "ftp", "smb"] as const)("%s:// path → conn_remove", async (kind) => {
+    mocked.mockImplementation(async () => null);
+    await permanentlyDeleteMany([`${kind}://id/a`]);
+    expect(invoke).toHaveBeenCalledWith(
+      "conn_remove",
+      expect.objectContaining({ id: "id", path: "/a" }),
+    );
+  });
 
   it("local paths hit fs_remove (per-path)", async () => {
     mocked.mockImplementation(async () => null);
@@ -569,27 +538,21 @@ describe("client.permanentlyDeleteMany — every remote scheme hits conn_remove"
 });
 
 describe("client.startSync — every remote scheme picks cross-engine dispatch", () => {
-  it.each(["sftp", "ftp", "smb"] as const)(
-    "%s:// src → sync_start_cross",
-    async (kind) => {
-      mocked.mockImplementation(async () => "job-2");
-      await startSync(`${kind}://id/foo`, "/dest");
-      expect(invoke).toHaveBeenCalledWith(
-        "sync_start_cross",
-        expect.objectContaining({ src: `${kind}://id/foo`, dest: "/dest" }),
-      );
-    },
-  );
+  it.each(["sftp", "ftp", "smb"] as const)("%s:// src → sync_start_cross", async (kind) => {
+    mocked.mockImplementation(async () => "job-2");
+    await startSync(`${kind}://id/foo`, "/dest");
+    expect(invoke).toHaveBeenCalledWith(
+      "sync_start_cross",
+      expect.objectContaining({ src: `${kind}://id/foo`, dest: "/dest" }),
+    );
+  });
 
-  it.each(["sftp", "ftp", "smb"] as const)(
-    "%s:// dest → sync_start_cross",
-    async (kind) => {
-      mocked.mockImplementation(async () => "job-3");
-      await startSync("/src", `${kind}://id/dest`);
-      expect(invoke).toHaveBeenCalledWith(
-        "sync_start_cross",
-        expect.objectContaining({ src: "/src", dest: `${kind}://id/dest` }),
-      );
-    },
-  );
+  it.each(["sftp", "ftp", "smb"] as const)("%s:// dest → sync_start_cross", async (kind) => {
+    mocked.mockImplementation(async () => "job-3");
+    await startSync("/src", `${kind}://id/dest`);
+    expect(invoke).toHaveBeenCalledWith(
+      "sync_start_cross",
+      expect.objectContaining({ src: "/src", dest: `${kind}://id/dest` }),
+    );
+  });
 });

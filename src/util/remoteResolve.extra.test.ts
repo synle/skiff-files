@@ -9,11 +9,7 @@
 //   - resolveRemoteUrl when connList throws — must still fall through
 //     to connCreateFtp rather than blowing up
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  __testing__,
-  parseRemoteUrl,
-  resolveRemoteUrl,
-} from "./remoteResolve";
+import { __testing__, parseRemoteUrl, resolveRemoteUrl } from "./remoteResolve";
 
 vi.mock("../api/conn", () => ({
   connCreateFtp: vi.fn(async () => "deadbeef-0000-0000-0000-aaaaaaaaaaaa"),
@@ -61,9 +57,7 @@ describe("parseRemoteUrl — smb:// scheme", () => {
   });
 
   it("returns null for canonical UUID-form smb URLs", () => {
-    expect(
-      parseRemoteUrl("smb://550e8400-e29b-41d4-a716-446655440000/Public"),
-    ).toBeNull();
+    expect(parseRemoteUrl("smb://550e8400-e29b-41d4-a716-446655440000/Public")).toBeNull();
   });
 });
 
@@ -71,9 +65,7 @@ describe("resolveRemoteUrl — connList resilience", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { connCreateFtp, connList } = await import("../api/conn");
-    vi.mocked(connCreateFtp).mockResolvedValue(
-      "deadbeef-0000-0000-0000-aaaaaaaaaaaa",
-    );
+    vi.mocked(connCreateFtp).mockResolvedValue("deadbeef-0000-0000-0000-aaaaaaaaaaaa");
     // Make connList throw — the orchestrator must still fall through
     // to the auto-create path rather than aborting the navigation.
     vi.mocked(connList).mockRejectedValue(new Error("connList failed"));

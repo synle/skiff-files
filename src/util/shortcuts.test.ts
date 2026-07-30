@@ -63,9 +63,7 @@ describe("SHORTCUT_GROUPS", () => {
     expect(ids).toContain("app.viewZoomIn");
     expect(ids).toContain("app.viewZoomOut");
     expect(ids).toContain("app.viewZoomReset");
-    const byId = new Map(
-      view.items.filter((i) => i.actionId).map((i) => [i.actionId!, i]),
-    );
+    const byId = new Map(view.items.filter((i) => i.actionId).map((i) => [i.actionId!, i]));
     expect(byId.get("app.viewZoomIn")?.defaultCombo).toBe("cmd+shift+=");
     expect(byId.get("app.viewZoomOut")?.defaultCombo).toBe("cmd+shift+-");
     expect(byId.get("app.viewZoomReset")?.defaultCombo).toBe("cmd+shift+0");

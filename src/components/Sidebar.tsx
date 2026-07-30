@@ -36,9 +36,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import KeyboardDoubleArrowLeftIcon from "@mui/icons-material/KeyboardDoubleArrowLeft";
 import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArrowRight";
-import SidebarContextMenu, {
-  type SidebarContextState,
-} from "./SidebarContextMenu";
+import SidebarContextMenu, { type SidebarContextState } from "./SidebarContextMenu";
 import RecentPathsDialog from "./RecentPathsDialog";
 import { shortPath } from "../util/shortPath";
 import { OPEN_IN_TAB_EVENT, type Page } from "../App";
@@ -153,9 +151,7 @@ function SectionHeader({
     <Box
       component="button"
       type="button"
-      onClick={(e: React.MouseEvent) =>
-        onToggle(e.metaKey || e.ctrlKey)
-      }
+      onClick={(e: React.MouseEvent) => onToggle(e.metaKey || e.ctrlKey)}
       aria-expanded={!collapsed}
       aria-controls={`sidebar-section-${id}`}
       sx={{
@@ -260,9 +256,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
     if (!trimmed || trimmed === current.label) return;
     update(
       "bookmarks",
-      settings.bookmarks.map((b) =>
-        b.id === id ? { ...b, label: trimmed } : b,
-      ),
+      settings.bookmarks.map((b) => (b.id === id ? { ...b, label: trimmed } : b)),
     );
   };
 
@@ -339,8 +333,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
   };
   /** Is the section visible at all? Missing key = visible (default).
    *  Hidden sections render nothing — neither header nor body. */
-  const isVisible = (id: string): boolean =>
-    settings.sidebarSectionsVisible[id] !== false;
+  const isVisible = (id: string): boolean => settings.sidebarSectionsVisible[id] !== false;
 
   /** CSS `order` index for a section. We render every section in
    *  source order but each lives inside a flex-column parent and
@@ -386,9 +379,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
 
   /** Anchor + actions for the per-row context menu. Null when no
    *  menu is open. */
-  const [contextMenu, setContextMenu] = useState<SidebarContextState | null>(
-    null,
-  );
+  const [contextMenu, setContextMenu] = useState<SidebarContextState | null>(null);
 
   /** Hide a hardcoded favorite (Home / Desktop / Documents / Downloads
    *  / Trash). Persisted via `hiddenFavorites: string[]` so the
@@ -412,21 +403,14 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
    *  Skips when the path already lives in bookmarks. */
   const bookmarkPath = (path: string, label: string) => {
     if (settings.bookmarks.some((b) => b.path === path)) return;
-    update("bookmarks", [
-      ...settings.bookmarks,
-      { id: crypto.randomUUID(), label, path },
-    ]);
+    update("bookmarks", [...settings.bookmarks, { id: crypto.randomUUID(), label, path }]);
   };
 
   /** Closure over toggleSection + isCollapsed for the SectionHeader
    *  child component (defined outside this function so React doesn't
    *  recreate the type on every parent render — that was breaking
    *  the click handler in some renders). */
-  const renderSectionHeader = (
-    id: string,
-    label: string,
-    hideInIconOnly?: boolean,
-  ) => (
+  const renderSectionHeader = (id: string, label: string, hideInIconOnly?: boolean) => (
     <SectionHeader
       id={id}
       label={label}
@@ -501,12 +485,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         if (cancelled) return;
         const initial = new Set<string>(
           js
-            .filter(
-              (j) =>
-                j.state === "planning" ||
-                j.state === "running" ||
-                j.state === "paused",
-            )
+            .filter((j) => j.state === "planning" || j.state === "running" || j.state === "paused")
             .map((j) => j.id),
         );
         setActiveJobs(initial);
@@ -586,10 +565,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
     let lastNext = startW;
     const onMove = (ev: MouseEvent) => {
       const dx = ev.clientX - startX;
-      lastNext = Math.max(
-        SIDEBAR_WIDTH_MIN,
-        Math.min(SIDEBAR_WIDTH_MAX, startW + dx),
-      );
+      lastNext = Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, startW + dx));
       setDragWidth(lastNext);
     };
     const onUp = () => {
@@ -640,463 +616,432 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         }}
       >
         <Box style={{ order: orderOf("favorites") }}>
-        {isVisible("favorites") &&
-          renderSectionHeader(
-            "favorites",
-            t("sidebar.section.favorites"),
-            // Suppress the divider bubble in the collapsed rail
-            // when every favorite (including Trash) is hidden — no
-            // icons would render below it, so the lone bubble would
-            // read as a dead grey blob.
-            FAVORITES.every((f) => settings.hiddenFavorites.includes(f.rel)) &&
-              (!trashPath || settings.hiddenFavorites.includes("trash")),
-          )}
-        {isVisible("favorites") && !isCollapsed("favorites") && (
-          <List dense disablePadding id="sidebar-section-favorites">
-            {FAVORITES.filter(
-              (f) => !settings.hiddenFavorites.includes(f.rel),
-            ).map((f) => (
-              <ListItem key={f.label} disablePadding>
-                {/* In iconOnly (collapsed-rail) mode the row's
+          {isVisible("favorites") &&
+            renderSectionHeader(
+              "favorites",
+              t("sidebar.section.favorites"),
+              // Suppress the divider bubble in the collapsed rail
+              // when every favorite (including Trash) is hidden — no
+              // icons would render below it, so the lone bubble would
+              // read as a dead grey blob.
+              FAVORITES.every((f) => settings.hiddenFavorites.includes(f.rel)) &&
+                (!trashPath || settings.hiddenFavorites.includes("trash")),
+            )}
+          {isVisible("favorites") && !isCollapsed("favorites") && (
+            <List dense disablePadding id="sidebar-section-favorites">
+              {FAVORITES.filter((f) => !settings.hiddenFavorites.includes(f.rel)).map((f) => (
+                <ListItem key={f.label} disablePadding>
+                  {/* In iconOnly (collapsed-rail) mode the row's
                     ListItemText is hidden via the parent CSS scope,
                     so the user has no in-line label to read. Surface
                     the favorite name via a right-anchored Tooltip
                     instead — mirrors the pattern the bottom nav
                     (Transfers / Settings / Collapse) uses. Empty
                     title in expanded mode = no tooltip rendered. */}
-                <Tooltip
-                  title={settings.sidebarIconOnly ? f.label : ""}
-                  placement="right"
-                >
-                  <ListItemButton
-                    disabled={!home}
-                    onClick={() => onNavigate(join(f.rel))}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        section: "favorites",
-                        itemId: f.rel,
-                        actions: [
-                          {
-                            key: "bookmark",
-                            icon: <BookmarkIcon fontSize="small" />,
-                            label: "Add to bookmarks",
-                            onClick: () =>
-                              bookmarkPath(join(f.rel), f.label),
-                          },
-                          {
-                            key: "hide",
-                            icon: <VisibilityOffIcon fontSize="small" />,
-                            label: `Hide "${f.label}"`,
-                            onClick: () => hideFavorite(f.rel),
-                          },
-                        ],
-                      });
-                    }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 32 }}>{f.icon}</ListItemIcon>
-                    <ListItemText primary={f.label} />
-                  </ListItemButton>
-                </Tooltip>
-              </ListItem>
-            ))}
-            {trashPath && !settings.hiddenFavorites.includes("trash") && (
-              <ListItem disablePadding>
-                {/* macOS sandboxes ~/.Trash via TCC — read_dir errors with
-                 *  "Operation not permitted" without Full Disk Access. Reveal
-                 *  it in Finder instead, which has the entitlement and a
-                 *  better Trash UI (Empty Trash / Put Back) anyway. */}
-                <Tooltip
-                  title={settings.sidebarIconOnly ? "Trash" : ""}
-                  placement="right"
-                >
-                <ListItemButton
-                  onClick={() => {
-                    void fsOpenWithDefault(trashPath).catch(() => {});
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setContextMenu({
-                      x: e.clientX,
-                      y: e.clientY,
-                      section: "favorites",
-                      itemId: "trash",
-                      actions: [
-                        {
-                          key: "hide",
-                          icon: <VisibilityOffIcon fontSize="small" />,
-                          label: 'Hide "Trash"',
-                          onClick: () => hideFavorite("trash"),
-                        },
-                      ],
-                    });
-                  }}
-                  // Drop target for "drag rows here to delete" — Finder
-                  // muscle memory. Accepts the path-drag MIME the
-                  // FileList rows emit. Local paths only; sftp:// is
-                  // skipped silently (those go through right-click
-                  // "Move to Trash" which uses conn_remove instead).
-                  onDragOver={(e) => {
-                    if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "copy";
-                    }
-                  }}
-                  onDrop={(e) => {
-                    const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
-                    if (!raw) return;
-                    e.preventDefault();
-                    const paths = raw
-                      .split("\n")
-                      .filter((p) => p && !p.startsWith("sftp://"));
-                    if (paths.length === 0) return;
-                    if (
-                      !window.confirm(
-                        `Move ${paths.length} item${paths.length === 1 ? "" : "s"} to Trash?`,
-                      )
-                    ) {
-                      return;
-                    }
-                    pushTrashBatch(paths);
-                    void fsTrashMany(paths).catch(() => {
-                      /* failure surfaces via the next list_dir refresh */
-                    });
-                    // Nudge any open Browser to refresh — not strictly
-                    // necessary (the watcher will catch it within
-                    // ~150ms) but feels snappier.
-                    window.dispatchEvent(
-                      new CustomEvent("skiff:trash-completed"),
-                    );
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <DeleteIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText primary="Trash" />
-                </ListItemButton>
-                </Tooltip>
-              </ListItem>
-            )}
-          </List>
-        )}
+                  <Tooltip title={settings.sidebarIconOnly ? f.label : ""} placement="right">
+                    <ListItemButton
+                      disabled={!home}
+                      onClick={() => onNavigate(join(f.rel))}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          section: "favorites",
+                          itemId: f.rel,
+                          actions: [
+                            {
+                              key: "bookmark",
+                              icon: <BookmarkIcon fontSize="small" />,
+                              label: "Add to bookmarks",
+                              onClick: () => bookmarkPath(join(f.rel), f.label),
+                            },
+                            {
+                              key: "hide",
+                              icon: <VisibilityOffIcon fontSize="small" />,
+                              label: `Hide "${f.label}"`,
+                              onClick: () => hideFavorite(f.rel),
+                            },
+                          ],
+                        });
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>{f.icon}</ListItemIcon>
+                      <ListItemText primary={f.label} />
+                    </ListItemButton>
+                  </Tooltip>
+                </ListItem>
+              ))}
+              {trashPath && !settings.hiddenFavorites.includes("trash") && (
+                <ListItem disablePadding>
+                  {/* macOS sandboxes ~/.Trash via TCC — read_dir errors with
+                   *  "Operation not permitted" without Full Disk Access. Reveal
+                   *  it in Finder instead, which has the entitlement and a
+                   *  better Trash UI (Empty Trash / Put Back) anyway. */}
+                  <Tooltip title={settings.sidebarIconOnly ? "Trash" : ""} placement="right">
+                    <ListItemButton
+                      onClick={() => {
+                        void fsOpenWithDefault(trashPath).catch(() => {});
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          section: "favorites",
+                          itemId: "trash",
+                          actions: [
+                            {
+                              key: "hide",
+                              icon: <VisibilityOffIcon fontSize="small" />,
+                              label: 'Hide "Trash"',
+                              onClick: () => hideFavorite("trash"),
+                            },
+                          ],
+                        });
+                      }}
+                      // Drop target for "drag rows here to delete" — Finder
+                      // muscle memory. Accepts the path-drag MIME the
+                      // FileList rows emit. Local paths only; sftp:// is
+                      // skipped silently (those go through right-click
+                      // "Move to Trash" which uses conn_remove instead).
+                      onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "copy";
+                        }
+                      }}
+                      onDrop={(e) => {
+                        const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+                        if (!raw) return;
+                        e.preventDefault();
+                        const paths = raw.split("\n").filter((p) => p && !p.startsWith("sftp://"));
+                        if (paths.length === 0) return;
+                        if (
+                          !window.confirm(
+                            `Move ${paths.length} item${paths.length === 1 ? "" : "s"} to Trash?`,
+                          )
+                        ) {
+                          return;
+                        }
+                        pushTrashBatch(paths);
+                        void fsTrashMany(paths).catch(() => {
+                          /* failure surfaces via the next list_dir refresh */
+                        });
+                        // Nudge any open Browser to refresh — not strictly
+                        // necessary (the watcher will catch it within
+                        // ~150ms) but feels snappier.
+                        window.dispatchEvent(new CustomEvent("skiff:trash-completed"));
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <DeleteIcon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary="Trash" />
+                    </ListItemButton>
+                  </Tooltip>
+                </ListItem>
+              )}
+            </List>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("bookmarks") }}>
-        {isVisible("bookmarks") && settings.bookmarks.length > 0 && (
-          <Box
-            // Drop target for "drag folder into Bookmarks → add new
-            // bookmark". Bubbles up from below: a drop on a bookmark
-            // row preventDefaults via its own handler (existing
-            // sync-into-bookmark flow), so this fires only when the
-            // drop landed on the section header / list whitespace.
-            // Falls through to the inner row handlers when those
-            // accept the drop first.
-            onDragOver={(e) => {
-              if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+          {isVisible("bookmarks") && settings.bookmarks.length > 0 && (
+            <Box
+              // Drop target for "drag folder into Bookmarks → add new
+              // bookmark". Bubbles up from below: a drop on a bookmark
+              // row preventDefaults via its own handler (existing
+              // sync-into-bookmark flow), so this fires only when the
+              // drop landed on the section header / list whitespace.
+              // Falls through to the inner row handlers when those
+              // accept the drop first.
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                }
+              }}
+              onDrop={(e) => {
+                const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+                if (!raw) return;
                 e.preventDefault();
-                e.dataTransfer.dropEffect = "copy";
-              }
-            }}
-            onDrop={(e) => {
-              const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
-              if (!raw) return;
-              e.preventDefault();
-              // Each path becomes a new bookmark, deduped by path.
-              const incoming = raw
-                .split("\n")
-                .filter(Boolean)
-                .filter(
-                  (p) =>
-                    !settings.bookmarks.some((b) => b.path === p),
-                )
-                .map((p) => {
-                  const segs = p.split(/[\\/]/).filter(Boolean);
-                  return {
-                    id: crypto.randomUUID(),
-                    label: segs.at(-1) ?? p,
-                    path: p,
-                  };
-                });
-              if (incoming.length === 0) return;
-              update("bookmarks", [...settings.bookmarks, ...incoming]);
-            }}
-          >
-            {renderSectionHeader("bookmarks", t("sidebar.section.bookmarks"))}
-            {!isCollapsed("bookmarks") && settings.bookmarks.length >= 5 && (
-              <Box sx={{ px: 2, py: 0.5, display: "flex", gap: 0.5, alignItems: "center" }}>
-                {settings.bookmarks.length >= 10 && (
-                  <input
-                    type="text"
-                    placeholder="Filter bookmarks…"
-                    value={bookmarkFilter}
-                    onChange={(e) => setBookmarkFilter(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: "4px 6px",
-                      fontSize: "0.75rem",
-                      background: "transparent",
-                      border: "1px solid",
-                      borderColor: "rgba(127,127,127,0.3)",
-                      borderRadius: 4,
-                      color: "inherit",
-                    }}
-                  />
-                )}
-                <Tooltip title="Sort A→Z">
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      const sorted = [...settings.bookmarks].sort((a, b) =>
-                        a.label.localeCompare(b.label, undefined, {
-                          sensitivity: "base",
-                          numeric: true,
-                        }),
-                      );
-                      update("bookmarks", sorted);
-                    }}
-                    aria-label="Sort bookmarks A to Z"
-                  >
-                    <SortByAlphaIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            )}
-            {!isCollapsed("bookmarks") && (
-            <List dense disablePadding id="sidebar-section-bookmarks">
-              {settings.bookmarks
-                .filter((b) =>
-                  bookmarkFilter
-                    ? b.label
-                        .toLowerCase()
-                        .includes(bookmarkFilter.toLowerCase())
-                    : true,
-                )
-                .map((b, i) => (
-                <ListItem
-                  key={b.id}
-                  disablePadding
-                  // Mouse drag-reorder. Uses a separate MIME from the
-                  // path-drop flow on bookmark rows so the two
-                  // gestures don't collide. Reading the source id
-                  // from dataTransfer in onDrop tells us which row to
-                  // splice + where.
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(
-                      "application/x-skiff-bookmark",
-                      b.id,
-                    );
-                    e.dataTransfer.effectAllowed = "move";
-                  }}
-                  onDragOver={(e) => {
-                    if (
-                      e.dataTransfer.types.includes(
-                        "application/x-skiff-bookmark",
-                      )
-                    ) {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
-                    }
-                  }}
-                  onDrop={(e) => {
-                    const sourceId = e.dataTransfer.getData(
-                      "application/x-skiff-bookmark",
-                    );
-                    if (!sourceId || sourceId === b.id) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const list = settings.bookmarks;
-                    const sIdx = list.findIndex((x) => x.id === sourceId);
-                    const tIdx = list.findIndex((x) => x.id === b.id);
-                    if (sIdx < 0 || tIdx < 0) return;
-                    const next = [...list];
-                    const [moved] = next.splice(sIdx, 1);
-                    next.splice(tIdx, 0, moved);
-                    update("bookmarks", next);
-                  }}
-                  secondaryAction={
-                    <Box sx={{ display: "flex", gap: 0.25 }}>
-                      <IconButton
-                        size="small"
-                        edge="end"
-                        disabled={i === 0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveBookmark(b.id, "up");
-                        }}
-                        aria-label={`Move ${b.label} up`}
-                        sx={{ p: 0.25 }}
-                      >
-                        <KeyboardArrowUpIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        edge="end"
-                        disabled={i === settings.bookmarks.length - 1}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveBookmark(b.id, "down");
-                        }}
-                        aria-label={`Move ${b.label} down`}
-                        sx={{ p: 0.25 }}
-                      >
-                        <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        edge="end"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeBookmark(b.id);
-                        }}
-                        aria-label={`Remove bookmark ${b.label}`}
-                        sx={{ p: 0.25 }}
-                      >
-                        <CloseIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    </Box>
-                  }
-                >
-                  <ListItemButton
-                    onClick={() => onNavigate(b.path)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      // Use the full-list index so Move up/down stay
-                      // consistent regardless of an active bookmark
-                      // filter — moving a row up should swap with its
-                      // original neighbor, not with whatever rendered
-                      // right above it post-filter.
-                      const realIdx = settings.bookmarks.findIndex(
-                        (x) => x.id === b.id,
-                      );
-                      const isFirst = realIdx === 0;
-                      const isLast = realIdx === settings.bookmarks.length - 1;
-                      setContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        section: "bookmarks",
-                        itemId: b.id,
-                        actions: [
-                          {
-                            key: "reveal",
-                            icon: <LaunchIcon fontSize="small" />,
-                            label: "Show in Finder/Explorer",
-                            dividerAfter: true,
-                            // `osReveal` translates internal SMB URLs to the
-                            // OS-native form and refuses SFTP / FTP (no
-                            // native handler) — the menu item stays visible
-                            // either way; refusal surfaces a silent no-op
-                            // here since the bookmark menu has no toast.
-                            onClick: () => {
-                              void osReveal(b.path, settings.connections);
-                            },
-                          },
-                          {
-                            key: "rename",
-                            icon: <EditIcon fontSize="small" />,
-                            label: "Rename…",
-                            onClick: () => renameBookmark(b.id),
-                          },
-                          {
-                            key: "up",
-                            icon: <KeyboardArrowUpIcon fontSize="small" />,
-                            label: "Move up",
-                            disabled: isFirst,
-                            onClick: () => moveBookmark(b.id, "up"),
-                          },
-                          {
-                            key: "down",
-                            icon: <KeyboardArrowDownIcon fontSize="small" />,
-                            label: "Move down",
-                            disabled: isLast,
-                            dividerAfter: true,
-                            onClick: () => moveBookmark(b.id, "down"),
-                          },
-                          {
-                            key: "remove",
-                            icon: <CloseIcon fontSize="small" />,
-                            label: "Remove",
-                            onClick: () => removeBookmark(b.id),
-                          },
-                        ],
-                      });
-                    }}
-                    // Drop a Skiff selection here to sync into the
-                    // bookmark's path. Mirrors the host-drop flow but
-                    // skips the destination prompt since the bookmark
-                    // already names a path.
-                    onDragOver={(e) => {
-                      if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "copy";
-                      }
-                    }}
-                    onDrop={(e) => {
-                      const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
-                      if (!raw) return;
-                      e.preventDefault();
-                      const paths = raw.split("\n").filter(Boolean);
-                      if (paths.length === 0) return;
-                      if (
-                        !window.confirm(
-                          `Sync ${paths.length} item${paths.length === 1 ? "" : "s"} into ${b.label}?`,
-                        )
-                      ) {
-                        return;
-                      }
-                      for (const p of paths) {
-                        const segs = p.split(/[\\/]/).filter(Boolean);
-                        const base = segs.at(-1) ?? p;
-                        const dest = b.path.endsWith("/")
-                          ? `${b.path}${base}`
-                          : `${b.path}/${base}`;
-                        void startSync(p, dest, {
-                          maxSizeGb: 100,
-                          conflictPolicy: "skip",
-                        }).catch(() => {
-                          /* errors surface in TransfersPage */
-                        });
-                      }
-                    }}
-                    title="Right-click to rename · drop here to sync"
-                  >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <BookmarkIcon fontSize="small" color="primary" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={b.label}
-                      slotProps={{
-                        primary: { variant: "body2", noWrap: true },
+                // Each path becomes a new bookmark, deduped by path.
+                const incoming = raw
+                  .split("\n")
+                  .filter(Boolean)
+                  .filter((p) => !settings.bookmarks.some((b) => b.path === p))
+                  .map((p) => {
+                    const segs = p.split(/[\\/]/).filter(Boolean);
+                    return {
+                      id: crypto.randomUUID(),
+                      label: segs.at(-1) ?? p,
+                      path: p,
+                    };
+                  });
+                if (incoming.length === 0) return;
+                update("bookmarks", [...settings.bookmarks, ...incoming]);
+              }}
+            >
+              {renderSectionHeader("bookmarks", t("sidebar.section.bookmarks"))}
+              {!isCollapsed("bookmarks") && settings.bookmarks.length >= 5 && (
+                <Box sx={{ px: 2, py: 0.5, display: "flex", gap: 0.5, alignItems: "center" }}>
+                  {settings.bookmarks.length >= 10 && (
+                    <input
+                      type="text"
+                      placeholder="Filter bookmarks…"
+                      value={bookmarkFilter}
+                      onChange={(e) => setBookmarkFilter(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: "4px 6px",
+                        fontSize: "0.75rem",
+                        background: "transparent",
+                        border: "1px solid",
+                        borderColor: "rgba(127,127,127,0.3)",
+                        borderRadius: 4,
+                        color: "inherit",
                       }}
                     />
-                  </ListItemButton>
-                </ListItem>
-              ))}
-            </List>
-            )}
-          </Box>
-        )}
+                  )}
+                  <Tooltip title="Sort A→Z">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const sorted = [...settings.bookmarks].sort((a, b) =>
+                          a.label.localeCompare(b.label, undefined, {
+                            sensitivity: "base",
+                            numeric: true,
+                          }),
+                        );
+                        update("bookmarks", sorted);
+                      }}
+                      aria-label="Sort bookmarks A to Z"
+                    >
+                      <SortByAlphaIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
+              {!isCollapsed("bookmarks") && (
+                <List dense disablePadding id="sidebar-section-bookmarks">
+                  {settings.bookmarks
+                    .filter((b) =>
+                      bookmarkFilter
+                        ? b.label.toLowerCase().includes(bookmarkFilter.toLowerCase())
+                        : true,
+                    )
+                    .map((b, i) => (
+                      <ListItem
+                        key={b.id}
+                        disablePadding
+                        // Mouse drag-reorder. Uses a separate MIME from the
+                        // path-drop flow on bookmark rows so the two
+                        // gestures don't collide. Reading the source id
+                        // from dataTransfer in onDrop tells us which row to
+                        // splice + where.
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("application/x-skiff-bookmark", b.id);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragOver={(e) => {
+                          if (e.dataTransfer.types.includes("application/x-skiff-bookmark")) {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                          }
+                        }}
+                        onDrop={(e) => {
+                          const sourceId = e.dataTransfer.getData("application/x-skiff-bookmark");
+                          if (!sourceId || sourceId === b.id) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const list = settings.bookmarks;
+                          const sIdx = list.findIndex((x) => x.id === sourceId);
+                          const tIdx = list.findIndex((x) => x.id === b.id);
+                          if (sIdx < 0 || tIdx < 0) return;
+                          const next = [...list];
+                          const [moved] = next.splice(sIdx, 1);
+                          next.splice(tIdx, 0, moved);
+                          update("bookmarks", next);
+                        }}
+                        secondaryAction={
+                          <Box sx={{ display: "flex", gap: 0.25 }}>
+                            <IconButton
+                              size="small"
+                              edge="end"
+                              disabled={i === 0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveBookmark(b.id, "up");
+                              }}
+                              aria-label={`Move ${b.label} up`}
+                              sx={{ p: 0.25 }}
+                            >
+                              <KeyboardArrowUpIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              edge="end"
+                              disabled={i === settings.bookmarks.length - 1}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveBookmark(b.id, "down");
+                              }}
+                              aria-label={`Move ${b.label} down`}
+                              sx={{ p: 0.25 }}
+                            >
+                              <KeyboardArrowDownIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              edge="end"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeBookmark(b.id);
+                              }}
+                              aria-label={`Remove bookmark ${b.label}`}
+                              sx={{ p: 0.25 }}
+                            >
+                              <CloseIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Box>
+                        }
+                      >
+                        <ListItemButton
+                          onClick={() => onNavigate(b.path)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            // Use the full-list index so Move up/down stay
+                            // consistent regardless of an active bookmark
+                            // filter — moving a row up should swap with its
+                            // original neighbor, not with whatever rendered
+                            // right above it post-filter.
+                            const realIdx = settings.bookmarks.findIndex((x) => x.id === b.id);
+                            const isFirst = realIdx === 0;
+                            const isLast = realIdx === settings.bookmarks.length - 1;
+                            setContextMenu({
+                              x: e.clientX,
+                              y: e.clientY,
+                              section: "bookmarks",
+                              itemId: b.id,
+                              actions: [
+                                {
+                                  key: "reveal",
+                                  icon: <LaunchIcon fontSize="small" />,
+                                  label: "Show in Finder/Explorer",
+                                  dividerAfter: true,
+                                  // `osReveal` translates internal SMB URLs to the
+                                  // OS-native form and refuses SFTP / FTP (no
+                                  // native handler) — the menu item stays visible
+                                  // either way; refusal surfaces a silent no-op
+                                  // here since the bookmark menu has no toast.
+                                  onClick: () => {
+                                    void osReveal(b.path, settings.connections);
+                                  },
+                                },
+                                {
+                                  key: "rename",
+                                  icon: <EditIcon fontSize="small" />,
+                                  label: "Rename…",
+                                  onClick: () => renameBookmark(b.id),
+                                },
+                                {
+                                  key: "up",
+                                  icon: <KeyboardArrowUpIcon fontSize="small" />,
+                                  label: "Move up",
+                                  disabled: isFirst,
+                                  onClick: () => moveBookmark(b.id, "up"),
+                                },
+                                {
+                                  key: "down",
+                                  icon: <KeyboardArrowDownIcon fontSize="small" />,
+                                  label: "Move down",
+                                  disabled: isLast,
+                                  dividerAfter: true,
+                                  onClick: () => moveBookmark(b.id, "down"),
+                                },
+                                {
+                                  key: "remove",
+                                  icon: <CloseIcon fontSize="small" />,
+                                  label: "Remove",
+                                  onClick: () => removeBookmark(b.id),
+                                },
+                              ],
+                            });
+                          }}
+                          // Drop a Skiff selection here to sync into the
+                          // bookmark's path. Mirrors the host-drop flow but
+                          // skips the destination prompt since the bookmark
+                          // already names a path.
+                          onDragOver={(e) => {
+                            if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "copy";
+                            }
+                          }}
+                          onDrop={(e) => {
+                            const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+                            if (!raw) return;
+                            e.preventDefault();
+                            const paths = raw.split("\n").filter(Boolean);
+                            if (paths.length === 0) return;
+                            if (
+                              !window.confirm(
+                                `Sync ${paths.length} item${paths.length === 1 ? "" : "s"} into ${b.label}?`,
+                              )
+                            ) {
+                              return;
+                            }
+                            for (const p of paths) {
+                              const segs = p.split(/[\\/]/).filter(Boolean);
+                              const base = segs.at(-1) ?? p;
+                              const dest = b.path.endsWith("/")
+                                ? `${b.path}${base}`
+                                : `${b.path}/${base}`;
+                              void startSync(p, dest, {
+                                maxSizeGb: 100,
+                                conflictPolicy: "skip",
+                              }).catch(() => {
+                                /* errors surface in TransfersPage */
+                              });
+                            }
+                          }}
+                          title="Right-click to rename · drop here to sync"
+                        >
+                          <ListItemIcon sx={{ minWidth: 32 }}>
+                            <BookmarkIcon fontSize="small" color="primary" />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={b.label}
+                            slotProps={{
+                              primary: { variant: "body2", noWrap: true },
+                            }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                </List>
+              )}
+            </Box>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("workspaces") }}>
-        {isVisible("workspaces") && settings.tabWorkspaces.length > 0 && (
-          <>
-            {renderSectionHeader("workspaces", t("sidebar.section.workspaces"))}
-            {!isCollapsed("workspaces") &&
-              settings.tabWorkspaces.length >= 5 && (
+          {isVisible("workspaces") && settings.tabWorkspaces.length > 0 && (
+            <>
+              {renderSectionHeader("workspaces", t("sidebar.section.workspaces"))}
+              {!isCollapsed("workspaces") && settings.tabWorkspaces.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
                   <Tooltip title="Sort A→Z">
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.tabWorkspaces].sort(
-                          (a, b) =>
-                            a.label.localeCompare(b.label, undefined, {
-                              sensitivity: "base",
-                              numeric: true,
-                            }),
+                        const sorted = [...settings.tabWorkspaces].sort((a, b) =>
+                          a.label.localeCompare(b.label, undefined, {
+                            sensitivity: "base",
+                            numeric: true,
+                          }),
                         );
                         update("tabWorkspaces", sorted);
                       }}
@@ -1107,160 +1052,139 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   </Tooltip>
                 </Box>
               )}
-            {!isCollapsed("workspaces") && (
-              <List dense disablePadding id="sidebar-section-workspaces">
-                {settings.tabWorkspaces.map((ws) => (
-                  <ListItem
-                    key={ws.id}
-                    disablePadding
-                    // Drag-reorder: same shape as the bookmarks
-                    // section. Custom MIME so it doesn't collide
-                    // with file-row drags or bookmark drags.
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(
-                        "application/x-skiff-workspace",
-                        ws.id,
-                      );
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragOver={(e) => {
-                      if (
-                        e.dataTransfer.types.includes(
-                          "application/x-skiff-workspace",
-                        )
-                      ) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                      }
-                    }}
-                    onDrop={(e) => {
-                      const sourceId = e.dataTransfer.getData(
-                        "application/x-skiff-workspace",
-                      );
-                      if (!sourceId || sourceId === ws.id) return;
-                      e.preventDefault();
-                      const list = settings.tabWorkspaces;
-                      const fromIdx = list.findIndex((x) => x.id === sourceId);
-                      const toIdx = list.findIndex((x) => x.id === ws.id);
-                      if (fromIdx < 0 || toIdx < 0) return;
-                      const next = [...list];
-                      const [moved] = next.splice(fromIdx, 1);
-                      next.splice(toIdx, 0, moved);
-                      update("tabWorkspaces", next);
-                    }}
-                  >
-                    <ListItemButton
-                      onClick={() => {
-                        const ok = window.confirm(
-                          `Replace your current tabs with "${ws.label}" (${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"})?`,
-                        );
-                        if (!ok) return;
-                        // Same event the command palette uses;
-                        // BrowserTabs listens.
-                        window.dispatchEvent(
-                          new CustomEvent("skiff:restore-workspace", {
-                            detail: ws,
-                          }),
-                        );
+              {!isCollapsed("workspaces") && (
+                <List dense disablePadding id="sidebar-section-workspaces">
+                  {settings.tabWorkspaces.map((ws) => (
+                    <ListItem
+                      key={ws.id}
+                      disablePadding
+                      // Drag-reorder: same shape as the bookmarks
+                      // section. Custom MIME so it doesn't collide
+                      // with file-row drags or bookmark drags.
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("application/x-skiff-workspace", ws.id);
+                        e.dataTransfer.effectAllowed = "move";
                       }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          section: "workspaces",
-                          itemId: ws.id,
-                          actions: [
-                            {
-                              key: "append",
-                              label: "Append (add to current tabs)",
-                              onClick: () =>
-                                window.dispatchEvent(
-                                  new CustomEvent("skiff:append-workspace", {
-                                    detail: ws,
-                                  }),
-                                ),
-                            },
-                            {
-                              key: "rename",
-                              icon: <EditIcon fontSize="small" />,
-                              label: "Rename…",
-                              onClick: () => {
-                                const next = window.prompt(
-                                  "Rename workspace:",
-                                  ws.label,
-                                );
-                                if (next === null) return;
-                                const trimmed = next.trim();
-                                if (!trimmed) return;
-                                update(
-                                  "tabWorkspaces",
-                                  settings.tabWorkspaces.map((x) =>
-                                    x.id === ws.id
-                                      ? { ...x, label: trimmed }
-                                      : x,
-                                  ),
-                                );
-                              },
-                            },
-                            {
-                              key: "delete",
-                              icon: <CloseIcon fontSize="small" />,
-                              label: "Delete",
-                              onClick: () =>
-                                update(
-                                  "tabWorkspaces",
-                                  settings.tabWorkspaces.filter(
-                                    (x) => x.id !== ws.id,
-                                  ),
-                                ),
-                            },
-                          ],
-                        });
+                      onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes("application/x-skiff-workspace")) {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }
                       }}
-                      title={`Restore "${ws.label}" — ${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"} · right-click to rename / delete`}
+                      onDrop={(e) => {
+                        const sourceId = e.dataTransfer.getData("application/x-skiff-workspace");
+                        if (!sourceId || sourceId === ws.id) return;
+                        e.preventDefault();
+                        const list = settings.tabWorkspaces;
+                        const fromIdx = list.findIndex((x) => x.id === sourceId);
+                        const toIdx = list.findIndex((x) => x.id === ws.id);
+                        if (fromIdx < 0 || toIdx < 0) return;
+                        const next = [...list];
+                        const [moved] = next.splice(fromIdx, 1);
+                        next.splice(toIdx, 0, moved);
+                        update("tabWorkspaces", next);
+                      }}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <ViewWeekIcon
-                          fontSize="small"
-                          sx={{ color: "text.secondary" }}
-                        />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={ws.label}
-                        secondary={`${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}`}
-                        slotProps={{
-                          primary: { variant: "body2", noWrap: true },
-                          secondary: { variant: "caption" },
+                      <ListItemButton
+                        onClick={() => {
+                          const ok = window.confirm(
+                            `Replace your current tabs with "${ws.label}" (${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"})?`,
+                          );
+                          if (!ok) return;
+                          // Same event the command palette uses;
+                          // BrowserTabs listens.
+                          window.dispatchEvent(
+                            new CustomEvent("skiff:restore-workspace", {
+                              detail: ws,
+                            }),
+                          );
                         }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </>
-        )}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            section: "workspaces",
+                            itemId: ws.id,
+                            actions: [
+                              {
+                                key: "append",
+                                label: "Append (add to current tabs)",
+                                onClick: () =>
+                                  window.dispatchEvent(
+                                    new CustomEvent("skiff:append-workspace", {
+                                      detail: ws,
+                                    }),
+                                  ),
+                              },
+                              {
+                                key: "rename",
+                                icon: <EditIcon fontSize="small" />,
+                                label: "Rename…",
+                                onClick: () => {
+                                  const next = window.prompt("Rename workspace:", ws.label);
+                                  if (next === null) return;
+                                  const trimmed = next.trim();
+                                  if (!trimmed) return;
+                                  update(
+                                    "tabWorkspaces",
+                                    settings.tabWorkspaces.map((x) =>
+                                      x.id === ws.id ? { ...x, label: trimmed } : x,
+                                    ),
+                                  );
+                                },
+                              },
+                              {
+                                key: "delete",
+                                icon: <CloseIcon fontSize="small" />,
+                                label: "Delete",
+                                onClick: () =>
+                                  update(
+                                    "tabWorkspaces",
+                                    settings.tabWorkspaces.filter((x) => x.id !== ws.id),
+                                  ),
+                              },
+                            ],
+                          });
+                        }}
+                        title={`Restore "${ws.label}" — ${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"} · right-click to rename / delete`}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <ViewWeekIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={ws.label}
+                          secondary={`${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}`}
+                          slotProps={{
+                            primary: { variant: "body2", noWrap: true },
+                            secondary: { variant: "caption" },
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("searches") }}>
-        {isVisible("searches") && settings.savedSearches.length > 0 && (
-          <>
-            {renderSectionHeader("searches", t("sidebar.section.searches"))}
-            {!isCollapsed("searches") &&
-              settings.savedSearches.length >= 5 && (
+          {isVisible("searches") && settings.savedSearches.length > 0 && (
+            <>
+              {renderSectionHeader("searches", t("sidebar.section.searches"))}
+              {!isCollapsed("searches") && settings.savedSearches.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
                   <Tooltip title="Sort A→Z">
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.savedSearches].sort(
-                          (a, b) =>
-                            a.label.localeCompare(b.label, undefined, {
-                              sensitivity: "base",
-                              numeric: true,
-                            }),
+                        const sorted = [...settings.savedSearches].sort((a, b) =>
+                          a.label.localeCompare(b.label, undefined, {
+                            sensitivity: "base",
+                            numeric: true,
+                          }),
                         );
                         update("savedSearches", sorted);
                       }}
@@ -1271,150 +1195,129 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   </Tooltip>
                 </Box>
               )}
-            {!isCollapsed("searches") && (
-              <List dense disablePadding id="sidebar-section-searches">
-                {settings.savedSearches.map((s) => (
-                  <ListItem
-                    key={s.id}
-                    disablePadding
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(
-                        "application/x-skiff-search",
-                        s.id,
-                      );
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragOver={(e) => {
-                      if (
-                        e.dataTransfer.types.includes(
-                          "application/x-skiff-search",
-                        )
-                      ) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                      }
-                    }}
-                    onDrop={(e) => {
-                      const sourceId = e.dataTransfer.getData(
-                        "application/x-skiff-search",
-                      );
-                      if (!sourceId || sourceId === s.id) return;
-                      e.preventDefault();
-                      const list = settings.savedSearches;
-                      const fromIdx = list.findIndex((x) => x.id === sourceId);
-                      const toIdx = list.findIndex((x) => x.id === s.id);
-                      if (fromIdx < 0 || toIdx < 0) return;
-                      const next = [...list];
-                      const [moved] = next.splice(fromIdx, 1);
-                      next.splice(toIdx, 0, moved);
-                      update("savedSearches", next);
-                    }}
-                  >
-                    <ListItemButton
-                      onClick={() => {
-                        // Browser listens; switching to the Browser
-                        // page first ensures the search applies to a
-                        // visible Browser instance.
-                        onSwitchPage("browser");
-                        queueMicrotask(() =>
-                          window.dispatchEvent(
-                            new CustomEvent("skiff:run-saved-search", {
-                              detail: s,
-                            }),
-                          ),
-                        );
+              {!isCollapsed("searches") && (
+                <List dense disablePadding id="sidebar-section-searches">
+                  {settings.savedSearches.map((s) => (
+                    <ListItem
+                      key={s.id}
+                      disablePadding
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("application/x-skiff-search", s.id);
+                        e.dataTransfer.effectAllowed = "move";
                       }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          section: "bookmarks",
-                          itemId: s.id,
-                          actions: [
-                            {
-                              key: "rename",
-                              icon: <EditIcon fontSize="small" />,
-                              label: "Rename…",
-                              onClick: () => {
-                                const next = window.prompt(
-                                  "Rename saved search:",
-                                  s.label,
-                                );
-                                if (next === null) return;
-                                const trimmed = next.trim();
-                                if (!trimmed) return;
-                                update(
-                                  "savedSearches",
-                                  settings.savedSearches.map((x) =>
-                                    x.id === s.id
-                                      ? { ...x, label: trimmed }
-                                      : x,
-                                  ),
-                                );
-                              },
-                            },
-                            {
-                              key: "delete",
-                              icon: <CloseIcon fontSize="small" />,
-                              label: "Delete",
-                              onClick: () =>
-                                update(
-                                  "savedSearches",
-                                  settings.savedSearches.filter(
-                                    (x) => x.id !== s.id,
-                                  ),
-                                ),
-                            },
-                          ],
-                        });
+                      onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes("application/x-skiff-search")) {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }
                       }}
-                      title={`Run "${s.label}" — ${s.query}${s.regex ? " (regex)" : ""}${s.caseSensitive ? " (case)" : ""}${s.recursive ? " (recursive)" : ""}`}
+                      onDrop={(e) => {
+                        const sourceId = e.dataTransfer.getData("application/x-skiff-search");
+                        if (!sourceId || sourceId === s.id) return;
+                        e.preventDefault();
+                        const list = settings.savedSearches;
+                        const fromIdx = list.findIndex((x) => x.id === sourceId);
+                        const toIdx = list.findIndex((x) => x.id === s.id);
+                        if (fromIdx < 0 || toIdx < 0) return;
+                        const next = [...list];
+                        const [moved] = next.splice(fromIdx, 1);
+                        next.splice(toIdx, 0, moved);
+                        update("savedSearches", next);
+                      }}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <SearchIcon
-                          fontSize="small"
-                          sx={{ color: "text.secondary" }}
-                        />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={s.label}
-                        secondary={s.query}
-                        slotProps={{
-                          primary: { variant: "body2", noWrap: true },
-                          secondary: {
-                            variant: "caption",
-                            sx: { fontFamily: "monospace" },
-                          },
+                      <ListItemButton
+                        onClick={() => {
+                          // Browser listens; switching to the Browser
+                          // page first ensures the search applies to a
+                          // visible Browser instance.
+                          onSwitchPage("browser");
+                          queueMicrotask(() =>
+                            window.dispatchEvent(
+                              new CustomEvent("skiff:run-saved-search", {
+                                detail: s,
+                              }),
+                            ),
+                          );
                         }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </>
-        )}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            section: "bookmarks",
+                            itemId: s.id,
+                            actions: [
+                              {
+                                key: "rename",
+                                icon: <EditIcon fontSize="small" />,
+                                label: "Rename…",
+                                onClick: () => {
+                                  const next = window.prompt("Rename saved search:", s.label);
+                                  if (next === null) return;
+                                  const trimmed = next.trim();
+                                  if (!trimmed) return;
+                                  update(
+                                    "savedSearches",
+                                    settings.savedSearches.map((x) =>
+                                      x.id === s.id ? { ...x, label: trimmed } : x,
+                                    ),
+                                  );
+                                },
+                              },
+                              {
+                                key: "delete",
+                                icon: <CloseIcon fontSize="small" />,
+                                label: "Delete",
+                                onClick: () =>
+                                  update(
+                                    "savedSearches",
+                                    settings.savedSearches.filter((x) => x.id !== s.id),
+                                  ),
+                              },
+                            ],
+                          });
+                        }}
+                        title={`Run "${s.label}" — ${s.query}${s.regex ? " (regex)" : ""}${s.caseSensitive ? " (case)" : ""}${s.recursive ? " (recursive)" : ""}`}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={s.label}
+                          secondary={s.query}
+                          slotProps={{
+                            primary: { variant: "body2", noWrap: true },
+                            secondary: {
+                              variant: "caption",
+                              sx: { fontFamily: "monospace" },
+                            },
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("syncjobs") }}>
-        {isVisible("syncjobs") && settings.savedSyncJobs.length > 0 && (
-          <>
-            {renderSectionHeader("syncjobs", t("sidebar.section.syncjobs"))}
-            {!isCollapsed("syncjobs") &&
-              settings.savedSyncJobs.length >= 5 && (
+          {isVisible("syncjobs") && settings.savedSyncJobs.length > 0 && (
+            <>
+              {renderSectionHeader("syncjobs", t("sidebar.section.syncjobs"))}
+              {!isCollapsed("syncjobs") && settings.savedSyncJobs.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
                   <Tooltip title="Sort A→Z">
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.savedSyncJobs].sort(
-                          (a, b) =>
-                            a.label.localeCompare(b.label, undefined, {
-                              sensitivity: "base",
-                              numeric: true,
-                            }),
+                        const sorted = [...settings.savedSyncJobs].sort((a, b) =>
+                          a.label.localeCompare(b.label, undefined, {
+                            sensitivity: "base",
+                            numeric: true,
+                          }),
                         );
                         update("savedSyncJobs", sorted);
                       }}
@@ -1425,162 +1328,141 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   </Tooltip>
                 </Box>
               )}
-            {!isCollapsed("syncjobs") && (
-              <List dense disablePadding id="sidebar-section-syncjobs">
-                {settings.savedSyncJobs.map((j) => (
-                  <ListItem
-                    key={j.id}
-                    disablePadding
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(
-                        "application/x-skiff-syncjob",
-                        j.id,
-                      );
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragOver={(e) => {
-                      if (
-                        e.dataTransfer.types.includes(
-                          "application/x-skiff-syncjob",
-                        )
-                      ) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                      }
-                    }}
-                    onDrop={(e) => {
-                      const sourceId = e.dataTransfer.getData(
-                        "application/x-skiff-syncjob",
-                      );
-                      if (!sourceId || sourceId === j.id) return;
-                      e.preventDefault();
-                      const list = settings.savedSyncJobs;
-                      const fromIdx = list.findIndex((x) => x.id === sourceId);
-                      const toIdx = list.findIndex((x) => x.id === j.id);
-                      if (fromIdx < 0 || toIdx < 0) return;
-                      const next = [...list];
-                      const [moved] = next.splice(fromIdx, 1);
-                      next.splice(toIdx, 0, moved);
-                      update("savedSyncJobs", next);
-                    }}
-                  >
-                    <ListItemButton
-                      onClick={() => {
-                        // Mirrors the palette flow: confirm before
-                        // running a real transfer.
-                        const ok = window.confirm(
-                          `Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`,
-                        );
-                        if (!ok) return;
-                        onSwitchPage("transfers");
-                        queueMicrotask(() =>
-                          window.dispatchEvent(
-                            new CustomEvent("skiff:run-sync-job", {
-                              detail: j.id,
-                            }),
-                          ),
-                        );
+              {!isCollapsed("syncjobs") && (
+                <List dense disablePadding id="sidebar-section-syncjobs">
+                  {settings.savedSyncJobs.map((j) => (
+                    <ListItem
+                      key={j.id}
+                      disablePadding
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("application/x-skiff-syncjob", j.id);
+                        e.dataTransfer.effectAllowed = "move";
                       }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          section: "bookmarks",
-                          itemId: j.id,
-                          actions: [
-                            {
-                              key: "dryrun",
-                              label: "Run as dry-run",
-                              onClick: () => {
-                                onSwitchPage("transfers");
-                                window.dispatchEvent(
-                                  new CustomEvent("skiff:run-sync-job", {
-                                    detail: { id: j.id, dryRun: true },
-                                  }),
-                                );
-                              },
-                            },
-                            {
-                              key: "rename",
-                              icon: <EditIcon fontSize="small" />,
-                              label: "Rename…",
-                              onClick: () => {
-                                const next = window.prompt(
-                                  "Rename sync job:",
-                                  j.label,
-                                );
-                                if (next === null) return;
-                                const trimmed = next.trim();
-                                if (!trimmed) return;
-                                update(
-                                  "savedSyncJobs",
-                                  settings.savedSyncJobs.map((x) =>
-                                    x.id === j.id
-                                      ? { ...x, label: trimmed }
-                                      : x,
-                                  ),
-                                );
-                              },
-                            },
-                            {
-                              key: "delete",
-                              icon: <CloseIcon fontSize="small" />,
-                              label: "Delete",
-                              onClick: () =>
-                                update(
-                                  "savedSyncJobs",
-                                  settings.savedSyncJobs.filter(
-                                    (x) => x.id !== j.id,
-                                  ),
-                                ),
-                            },
-                          ],
-                        });
+                      onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes("application/x-skiff-syncjob")) {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }
                       }}
-                      title={`Run "${j.label}" — ${j.src} → ${j.dest}`}
+                      onDrop={(e) => {
+                        const sourceId = e.dataTransfer.getData("application/x-skiff-syncjob");
+                        if (!sourceId || sourceId === j.id) return;
+                        e.preventDefault();
+                        const list = settings.savedSyncJobs;
+                        const fromIdx = list.findIndex((x) => x.id === sourceId);
+                        const toIdx = list.findIndex((x) => x.id === j.id);
+                        if (fromIdx < 0 || toIdx < 0) return;
+                        const next = [...list];
+                        const [moved] = next.splice(fromIdx, 1);
+                        next.splice(toIdx, 0, moved);
+                        update("savedSyncJobs", next);
+                      }}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <SwapHorizIcon
-                          fontSize="small"
-                          sx={{ color: "text.secondary" }}
-                        />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={j.label}
-                        secondary={j.conflictPolicy}
-                        slotProps={{
-                          primary: { variant: "body2", noWrap: true },
-                          secondary: { variant: "caption" },
+                      <ListItemButton
+                        onClick={() => {
+                          // Mirrors the palette flow: confirm before
+                          // running a real transfer.
+                          const ok = window.confirm(
+                            `Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`,
+                          );
+                          if (!ok) return;
+                          onSwitchPage("transfers");
+                          queueMicrotask(() =>
+                            window.dispatchEvent(
+                              new CustomEvent("skiff:run-sync-job", {
+                                detail: j.id,
+                              }),
+                            ),
+                          );
                         }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </>
-        )}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            section: "bookmarks",
+                            itemId: j.id,
+                            actions: [
+                              {
+                                key: "dryrun",
+                                label: "Run as dry-run",
+                                onClick: () => {
+                                  onSwitchPage("transfers");
+                                  window.dispatchEvent(
+                                    new CustomEvent("skiff:run-sync-job", {
+                                      detail: { id: j.id, dryRun: true },
+                                    }),
+                                  );
+                                },
+                              },
+                              {
+                                key: "rename",
+                                icon: <EditIcon fontSize="small" />,
+                                label: "Rename…",
+                                onClick: () => {
+                                  const next = window.prompt("Rename sync job:", j.label);
+                                  if (next === null) return;
+                                  const trimmed = next.trim();
+                                  if (!trimmed) return;
+                                  update(
+                                    "savedSyncJobs",
+                                    settings.savedSyncJobs.map((x) =>
+                                      x.id === j.id ? { ...x, label: trimmed } : x,
+                                    ),
+                                  );
+                                },
+                              },
+                              {
+                                key: "delete",
+                                icon: <CloseIcon fontSize="small" />,
+                                label: "Delete",
+                                onClick: () =>
+                                  update(
+                                    "savedSyncJobs",
+                                    settings.savedSyncJobs.filter((x) => x.id !== j.id),
+                                  ),
+                              },
+                            ],
+                          });
+                        }}
+                        title={`Run "${j.label}" — ${j.src} → ${j.dest}`}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <SwapHorizIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={j.label}
+                          secondary={j.conflictPolicy}
+                          slotProps={{
+                            primary: { variant: "body2", noWrap: true },
+                            secondary: { variant: "caption" },
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("selections") }}>
-        {isVisible("selections") && settings.savedSelections.length > 0 && (
-          <>
-            {renderSectionHeader("selections", t("sidebar.section.selections"))}
-            {!isCollapsed("selections") &&
-              settings.savedSelections.length >= 5 && (
+          {isVisible("selections") && settings.savedSelections.length > 0 && (
+            <>
+              {renderSectionHeader("selections", t("sidebar.section.selections"))}
+              {!isCollapsed("selections") && settings.savedSelections.length >= 5 && (
                 <Box sx={{ px: 2, py: 0.5, display: "flex", justifyContent: "flex-end" }}>
                   <Tooltip title="Sort A→Z">
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.savedSelections].sort(
-                          (a, b) =>
-                            a.label.localeCompare(b.label, undefined, {
-                              sensitivity: "base",
-                              numeric: true,
-                            }),
+                        const sorted = [...settings.savedSelections].sort((a, b) =>
+                          a.label.localeCompare(b.label, undefined, {
+                            sensitivity: "base",
+                            numeric: true,
+                          }),
                         );
                         update("savedSelections", sorted);
                       }}
@@ -1591,511 +1473,482 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   </Tooltip>
                 </Box>
               )}
-            {!isCollapsed("selections") && (
-              <List dense disablePadding id="sidebar-section-selections">
-                {settings.savedSelections.map((s) => (
-                  <ListItem
-                    key={s.id}
-                    disablePadding
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(
-                        "application/x-skiff-selection",
-                        s.id,
-                      );
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragOver={(e) => {
-                      if (
-                        e.dataTransfer.types.includes(
-                          "application/x-skiff-selection",
-                        )
-                      ) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                      }
-                    }}
-                    onDrop={(e) => {
-                      const sourceId = e.dataTransfer.getData(
-                        "application/x-skiff-selection",
-                      );
-                      if (!sourceId || sourceId === s.id) return;
-                      e.preventDefault();
-                      const list = settings.savedSelections;
-                      const fromIdx = list.findIndex((x) => x.id === sourceId);
-                      const toIdx = list.findIndex((x) => x.id === s.id);
-                      if (fromIdx < 0 || toIdx < 0) return;
-                      const next = [...list];
-                      const [moved] = next.splice(fromIdx, 1);
-                      next.splice(toIdx, 0, moved);
-                      update("savedSelections", next);
-                    }}
-                  >
-                    <ListItemButton
-                      onClick={() => {
-                        // Switch to Browser then dispatch — same
-                        // pattern as workspaces / searches.
-                        onSwitchPage("browser");
-                        queueMicrotask(() =>
-                          window.dispatchEvent(
-                            new CustomEvent("skiff:restore-selection", {
-                              detail: s.paths,
-                            }),
-                          ),
-                        );
+              {!isCollapsed("selections") && (
+                <List dense disablePadding id="sidebar-section-selections">
+                  {settings.savedSelections.map((s) => (
+                    <ListItem
+                      key={s.id}
+                      disablePadding
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("application/x-skiff-selection", s.id);
+                        e.dataTransfer.effectAllowed = "move";
                       }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          section: "bookmarks",
-                          itemId: s.id,
-                          actions: [
-                            {
-                              key: "open-as-tabs",
-                              label: "Open paths as tabs",
-                              onClick: () => {
-                                // Each path becomes a new tab. Skip
-                                // sftp:// paths that aren't real
-                                // browseable folders without an
-                                // active connection. We treat
-                                // PARENT folders for files (so the
-                                // user lands at the file's parent
-                                // and can see context).
-                                for (const p of s.paths) {
-                                  // OPEN_IN_TAB_EVENT seeds a new
-                                  // tab at the dispatched path.
-                                  // BrowserTabs listens.
-                                  window.dispatchEvent(
-                                    new CustomEvent(OPEN_IN_TAB_EVENT, {
-                                      detail: p,
-                                    }),
-                                  );
-                                }
-                              },
-                            },
-                            {
-                              key: "rename",
-                              icon: <EditIcon fontSize="small" />,
-                              label: "Rename…",
-                              onClick: () => {
-                                const next = window.prompt(
-                                  "Rename selection group:",
-                                  s.label,
-                                );
-                                if (next === null) return;
-                                const trimmed = next.trim();
-                                if (!trimmed) return;
-                                update(
-                                  "savedSelections",
-                                  settings.savedSelections.map((x) =>
-                                    x.id === s.id
-                                      ? { ...x, label: trimmed }
-                                      : x,
-                                  ),
-                                );
-                              },
-                            },
-                            {
-                              key: "delete",
-                              icon: <CloseIcon fontSize="small" />,
-                              label: "Delete",
-                              onClick: () =>
-                                update(
-                                  "savedSelections",
-                                  settings.savedSelections.filter(
-                                    (x) => x.id !== s.id,
-                                  ),
-                                ),
-                            },
-                          ],
-                        });
+                      onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes("application/x-skiff-selection")) {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }
                       }}
-                      title={`Restore "${s.label}" — ${s.paths.length} path${s.paths.length === 1 ? "" : "s"}`}
+                      onDrop={(e) => {
+                        const sourceId = e.dataTransfer.getData("application/x-skiff-selection");
+                        if (!sourceId || sourceId === s.id) return;
+                        e.preventDefault();
+                        const list = settings.savedSelections;
+                        const fromIdx = list.findIndex((x) => x.id === sourceId);
+                        const toIdx = list.findIndex((x) => x.id === s.id);
+                        if (fromIdx < 0 || toIdx < 0) return;
+                        const next = [...list];
+                        const [moved] = next.splice(fromIdx, 1);
+                        next.splice(toIdx, 0, moved);
+                        update("savedSelections", next);
+                      }}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <CheckBoxOutlineBlankIcon
-                          fontSize="small"
-                          sx={{ color: "text.secondary" }}
-                        />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={s.label}
-                        secondary={`${s.paths.length} path${s.paths.length === 1 ? "" : "s"}`}
-                        slotProps={{
-                          primary: { variant: "body2", noWrap: true },
-                          secondary: { variant: "caption" },
+                      <ListItemButton
+                        onClick={() => {
+                          // Switch to Browser then dispatch — same
+                          // pattern as workspaces / searches.
+                          onSwitchPage("browser");
+                          queueMicrotask(() =>
+                            window.dispatchEvent(
+                              new CustomEvent("skiff:restore-selection", {
+                                detail: s.paths,
+                              }),
+                            ),
+                          );
                         }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </>
-        )}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            section: "bookmarks",
+                            itemId: s.id,
+                            actions: [
+                              {
+                                key: "open-as-tabs",
+                                label: "Open paths as tabs",
+                                onClick: () => {
+                                  // Each path becomes a new tab. Skip
+                                  // sftp:// paths that aren't real
+                                  // browseable folders without an
+                                  // active connection. We treat
+                                  // PARENT folders for files (so the
+                                  // user lands at the file's parent
+                                  // and can see context).
+                                  for (const p of s.paths) {
+                                    // OPEN_IN_TAB_EVENT seeds a new
+                                    // tab at the dispatched path.
+                                    // BrowserTabs listens.
+                                    window.dispatchEvent(
+                                      new CustomEvent(OPEN_IN_TAB_EVENT, {
+                                        detail: p,
+                                      }),
+                                    );
+                                  }
+                                },
+                              },
+                              {
+                                key: "rename",
+                                icon: <EditIcon fontSize="small" />,
+                                label: "Rename…",
+                                onClick: () => {
+                                  const next = window.prompt("Rename selection group:", s.label);
+                                  if (next === null) return;
+                                  const trimmed = next.trim();
+                                  if (!trimmed) return;
+                                  update(
+                                    "savedSelections",
+                                    settings.savedSelections.map((x) =>
+                                      x.id === s.id ? { ...x, label: trimmed } : x,
+                                    ),
+                                  );
+                                },
+                              },
+                              {
+                                key: "delete",
+                                icon: <CloseIcon fontSize="small" />,
+                                label: "Delete",
+                                onClick: () =>
+                                  update(
+                                    "savedSelections",
+                                    settings.savedSelections.filter((x) => x.id !== s.id),
+                                  ),
+                              },
+                            ],
+                          });
+                        }}
+                        title={`Restore "${s.label}" — ${s.paths.length} path${s.paths.length === 1 ? "" : "s"}`}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <CheckBoxOutlineBlankIcon
+                            fontSize="small"
+                            sx={{ color: "text.secondary" }}
+                          />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={s.label}
+                          secondary={`${s.paths.length} path${s.paths.length === 1 ? "" : "s"}`}
+                          slotProps={{
+                            primary: { variant: "body2", noWrap: true },
+                            secondary: { variant: "caption" },
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("recent") }}>
-        {isVisible("recent") && settings.recentPaths.length > 0 && (
-          <>
-            {renderSectionHeader("recent", t("sidebar.section.recent"))}
-            {!isCollapsed("recent") && (
-            <List dense disablePadding id="sidebar-section-recent">
-              {settings.recentPaths
-                .slice(0, Math.max(0, settings.recentPathsMax))
-                .map((p) => {
-                  // Compact single-line label so the Recent section
-                  // doesn't dominate the sidebar's vertical budget.
-                  // The basename is preserved verbatim; middle dirs
-                  // collapse to one char each. Full path is in the
-                  // tooltip + the "Show all recent" dialog.
-                  const segs = p.split(/[\\/]/).filter(Boolean);
-                  const basename = segs.at(-1) ?? p;
-                  const label = shortPath(p, home);
-                  return (
-                    <ListItem key={p} disablePadding>
-                      <Tooltip title={p} placement="right" enterDelay={500}>
-                        <ListItemButton
-                          onClick={() => onNavigate(p)}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            const alreadyBookmarked =
-                              settings.bookmarks.some((bk) => bk.path === p);
-                            setContextMenu({
-                              x: e.clientX,
-                              y: e.clientY,
-                              section: "recent",
-                              itemId: p,
-                              actions: [
-                                {
-                                  key: "reveal",
-                                  icon: <LaunchIcon fontSize="small" />,
-                                  label: "Show in Finder/Explorer",
-                                  dividerAfter: true,
-                                  // See bookmarks menu above — `osReveal`
-                                  // translates SMB UUID URLs to native form
-                                  // before the IPC call so macOS Finder
-                                  // doesn't try to resolve the UUID as a
-                                  // hostname.
-                                  onClick: () => {
-                                    void osReveal(p, settings.connections);
+          {isVisible("recent") && settings.recentPaths.length > 0 && (
+            <>
+              {renderSectionHeader("recent", t("sidebar.section.recent"))}
+              {!isCollapsed("recent") && (
+                <List dense disablePadding id="sidebar-section-recent">
+                  {settings.recentPaths.slice(0, Math.max(0, settings.recentPathsMax)).map((p) => {
+                    // Compact single-line label so the Recent section
+                    // doesn't dominate the sidebar's vertical budget.
+                    // The basename is preserved verbatim; middle dirs
+                    // collapse to one char each. Full path is in the
+                    // tooltip + the "Show all recent" dialog.
+                    const segs = p.split(/[\\/]/).filter(Boolean);
+                    const basename = segs.at(-1) ?? p;
+                    const label = shortPath(p, home);
+                    return (
+                      <ListItem key={p} disablePadding>
+                        <Tooltip title={p} placement="right" enterDelay={500}>
+                          <ListItemButton
+                            onClick={() => onNavigate(p)}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              const alreadyBookmarked = settings.bookmarks.some(
+                                (bk) => bk.path === p,
+                              );
+                              setContextMenu({
+                                x: e.clientX,
+                                y: e.clientY,
+                                section: "recent",
+                                itemId: p,
+                                actions: [
+                                  {
+                                    key: "reveal",
+                                    icon: <LaunchIcon fontSize="small" />,
+                                    label: "Show in Finder/Explorer",
+                                    dividerAfter: true,
+                                    // See bookmarks menu above — `osReveal`
+                                    // translates SMB UUID URLs to native form
+                                    // before the IPC call so macOS Finder
+                                    // doesn't try to resolve the UUID as a
+                                    // hostname.
+                                    onClick: () => {
+                                      void osReveal(p, settings.connections);
+                                    },
                                   },
-                                },
-                                {
-                                  key: "bookmark",
-                                  icon: <BookmarkIcon fontSize="small" />,
-                                  label: "Add to bookmarks",
-                                  disabled: alreadyBookmarked,
-                                  dividerAfter: true,
-                                  onClick: () => bookmarkPath(p, basename),
-                                },
-                                {
-                                  key: "remove",
-                                  icon: <CloseIcon fontSize="small" />,
-                                  label: "Remove from recent",
-                                  onClick: () => removeRecent(p),
-                                },
-                              ],
-                            });
-                          }}
-                        >
-                          <ListItemIcon sx={{ minWidth: 32 }}>
-                            <HistoryIcon
-                              fontSize="small"
-                              sx={{ color: "text.secondary" }}
-                            />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={label}
-                            slotProps={{
-                              primary: { variant: "body2", noWrap: true },
+                                  {
+                                    key: "bookmark",
+                                    icon: <BookmarkIcon fontSize="small" />,
+                                    label: "Add to bookmarks",
+                                    disabled: alreadyBookmarked,
+                                    dividerAfter: true,
+                                    onClick: () => bookmarkPath(p, basename),
+                                  },
+                                  {
+                                    key: "remove",
+                                    icon: <CloseIcon fontSize="small" />,
+                                    label: "Remove from recent",
+                                    onClick: () => removeRecent(p),
+                                  },
+                                ],
+                              });
                             }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 32 }}>
+                              <HistoryIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={label}
+                              slotProps={{
+                                primary: { variant: "body2", noWrap: true },
+                              }}
+                            />
+                          </ListItemButton>
+                        </Tooltip>
+                      </ListItem>
+                    );
+                  })}
+                  {settings.recentPaths.length > settings.recentPathsMax && (
+                    <ListItem disablePadding>
+                      <ListItemButton
+                        onClick={() => setRecentDialogOpen(true)}
+                        aria-label="Show all recent paths"
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <KeyboardArrowDownIcon
+                            fontSize="small"
+                            sx={{ color: "text.secondary" }}
                           />
-                        </ListItemButton>
-                      </Tooltip>
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={`Show more (${settings.recentPaths.length - settings.recentPathsMax})`}
+                          slotProps={{
+                            primary: {
+                              variant: "body2",
+                              noWrap: true,
+                              sx: { color: "text.secondary" },
+                            },
+                          }}
+                        />
+                      </ListItemButton>
                     </ListItem>
-                  );
-                })}
-              {settings.recentPaths.length > settings.recentPathsMax && (
-                <ListItem disablePadding>
-                  <ListItemButton
-                    onClick={() => setRecentDialogOpen(true)}
-                    aria-label="Show all recent paths"
-                  >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <KeyboardArrowDownIcon
-                        fontSize="small"
-                        sx={{ color: "text.secondary" }}
-                      />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={`Show more (${settings.recentPaths.length - settings.recentPathsMax})`}
-                      slotProps={{
-                        primary: {
-                          variant: "body2",
-                          noWrap: true,
-                          sx: { color: "text.secondary" },
-                        },
-                      }}
-                    />
-                  </ListItemButton>
-                </ListItem>
+                  )}
+                </List>
               )}
-            </List>
-            )}
-          </>
-        )}
+            </>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("hosts") }}>
-        {isVisible("hosts") && renderSectionHeader("hosts", t("sidebar.section.hosts"))}
-        {isVisible("hosts") && !isCollapsed("hosts") && (
-        <Box id="sidebar-section-hosts">
-        {connections == null ? (
-          <Box sx={{ px: 2, py: 0.5 }}>
-            <CircularProgress size={14} />
-          </Box>
-        ) : connections.length === 0 ? (
-          <List dense disablePadding>
-            <ListItem disablePadding>
-              {/* In iconOnly mode the ListItemText is hidden by the
+          {isVisible("hosts") && renderSectionHeader("hosts", t("sidebar.section.hosts"))}
+          {isVisible("hosts") && !isCollapsed("hosts") && (
+            <Box id="sidebar-section-hosts">
+              {connections == null ? (
+                <Box sx={{ px: 2, py: 0.5 }}>
+                  <CircularProgress size={14} />
+                </Box>
+              ) : connections.length === 0 ? (
+                <List dense disablePadding>
+                  <ListItem disablePadding>
+                    {/* In iconOnly mode the ListItemText is hidden by the
                   parent CSS scope, so the bare HubIcon needs a
                   Tooltip to convey its purpose. Mirrors the favorites
                   pattern — empty title in expanded mode = no tooltip. */}
-              <Tooltip
-                title={settings.sidebarIconOnly ? "Manage connections" : ""}
-                placement="right"
-              >
-                <ListItemButton onClick={() => onSwitchPage("connections")}>
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <HubIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Manage connections…"
-                    slotProps={{ primary: { variant: "body2" } }}
-                  />
-                </ListItemButton>
-              </Tooltip>
-            </ListItem>
-          </List>
-        ) : (
-          <List dense disablePadding>
-            {connections.map((c) => {
-              // After 0.2.246 we have multiple remote kinds — pick
-              // the address-bar scheme + the kind-specific icon
-              // here instead of hardcoding `sftp://`. The kind label
-              // is uppercased so it reads as a protocol tag in the
-              // connection's tooltip.
-              //
-              // 0.2.265 added SMB. The previous ternary defaulted to
-              // "sftp" for any non-FTP kind, which silently routed
-              // SMB navigation to `sftp://<smb-uuid>/` and broke
-              // every downstream resolve_backend call (the SMB
-              // connection-id wasn't in the SFTP registry). Pick
-              // the scheme explicitly per kind.
-              const scheme =
-                c.kind === "ftp" ? "ftp" : c.kind === "smb" ? "smb" : "sftp";
-              const kindLabel = c.kind.toUpperCase();
-              const tooltip = `${kindLabel} · ${c.label}`;
-              const KindIcon = c.kind === "ftp" ? CloudIcon : HubIcon;
-              return (
-              <ListItem key={c.id} disablePadding>
-                <Tooltip title={tooltip} placement="right">
-                <ListItemButton
-                  onClick={() => {
-                    // App.tsx's `onNavigate` already handles the
-                    // page switch + navigate-event dispatch (with
-                    // the setTimeout(0) deferral that kills the
-                    // first-click-lost race when coming from
-                    // Settings). No need to call onSwitchPage
-                    // explicitly here.
-                    onNavigate(`${scheme}://${c.id}/`);
-                  }}
-                  // Drag-drop target: dropping a Skiff selection here
-                  // starts a Skiffsync job from the dragged paths to a
-                  // user-prompted destination on the remote. Uses the
-                  // custom MIME so OS-file drags fall through to the
-                  // Browser pane's existing drop handler.
-                  onDragOver={(e) => {
-                    if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "copy";
-                    }
-                  }}
-                  onDrop={(e) => {
-                    const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
-                    if (!raw) return;
-                    e.preventDefault();
-                    const paths = raw.split("\n").filter(Boolean);
-                    if (paths.length === 0) return;
-                    const remoteDest = window.prompt(
-                      `Sync ${paths.length} item${paths.length === 1 ? "" : "s"} to ${c.label}. Destination path on remote:`,
-                      "/",
+                    <Tooltip
+                      title={settings.sidebarIconOnly ? "Manage connections" : ""}
+                      placement="right"
+                    >
+                      <ListItemButton onClick={() => onSwitchPage("connections")}>
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <HubIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="Manage connections…"
+                          slotProps={{ primary: { variant: "body2" } }}
+                        />
+                      </ListItemButton>
+                    </Tooltip>
+                  </ListItem>
+                </List>
+              ) : (
+                <List dense disablePadding>
+                  {connections.map((c) => {
+                    // After 0.2.246 we have multiple remote kinds — pick
+                    // the address-bar scheme + the kind-specific icon
+                    // here instead of hardcoding `sftp://`. The kind label
+                    // is uppercased so it reads as a protocol tag in the
+                    // connection's tooltip.
+                    //
+                    // 0.2.265 added SMB. The previous ternary defaulted to
+                    // "sftp" for any non-FTP kind, which silently routed
+                    // SMB navigation to `sftp://<smb-uuid>/` and broke
+                    // every downstream resolve_backend call (the SMB
+                    // connection-id wasn't in the SFTP registry). Pick
+                    // the scheme explicitly per kind.
+                    const scheme = c.kind === "ftp" ? "ftp" : c.kind === "smb" ? "smb" : "sftp";
+                    const kindLabel = c.kind.toUpperCase();
+                    const tooltip = `${kindLabel} · ${c.label}`;
+                    const KindIcon = c.kind === "ftp" ? CloudIcon : HubIcon;
+                    return (
+                      <ListItem key={c.id} disablePadding>
+                        <Tooltip title={tooltip} placement="right">
+                          <ListItemButton
+                            onClick={() => {
+                              // App.tsx's `onNavigate` already handles the
+                              // page switch + navigate-event dispatch (with
+                              // the setTimeout(0) deferral that kills the
+                              // first-click-lost race when coming from
+                              // Settings). No need to call onSwitchPage
+                              // explicitly here.
+                              onNavigate(`${scheme}://${c.id}/`);
+                            }}
+                            // Drag-drop target: dropping a Skiff selection here
+                            // starts a Skiffsync job from the dragged paths to a
+                            // user-prompted destination on the remote. Uses the
+                            // custom MIME so OS-file drags fall through to the
+                            // Browser pane's existing drop handler.
+                            onDragOver={(e) => {
+                              if (e.dataTransfer.types.includes(SKIFF_DRAG_MIME)) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "copy";
+                              }
+                            }}
+                            onDrop={(e) => {
+                              const raw = e.dataTransfer.getData(SKIFF_DRAG_MIME);
+                              if (!raw) return;
+                              e.preventDefault();
+                              const paths = raw.split("\n").filter(Boolean);
+                              if (paths.length === 0) return;
+                              const remoteDest = window.prompt(
+                                `Sync ${paths.length} item${paths.length === 1 ? "" : "s"} to ${c.label}. Destination path on remote:`,
+                                "/",
+                              );
+                              if (!remoteDest) return;
+                              for (const p of paths) {
+                                // Nest each entry under <dest>/<basename>.
+                                const segs = p.split(/[\\/]/).filter(Boolean);
+                                const base = segs.at(-1) ?? p;
+                                const target = `${scheme}://${c.id}${remoteDest.endsWith("/") ? remoteDest : remoteDest + "/"}${base}`;
+                                void startSync(p, target, {
+                                  maxSizeGb: 100,
+                                  conflictPolicy: "skip",
+                                }).catch(() => {
+                                  /* errors surface in TransfersPage */
+                                });
+                              }
+                            }}
+                            aria-label={`Browse ${kindLabel} ${c.label}`}
+                          >
+                            <ListItemIcon sx={{ minWidth: 32 }}>
+                              {settings.sidebarShowStatusDots ? (
+                                <Tooltip title={`${kindLabel} connected`}>
+                                  <CircleIcon
+                                    aria-label={`${kindLabel} status: connected`}
+                                    sx={{ fontSize: 10, color: "success.main" }}
+                                  />
+                                </Tooltip>
+                              ) : (
+                                <KindIcon fontSize="small" />
+                              )}
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={
+                                // Bug 10 (0.2.281) — protocol chip + label,
+                                // mirroring the tab strip + address-bar shape
+                                // so the user sees "FTP testuser@…" / "SMB
+                                // admin@…" in every surface that mentions a
+                                // remote connection.
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <Chip
+                                    size="small"
+                                    label={kindLabel}
+                                    sx={{
+                                      height: 16,
+                                      fontSize: 9,
+                                      fontWeight: 600,
+                                      flexShrink: 0,
+                                      "& .MuiChip-label": { px: 0.5 },
+                                    }}
+                                  />
+                                  <Typography variant="body2" noWrap sx={{ minWidth: 0, flex: 1 }}>
+                                    {c.label}
+                                  </Typography>
+                                </Box>
+                              }
+                            />
+                          </ListItemButton>
+                        </Tooltip>
+                      </ListItem>
                     );
-                    if (!remoteDest) return;
-                    for (const p of paths) {
-                      // Nest each entry under <dest>/<basename>.
-                      const segs = p.split(/[\\/]/).filter(Boolean);
-                      const base = segs.at(-1) ?? p;
-                      const target = `${scheme}://${c.id}${remoteDest.endsWith("/") ? remoteDest : remoteDest + "/"}${base}`;
-                      void startSync(p, target, {
-                        maxSizeGb: 100,
-                        conflictPolicy: "skip",
-                      }).catch(() => {
-                        /* errors surface in TransfersPage */
-                      });
-                    }
-                  }}
-                  aria-label={`Browse ${kindLabel} ${c.label}`}
-                >
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    {settings.sidebarShowStatusDots ? (
-                      <Tooltip title={`${kindLabel} connected`}>
-                        <CircleIcon
-                          aria-label={`${kindLabel} status: connected`}
-                          sx={{ fontSize: 10, color: "success.main" }}
-                        />
-                      </Tooltip>
-                    ) : (
-                      <KindIcon fontSize="small" />
-                    )}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      // Bug 10 (0.2.281) — protocol chip + label,
-                      // mirroring the tab strip + address-bar shape
-                      // so the user sees "FTP testuser@…" / "SMB
-                      // admin@…" in every surface that mentions a
-                      // remote connection.
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                          minWidth: 0,
-                        }}
-                      >
-                        <Chip
-                          size="small"
-                          label={kindLabel}
-                          sx={{
-                            height: 16,
-                            fontSize: 9,
-                            fontWeight: 600,
-                            flexShrink: 0,
-                            "& .MuiChip-label": { px: 0.5 },
-                          }}
-                        />
-                        <Typography
-                          variant="body2"
-                          noWrap
-                          sx={{ minWidth: 0, flex: 1 }}
-                        >
-                          {c.label}
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </ListItemButton>
-                </Tooltip>
-              </ListItem>
-              );
-            })}
-            <ListItem disablePadding>
-              {/* In iconOnly mode the ListItemText is hidden by the
+                  })}
+                  <ListItem disablePadding>
+                    {/* In iconOnly mode the ListItemText is hidden by the
                   parent CSS scope, so the bare HubIcon needs a
                   Tooltip to convey its purpose. Mirrors the favorites
                   pattern — empty title in expanded mode = no tooltip. */}
-              <Tooltip
-                title={settings.sidebarIconOnly ? "Manage connections" : ""}
-                placement="right"
-              >
-                <ListItemButton onClick={() => onSwitchPage("connections")}>
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <HubIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Manage connections…"
-                    slotProps={{ primary: { variant: "body2" } }}
-                  />
-                </ListItemButton>
-              </Tooltip>
-            </ListItem>
-          </List>
-        )}
-        </Box>
-        )}
+                    <Tooltip
+                      title={settings.sidebarIconOnly ? "Manage connections" : ""}
+                      placement="right"
+                    >
+                      <ListItemButton onClick={() => onSwitchPage("connections")}>
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <HubIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="Manage connections…"
+                          slotProps={{ primary: { variant: "body2" } }}
+                        />
+                      </ListItemButton>
+                    </Tooltip>
+                  </ListItem>
+                </List>
+              )}
+            </Box>
+          )}
         </Box>
 
         <Box style={{ order: orderOf("devices") }}>
-        {isVisible("devices") &&
-          renderSectionHeader(
-            "devices",
-            t("sidebar.section.devices"),
-            // Empty-mounts case renders only a Typography that's
-            // hidden by the iconOnly CSS scope above, so the header
-            // would float over empty space. Suppress the bubble.
-            // While the mount list is still loading we keep the
-            // bubble (the spinner shows up below it).
-            mounts != null && mounts.length === 0,
-          )}
-        {isVisible("devices") && !isCollapsed("devices") && (
-          mounts == null ? (
-            <Box sx={{ px: 2, py: 0.5 }} id="sidebar-section-devices">
-              <CircularProgress size={14} />
-            </Box>
-          ) : mounts.length === 0 ? (
-            <Typography
-              variant="caption"
-              sx={{ px: 2, color: "text.disabled", display: "block" }}
-              id="sidebar-section-devices"
-            >
-              No mounted volumes
-            </Typography>
-          ) : (
-            <List dense disablePadding id="sidebar-section-devices">
-              {mounts.map((m) => (
-                <ListItem key={m.mountPoint} disablePadding>
-                  <Tooltip
-                    title={
-                      settings.sidebarIconOnly
-                        ? `${m.name}${m.total > 0 ? ` · ${formatBytes(m.free)} free of ${formatBytes(m.total)}` : ""}`
-                        : ""
-                    }
-                    placement="right"
-                  >
-                  <ListItemButton
-                    onClick={() => onNavigate(m.mountPoint)}
-                    title={`${m.mountPoint}${m.total > 0 ? ` · ${formatBytes(m.free)} free of ${formatBytes(m.total)}` : ""}`}
-                  >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      {m.removable ? (
-                        <UsbIcon fontSize="small" />
-                      ) : (
-                        <StorageIcon fontSize="small" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={m.name}
-                      secondary={
-                        m.total > 0
-                          ? `${formatBytes(m.free)} free`
-                          : undefined
+          {isVisible("devices") &&
+            renderSectionHeader(
+              "devices",
+              t("sidebar.section.devices"),
+              // Empty-mounts case renders only a Typography that's
+              // hidden by the iconOnly CSS scope above, so the header
+              // would float over empty space. Suppress the bubble.
+              // While the mount list is still loading we keep the
+              // bubble (the spinner shows up below it).
+              mounts != null && mounts.length === 0,
+            )}
+          {isVisible("devices") &&
+            !isCollapsed("devices") &&
+            (mounts == null ? (
+              <Box sx={{ px: 2, py: 0.5 }} id="sidebar-section-devices">
+                <CircularProgress size={14} />
+              </Box>
+            ) : mounts.length === 0 ? (
+              <Typography
+                variant="caption"
+                sx={{ px: 2, color: "text.disabled", display: "block" }}
+                id="sidebar-section-devices"
+              >
+                No mounted volumes
+              </Typography>
+            ) : (
+              <List dense disablePadding id="sidebar-section-devices">
+                {mounts.map((m) => (
+                  <ListItem key={m.mountPoint} disablePadding>
+                    <Tooltip
+                      title={
+                        settings.sidebarIconOnly
+                          ? `${m.name}${m.total > 0 ? ` · ${formatBytes(m.free)} free of ${formatBytes(m.total)}` : ""}`
+                          : ""
                       }
-                      slotProps={{
-                        primary: { variant: "body2", noWrap: true },
-                        secondary: { variant: "caption" },
-                      }}
-                    />
-                  </ListItemButton>
-                  </Tooltip>
-                </ListItem>
-              ))}
-            </List>
-          )
-        )}
+                      placement="right"
+                    >
+                      <ListItemButton
+                        onClick={() => onNavigate(m.mountPoint)}
+                        title={`${m.mountPoint}${m.total > 0 ? ` · ${formatBytes(m.free)} free of ${formatBytes(m.total)}` : ""}`}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          {m.removable ? (
+                            <UsbIcon fontSize="small" />
+                          ) : (
+                            <StorageIcon fontSize="small" />
+                          )}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={m.name}
+                          secondary={m.total > 0 ? `${formatBytes(m.free)} free` : undefined}
+                          slotProps={{
+                            primary: { variant: "body2", noWrap: true },
+                            secondary: { variant: "caption" },
+                          }}
+                        />
+                      </ListItemButton>
+                    </Tooltip>
+                  </ListItem>
+                ))}
+              </List>
+            ))}
         </Box>
       </Box>
 
@@ -2157,10 +2010,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
             title={settings.sidebarIconOnly ? t("sidebar.nav.settings") : ""}
             placement="right"
           >
-            <ListItemButton
-              selected={page === "settings"}
-              onClick={() => onSwitchPage("settings")}
-            >
+            <ListItemButton selected={page === "settings"} onClick={() => onSwitchPage("settings")}>
               <ListItemIcon
                 sx={{
                   minWidth: settings.sidebarIconOnly ? undefined : 32,
@@ -2174,18 +2024,10 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
         </ListItem>
         <ListItem disablePadding>
           <Tooltip
-            title={
-              settings.sidebarIconOnly
-                ? "Expand sidebar"
-                : "Collapse sidebar"
-            }
+            title={settings.sidebarIconOnly ? "Expand sidebar" : "Collapse sidebar"}
             placement="right"
           >
-            <ListItemButton
-              onClick={() =>
-                update("sidebarIconOnly", !settings.sidebarIconOnly)
-              }
-            >
+            <ListItemButton onClick={() => update("sidebarIconOnly", !settings.sidebarIconOnly)}>
               <ListItemIcon
                 sx={{
                   minWidth: settings.sidebarIconOnly ? undefined : 32,
@@ -2197,13 +2039,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                   <KeyboardDoubleArrowLeftIcon fontSize="small" />
                 )}
               </ListItemIcon>
-              <ListItemText
-                primary={
-                  settings.sidebarIconOnly
-                    ? "Expand"
-                    : "Collapse"
-                }
-              />
+              <ListItemText primary={settings.sidebarIconOnly ? "Expand" : "Collapse"} />
             </ListItemButton>
           </Tooltip>
         </ListItem>
@@ -2232,10 +2068,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
       />
       {/* Per-section context menu. Sidebar rows set up their own
           actions; this just renders whatever's in `contextMenu`. */}
-      <SidebarContextMenu
-        state={contextMenu}
-        onClose={() => setContextMenu(null)}
-      />
+      <SidebarContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />
       {/* Overflow surface for the Recent section. Sidebar only renders
           the top N entries; this dialog surfaces the full history. */}
       <RecentPathsDialog

@@ -5,12 +5,7 @@
 // the `readLegacyJson` parse-error path (line 166 — malformed JSON
 // in localStorage must NOT crash the migration).
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  ftpToConn,
-  migrateLegacyDrafts,
-  smbToConn,
-  type SavedConnection,
-} from "./connectionStore";
+import { ftpToConn, migrateLegacyDrafts, smbToConn, type SavedConnection } from "./connectionStore";
 
 beforeEach(() => {
   localStorage.clear();
@@ -52,9 +47,7 @@ describe("migrateLegacyDrafts — SMB legacy shape", () => {
     // host (which would crash dispatch downstream).
     localStorage.setItem(
       "skiff-files.connections.smb.v1",
-      JSON.stringify([
-        { id: "bad", label: "broken", port: 445, user: "admin" },
-      ]),
+      JSON.stringify([{ id: "bad", label: "broken", port: 445, user: "admin" }]),
     );
     const out = migrateLegacyDrafts([]);
     expect(out).toHaveLength(0);
@@ -101,10 +94,7 @@ describe("migrateLegacyDrafts — malformed JSON guard", () => {
     // readLegacyJson catches the JSON.parse failure and returns [].
     // The migration must complete without throwing so a single
     // corrupt key doesn't lock the user out of every other saved row.
-    localStorage.setItem(
-      "skiff-files.connections.v1",
-      "{ this isn't valid JSON",
-    );
+    localStorage.setItem("skiff-files.connections.v1", "{ this isn't valid JSON");
     localStorage.setItem(
       "skiff-files.connections.ftp.v1",
       JSON.stringify([

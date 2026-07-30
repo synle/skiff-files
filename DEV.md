@@ -30,11 +30,11 @@ Need real remote servers to develop against? There's a docker-based harness in [
 
 Saved connection passwords (and any future SFTP key passphrases) live in the **OS keychain**, never on disk. Implementation: [`src-tauri/src/creds.rs`](./src-tauri/src/creds.rs), backed by the `keyring` crate which speaks the native API of each platform:
 
-| Platform | Backend | Audit / management UI |
-|----------|---------|------------------------|
-| macOS    | Keychain (`Security.framework`) | **Keychain Access.app** (`/System/Applications/Utilities/`) |
-| Windows  | Credential Manager (`wincred` + per-user DPAPI) | **Control Panel → User Accounts → Credential Manager → Windows Credentials** |
-| Linux    | libsecret over D-Bus (GNOME Keyring / KWallet / KeePassXC) | **Seahorse** (`seahorse`) or the equivalent for your keyring daemon |
+| Platform | Backend                                                    | Audit / management UI                                                        |
+| -------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| macOS    | Keychain (`Security.framework`)                            | **Keychain Access.app** (`/System/Applications/Utilities/`)                  |
+| Windows  | Credential Manager (`wincred` + per-user DPAPI)            | **Control Panel → User Accounts → Credential Manager → Windows Credentials** |
+| Linux    | libsecret over D-Bus (GNOME Keyring / KWallet / KeePassXC) | **Seahorse** (`seahorse`) or the equivalent for your keyring daemon          |
 
 The OS encrypts the secret at rest with the user session and refuses to release it to another user or process on the same machine. Only the Skiff Files binary running as the current user can read its own entries.
 
@@ -57,7 +57,7 @@ The keychain only returns secrets to the user who wrote them, so this works on t
 
 1. Open **Keychain Access** (Spotlight: `keychain access`).
 2. In the search box top-right, search for **`com.synle.skiff-files`**.
-3. Each saved connection appears as an *application password* with name `com.synle.skiff-files` and account `auth:<connection-id>`.
+3. Each saved connection appears as an _application password_ with name `com.synle.skiff-files` and account `auth:<connection-id>`.
 4. Double-click → tick **Show password** → enter your macOS login password to reveal.
 
 **macOS — CLI**

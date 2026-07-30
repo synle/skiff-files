@@ -8,15 +8,7 @@
 // those policies already exist in the engine — the UI just needs to
 // dispatch a sync_resume + a policy change. That refinement lands in
 // 0.1.8 once we have a way to update a running job's options.
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Dialog, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import {
   onConflict,
@@ -29,15 +21,7 @@ import { useSettings } from "../state/settings";
 
 /** Side-by-side metadata block. Shows the same fields TeraCopy does:
  *  size, mtime, with "Same date / Same size" badges when applicable. */
-function MetaBlock({
-  label,
-  size,
-  mtime,
-}: {
-  label: string;
-  size: number;
-  mtime: number | null;
-}) {
+function MetaBlock({ label, size, mtime }: { label: string; size: number; mtime: number | null }) {
   return (
     <Box
       sx={{
@@ -106,9 +90,7 @@ export default function ConflictModal() {
   if (!head) return null;
   const sameSize = head.srcSize === head.destSize;
   const sameMtime =
-    head.srcMtime != null &&
-    head.destMtime != null &&
-    head.srcMtime === head.destMtime;
+    head.srcMtime != null && head.destMtime != null && head.srcMtime === head.destMtime;
 
   return (
     <Dialog
@@ -128,16 +110,8 @@ export default function ConflictModal() {
           </Typography>
 
           <Stack direction="row" spacing={1.5}>
-            <MetaBlock
-              label="Source"
-              size={head.srcSize}
-              mtime={head.srcMtime}
-            />
-            <MetaBlock
-              label="Destination"
-              size={head.destSize}
-              mtime={head.destMtime}
-            />
+            <MetaBlock label="Source" size={head.srcSize} mtime={head.srcMtime} />
+            <MetaBlock label="Destination" size={head.destSize} mtime={head.destMtime} />
           </Stack>
 
           {(sameSize || sameMtime) && (
@@ -173,33 +147,18 @@ export default function ConflictModal() {
 
           <Stack spacing={1.5}>
             {/* Per-file row */}
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ flexWrap: "wrap" }}
-              useFlexGap
-            >
-              <Button
-                variant="contained"
-                onClick={() => void decide("overwrite")}
-              >
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }} useFlexGap>
+              <Button variant="contained" onClick={() => void decide("overwrite")}>
                 Overwrite
               </Button>
               <Button variant="outlined" onClick={() => void decide("skip")}>
                 Skip
               </Button>
-              <Button
-                variant="outlined"
-                onClick={() => void decide("keepBoth")}
-              >
+              <Button variant="outlined" onClick={() => void decide("keepBoth")}>
                 Keep both
               </Button>
               <Box sx={{ flex: 1 }} />
-              <Button
-                variant="text"
-                color="error"
-                onClick={() => void decide("cancelJob")}
-              >
+              <Button variant="text" color="error" onClick={() => void decide("cancelJob")}>
                 Cancel job
               </Button>
             </Stack>
@@ -212,31 +171,14 @@ export default function ConflictModal() {
                 <Typography variant="caption" color="text.secondary">
                   Apply to all {queue.length} pending conflicts:
                 </Typography>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ flexWrap: "wrap" }}
-                  useFlexGap
-                >
-                  <Button
-                    size="small"
-                    variant="text"
-                    onClick={() => void decide("overwriteAll")}
-                  >
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }} useFlexGap>
+                  <Button size="small" variant="text" onClick={() => void decide("overwriteAll")}>
                     Overwrite all
                   </Button>
-                  <Button
-                    size="small"
-                    variant="text"
-                    onClick={() => void decide("skipAll")}
-                  >
+                  <Button size="small" variant="text" onClick={() => void decide("skipAll")}>
                     Skip all
                   </Button>
-                  <Button
-                    size="small"
-                    variant="text"
-                    onClick={() => void decide("keepBothAll")}
-                  >
+                  <Button size="small" variant="text" onClick={() => void decide("keepBothAll")}>
                     Keep both for all
                   </Button>
                 </Stack>

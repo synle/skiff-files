@@ -13,9 +13,9 @@ export type Backend =
   // bind a single share at create time, so the connectionId encodes
   // (host, port, user, share) and the remotePath is share-relative.
   | { kind: "smb"; connectionId: string }
-//
-// (the existing variants follow — kept as one union for grep-ability)
-//
+  //
+  // (the existing variants follow — kept as one union for grep-ability)
+  //
   | { kind: "local" }
   | { kind: "sftp"; connectionId: string }
   | { kind: "ftp"; connectionId: string };
@@ -68,10 +68,7 @@ export function parseLocation(path: string): Location {
   return { backend: { kind: "local" }, remotePath: path };
 }
 
-function splitRemote(
-  path: string,
-  prefix: string,
-): { id: string; remote: string } {
+function splitRemote(path: string, prefix: string): { id: string; remote: string } {
   const rest = path.slice(prefix.length);
   const slash = rest.indexOf("/");
   const id = slash < 0 ? rest : rest.slice(0, slash);
@@ -120,9 +117,5 @@ export function formatLocation(loc: Location): string {
  *  same uniform remote semantics as SFTP and FTP from this point
  *  forward. */
 export function isRemote(path: string): boolean {
-  return (
-    path.startsWith(SFTP_PREFIX) ||
-    path.startsWith(FTP_PREFIX) ||
-    path.startsWith(SMB_PREFIX)
-  );
+  return path.startsWith(SFTP_PREFIX) || path.startsWith(FTP_PREFIX) || path.startsWith(SMB_PREFIX);
 }

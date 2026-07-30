@@ -148,9 +148,7 @@ describe("BrowserTabs — extras", () => {
     r();
     fireEvent.contextMenu(screen.getAllByRole("tab")[0]);
     fireEvent.click(screen.getByText(/^Bookmark this folder$/));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect((stored.bookmarks ?? []).length).toBe(1);
   });
 

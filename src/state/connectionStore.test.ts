@@ -196,11 +196,7 @@ describe("migrateLegacyDrafts — idempotency (Bug 13)", () => {
 
 describe("matchConnectionsForHost", () => {
   it("filters by kind + host + port triple", () => {
-    const list: SavedConnection[] = [
-      sftp,
-      { ...sftp, id: "s-2", port: 2222 },
-      ftp,
-    ];
+    const list: SavedConnection[] = [sftp, { ...sftp, id: "s-2", port: 2222 }, ftp];
     expect(matchConnectionsForHost(list, "sftp", "host", 22)).toHaveLength(1);
     expect(matchConnectionsForHost(list, "sftp", "host", 2222)).toHaveLength(1);
     // Wrong kind → no match.
@@ -208,17 +204,12 @@ describe("matchConnectionsForHost", () => {
   });
 
   it("port=null matches any port on the host", () => {
-    const list: SavedConnection[] = [
-      sftp,
-      { ...sftp, id: "s-2", port: 2222 },
-    ];
+    const list: SavedConnection[] = [sftp, { ...sftp, id: "s-2", port: 2222 }];
     expect(matchConnectionsForHost(list, "sftp", "host", null)).toHaveLength(2);
   });
 
   it("host match is case-insensitive", () => {
-    expect(
-      matchConnectionsForHost([sftp], "sftp", "HOST", 22),
-    ).toHaveLength(1);
+    expect(matchConnectionsForHost([sftp], "sftp", "HOST", 22)).toHaveLength(1);
   });
 });
 
@@ -227,7 +218,6 @@ describe("matchConnectionsForHost", () => {
 // routing tuple compute the same id and `addOrUpdateConnection`
 // replaces in place. See `src/util/connectionUrl.test.ts` and the
 // "addOrUpdateConnection" suite above for the new contract.
-
 
 describe("moveConnection", () => {
   const a: SavedConnection = { ...sftp, id: "a" };

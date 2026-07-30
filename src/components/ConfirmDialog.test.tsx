@@ -59,9 +59,7 @@ describe("ConfirmDialog", () => {
     const { onConfirm } = r({ confirmLabel: "Move to Trash" });
     // There are two "Move to Trash" texts (title + button); use
     // role to disambiguate.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Move to Trash" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Move to Trash" }));
     expect(onConfirm).toHaveBeenCalled();
   });
 });

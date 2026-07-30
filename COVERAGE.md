@@ -8,22 +8,22 @@ Captured against the current test suite minus `src/App.test.tsx` (pre-existing h
 
 ### Frontend
 
-| Metric | Baseline | CI floor |
-|---|---|---|
-| Lines | **39.71%** | 38 |
-| Statements | **38.06%** | 37 |
-| Branches | **35.91%** | 34 |
-| Functions | **31.66%** | 30 |
+| Metric     | Baseline   | CI floor |
+| ---------- | ---------- | -------- |
+| Lines      | **39.71%** | 38       |
+| Statements | **38.06%** | 37       |
+| Branches   | **35.91%** | 34       |
+| Functions  | **31.66%** | 30       |
 
 Floors live in `vite.config.ts → test.coverage.thresholds`. Vitest's `--coverage` flag fails the run when any of the four falls below its floor.
 
 ### Rust
 
-| Metric | Baseline | CI floor |
-|---|---|---|
-| Regions | **54.43%** | 54 |
-| Functions | **42.97%** | 42 |
-| Lines | **52.85%** | 52 |
+| Metric    | Baseline   | CI floor |
+| --------- | ---------- | -------- |
+| Regions   | **54.43%** | 54       |
+| Functions | **42.97%** | 42       |
+| Lines     | **52.85%** | 52       |
 
 Floors are passed inline to `cargo llvm-cov` via `--fail-under-lines` / `--fail-under-functions` / `--fail-under-regions` in [`build.yml`](./.github/workflows/build.yml).
 

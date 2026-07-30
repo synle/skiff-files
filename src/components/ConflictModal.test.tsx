@@ -21,9 +21,7 @@ beforeEach(() => {
 function renderAndCapture(): {
   fire: (payload: Record<string, unknown>) => void;
 } {
-  let handler:
-    | ((event: { payload: Record<string, unknown> }) => void)
-    | null = null;
+  let handler: ((event: { payload: Record<string, unknown> }) => void) | null = null;
   mockedListen.mockImplementationOnce(async (eventName, cb) => {
     if (eventName === "sync:conflict") {
       handler = cb as typeof handler;
@@ -41,8 +39,7 @@ function renderAndCapture(): {
     fire: (payload) => {
       // The listener mounts inside an async useEffect — block until it
       // registers the callback, then fire.
-      const tick = () =>
-        new Promise<void>((resolve) => setTimeout(resolve, 0));
+      const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
       void (async () => {
         // Drain microtasks until the handler is set.
         for (let i = 0; i < 20 && !handler; i++) {
@@ -72,18 +69,14 @@ const samplePayload = {
 describe("ConflictModal", () => {
   it("does not render until a conflict event fires", () => {
     renderAndCapture();
-    expect(
-      screen.queryByText(/Destination file already exists/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Destination file already exists/)).not.toBeInTheDocument();
   });
 
   it("renders the dest path + Same-size + Same-date badges when applicable", async () => {
     const { fire } = renderAndCapture();
     fire(samplePayload);
     await waitFor(() => {
-      expect(
-        screen.getByText("Destination file already exists"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Destination file already exists")).toBeInTheDocument();
     });
     expect(screen.getByText("/dest/a.txt")).toBeInTheDocument();
     expect(screen.getByText("Same size")).toBeInTheDocument();
@@ -93,9 +86,7 @@ describe("ConflictModal", () => {
   it("Overwrite invokes sync_resolve_conflict with overwrite", async () => {
     const { fire } = renderAndCapture();
     fire(samplePayload);
-    await waitFor(() =>
-      expect(screen.getByText("Overwrite")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Overwrite")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Overwrite"));
     await waitFor(() => {
       expect(mockedInvoke).toHaveBeenCalledWith("sync_resolve_conflict", {
@@ -109,9 +100,7 @@ describe("ConflictModal", () => {
   it("Skip / Keep both / Cancel job each map to the right decision", async () => {
     const { fire } = renderAndCapture();
     fire(samplePayload);
-    await waitFor(() =>
-      expect(screen.getByText("Skip")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Skip")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Skip"));
     await waitFor(() =>
       expect(mockedInvoke).toHaveBeenCalledWith(
@@ -122,9 +111,7 @@ describe("ConflictModal", () => {
 
     // Fire a second event to test KeepBoth.
     fire({ ...samplePayload, conflictId: "c-2" });
-    await waitFor(() =>
-      expect(screen.getByText("Keep both")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Keep both")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Keep both"));
     await waitFor(() =>
       expect(mockedInvoke).toHaveBeenCalledWith(
@@ -134,9 +121,7 @@ describe("ConflictModal", () => {
     );
 
     fire({ ...samplePayload, conflictId: "c-3" });
-    await waitFor(() =>
-      expect(screen.getByText("Cancel job")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Cancel job")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Cancel job"));
     await waitFor(() =>
       expect(mockedInvoke).toHaveBeenCalledWith(
@@ -150,9 +135,7 @@ describe("ConflictModal", () => {
     const { fire } = renderAndCapture();
     fire({ ...samplePayload, conflictId: "c-1" });
     fire({ ...samplePayload, conflictId: "c-2", dest: "/dest/b.txt" });
-    await waitFor(() =>
-      expect(screen.getByText("Overwrite all")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Overwrite all")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Overwrite all"));
     await waitFor(() =>
       expect(mockedInvoke).toHaveBeenCalledWith(
@@ -165,9 +148,7 @@ describe("ConflictModal", () => {
   it("Apply-to-all row is hidden for single-conflict prompts", async () => {
     const { fire } = renderAndCapture();
     fire(samplePayload);
-    await waitFor(() =>
-      expect(screen.getByText("Overwrite")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Overwrite")).toBeInTheDocument());
     expect(screen.queryByText("Overwrite all")).not.toBeInTheDocument();
   });
 
@@ -175,14 +156,10 @@ describe("ConflictModal", () => {
     const { fire } = renderAndCapture();
     fire({ ...samplePayload, conflictId: "c-1" });
     fire({ ...samplePayload, conflictId: "c-2", dest: "/dest/b.txt" });
-    await waitFor(() =>
-      expect(screen.getByText("/dest/a.txt")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("/dest/a.txt")).toBeInTheDocument());
     // Queue length indicator visible.
     expect(screen.getByText(/1 more conflict/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("Skip"));
-    await waitFor(() =>
-      expect(screen.getByText("/dest/b.txt")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("/dest/b.txt")).toBeInTheDocument());
   });
 });

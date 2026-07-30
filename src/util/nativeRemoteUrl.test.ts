@@ -59,20 +59,14 @@ describe("toNativeRemoteUrl", () => {
   it("translates bound-share SMB by injecting the share back", () => {
     // Internal URL has the form `smb://uuid/<rel>` because the
     // connection bound `share=Public` at session-setup.
-    const got = toNativeRemoteUrl(
-      "smb://smb-1/folder/file.png",
-      [SMB_BOUND],
-    );
+    const got = toNativeRemoteUrl("smb://smb-1/folder/file.png", [SMB_BOUND]);
     expect(got.url).toBe("smb://admin@nas.local/Public/folder/file.png");
   });
 
   it("translates share-agnostic SMB preserving the share segment", () => {
     // Internal URL has the form `smb://uuid/<share>/<rel>` because
     // the connection didn't bind a share at setup.
-    const got = toNativeRemoteUrl(
-      "smb://smb-2/Public/folder/file.png",
-      [SMB_AGNOSTIC],
-    );
+    const got = toNativeRemoteUrl("smb://smb-2/Public/folder/file.png", [SMB_AGNOSTIC]);
     expect(got.url).toBe("smb://admin@nas.local/Public/folder/file.png");
   });
 
@@ -107,10 +101,7 @@ describe("toNativeRemoteUrl", () => {
   });
 
   it("returns null when the connection id is unknown", () => {
-    const got = toNativeRemoteUrl(
-      "smb://00000000-0000-0000-0000-000000000000/x",
-      [SMB_BOUND],
-    );
+    const got = toNativeRemoteUrl("smb://00000000-0000-0000-0000-000000000000/x", [SMB_BOUND]);
     expect(got.url).toBeNull();
     expect(got.reason).toMatch(/Unknown connection/);
   });

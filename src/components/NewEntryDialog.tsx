@@ -75,8 +75,7 @@ export default function NewEntryDialog({
 
   const trimmed = name.trim();
   const collides = trimmed.length > 0 && existingNames.has(trimmed);
-  const hasSeparator =
-    trimmed.includes("/") || trimmed.includes("\\");
+  const hasSeparator = trimmed.includes("/") || trimmed.includes("\\");
   const submitDisabled = busy || trimmed.length === 0 || collides || hasSeparator;
 
   const submit = async () => {
@@ -105,11 +104,7 @@ export default function NewEntryDialog({
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ wordBreak: "break-all" }}
-          >
+          <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-all" }}>
             {parentPath}
           </Typography>
           <TextField
@@ -141,11 +136,7 @@ export default function NewEntryDialog({
         <Button onClick={onClose} disabled={busy}>
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => void submit()}
-          disabled={submitDisabled}
-        >
+        <Button variant="contained" onClick={() => void submit()} disabled={submitDisabled}>
           {submitLabel}
         </Button>
       </DialogActions>

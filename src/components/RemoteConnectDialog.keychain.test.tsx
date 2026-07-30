@@ -12,9 +12,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import { SettingsProvider, useSettings } from "../state/settings";
-import RemoteConnectDialog, {
-  type RemoteConnectRequest,
-} from "./RemoteConnectDialog";
+import RemoteConnectDialog, { type RemoteConnectRequest } from "./RemoteConnectDialog";
 
 vi.mock("../api/conn", () => ({
   connCreateSftp: vi.fn(async () => "sftp-uuid"),
@@ -50,11 +48,7 @@ function ConnectionsProbe() {
   // Exposes the live settings.connections array to the test so it
   // can inspect what got persisted after the connect flow runs.
   const { settings } = useSettings();
-  return (
-    <div data-testid="connections-json">
-      {JSON.stringify(settings.connections)}
-    </div>
-  );
+  return <div data-testid="connections-json">{JSON.stringify(settings.connections)}</div>;
 }
 
 function SettingFlipper({ flag }: { flag: boolean }) {
@@ -72,20 +66,12 @@ function SettingFlipper({ flag }: { flag: boolean }) {
   return null;
 }
 
-function renderDialog(
-  request: RemoteConnectRequest,
-  saveToKeychain: boolean,
-) {
+function renderDialog(request: RemoteConnectRequest, saveToKeychain: boolean) {
   render(
     <ThemeProvider theme={theme}>
       <SettingsProvider>
         <SettingFlipper flag={saveToKeychain} />
-        <RemoteConnectDialog
-          open
-          request={request}
-          onClose={vi.fn()}
-          onConnected={vi.fn()}
-        />
+        <RemoteConnectDialog open request={request} onClose={vi.fn()} onConnected={vi.fn()} />
         <ConnectionsProbe />
       </SettingsProvider>
     </ThemeProvider>,
@@ -111,9 +97,7 @@ async function fillAndConnect(opts: {
   }
   if (opts.expectHelperContains) {
     await waitFor(() => {
-      expect(
-        screen.getByText(new RegExp(opts.expectHelperContains!, "i")),
-      ).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(opts.expectHelperContains!, "i"))).toBeInTheDocument();
     });
   }
   fireEvent.click(screen.getByRole("button", { name: /Connect/i }));
@@ -130,10 +114,7 @@ function parseConnections(): Array<{
 
 describe("RemoteConnectDialog — Remember password store routing", () => {
   it("keychain ON + capable + Remember ON → credsStore called, settings.json carries no password", async () => {
-    renderDialog(
-      { scheme: "ftp", host: "10.0.0.1", port: 21, remotePath: "/" },
-      true,
-    );
+    renderDialog({ scheme: "ftp", host: "10.0.0.1", port: 21, remotePath: "/" }, true);
     await fillAndConnect({
       remember: true,
       expectHelperContains: "Stored in the OS keychain",
@@ -158,10 +139,7 @@ describe("RemoteConnectDialog — Remember password store routing", () => {
   });
 
   it("keychain OFF + Remember ON → settings.json holds the plaintext, no credsStore call", async () => {
-    renderDialog(
-      { scheme: "ftp", host: "10.0.0.2", port: 21, remotePath: "/" },
-      false,
-    );
+    renderDialog({ scheme: "ftp", host: "10.0.0.2", port: 21, remotePath: "/" }, false);
     await fillAndConnect({ remember: true });
     await waitFor(() => {
       const rows = parseConnections();
@@ -176,10 +154,7 @@ describe("RemoteConnectDialog — Remember password store routing", () => {
 
   it("keychain unavailable falls back to plaintext even when the setting is on", async () => {
     credsCapable.mockResolvedValueOnce(false);
-    renderDialog(
-      { scheme: "ftp", host: "10.0.0.3", port: 21, remotePath: "/" },
-      true,
-    );
+    renderDialog({ scheme: "ftp", host: "10.0.0.3", port: 21, remotePath: "/" }, true);
     await fillAndConnect({ remember: true });
     await waitFor(() => {
       const rows = parseConnections();
@@ -190,10 +165,7 @@ describe("RemoteConnectDialog — Remember password store routing", () => {
   });
 
   it("Remember password OFF → nothing persisted in either store; keychain still gets a defensive delete", async () => {
-    renderDialog(
-      { scheme: "ftp", host: "10.0.0.4", port: 21, remotePath: "/" },
-      true,
-    );
+    renderDialog({ scheme: "ftp", host: "10.0.0.4", port: 21, remotePath: "/" }, true);
     await fillAndConnect({ remember: false });
     await waitFor(() => {
       const rows = parseConnections();

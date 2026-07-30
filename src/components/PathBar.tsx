@@ -59,27 +59,24 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
   // strip in `BrowserTabs` already uses. Outside Tauri (test runs) the
   // initial `connList()` rejects and we keep the empty map; the
   // breadcrumb gracefully falls back to the UUID.
-  const [connMap, setConnMap] = useState<Map<string, ConnectionInfo>>(
-    new Map(),
-  );
+  const [connMap, setConnMap] = useState<Map<string, ConnectionInfo>>(new Map());
   useEffect(() => {
     const refresh = () => {
       void connList()
         .then((list) => setConnMap(new Map(list.map((c) => [c.id, c]))))
-        .catch(() => { /* outside Tauri — keep empty */ });
+        .catch(() => {
+          /* outside Tauri — keep empty */
+        });
     };
     refresh();
     window.addEventListener("skiff:connections-changed", refresh);
-    return () =>
-      window.removeEventListener("skiff:connections-changed", refresh);
+    return () => window.removeEventListener("skiff:connections-changed", refresh);
   }, []);
 
   // `id → label` view of the connMap that `humanizeRemoteUrl` consumes
   // directly. Recomputed when `connMap` changes; cheap enough to skip
   // a useMemo cache.
-  const labelMap = new Map(
-    Array.from(connMap.entries(), ([id, info]) => [id, info.label]),
-  );
+  const labelMap = new Map(Array.from(connMap.entries(), ([id, info]) => [id, info.label]));
   /** Always return the user-facing form of a path. Remote paths get
    *  their UUID prefix swapped for the friendly host label so the
    *  address bar reads `smb://admin@host:445/G/sub` instead of
@@ -99,9 +96,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
     setDraft(humanize(path));
     // Wait a tick so the TextField mounts before we focus / select.
     queueMicrotask(() => {
-      const el = document.querySelector<HTMLInputElement>(
-        'input[aria-label="Path"]',
-      );
+      const el = document.querySelector<HTMLInputElement>('input[aria-label="Path"]');
       el?.focus();
       el?.select();
     });
@@ -112,7 +107,9 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
   /** Cache of the last parent listing, keyed by parent path. Avoids
    *  re-issuing list_dir on every Tab press. Cleared when the parent
    *  changes (the next Tab refetches). */
-  const cacheRef = useRef<{ parent: string; entries: { name: string; isDir: boolean }[] } | null>(null);
+  const cacheRef = useRef<{ parent: string; entries: { name: string; isDir: boolean }[] } | null>(
+    null,
+  );
 
   // Keep the draft in sync with the current path so the next edit-mode
   // opening starts from the latest value. We deliberately skip the sync
@@ -125,7 +122,6 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, connMap, editing]);
 
-
   const segments = pathSegments(path);
   // Remote-aware breadcrumb shape: when the path is `smb://<uuid>/…`
   // we render a protocol chip + the friendly connection label in
@@ -135,9 +131,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
   const loc = parseLocation(path);
   const isRemoteLoc = loc.backend.kind !== "local";
   const remoteConn =
-    loc.backend.kind !== "local"
-      ? connMap.get(loc.backend.connectionId) ?? null
-      : null;
+    loc.backend.kind !== "local" ? (connMap.get(loc.backend.connectionId) ?? null) : null;
   // Skip the leading "/" segment AND, for remote paths, the
   // connection-id segment — both are replaced by the protocol chip
   // + friendly label rendered separately. Local paths keep their
@@ -167,9 +161,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
       // label (`...:445`) for the same connection — otherwise the
       // shorter prefix would match `/G/sub` as the remote path tail
       // and we'd lose the share binding.
-      const sorted = [...connMap.entries()].sort(
-        (a, b) => b[1].label.length - a[1].label.length,
-      );
+      const sorted = [...connMap.entries()].sort((a, b) => b[1].label.length - a[1].label.length);
       for (const [id, info] of sorted) {
         const friendlyPrefix = `${info.kind}://${info.label}`;
         if (target === friendlyPrefix || target.startsWith(friendlyPrefix + "/")) {
@@ -192,9 +184,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
       const req = parseRemoteUrl(target);
       if (req) {
         setEditing(false);
-        window.dispatchEvent(
-          new CustomEvent("skiff:connect-to-remote", { detail: req }),
-        );
+        window.dispatchEvent(new CustomEvent("skiff:connect-to-remote", { detail: req }));
         return;
       }
       onNavigate(target);
@@ -289,9 +279,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
             // Protocol chip — SMB / SFTP / FTP — same shape the tab
             // strip uses. Tooltip carries the raw connection id so
             // users can still copy/paste the UUID if they need to.
-            <Tooltip
-              title={`${loc.backend.kind.toUpperCase()} · ${loc.backend.connectionId}`}
-            >
+            <Tooltip title={`${loc.backend.kind.toUpperCase()} · ${loc.backend.connectionId}`}>
               <Chip
                 size="small"
                 label={loc.backend.kind.toUpperCase()}
@@ -306,21 +294,22 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
               />
             </Tooltip>
           )}
-          {isRemoteLoc && remoteConn && (
-            // Friendly registry label (e.g. `admin@192.168.1.1:445/G`)
-            // replacing the raw UUID at the start of the breadcrumb.
-            // Clickable — navigates to the connection root.
-            <Link
-              component="button"
-              onClick={() => onNavigate(segments[0]?.path ?? path)}
-              underline="hover"
-              color="inherit"
-              title={remoteConn.label}
-              sx={{ fontSize: "0.875rem", fontWeight: 500, whiteSpace: "nowrap" }}
-            >
-              {remoteConn.label}
-            </Link>
-          )}
+          {isRemoteLoc &&
+            remoteConn && (
+              // Friendly registry label (e.g. `admin@192.168.1.1:445/G`)
+              // replacing the raw UUID at the start of the breadcrumb.
+              // Clickable — navigates to the connection root.
+              <Link
+                component="button"
+                onClick={() => onNavigate(segments[0]?.path ?? path)}
+                underline="hover"
+                color="inherit"
+                title={remoteConn.label}
+                sx={{ fontSize: "0.875rem", fontWeight: 500, whiteSpace: "nowrap" }}
+              >
+                {remoteConn.label}
+              </Link>
+            )}
           <Breadcrumbs
             sx={{ flexGrow: 1, overflow: "hidden", minWidth: 0 }}
             maxItems={6}
@@ -368,11 +357,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
       )}
 
       <Tooltip title={editing ? "Cancel" : "Edit path"}>
-        <IconButton
-          size="small"
-          onClick={() => setEditing((e) => !e)}
-          aria-label="Edit path"
-        >
+        <IconButton size="small" onClick={() => setEditing((e) => !e)} aria-label="Edit path">
           <EditIcon fontSize="small" />
         </IconButton>
       </Tooltip>
@@ -381,9 +366,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
         open={segMenu != null}
         onClose={() => setSegMenu(null)}
         anchorReference="anchorPosition"
-        anchorPosition={
-          segMenu ? { top: segMenu.y, left: segMenu.x } : undefined
-        }
+        anchorPosition={segMenu ? { top: segMenu.y, left: segMenu.x } : undefined}
         slotProps={{ list: { dense: true } }}
       >
         <MenuItem
@@ -397,9 +380,7 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
         <MenuItem
           onClick={() => {
             if (segMenu) {
-              window.dispatchEvent(
-                new CustomEvent(OPEN_IN_TAB_EVENT, { detail: segMenu.segPath }),
-              );
+              window.dispatchEvent(new CustomEvent(OPEN_IN_TAB_EVENT, { detail: segMenu.segPath }));
             }
             setSegMenu(null);
           }}

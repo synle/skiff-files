@@ -67,14 +67,10 @@ function saveJson<T>(key: string, list: T[]): void {
   }
 }
 
-export const loadSftpDrafts = (): SftpDraft[] =>
-  loadJson<SftpDraft>(SFTP_STORAGE_KEY);
-export const saveSftpDrafts = (drafts: SftpDraft[]): void =>
-  saveJson(SFTP_STORAGE_KEY, drafts);
-export const loadFtpDrafts = (): FtpDraft[] =>
-  loadJson<FtpDraft>(FTP_STORAGE_KEY);
-export const saveFtpDrafts = (drafts: FtpDraft[]): void =>
-  saveJson(FTP_STORAGE_KEY, drafts);
+export const loadSftpDrafts = (): SftpDraft[] => loadJson<SftpDraft>(SFTP_STORAGE_KEY);
+export const saveSftpDrafts = (drafts: SftpDraft[]): void => saveJson(SFTP_STORAGE_KEY, drafts);
+export const loadFtpDrafts = (): FtpDraft[] => loadJson<FtpDraft>(FTP_STORAGE_KEY);
+export const saveFtpDrafts = (drafts: FtpDraft[]): void => saveJson(FTP_STORAGE_KEY, drafts);
 /** Loads SMB drafts with on-read migration. The same storage key was
  *  previously written by ConnectionsPage's older `{ server, share, user }`
  *  shape (no port/host/domain); reading that into the canonical
@@ -92,12 +88,7 @@ export const loadSmbDrafts = (): SmbDraft[] => {
     .map((d) => ({
       id: typeof d.id === "string" ? d.id : `smb-${Date.now()}-${Math.random()}`,
       label: typeof d.label === "string" ? d.label : "",
-      host:
-        typeof d.host === "string"
-          ? d.host
-          : typeof d.server === "string"
-            ? d.server
-            : "",
+      host: typeof d.host === "string" ? d.host : typeof d.server === "string" ? d.server : "",
       port: typeof d.port === "number" ? d.port : 445,
       share: typeof d.share === "string" ? d.share : "",
       user: typeof d.user === "string" ? d.user : "",
@@ -105,8 +96,7 @@ export const loadSmbDrafts = (): SmbDraft[] => {
     }))
     .filter((d) => d.host !== "");
 };
-export const saveSmbDrafts = (drafts: SmbDraft[]): void =>
-  saveJson(SMB_STORAGE_KEY, drafts);
+export const saveSmbDrafts = (drafts: SmbDraft[]): void => saveJson(SMB_STORAGE_KEY, drafts);
 
 /** Case-insensitive host match. Port match is optional — when the
  *  caller doesn't provide a port (raw `ftp://host` typing), every

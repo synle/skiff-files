@@ -30,10 +30,7 @@ const folder: Entry = {
 function r(props: { entry: Entry | null }) {
   return render(
     <ThemeProvider theme={theme}>
-      <PropertiesDialog
-        entry={props.entry}
-        onClose={vi.fn()}
-      />
+      <PropertiesDialog entry={props.entry} onClose={vi.fn()} />
     </ThemeProvider>,
   );
 }

@@ -3,17 +3,17 @@ name: Release Official
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.1.0). Leave empty to use version from tauri.conf.json.'
+        description: "Release tag (e.g. v0.1.0). Leave empty to use version from tauri.conf.json."
         required: false
-        default: ''
+        default: ""
       release_notes:
-        description: 'Custom release notes (optional). Prepended before the changelog.'
+        description: "Custom release notes (optional). Prepended before the changelog."
         required: false
-        default: ''
+        default: ""
 
 permissions:
   contents: write
@@ -127,11 +127,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_RELEASE: 'true'
+          TAURI_RELEASE: "true"
         with:
           tagName: ${{ needs.prepare.outputs.tag }}
-          releaseName: 'Skiff Files ${{ needs.prepare.outputs.tag }}'
-          releaseBody: 'Build in progress...'
+          releaseName: "Skiff Files ${{ needs.prepare.outputs.tag }}"
+          releaseBody: "Build in progress..."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

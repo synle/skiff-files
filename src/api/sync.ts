@@ -62,13 +62,7 @@ export interface JobOptions {
 }
 
 /** Mirror of `crate::sync::types::JobState`. */
-export type JobState =
-  | "planning"
-  | "running"
-  | "paused"
-  | "cancelled"
-  | "done"
-  | "failed";
+export type JobState = "planning" | "running" | "paused" | "cancelled" | "done" | "failed";
 
 /** Mirror of `crate::sync::types::JobInfo`. */
 export interface JobInfo {
@@ -107,30 +101,18 @@ export interface Summary {
   cancelled: boolean;
 }
 
-export const syncStartLocal = (
-  src: string,
-  dest: string,
-  options?: JobOptions,
-): Promise<string> =>
+export const syncStartLocal = (src: string, dest: string, options?: JobOptions): Promise<string> =>
   invoke<string>("sync_start_local", { src, dest, options });
 
 /** `cprepo` mode — same shape as syncStartLocal but only git-tracked
  *  files are included in the plan. */
-export const syncStartRepo = (
-  src: string,
-  dest: string,
-  options?: JobOptions,
-): Promise<string> =>
+export const syncStartRepo = (src: string, dest: string, options?: JobOptions): Promise<string> =>
   invoke<string>("sync_start_repo", { src, dest, options });
 
 /** Cross-protocol sync. Either side may be local or `sftp://<id>/...`.
  *  The Rust side dispatches the engine; the frontend just hands over
  *  the strings. */
-export const syncStartCross = (
-  src: string,
-  dest: string,
-  options?: JobOptions,
-): Promise<string> =>
+export const syncStartCross = (src: string, dest: string, options?: JobOptions): Promise<string> =>
   invoke<string>("sync_start_cross", { src, dest, options });
 
 /** `cpstamp` mode — copy `src` into `destDir` with a YYYY_MM_DD_HH_MM
@@ -150,17 +132,14 @@ export interface DedupSummary {
 export const syncDedup = (path: string): Promise<DedupSummary> =>
   invoke<DedupSummary>("sync_dedup", { path });
 
-export const syncCancel = (id: string): Promise<void> =>
-  invoke<void>("sync_cancel", { id });
+export const syncCancel = (id: string): Promise<void> => invoke<void>("sync_cancel", { id });
 
 /** Pause a running job. Block at the next inter-file checkpoint until
  *  syncResume or syncCancel. */
-export const syncPause = (id: string): Promise<void> =>
-  invoke<void>("sync_pause", { id });
+export const syncPause = (id: string): Promise<void> => invoke<void>("sync_pause", { id });
 
 /** Resume a paused job. No-op when the job isn't paused. */
-export const syncResume = (id: string): Promise<void> =>
-  invoke<void>("sync_resume", { id });
+export const syncResume = (id: string): Promise<void> => invoke<void>("sync_resume", { id });
 
 /** Reply to a sync:conflict prompt. The conflict id comes from the
  *  event payload; the decision is whatever button the user clicked. */
@@ -168,18 +147,14 @@ export const syncResolveConflict = (
   jobId: string,
   conflictId: string,
   decision: ConflictPromptDecision,
-): Promise<void> =>
-  invoke<void>("sync_resolve_conflict", { jobId, conflictId, decision });
+): Promise<void> => invoke<void>("sync_resolve_conflict", { jobId, conflictId, decision });
 
 /** Subscribe to sync:conflict events. The modal in TransfersPage uses
  *  this to surface the TeraCopy-style prompt. */
-export const onConflict = (
-  cb: (p: ConflictPromptPayload) => void,
-): Promise<UnlistenFn> =>
+export const onConflict = (cb: (p: ConflictPromptPayload) => void): Promise<UnlistenFn> =>
   listen<ConflictPromptPayload>("sync:conflict", (e) => cb(e.payload));
 
-export const syncList = (): Promise<JobInfo[]> =>
-  invoke<JobInfo[]>("sync_list");
+export const syncList = (): Promise<JobInfo[]> => invoke<JobInfo[]>("sync_list");
 
 /** Subscribe to per-file progress. The returned unlisten fn must be
  *  called on unmount to avoid leaking listeners. */
@@ -192,7 +167,5 @@ export const onDone = (cb: (s: Summary) => void): Promise<UnlistenFn> =>
 
 /** Subscribe to job-level fatal errors (NOT per-file errors — those are
  *  rolled into the summary). */
-export const onError = (
-  cb: (e: { jobId: string; error: string }) => void,
-): Promise<UnlistenFn> =>
+export const onError = (cb: (e: { jobId: string; error: string }) => void): Promise<UnlistenFn> =>
   listen<{ jobId: string; error: string }>("sync:error", (e) => cb(e.payload));

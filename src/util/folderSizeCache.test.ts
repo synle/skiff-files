@@ -40,7 +40,11 @@ describe("folderSizeCache", () => {
   });
 
   it("coalesces concurrent in-flight requests into one invoke", async () => {
-    let resolveFn: (v: { entries: number; totalSize: number; truncated: boolean }) => void = () => {};
+    let resolveFn: (v: {
+      entries: number;
+      totalSize: number;
+      truncated: boolean;
+    }) => void = () => {};
     const promise = new Promise<{
       entries: number;
       totalSize: number;
@@ -53,9 +57,7 @@ describe("folderSizeCache", () => {
     const a = fetchFolderSize("/parallel");
     const b = fetchFolderSize("/parallel");
     // Both await the same Promise; the second call must NOT re-invoke.
-    const dirSummaryCalls = mocked.mock.calls.filter(
-      (c) => c[0] === "fs_dir_summary",
-    );
+    const dirSummaryCalls = mocked.mock.calls.filter((c) => c[0] === "fs_dir_summary");
     expect(dirSummaryCalls.length).toBe(1);
     resolveFn({ entries: 2, totalSize: 200, truncated: false });
     const [ra, rb] = await Promise.all([a, b]);

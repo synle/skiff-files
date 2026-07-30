@@ -48,13 +48,9 @@ function summarizeJob(j: JobUiState): string {
   const p = j.progress;
   const arrow = `${j.info.src} → ${j.info.dest}`;
   if (!p) return arrow;
-  const files =
-    p.filesTotal > 0 ? `${p.filesDone} / ${p.filesTotal}` : `${p.filesDone}`;
+  const files = p.filesTotal > 0 ? `${p.filesDone} / ${p.filesTotal}` : `${p.filesDone}`;
   if (p.bytesTotal && p.bytesTotal > 0) {
-    const pct = Math.min(
-      100,
-      Math.round((p.bytesDone / p.bytesTotal) * 100),
-    );
+    const pct = Math.min(100, Math.round((p.bytesDone / p.bytesTotal) * 100));
     return `${arrow} · ${files} · ${pct}%`;
   }
   return `${arrow} · ${files}`;
@@ -64,8 +60,7 @@ export default function OperationsDrawer() {
   const { settings, update } = useSettings();
   const [jobs, setJobs] = useState<Record<string, JobUiState>>({});
   const expanded = settings.operationsDrawerExpanded;
-  const setExpanded = (next: boolean) =>
-    update("operationsDrawerExpanded", next);
+  const setExpanded = (next: boolean) => update("operationsDrawerExpanded", next);
   /** When true, the drawer is hidden until a new job starts. Used by
    *  the user pressing the × — we don't unsubscribe from events
    *  because that'd break the "drawer reappears on next job" UX. */
@@ -219,8 +214,7 @@ export default function OperationsDrawer() {
         }}
       >
         <Typography variant="caption" sx={{ flex: 1, fontWeight: 600 }}>
-          {jobList.length} operation{jobList.length === 1 ? "" : "s"} in
-          progress
+          {jobList.length} operation{jobList.length === 1 ? "" : "s"} in progress
         </Typography>
         <Tooltip title={expanded ? "Collapse" : "Expand"}>
           <IconButton
@@ -228,11 +222,7 @@ export default function OperationsDrawer() {
             onClick={() => setExpanded(!expanded)}
             aria-label={expanded ? "Collapse operations drawer" : "Expand operations drawer"}
           >
-            {expanded ? (
-              <ExpandMoreIcon fontSize="small" />
-            ) : (
-              <ExpandLessIcon fontSize="small" />
-            )}
+            {expanded ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
         <Tooltip title="Hide until next operation">
@@ -252,10 +242,7 @@ export default function OperationsDrawer() {
             const buf = samplesRef.current[j.info.id] ?? [];
             const eta = computeEta(buf, p?.bytesTotal);
             const paused = j.info.state === "paused";
-            const inFlight =
-              j.info.state === "running" ||
-              j.info.state === "planning" ||
-              paused;
+            const inFlight = j.info.state === "running" || j.info.state === "planning" || paused;
             const isOpen = openJobId === j.info.id;
             return (
               <Accordion
@@ -264,9 +251,7 @@ export default function OperationsDrawer() {
                 square
                 elevation={0}
                 expanded={isOpen}
-                onChange={(_, willOpen) =>
-                  setOpenJobId(willOpen ? j.info.id : null)
-                }
+                onChange={(_, willOpen) => setOpenJobId(willOpen ? j.info.id : null)}
                 sx={{
                   "&:before": { display: "none" },
                   borderBottom: 1,
@@ -316,15 +301,9 @@ export default function OperationsDrawer() {
                         ? () => void syncPause(j.info.id).catch(() => {})
                         : undefined
                     }
-                    onResume={
-                      paused
-                        ? () => void syncResume(j.info.id).catch(() => {})
-                        : undefined
-                    }
+                    onResume={paused ? () => void syncResume(j.info.id).catch(() => {}) : undefined}
                     onCancel={
-                      inFlight
-                        ? () => void syncCancel(j.info.id).catch(() => {})
-                        : undefined
+                      inFlight ? () => void syncCancel(j.info.id).catch(() => {}) : undefined
                     }
                     error={j.error ?? null}
                   />

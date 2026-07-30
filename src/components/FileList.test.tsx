@@ -242,9 +242,7 @@ describe("FileList", () => {
       .getAllByTestId("file-row")
       .find((r) => r.textContent?.includes("alpha.txt"))!;
     fireEvent.click(row);
-    expect(onPrimarySelect).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "alpha.txt" }),
-    );
+    expect(onPrimarySelect).toHaveBeenCalledWith(expect.objectContaining({ name: "alpha.txt" }));
   });
 
   it("reports the multi-selection set via onSelectionChange", () => {

@@ -81,10 +81,7 @@ export function connectionUrl(identity: ConnectionIdentity): string {
  *  The `kind` argument supplies the default port when the id omits
  *  one. Without `kind` we can't tell whether `host` means port 22,
  *  21, or 445, so the parse signature requires it. */
-export function parseConnectionId(
-  id: string,
-  kind: ConnectionKind,
-): ConnectionIdentity | null {
+export function parseConnectionId(id: string, kind: ConnectionKind): ConnectionIdentity | null {
   const at = id.indexOf("@");
   if (at < 0) return null;
   const user = id.slice(0, at);

@@ -19,11 +19,9 @@ function installMatchMedia(initial: boolean) {
   const mq = {
     matches: initial,
     media: "(prefers-reduced-motion: reduce)",
-    addEventListener: vi.fn(
-      (_: string, cb: (e: MediaQueryListEvent) => void) => {
-        listener = cb;
-      },
-    ),
+    addEventListener: vi.fn((_: string, cb: (e: MediaQueryListEvent) => void) => {
+      listener = cb;
+    }),
     removeEventListener: vi.fn(),
     onchange: null,
   };

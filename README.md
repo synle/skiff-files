@@ -70,12 +70,12 @@ System theme follows your OS by default; flip it explicitly to Light / Dark, cha
 
 ## Requirements
 
-| Tool | Version | Notes |
-|------|---------|-------|
-| Node.js | 20+ | Use `fnm` / `nvm` |
-| npm | 10+ | Ships with Node |
-| Rust | stable | `rustup default stable` |
-| Tauri prereqs | — | See [tauri.app prerequisites](https://tauri.app/start/prerequisites/) |
+| Tool          | Version | Notes                                                                 |
+| ------------- | ------- | --------------------------------------------------------------------- |
+| Node.js       | 20+     | Use `fnm` / `nvm`                                                     |
+| npm           | 10+     | Ships with Node                                                       |
+| Rust          | stable  | `rustup default stable`                                               |
+| Tauri prereqs | —       | See [tauri.app prerequisites](https://tauri.app/start/prerequisites/) |
 
 Platform extras:
 
@@ -93,6 +93,7 @@ npx tauri dev
 ```
 
 For deeper dives:
+
 - **[DEV.md](./DEV.md)** — local setup, day-to-day commands, project layout
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** — how the major modules fit together
 - **[TODO.md](./TODO.md)** — phased roadmap + deferred backlog

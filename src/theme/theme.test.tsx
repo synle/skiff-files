@@ -54,10 +54,9 @@ describe("useEffectiveMode", () => {
   it("re-renders when the OS theme flips and mode is system", () => {
     const mq = installMatchMedia(false);
     type Mode = "light" | "dark" | "system";
-    const { result, rerender } = renderHook(
-      ({ m }: { m: Mode }) => useEffectiveMode(m),
-      { initialProps: { m: "system" as Mode } },
-    );
+    const { result, rerender } = renderHook(({ m }: { m: Mode }) => useEffectiveMode(m), {
+      initialProps: { m: "system" as Mode },
+    });
     expect(result.current).toBe("light");
     act(() => mq.fire(true));
     expect(result.current).toBe("dark");
@@ -101,12 +100,9 @@ describe("fontSizePx + themeForFull (regression for the silent fontSize no-op)",
     // was rebuilt with the new typography.fontSize at createTheme time.
     // If we ever regress to spreading typography from a baked theme, the
     // variant pixel sizes will collapse to a single value across modes.
-    const small = themeForFull("light", false, "small").typography
-      .body1.fontSize;
-    const medium = themeForFull("light", false, "medium").typography
-      .body1.fontSize;
-    const large = themeForFull("light", false, "large").typography
-      .body1.fontSize;
+    const small = themeForFull("light", false, "small").typography.body1.fontSize;
+    const medium = themeForFull("light", false, "medium").typography.body1.fontSize;
+    const large = themeForFull("light", false, "large").typography.body1.fontSize;
     expect(small).not.toBe(medium);
     expect(medium).not.toBe(large);
   });

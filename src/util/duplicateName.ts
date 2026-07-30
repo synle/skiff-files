@@ -42,15 +42,10 @@ function splitExt(name: string): { stem: string; ext: string } {
 
 /** Build the duplicate name. `isDir = true` skips the extension
  *  split entirely. `now` lets tests inject a fixed clock. */
-export function duplicateName(
-  source: string,
-  options?: { isDir?: boolean; now?: Date },
-): string {
+export function duplicateName(source: string, options?: { isDir?: boolean; now?: Date }): string {
   const isDir = options?.isDir ?? false;
   const now = options?.now ?? new Date();
-  const { stem: rawStem, ext } = isDir
-    ? { stem: source, ext: "" }
-    : splitExt(source);
+  const { stem: rawStem, ext } = isDir ? { stem: source, ext: "" } : splitExt(source);
   // Strip ANY number of previous `-copy-<timestamp>(-N)?` suffixes
   // so re-duplicating a re-duplicate doesn't grow the name forever
   // (the previous bug — names like `untitled-copy-…-copy-…-copy-…`).

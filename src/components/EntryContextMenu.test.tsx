@@ -114,9 +114,7 @@ describe("EntryContextMenu", () => {
   it("hides OS-shell items for remote (sftp://) entries", () => {
     const remote: Entry = { ...file, path: "sftp://abc/x.txt" };
     r({ entry: remote, x: 10, y: 10 });
-    expect(
-      screen.queryByText("Open with default app"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Open with default app")).not.toBeInTheDocument();
     expect(screen.queryByText("Reveal in OS")).not.toBeInTheDocument();
   });
 
@@ -177,10 +175,7 @@ describe("EntryContextMenu", () => {
       };
       render(
         <ThemeProvider theme={theme}>
-          <EntryContextMenu
-            state={{ entry: file, x: 10, y: 10 }}
-            {...handlers}
-          />
+          <EntryContextMenu state={{ entry: file, x: 10, y: 10 }} {...handlers} />
         </ThemeProvider>,
       );
       return handlers;
@@ -263,10 +258,7 @@ describe("EntryContextMenu", () => {
       const localFile: Entry = { ...file, path: "/a/b/c.txt", name: "c.txt" };
       render(
         <ThemeProvider theme={theme}>
-          <EntryContextMenu
-            state={{ entry: localFile, x: 10, y: 10 }}
-            {...h}
-          />
+          <EntryContextMenu state={{ entry: localFile, x: 10, y: 10 }} {...h} />
         </ThemeProvider>,
       );
       fireEvent.click(screen.getByText("Copy path"));
@@ -287,10 +279,7 @@ describe("EntryContextMenu", () => {
       };
       render(
         <ThemeProvider theme={theme}>
-          <EntryContextMenu
-            state={{ entry: localFile, x: 10, y: 10 }}
-            {...h}
-          />
+          <EntryContextMenu state={{ entry: localFile, x: 10, y: 10 }} {...h} />
         </ThemeProvider>,
       );
       fireEvent.click(screen.getByText("Copy filename"));
@@ -311,10 +300,7 @@ describe("EntryContextMenu", () => {
       };
       render(
         <ThemeProvider theme={theme}>
-          <EntryContextMenu
-            state={{ entry: localFile, x: 10, y: 10 }}
-            {...h}
-          />
+          <EntryContextMenu state={{ entry: localFile, x: 10, y: 10 }} {...h} />
         </ThemeProvider>,
       );
       fireEvent.click(screen.getByText("Copy parent path"));

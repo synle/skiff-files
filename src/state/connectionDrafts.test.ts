@@ -82,11 +82,9 @@ describe("connectionDrafts: load / save round-trip", () => {
   });
 
   it("save silently drops on quota / private-mode (no throw)", () => {
-    const spy = vi
-      .spyOn(Storage.prototype, "setItem")
-      .mockImplementation(() => {
-        throw new Error("QuotaExceededError");
-      });
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
     expect(() => saveSftpDrafts([sftp()])).not.toThrow();
     spy.mockRestore();
   });
@@ -105,20 +103,12 @@ describe("connectionDrafts: matchesHost", () => {
       sftp({ id: "b", host: "h", port: 2222 }),
       sftp({ id: "c", host: "other", port: 22 }),
     ];
-    expect(matchSftpDraftsForHost(list, "h", null).map((d) => d.id)).toEqual([
-      "a",
-      "b",
-    ]);
+    expect(matchSftpDraftsForHost(list, "h", null).map((d) => d.id)).toEqual(["a", "b"]);
   });
 
   it("filters to the exact port when a port is supplied", () => {
-    const list = [
-      ftp({ id: "a", host: "h", port: 21 }),
-      ftp({ id: "b", host: "h", port: 2121 }),
-    ];
-    expect(matchFtpDraftsForHost(list, "h", 21).map((d) => d.id)).toEqual([
-      "a",
-    ]);
+    const list = [ftp({ id: "a", host: "h", port: 21 }), ftp({ id: "b", host: "h", port: 2121 })];
+    expect(matchFtpDraftsForHost(list, "h", 21).map((d) => d.id)).toEqual(["a"]);
   });
 
   it("smb match runs through the same case-insensitive predicate", () => {
@@ -128,8 +118,6 @@ describe("connectionDrafts: matchesHost", () => {
   });
 
   it("returns an empty array when nothing matches (symmetric to the match case)", () => {
-    expect(matchSftpDraftsForHost([sftp({ host: "a" })], "b", null)).toEqual(
-      [],
-    );
+    expect(matchSftpDraftsForHost([sftp({ host: "a" })], "b", null)).toEqual([]);
   });
 });

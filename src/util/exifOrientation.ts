@@ -24,9 +24,7 @@
 /** Map an EXIF orientation value to the CSS `transform` snippet that
  *  re-uprights the image. Returns `null` for orientation 1 (already
  *  upright) and for any value outside the 1–8 valid range. */
-export function orientationToCssTransform(
-  orientation: number | null | undefined,
-): string | null {
+export function orientationToCssTransform(orientation: number | null | undefined): string | null {
   switch (orientation) {
     case 2:
       return "scaleX(-1)";
@@ -53,13 +51,6 @@ export function orientationToCssTransform(
  *  landscape, or vice versa). Used by the wrapper layout so the
  *  bounding box for the rotated image picks up the swapped
  *  width / height. */
-export function orientationSwapsDimensions(
-  orientation: number | null | undefined,
-): boolean {
-  return (
-    orientation === 5 ||
-    orientation === 6 ||
-    orientation === 7 ||
-    orientation === 8
-  );
+export function orientationSwapsDimensions(orientation: number | null | undefined): boolean {
+  return orientation === 5 || orientation === 6 || orientation === 7 || orientation === 8;
 }

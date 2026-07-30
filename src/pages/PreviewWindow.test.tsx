@@ -16,9 +16,7 @@ import { SettingsProvider } from "../state/settings";
 // a Tauri bridge. The `stat` helper drives the page; `readBase64` /
 // `readText` are pulled in by the downstream `Body` components.
 vi.mock("../api/client", async () => {
-  const actual = await vi.importActual<typeof import("../api/client")>(
-    "../api/client",
-  );
+  const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
   return {
     ...actual,
     stat: vi.fn(async (path: string) => ({
@@ -57,9 +55,7 @@ beforeEach(() => {
 describe("PreviewWindow", () => {
   it("surfaces an error when no #preview= hash is supplied", () => {
     r();
-    expect(
-      screen.getByText(/No preview path supplied/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No preview path supplied/i)).toBeInTheDocument();
   });
   it("stats the path from the hash and renders the filename", async () => {
     window.location.hash = "#preview=" + encodeURIComponent("/x/notes.md");
@@ -95,8 +91,6 @@ describe("PreviewWindow", () => {
     // the error message.
     window.location.hash = "#preview=%E0%A4%A";
     r();
-    expect(
-      screen.getByText(/No preview path supplied/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No preview path supplied/i)).toBeInTheDocument();
   });
 });

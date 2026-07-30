@@ -226,10 +226,10 @@ describe("fetchLatestRelease", () => {
 
   it("hits the public releases/latest endpoint with the GitHub Accept header", async () => {
     fetchSpy.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ tag_name: "v0.2.302", published_at: "2026-05-15T12:37:00Z" }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
+      new Response(JSON.stringify({ tag_name: "v0.2.302", published_at: "2026-05-15T12:37:00Z" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
     );
     const out = await fetchLatestRelease();
     expect(fetchSpy).toHaveBeenCalledWith(

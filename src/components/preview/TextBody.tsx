@@ -48,11 +48,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { readText } from "../../api/client";
 import type { Entry } from "../../api/fs";
-import {
-  escapeHtml,
-  highlightSource,
-  pickLanguage,
-} from "../../util/syntaxHighlight";
+import { escapeHtml, highlightSource, pickLanguage } from "../../util/syntaxHighlight";
 import { renderMarkdown } from "../../util/markdown";
 
 /** Threshold above which syntax highlighting is skipped — the Prism
@@ -92,9 +88,7 @@ export default function TextBody({ entry, mode = "inline" }: Props) {
   const [fontPx, setFontPx] = useState<number>(BASE_FONT_PX);
 
   // Copy-to-clipboard feedback.
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
-    "idle",
-  );
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   // Markdown render toggle. Only meaningful when the file kind is
   // markdown; default to RENDERED so the user sees the formatted
@@ -266,11 +260,7 @@ export default function TextBody({ entry, mode = "inline" }: Props) {
           />
         )}
       </Box>
-      <Stack
-        direction="row"
-        spacing={0.5}
-        sx={{ mt: 0.5, flexWrap: "wrap", alignItems: "center" }}
-      >
+      <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: "wrap", alignItems: "center" }}>
         <Tooltip
           title={
             copyState === "copied"
@@ -281,19 +271,11 @@ export default function TextBody({ entry, mode = "inline" }: Props) {
           }
         >
           <span>
-            <IconButton
-              size="small"
-              onClick={onCopy}
-              aria-label="Copy file contents"
-            >
+            <IconButton size="small" onClick={onCopy} aria-label="Copy file contents">
               <ContentCopyIcon
                 fontSize="small"
                 color={
-                  copyState === "copied"
-                    ? "success"
-                    : copyState === "error"
-                      ? "error"
-                      : undefined
+                  copyState === "copied" ? "success" : copyState === "error" ? "error" : undefined
                 }
               />
             </IconButton>
@@ -329,9 +311,7 @@ export default function TextBody({ entry, mode = "inline" }: Props) {
             </Tooltip>
           </>
         )}
-        <Tooltip
-          title={searchOpen ? "Close search" : "Search in file"}
-        >
+        <Tooltip title={searchOpen ? "Close search" : "Search in file"}>
           <span>
             <IconButton
               size="small"
@@ -486,11 +466,7 @@ function SearchBar({
   onClose,
 }: SearchBarProps) {
   const counterLabel =
-    query.length === 0
-      ? ""
-      : matchCount === 0
-        ? "0"
-        : `${activeHit + 1} / ${matchCount}`;
+    query.length === 0 ? "" : matchCount === 0 ? "0" : `${activeHit + 1} / ${matchCount}`;
   return (
     <Stack
       direction="row"
@@ -535,9 +511,7 @@ function SearchBar({
       <Select
         size="small"
         value={matchMode}
-        onChange={(e: SelectChangeEvent<MatchMode>) =>
-          setMatchMode(e.target.value as MatchMode)
-        }
+        onChange={(e: SelectChangeEvent<MatchMode>) => setMatchMode(e.target.value as MatchMode)}
         inputProps={{ "aria-label": "Match mode" }}
         sx={{ minWidth: 110 }}
       >
@@ -618,13 +592,7 @@ interface InlineTextViewProps {
  *  single `<pre>` block keeps native text-selection across line
  *  boundaries (which the virtualized variant cannot match because
  *  each line is its own DOM node). */
-function InlineTextView({
-  text,
-  language,
-  matches,
-  activeHit,
-  fontPx,
-}: InlineTextViewProps) {
+function InlineTextView({ text, language, matches, activeHit, fontPx }: InlineTextViewProps) {
   const html = useMemo(() => {
     const highlighted = highlightSource(text, language);
     if (matches.length === 0) return highlighted;
@@ -654,8 +622,7 @@ function InlineTextView({
         fontSize: `${fontPx}px`,
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
-        fontFamily:
-          "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
         lineHeight: 1.5,
       }}
       // Highlighted output mixes Prism span markup with our own
@@ -753,8 +720,7 @@ function VirtualizedTextView({
         height: maxHeight,
         overflow: "auto",
         fontSize: `${fontPx}px`,
-        fontFamily:
-          "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
         p: 1,
         lineHeight: 1.5,
       }}
@@ -814,8 +780,7 @@ export function overlayMatches(
   for (let i = 0; i < matches.length; i++) {
     const [start, end] = matches[i];
     if (start > cursor) parts.push(escapeHtml(text.slice(cursor, start)));
-    const cls =
-      i === activeHit ? "skiff-search-hit skiff-search-hit-active" : "skiff-search-hit";
+    const cls = i === activeHit ? "skiff-search-hit skiff-search-hit-active" : "skiff-search-hit";
     parts.push(`<mark class="${cls}">${escapeHtml(text.slice(start, end))}</mark>`);
     cursor = end;
   }
@@ -837,10 +802,7 @@ export function overlayMatchesInLine(
   const sorted = [...hits].sort((a, b) => a[0] - b[0]);
   for (const [start, end, idx] of sorted) {
     if (start > cursor) parts.push(escapeHtml(line.slice(cursor, start)));
-    const cls =
-      idx === activeHit
-        ? "skiff-search-hit skiff-search-hit-active"
-        : "skiff-search-hit";
+    const cls = idx === activeHit ? "skiff-search-hit skiff-search-hit-active" : "skiff-search-hit";
     parts.push(`<mark class="${cls}">${escapeHtml(line.slice(start, end))}</mark>`);
     cursor = end;
   }
@@ -858,8 +820,7 @@ export function lineIndexForOffset(lineStarts: number[], offset: number): number
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
     const startMid = lineStarts[mid];
-    const startNext =
-      mid + 1 < lineStarts.length ? lineStarts[mid + 1] : Number.MAX_SAFE_INTEGER;
+    const startNext = mid + 1 < lineStarts.length ? lineStarts[mid + 1] : Number.MAX_SAFE_INTEGER;
     if (offset < startMid) hi = mid - 1;
     else if (offset >= startNext) lo = mid + 1;
     else return mid;

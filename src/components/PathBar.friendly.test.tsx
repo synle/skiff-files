@@ -74,10 +74,7 @@ describe("PathBar — UUID never leaks into the editable input", () => {
 
   it("commit of the friendly form on an active connection navigates to the canonical UUID URL without prompting", async () => {
     const onNavigate = vi.fn();
-    renderBar(
-      "smb://df204a67-a012-4d96-aadd-8e48a1da5f40/sub",
-      onNavigate,
-    );
+    renderBar("smb://df204a67-a012-4d96-aadd-8e48a1da5f40/sub", onNavigate);
     // Wait for connList.
     await waitFor(() => {
       expect(screen.getByText(/admin@192\.168\.1\.1/)).toBeInTheDocument();

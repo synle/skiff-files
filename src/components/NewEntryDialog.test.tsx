@@ -56,9 +56,7 @@ describe("NewEntryDialog", () => {
   it("Submit button is disabled when name collides with a sibling", () => {
     r({ defaultName: "taken", existingNames: new Set(["taken"]) });
     expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
-    expect(
-      screen.getByText(/A file or folder named "taken" already exists/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/A file or folder named "taken" already exists/)).toBeInTheDocument();
   });
 
   it("Submit button is disabled when name contains a path separator", () => {
@@ -67,9 +65,7 @@ describe("NewEntryDialog", () => {
       target: { value: "bad/name" },
     });
     expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
-    expect(
-      screen.getByText(/Name can't contain a path separator/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Name can't contain a path separator/)).toBeInTheDocument();
   });
 
   it("Cancel button fires onClose", () => {

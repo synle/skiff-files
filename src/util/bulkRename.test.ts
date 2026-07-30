@@ -9,12 +9,7 @@ describe("applyBulkRename", () => {
   });
 
   it("does literal replacement when regex is off", () => {
-    const out = applyBulkRename(
-      ["my-file.TXT", "your-file.txt"],
-      "file",
-      "doc",
-      false,
-    );
+    const out = applyBulkRename(["my-file.TXT", "your-file.txt"], "file", "doc", false);
     expect(out.map((r) => r.newName)).toEqual(["my-doc.TXT", "your-doc.txt"]);
     expect(out.every((r) => r.changed)).toBe(true);
   });
@@ -29,16 +24,8 @@ describe("applyBulkRename", () => {
   });
 
   it("uses regex when enabled and supports capture groups", () => {
-    const out = applyBulkRename(
-      ["IMG_001.jpg", "IMG_002.jpg"],
-      "IMG_(\\d+)",
-      "photo-$1",
-      true,
-    );
-    expect(out.map((r) => r.newName)).toEqual([
-      "photo-001.jpg",
-      "photo-002.jpg",
-    ]);
+    const out = applyBulkRename(["IMG_001.jpg", "IMG_002.jpg"], "IMG_(\\d+)", "photo-$1", true);
+    expect(out.map((r) => r.newName)).toEqual(["photo-001.jpg", "photo-002.jpg"]);
   });
 
   it("surfaces an error per row when the regex is invalid", () => {
@@ -59,31 +46,13 @@ describe("applyBulkRename", () => {
   });
 
   it("expands {n} in the replace field as a 1-based sequence", () => {
-    const out = applyBulkRename(
-      ["a.txt", "b.txt", "c.txt"],
-      ".+",
-      "img-{n}",
-      true,
-    );
-    expect(out.map((r) => r.newName)).toEqual([
-      "img-1",
-      "img-2",
-      "img-3",
-    ]);
+    const out = applyBulkRename(["a.txt", "b.txt", "c.txt"], ".+", "img-{n}", true);
+    expect(out.map((r) => r.newName)).toEqual(["img-1", "img-2", "img-3"]);
   });
 
   it("expands {n:NN} with zero-padding", () => {
-    const out = applyBulkRename(
-      ["a", "b", "c"],
-      ".+",
-      "shot-{n:03}",
-      true,
-    );
-    expect(out.map((r) => r.newName)).toEqual([
-      "shot-001",
-      "shot-002",
-      "shot-003",
-    ]);
+    const out = applyBulkRename(["a", "b", "c"], ".+", "shot-{n:03}", true);
+    expect(out.map((r) => r.newName)).toEqual(["shot-001", "shot-002", "shot-003"]);
   });
 
   it("respects sequenceStart option", () => {
@@ -97,10 +66,7 @@ describe("applyBulkRename", () => {
     const out = applyBulkRename(["a.txt", "b.txt"], "", "", false, {
       prefix: "2026-",
     });
-    expect(out.map((r) => r.newName)).toEqual([
-      "2026-a.txt",
-      "2026-b.txt",
-    ]);
+    expect(out.map((r) => r.newName)).toEqual(["2026-a.txt", "2026-b.txt"]);
   });
 
   it("inserts suffix before the extension by default", () => {

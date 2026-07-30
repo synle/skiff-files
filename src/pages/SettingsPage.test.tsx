@@ -10,9 +10,15 @@ beforeEach(() => {
   // alert / prompt. jsdom doesn't implement them but they're patched
   // off by default in the test environment — re-stub here so the
   // click handlers don't throw.
-  vi.stubGlobal("confirm", vi.fn(() => true));
+  vi.stubGlobal(
+    "confirm",
+    vi.fn(() => true),
+  );
   vi.stubGlobal("alert", vi.fn());
-  vi.stubGlobal("prompt", vi.fn(() => null));
+  vi.stubGlobal(
+    "prompt",
+    vi.fn(() => null),
+  );
 });
 
 afterEach(() => {
@@ -49,25 +55,15 @@ describe("SettingsPage smoke", () => {
 
   it("includes the keyboard shortcut search field placeholder", () => {
     renderSettings();
-    expect(
-      screen.getByPlaceholderText(/Search shortcuts/i),
-    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Search shortcuts/i)).toBeInTheDocument();
   });
 
   it("renders the Advanced section with action buttons", () => {
     renderSettings();
-    expect(
-      screen.getByRole("button", { name: /Reveal app data folder/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Open settings.json/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Reload from disk/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Check for updates/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reveal app data folder/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open settings.json/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reload from disk/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Check for updates/i })).toBeInTheDocument();
   });
 
   it("clicking Reset all settings opens the confirm modal", () => {
@@ -77,17 +73,11 @@ describe("SettingsPage smoke", () => {
     // Tauri's webview suppresses native dialogs (footgun in
     // CLAUDE.md). The modal renders the destructive copy and a
     // confirm button labelled "Reset to defaults".
-    expect(
-      screen.getByText(/Reset all settings to defaults\?/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Reset to defaults/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Reset all settings to defaults\?/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reset to defaults/i })).toBeInTheDocument();
     // Cancel button (autoFocus by default in ConfirmDialog) is also
     // present so the modal can be dismissed without action.
-    expect(
-      screen.getByRole("button", { name: /^Cancel$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument();
   });
 
   it("renders Transfers section conflict policy and limits", () => {
@@ -124,15 +114,9 @@ describe("SettingsPage smoke", () => {
       }),
     );
     renderSettings();
-    expect(
-      screen.getByRole("button", { name: /Clear recent paths/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Clear bookmarks/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Clear search history/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Clear recent paths/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Clear bookmarks/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Clear search history/ })).toBeInTheDocument();
   });
 
   it("renders saved-data editor blocks with non-empty data", () => {
@@ -148,9 +132,7 @@ describe("SettingsPage smoke", () => {
           },
         ],
         savedSelections: [{ id: "s1", label: "Today", paths: ["/x"] }],
-        savedSearches: [
-          { id: "se1", label: "Big files", path: "/", query: "*.zip" },
-        ],
+        savedSearches: [{ id: "se1", label: "Big files", path: "/", query: "*.zip" }],
         savedSyncJobs: [
           {
             id: "j1",
@@ -201,19 +183,13 @@ describe("SettingsPage smoke", () => {
     const extInput = screen.getByPlaceholderText(/ext \(e\.g\. rs\)/);
     fireEvent.change(extInput, { target: { value: "ts" } });
     fireEvent.click(screen.getByRole("button", { name: "Add / Replace" }));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.customFileKinds.ts).toBe("code");
   });
 
   it("renders the sidebar accordion + status-dot toggles", () => {
     renderSettings();
-    expect(
-      screen.getByLabelText(/Accordion mode/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/Show connection-status dots/),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Accordion mode/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Show connection-status dots/)).toBeInTheDocument();
   });
 });

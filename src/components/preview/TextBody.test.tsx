@@ -19,15 +19,13 @@ import { vi } from "vitest";
 // inside TextBody so the integration tests can exercise the
 // virtualized renderer branch. ~70 KB of repeated "line" text.
 const LARGE_FIXTURE_LINES = 5000;
-const LARGE_FIXTURE = Array.from(
-  { length: LARGE_FIXTURE_LINES },
-  (_, i) => `line ${i} world`,
-).join("\n");
+const LARGE_FIXTURE = Array.from({ length: LARGE_FIXTURE_LINES }, (_, i) => `line ${i} world`).join(
+  "\n",
+);
 
 vi.mock("../../api/client", () => ({
   readText: vi.fn(async (path: string) => {
-    if (path === "/x/notes.md")
-      return "# Title\n\nHello world. world repeats.\nworld again.";
+    if (path === "/x/notes.md") return "# Title\n\nHello world. world repeats.\nworld again.";
     if (path === "/x/code.ts")
       return "const greeting = 'hello world';\nfunction sayHi() { return greeting; }";
     if (path === "/x/huge.txt") return LARGE_FIXTURE;
@@ -158,9 +156,7 @@ describe("TextBody integration", () => {
       name: /View raw markdown source/i,
     });
     fireEvent.click(rawBtn);
-    fireEvent.click(
-      await screen.findByRole("button", { name: /Search in file/i }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /Search in file/i }));
     const input = await screen.findByLabelText(/Search text in preview/i);
     fireEvent.change(input, { target: { value: "world" } });
     await waitFor(() => {
@@ -176,15 +172,11 @@ describe("TextBody integration", () => {
   });
   it("Esc inside the search input closes the bar", async () => {
     r(mkEntry({ name: "code.ts", path: "/x/code.ts", kind: "code" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: /Search in file/i }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /Search in file/i }));
     const input = await screen.findByLabelText(/Search text in preview/i);
     fireEvent.keyDown(input, { key: "Escape" });
     await waitFor(() => {
-      expect(
-        screen.queryByLabelText(/Search text in preview/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Search text in preview/i)).not.toBeInTheDocument();
     });
   });
   it("disables Copy / search controls until the file has loaded", async () => {
@@ -203,9 +195,7 @@ describe("TextBody integration", () => {
       clipboard: { writeText },
     });
     r(mkEntry());
-    fireEvent.click(
-      await screen.findByRole("button", { name: /Copy file contents/i }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /Copy file contents/i }));
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledTimes(1);
     });
@@ -260,13 +250,16 @@ describe("TextBody integration", () => {
 
 describe("overlayMatches", () => {
   it("wraps each match in a <mark> with the right class", () => {
-    const html = overlayMatches("foo bar foo", "ignored", [
-      [0, 3],
-      [8, 11],
-    ], 0);
-    expect(html).toContain(
-      '<mark class="skiff-search-hit skiff-search-hit-active">foo</mark>',
+    const html = overlayMatches(
+      "foo bar foo",
+      "ignored",
+      [
+        [0, 3],
+        [8, 11],
+      ],
+      0,
     );
+    expect(html).toContain('<mark class="skiff-search-hit skiff-search-hit-active">foo</mark>');
     expect(html).toContain('<mark class="skiff-search-hit">foo</mark>');
     // Inter-match text is preserved verbatim (HTML-escaped).
     expect(html).toContain(" bar ");
@@ -312,9 +305,7 @@ describe("overlayMatchesInLine", () => {
     );
     // The second hit (index 1) carries the active class; the first
     // (index 0) doesn't.
-    expect(html).toContain(
-      '<mark class="skiff-search-hit skiff-search-hit-active">cd</mark>',
-    );
+    expect(html).toContain('<mark class="skiff-search-hit skiff-search-hit-active">cd</mark>');
     expect(html).toContain('<mark class="skiff-search-hit">ab</mark>');
   });
 });

@@ -86,18 +86,12 @@ interface Props {
   fill?: boolean;
 }
 
-export default function GalleryThumb({
-  path,
-  kind,
-  size,
-  remote = false,
-  fill = false,
-}: Props) {
+export default function GalleryThumb({ path, kind, size, remote = false, fill = false }: Props) {
   const isImage = kind === "image";
   const skipFetch = !isImage || remote;
 
   const [dataUrl, setDataUrl] = useState<string | null>(() =>
-    skipFetch ? null : getCached(path, size) ?? null,
+    skipFetch ? null : (getCached(path, size) ?? null),
   );
   const [errored, setErrored] = useState(false);
 

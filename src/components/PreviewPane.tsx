@@ -7,14 +7,7 @@
 // Selection-driven: the parent passes the currently selected Entry. We
 // cancel any in-flight load if selection changes mid-fetch — important
 // because `fs_dir_summary` can take seconds on large trees.
-import {
-  Box,
-  Divider,
-  IconButton,
-  Stack,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, Divider, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import LaunchIcon from "@mui/icons-material/Launch";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
@@ -42,15 +35,8 @@ import { isImage, mimeForPath } from "../util/mime";
 import { toNativeRemoteUrl } from "../util/nativeRemoteUrl";
 import { parseLocation } from "../util/location";
 import { humanizeRemoteUrl } from "../util/humanizeRemoteUrl";
-import {
-  orientationSwapsDimensions,
-  orientationToCssTransform,
-} from "../util/exifOrientation";
-import {
-  PREVIEW_WIDTH_MAX,
-  PREVIEW_WIDTH_MIN,
-  useSettings,
-} from "../state/settings";
+import { orientationSwapsDimensions, orientationToCssTransform } from "../util/exifOrientation";
+import { PREVIEW_WIDTH_MAX, PREVIEW_WIDTH_MIN, useSettings } from "../state/settings";
 import IconForKind from "./IconForKind";
 import TextBody from "./preview/TextBody";
 import MediaBody from "./preview/MediaBody";
@@ -71,11 +57,7 @@ interface Props {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <Box sx={{ display: "flex", gap: 1 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ width: 80, flexShrink: 0 }}
-      >
+      <Typography variant="caption" color="text.secondary" sx={{ width: 80, flexShrink: 0 }}>
         {label}
       </Typography>
       <Typography variant="caption" sx={{ wordBreak: "break-all" }}>
@@ -268,10 +250,7 @@ export function ImageBody({
             // The HTML5 drag still fires inside our window for the
             // existing in-app drop targets (sidebar host items,
             // bookmarks, folder rows), so set the standard MIME too.
-            e.dataTransfer.setData(
-              "application/x-skiff-paths",
-              entry.path,
-            );
+            e.dataTransfer.setData("application/x-skiff-paths", entry.path);
             e.dataTransfer.effectAllowed = "copy";
             // Fire native drag in parallel so the OS picks it up
             // when the cursor leaves the window. Local-only — guarded
@@ -321,11 +300,7 @@ export function ImageBody({
             panStateRef.current = null;
             (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
           }}
-          title={
-            isZoomed
-              ? `Zoom ${Math.round((zoom ?? 1) * 100)}% · drag to pan`
-              : "Fit to pane"
-          }
+          title={isZoomed ? `Zoom ${Math.round((zoom ?? 1) * 100)}% · drag to pan` : "Fit to pane"}
           sx={{
             maxWidth: isZoomed ? "none" : "100%",
             maxHeight: isZoomed ? "none" : fittedMaxHeight,
@@ -363,11 +338,7 @@ export function ImageBody({
           }}
         />
       </Box>
-      <Stack
-        direction="row"
-        spacing={0.5}
-        sx={{ mt: 0.5, flexWrap: "wrap", alignItems: "center" }}
-      >
+      <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: "wrap", alignItems: "center" }}>
         <Tooltip title="Rotate left (90°)">
           <span>
             <IconButton
@@ -441,11 +412,7 @@ export function ImageBody({
         </Tooltip>
         <Tooltip title="Zoom 100%">
           <span>
-            <IconButton
-              size="small"
-              onClick={zoomActual}
-              aria-label="Zoom to 100% (actual size)"
-            >
+            <IconButton size="small" onClick={zoomActual} aria-label="Zoom to 100% (actual size)">
               <RestartAltIcon fontSize="small" />
             </IconButton>
           </span>
@@ -574,14 +541,8 @@ function FolderBody({ entry }: { entry: Entry }) {
   const prefix = summary.truncated ? "≥" : "";
   return (
     <Stack spacing={0.5}>
-      <Field
-        label="Items"
-        value={`${prefix}${summary.entries.toLocaleString()}`}
-      />
-      <Field
-        label="Total size"
-        value={`${prefix}${formatBytes(summary.totalSize)}`}
-      />
+      <Field label="Items" value={`${prefix}${summary.entries.toLocaleString()}`} />
+      <Field label="Total size" value={`${prefix}${formatBytes(summary.totalSize)}`} />
       {summary.truncated && (
         <Typography variant="caption" color="text.secondary">
           Truncated at scan cap.
@@ -736,10 +697,7 @@ export default function PreviewPane({ selected, width, onOpenInModal }: Props) {
       // when the mouse moves *left* (since the handle is on the left
       // edge), so subtract.
       const dx = ev.clientX - startX;
-      lastNext = Math.max(
-        PREVIEW_WIDTH_MIN,
-        Math.min(PREVIEW_WIDTH_MAX, startW - dx),
-      );
+      lastNext = Math.max(PREVIEW_WIDTH_MIN, Math.min(PREVIEW_WIDTH_MAX, startW - dx));
       setDragWidth(lastNext);
     };
     const onUp = () => {
@@ -834,30 +792,28 @@ export default function PreviewPane({ selected, width, onOpenInModal }: Props) {
                 </IconButton>
               </Tooltip>
             )}
-            {!selected.isDir && (() => {
-              // SMB has a native OS handler — translate the internal
-              // `smb://<uuid>/...` URL to `smb://[user@]host/share/...`
-              // before handing to the OS. SFTP / FTP don't have a
-              // native handler, so the button is hidden entirely.
-              const { url } = toNativeRemoteUrl(
-                selected.path,
-                settings.connections,
-              );
-              if (url == null) return null;
-              return (
-                <Tooltip title="Open with default app">
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      void fsOpenWithDefault(url);
-                    }}
-                    aria-label="Open with default app"
-                  >
-                    <LaunchIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              );
-            })()}
+            {!selected.isDir &&
+              (() => {
+                // SMB has a native OS handler — translate the internal
+                // `smb://<uuid>/...` URL to `smb://[user@]host/share/...`
+                // before handing to the OS. SFTP / FTP don't have a
+                // native handler, so the button is hidden entirely.
+                const { url } = toNativeRemoteUrl(selected.path, settings.connections);
+                if (url == null) return null;
+                return (
+                  <Tooltip title="Open with default app">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        void fsOpenWithDefault(url);
+                      }}
+                      aria-label="Open with default app"
+                    >
+                      <LaunchIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                );
+              })()}
           </Box>
 
           <Body
@@ -870,20 +826,12 @@ export default function PreviewPane({ selected, width, onOpenInModal }: Props) {
 
           <Stack spacing={0.5}>
             <Field label="Kind" value={selected.kind} />
-            <Field
-              label="Size"
-              value={selected.isDir ? "—" : formatBytes(selected.size)}
-            />
+            <Field label="Size" value={selected.isDir ? "—" : formatBytes(selected.size)} />
             <Field label="Modified" value={formatMtime(selected.mtime)} />
             {imageDimensions && (
-              <Field
-                label="Dimensions"
-                value={`${imageDimensions.w} × ${imageDimensions.h}`}
-              />
+              <Field label="Dimensions" value={`${imageDimensions.w} × ${imageDimensions.h}`} />
             )}
-            {imageExif?.dateTaken && (
-              <Field label="Taken" value={imageExif.dateTaken} />
-            )}
+            {imageExif?.dateTaken && <Field label="Taken" value={imageExif.dateTaken} />}
             {(imageExif?.cameraMake || imageExif?.cameraModel) && (
               <Field
                 label="Camera"
@@ -911,10 +859,7 @@ export default function PreviewPane({ selected, width, onOpenInModal }: Props) {
               />
             )}
             {selected.mode != null && (
-              <Field
-                label="Mode"
-                value={`0${selected.mode.toString(8).slice(-3)}`}
-              />
+              <Field label="Mode" value={`0${selected.mode.toString(8).slice(-3)}`} />
             )}
             <Field
               label="Path"

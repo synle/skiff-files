@@ -7,11 +7,7 @@
 //     connections + auto-creates new ones. We mock the conn API so
 //     the test stays a unit test, not an integration test.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  __testing__,
-  parseRemoteUrl,
-  resolveRemoteUrl,
-} from "./remoteResolve";
+import { __testing__, parseRemoteUrl, resolveRemoteUrl } from "./remoteResolve";
 
 vi.mock("../api/conn", () => ({
   connCreateFtp: vi.fn(async () => "deadbeef-0000-0000-0000-aaaaaaaaaaaa"),
@@ -127,9 +123,7 @@ describe("findExistingFtp", () => {
   });
 
   it("ignores non-ftp kinds (sftp connections never match)", () => {
-    const conns = [
-      { id: "id-x", kind: "sftp", label: "ftp.example.com:21" },
-    ];
+    const conns = [{ id: "id-x", kind: "sftp", label: "ftp.example.com:21" }];
     expect(
       findExistingFtp(conns, {
         user: "",
@@ -145,9 +139,7 @@ describe("resolveRemoteUrl", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { connCreateFtp, connList } = await import("../api/conn");
-    vi.mocked(connCreateFtp).mockResolvedValue(
-      "deadbeef-0000-0000-0000-aaaaaaaaaaaa",
-    );
+    vi.mocked(connCreateFtp).mockResolvedValue("deadbeef-0000-0000-0000-aaaaaaaaaaaa");
     vi.mocked(connList).mockResolvedValue([]);
   });
 
@@ -156,9 +148,7 @@ describe("resolveRemoteUrl", () => {
   });
 
   it("passes through sftp:// unchanged (no anonymous SFTP)", async () => {
-    expect(await resolveRemoteUrl("sftp://example.com/")).toBe(
-      "sftp://example.com/",
-    );
+    expect(await resolveRemoteUrl("sftp://example.com/")).toBe("sftp://example.com/");
   });
 
   it("UUID-form FTP URL is a no-op (already canonical)", async () => {
@@ -170,9 +160,7 @@ describe("resolveRemoteUrl", () => {
 
   it("host-form FTP URL → auto-creates and rewrites to UUID form", async () => {
     const out = await resolveRemoteUrl("ftp://ftp.example.com/pub");
-    expect(out).toBe(
-      "ftp://deadbeef-0000-0000-0000-aaaaaaaaaaaa/pub",
-    );
+    expect(out).toBe("ftp://deadbeef-0000-0000-0000-aaaaaaaaaaaa/pub");
     const { connCreateFtp } = await import("../api/conn");
     expect(connCreateFtp).toHaveBeenCalledWith({
       host: "ftp.example.com",
@@ -198,9 +186,7 @@ describe("resolveRemoteUrl", () => {
 
   it("preserves the path tail (including trailing slash defaults)", async () => {
     const out = await resolveRemoteUrl("ftp://192.168.1.1");
-    expect(out).toBe(
-      "ftp://deadbeef-0000-0000-0000-aaaaaaaaaaaa/",
-    );
+    expect(out).toBe("ftp://deadbeef-0000-0000-0000-aaaaaaaaaaaa/");
   });
 
   // Bug 7 — typing `ftp://mirror.kernel.org/` directly into the
@@ -250,12 +236,8 @@ describe("parseRemoteUrl", () => {
   });
 
   it("returns null for already-canonical UUID URLs", () => {
-    expect(
-      parseRemoteUrl("ftp://550e8400-e29b-41d4-a716-446655440000/pub"),
-    ).toBeNull();
-    expect(
-      parseRemoteUrl("sftp://550e8400-e29b-41d4-a716-446655440000/home"),
-    ).toBeNull();
+    expect(parseRemoteUrl("ftp://550e8400-e29b-41d4-a716-446655440000/pub")).toBeNull();
+    expect(parseRemoteUrl("sftp://550e8400-e29b-41d4-a716-446655440000/home")).toBeNull();
   });
 
   it("parses ftp://host (no port → null, lets matcher fuzz any port)", () => {

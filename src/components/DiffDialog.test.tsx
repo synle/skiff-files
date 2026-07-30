@@ -27,26 +27,16 @@ describe("DiffDialog", () => {
   it("shows the header with both paths once open", async () => {
     render(
       <ThemeProvider theme={theme}>
-        <DiffDialog
-          left="/left.txt"
-          right="/right.txt"
-          onClose={vi.fn()}
-        />
+        <DiffDialog left="/left.txt" right="/right.txt" onClose={vi.fn()} />
       </ThemeProvider>,
     );
-    expect(
-      screen.getByText(/\/left\.txt ↔ \/right\.txt/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/\/left\.txt ↔ \/right\.txt/)).toBeInTheDocument();
   });
 
   it("renders the diff hunks once readText resolves on both sides", async () => {
     render(
       <ThemeProvider theme={theme}>
-        <DiffDialog
-          left="/left.txt"
-          right="/right.txt"
-          onClose={vi.fn()}
-        />
+        <DiffDialog left="/left.txt" right="/right.txt" onClose={vi.fn()} />
       </ThemeProvider>,
     );
     // beta → BETA — the dialog will render both as removed + added.
@@ -59,11 +49,7 @@ describe("DiffDialog", () => {
   it("surfaces a load error from either side", async () => {
     render(
       <ThemeProvider theme={theme}>
-        <DiffDialog
-          left="/broken.txt"
-          right="/right.txt"
-          onClose={vi.fn()}
-        />
+        <DiffDialog left="/broken.txt" right="/right.txt" onClose={vi.fn()} />
       </ThemeProvider>,
     );
     await waitFor(() => {

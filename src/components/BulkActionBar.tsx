@@ -9,14 +9,7 @@
 //
 // All actions are also keyboard-accessible; this surface is purely
 // for discoverability.
-import {
-  Box,
-  Button,
-  IconButton,
-  Menu,
-  MenuItem,
-  Tooltip,
-} from "@mui/material";
+import { Box, Button, IconButton, Menu, MenuItem, Tooltip } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import ContentPasteIcon from "@mui/icons-material/ContentPaste";
@@ -157,9 +150,7 @@ export default function BulkActionBar({
         borderBottom: 1,
         borderColor: "divider",
         bgcolor: (t) =>
-          t.palette.mode === "dark"
-            ? "rgba(144, 202, 249, 0.08)"
-            : "rgba(25, 118, 210, 0.06)",
+          t.palette.mode === "dark" ? "rgba(144, 202, 249, 0.08)" : "rgba(25, 118, 210, 0.06)",
       }}
     >
       {/* Paste goes FIRST so it's the leftmost affordance whenever
@@ -199,18 +190,10 @@ export default function BulkActionBar({
       )}
       <Box sx={{ flex: 1 }} />
       {hasMultiSelection && onCopy && (
-        <ActionButton
-          label="Copy"
-          icon={<ContentCopyIcon fontSize="small" />}
-          onClick={onCopy}
-        />
+        <ActionButton label="Copy" icon={<ContentCopyIcon fontSize="small" />} onClick={onCopy} />
       )}
       {hasMultiSelection && onCut && (
-        <ActionButton
-          label="Cut"
-          icon={<ContentCutIcon fontSize="small" />}
-          onClick={onCut}
-        />
+        <ActionButton label="Cut" icon={<ContentCutIcon fontSize="small" />} onClick={onCut} />
       )}
       {hasMultiSelection && onCompress && (
         <ActionButton
@@ -220,11 +203,7 @@ export default function BulkActionBar({
         />
       )}
       {hasMultiSelection && onBulkRename && (
-        <ActionButton
-          label="Rename"
-          icon={<EditIcon fontSize="small" />}
-          onClick={onBulkRename}
-        />
+        <ActionButton label="Rename" icon={<EditIcon fontSize="small" />} onClick={onBulkRename} />
       )}
       {hasMultiSelection && onSaveSelectionGroup && (
         <ActionButton

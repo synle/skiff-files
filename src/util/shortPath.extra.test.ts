@@ -58,9 +58,7 @@ describe("shortPath — single-segment edges", () => {
   });
 
   it("a single home-direct path abbreviates to ~/<name>", () => {
-    expect(shortPath("/Users/syle/file.txt", "/Users/syle")).toBe(
-      "~/file.txt",
-    );
+    expect(shortPath("/Users/syle/file.txt", "/Users/syle")).toBe("~/file.txt");
   });
 
   it("a remote root passes through with just scheme + id + slash", () => {

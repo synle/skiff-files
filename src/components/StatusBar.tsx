@@ -135,10 +135,7 @@ export default function StatusBar({
             : `${selectedEntries} of ${totalEntries} selected · ${formatBytes(selectedSize)}`
           : findActive
             ? `${totalEntries}${findHitCap ? "+" : ""} match${totalEntries === 1 ? "" : "es"}`
-            : folderCount != null &&
-                fileCount != null &&
-                folderCount > 0 &&
-                fileCount > 0
+            : folderCount != null && fileCount != null && folderCount > 0 && fileCount > 0
               ? `${folderCount} folder${folderCount === 1 ? "" : "s"}, ${fileCount} file${fileCount === 1 ? "" : "s"}`
               : `${totalEntries} item${totalEntries === 1 ? "" : "s"}`}
       </Typography>
@@ -159,8 +156,8 @@ export default function StatusBar({
       )}
       {clipboardHint && clipboardHint.count > 0 && (
         <Typography variant="caption" color="text.secondary">
-          · {clipboardHint.count} item{clipboardHint.count === 1 ? "" : "s"}{" "}
-          ready to {clipboardHint.op === "cut" ? "move" : "paste"}
+          · {clipboardHint.count} item{clipboardHint.count === 1 ? "" : "s"} ready to{" "}
+          {clipboardHint.op === "cut" ? "move" : "paste"}
         </Typography>
       )}
       {/* Push the zoom cluster to the right edge. Spacer Box rather

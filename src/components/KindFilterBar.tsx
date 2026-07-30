@@ -72,17 +72,11 @@ export default function KindFilterBar({
   onClose,
 }: Props) {
   const toggle = (id: KindGroup) => {
-    onChange(
-      active.includes(id) ? active.filter((x) => x !== id) : [...active, id],
-    );
+    onChange(active.includes(id) ? active.filter((x) => x !== id) : [...active, id]);
   };
   const toggleTag = (c: TagColor) => {
     if (!onTagsChange) return;
-    onTagsChange(
-      activeTags.includes(c)
-        ? activeTags.filter((x) => x !== c)
-        : [...activeTags, c],
-    );
+    onTagsChange(activeTags.includes(c) ? activeTags.filter((x) => x !== c) : [...activeTags, c]);
   };
   return (
     <Box
@@ -142,9 +136,7 @@ export default function KindFilterBar({
                     cursor: "pointer",
                     width: 24,
                     "& .MuiChip-label": { display: "none" },
-                    backgroundColor: isActive
-                      ? tagColorHex(c)
-                      : "transparent",
+                    backgroundColor: isActive ? tagColorHex(c) : "transparent",
                     borderColor: tagColorHex(c),
                     "&::before": {
                       content: '""',
@@ -234,10 +226,7 @@ export function entryMatchesRecency(
 
 /** Returns true when an entry kind matches at least one active group.
  *  Empty `active` returns true for everything (no filter applied). */
-export function entryMatchesFilter(
-  kind: FileKind,
-  active: KindGroup[],
-): boolean {
+export function entryMatchesFilter(kind: FileKind, active: KindGroup[]): boolean {
   if (active.length === 0) return true;
   return active.some((id) => {
     const group = KIND_GROUPS.find((g) => g.id === id);

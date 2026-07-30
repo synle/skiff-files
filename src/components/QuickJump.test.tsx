@@ -31,13 +31,7 @@ function Harness({
   );
 }
 
-function Seeder({
-  bookmarks,
-  recentPaths,
-}: {
-  bookmarks: Bookmark[];
-  recentPaths: string[];
-}) {
+function Seeder({ bookmarks, recentPaths }: { bookmarks: Bookmark[]; recentPaths: string[] }) {
   const { update } = useSettings();
   // useEffect with empty deps so this runs exactly once, not on
   // every render. (The previous version called update() during
@@ -50,11 +44,7 @@ function Seeder({
   return null;
 }
 
-function r(opts?: {
-  bookmarks?: Bookmark[];
-  recentPaths?: string[];
-  open?: boolean;
-}) {
+function r(opts?: { bookmarks?: Bookmark[]; recentPaths?: string[]; open?: boolean }) {
   const onJump = vi.fn();
   const onClose = vi.fn();
   render(
@@ -79,9 +69,7 @@ describe("QuickJump", () => {
 
   it("seeds favorites from `home` when bookmarks + recent are empty", async () => {
     r();
-    await waitFor(() =>
-      expect(screen.getByText("Home")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Home")).toBeInTheDocument());
     expect(screen.getByText("Desktop")).toBeInTheDocument();
     expect(screen.getByText("Documents")).toBeInTheDocument();
     expect(screen.getByText("Downloads")).toBeInTheDocument();
@@ -117,8 +105,6 @@ describe("QuickJump", () => {
       bookmarks: [{ id: "1", label: "shared", path: "/x/shared" }],
       recentPaths: ["/x/shared"],
     });
-    await waitFor(() =>
-      expect(screen.getAllByText("shared")).toHaveLength(1),
-    );
+    await waitFor(() => expect(screen.getAllByText("shared")).toHaveLength(1));
   });
 });

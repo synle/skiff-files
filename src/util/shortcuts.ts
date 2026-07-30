@@ -29,7 +29,10 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Navigation",
     items: [
-      { keys: "↑ / ↓", description: "Move focus up / down (in grid views: previous / next row of cells)" },
+      {
+        keys: "↑ / ↓",
+        description: "Move focus up / down (in grid views: previous / next row of cells)",
+      },
       { keys: "Shift + ↑ / ↓ / ← / →", description: "Extend selection toward the new focused row" },
       { keys: "Enter", description: "Open the focused folder" },
       { keys: "Space", description: "Toggle the focused row's selection" },
@@ -60,7 +63,10 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Cmd / Ctrl + Click", description: "Toggle entry in selection" },
       { keys: "Shift + Click", description: "Range select from focused row" },
       { keys: "Cmd / Ctrl + A", description: "Select all" },
-      { keys: "Cmd / Ctrl + C", description: "Copy files (paste with Cmd+V) — also writes paths to text clipboard" },
+      {
+        keys: "Cmd / Ctrl + C",
+        description: "Copy files (paste with Cmd+V) — also writes paths to text clipboard",
+      },
       { keys: "Cmd / Ctrl + X", description: "Cut files (paste with Cmd+V to move)" },
       { keys: "Cmd / Ctrl + V", description: "Paste files into current folder" },
       {

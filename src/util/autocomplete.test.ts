@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  completePath,
-  longestCommonPrefix,
-  splitForCompletion,
-} from "./autocomplete";
+import { completePath, longestCommonPrefix, splitForCompletion } from "./autocomplete";
 
 describe("splitForCompletion", () => {
   it("splits at the last separator", () => {

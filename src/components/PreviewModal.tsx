@@ -33,12 +33,7 @@ import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import { useEffect, useState } from "react";
 import { Body, isPreviewableEntry } from "./PreviewPane";
 import IconForKind from "./IconForKind";
-import {
-  fsImageExif,
-  windowOpenPreview,
-  type Entry,
-  type ImageExif,
-} from "../api/fs";
+import { fsImageExif, windowOpenPreview, type Entry, type ImageExif } from "../api/fs";
 
 /** View mode shape for grid traversal. List → only ↑/↓ navigation;
  *  grid → full 2-D with `gridCols` columns laid out left-to-right
@@ -73,20 +68,12 @@ interface Props {
 /** Full-screen-ish preview Dialog. Wraps the same Body component the
  *  inline pane uses, but sized for inspection (90vw × 90vh) and with
  *  no "Open preview" affordance (we ARE the preview). */
-export default function PreviewModal({
-  entry,
-  onClose,
-  siblings,
-  view,
-  onNavigate,
-}: Props) {
+export default function PreviewModal({ entry, onClose, siblings, view, onNavigate }: Props) {
   // Image dimensions surfaced by ImageBody — modal doesn't render a
   // properties block (the inline pane does that job), but we keep the
   // wiring so ImageBody stays single-implementation. The value is
   // intentionally unused here.
-  const [, setImageDimensions] = useState<{ w: number; h: number } | null>(
-    null,
-  );
+  const [, setImageDimensions] = useState<{ w: number; h: number } | null>(null);
   /** EXIF for the current image so we can pre-apply the orientation
    *  transform in the modal too. Reset on entry change. */
   const [imageExif, setImageExif] = useState<ImageExif | null>(null);
@@ -116,9 +103,7 @@ export default function PreviewModal({
   // non-previewable kinds; filtering keeps the arrow keys focused on
   // entries the modal can actually render.
   const previewable = (siblings ?? []).filter((s) => isPreviewableEntry(s));
-  const currentIdx = entry
-    ? previewable.findIndex((s) => s.path === entry.path)
-    : -1;
+  const currentIdx = entry ? previewable.findIndex((s) => s.path === entry.path) : -1;
   const hasSiblings = previewable.length > 1 && currentIdx >= 0;
 
   // Compute target index for each arrow key. List view collapses
@@ -281,11 +266,7 @@ export default function PreviewModal({
               </IconButton>
             </Tooltip>
             <Tooltip title="Close (Esc)">
-              <IconButton
-                size="small"
-                onClick={onClose}
-                aria-label="Close preview"
-              >
+              <IconButton size="small" onClick={onClose} aria-label="Close preview">
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Tooltip>

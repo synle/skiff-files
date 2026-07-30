@@ -13,35 +13,24 @@ const LABELS = new Map<string, string>([
 describe("humanizeRemoteUrl", () => {
   it("swaps the SMB UUID for the friendly label", () => {
     expect(
-      humanizeRemoteUrl(
-        "smb://ba47a8e7-cc66-4af6-8d61-093b9b7b2fae/dropbox/code_hobby",
-        LABELS,
-      ),
+      humanizeRemoteUrl("smb://ba47a8e7-cc66-4af6-8d61-093b9b7b2fae/dropbox/code_hobby", LABELS),
     ).toBe("smb://admin@192.168.1.1:445/G/dropbox/code_hobby");
   });
 
   it("preserves SFTP / FTP scheme prefixes", () => {
-    expect(
-      humanizeRemoteUrl(
-        "sftp://550e8400-e29b-41d4-a716-446655440000/home/user",
-        LABELS,
-      ),
-    ).toBe("sftp://user@example.com:22/home/user");
-  });
-
-  it("passes through local paths unchanged", () => {
-    expect(humanizeRemoteUrl("/Users/syle/Downloads", LABELS)).toBe(
-      "/Users/syle/Downloads",
+    expect(humanizeRemoteUrl("sftp://550e8400-e29b-41d4-a716-446655440000/home/user", LABELS)).toBe(
+      "sftp://user@example.com:22/home/user",
     );
   });
 
+  it("passes through local paths unchanged", () => {
+    expect(humanizeRemoteUrl("/Users/syle/Downloads", LABELS)).toBe("/Users/syle/Downloads");
+  });
+
   it("keeps the raw URL when the connection id is unknown", () => {
-    expect(
-      humanizeRemoteUrl(
-        "smb://00000000-0000-0000-0000-000000000000/share",
-        LABELS,
-      ),
-    ).toBe("smb://00000000-0000-0000-0000-000000000000/share");
+    expect(humanizeRemoteUrl("smb://00000000-0000-0000-0000-000000000000/share", LABELS)).toBe(
+      "smb://00000000-0000-0000-0000-000000000000/share",
+    );
   });
 
   it("handles empty input", () => {
@@ -60,8 +49,7 @@ describe("humanizeMessage", () => {
   });
 
   it("leaves unknown UUIDs untouched", () => {
-    const msg =
-      "trace id 11111111-2222-3333-4444-555555555555 not in registry";
+    const msg = "trace id 11111111-2222-3333-4444-555555555555 not in registry";
     expect(humanizeMessage(msg, LABELS)).toBe(msg);
   });
 
@@ -84,8 +72,7 @@ describe("humanizeMessage", () => {
   // of surrounding text. Pin against substring replacement regressions
   // where the regex anchors at the start or end of the string.
   it("rewrites a UUID found mid-sentence inside a longer error message", () => {
-    const msg =
-      "Failed to list smb://ba47a8e7-cc66-4af6-8d61-093b9b7b2fae/share — broken pipe";
+    const msg = "Failed to list smb://ba47a8e7-cc66-4af6-8d61-093b9b7b2fae/share — broken pipe";
     expect(humanizeMessage(msg, LABELS)).toBe(
       "Failed to list smb://admin@192.168.1.1:445/G/share — broken pipe",
     );
@@ -95,23 +82,14 @@ describe("humanizeMessage", () => {
   // The regex must match on the bare UUID bytes regardless of what
   // sits on either side.
   it("rewrites a UUID surrounded by punctuation (parens / brackets / quotes)", () => {
-    expect(
-      humanizeMessage(
-        "(ba47a8e7-cc66-4af6-8d61-093b9b7b2fae) timed out",
-        LABELS,
-      ),
-    ).toBe("(admin@192.168.1.1:445/G) timed out");
-    expect(
-      humanizeMessage(
-        '"550e8400-e29b-41d4-a716-446655440000" is gone',
-        LABELS,
-      ),
-    ).toBe('"user@example.com:22" is gone');
-    expect(
-      humanizeMessage(
-        "[ba47a8e7-cc66-4af6-8d61-093b9b7b2fae]/foo/bar",
-        LABELS,
-      ),
-    ).toBe("[admin@192.168.1.1:445/G]/foo/bar");
+    expect(humanizeMessage("(ba47a8e7-cc66-4af6-8d61-093b9b7b2fae) timed out", LABELS)).toBe(
+      "(admin@192.168.1.1:445/G) timed out",
+    );
+    expect(humanizeMessage('"550e8400-e29b-41d4-a716-446655440000" is gone', LABELS)).toBe(
+      '"user@example.com:22" is gone',
+    );
+    expect(humanizeMessage("[ba47a8e7-cc66-4af6-8d61-093b9b7b2fae]/foo/bar", LABELS)).toBe(
+      "[admin@192.168.1.1:445/G]/foo/bar",
+    );
   });
 });

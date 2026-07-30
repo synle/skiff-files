@@ -9,8 +9,14 @@ const theme = createTheme();
 
 beforeEach(() => {
   localStorage.clear();
-  vi.stubGlobal("confirm", vi.fn(() => true));
-  vi.stubGlobal("prompt", vi.fn((_msg: string, def: string) => def));
+  vi.stubGlobal(
+    "confirm",
+    vi.fn(() => true),
+  );
+  vi.stubGlobal(
+    "prompt",
+    vi.fn((_msg: string, def: string) => def),
+  );
 });
 
 afterEach(() => {
@@ -122,10 +128,7 @@ describe("Sidebar — extras", () => {
   });
 
   it("renders accordion mode without crashing", () => {
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ sidebarAccordion: true }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ sidebarAccordion: true }));
     r();
     expect(screen.getByText("Favorites")).toBeInTheDocument();
   });
@@ -152,9 +155,7 @@ describe("Sidebar — extras", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
       JSON.stringify({
-        savedSearches: [
-          { id: "s1", label: "Big files", path: "/", query: "*.zip" },
-        ],
+        savedSearches: [{ id: "s1", label: "Big files", path: "/", query: "*.zip" }],
       }),
     );
     r();
@@ -165,9 +166,7 @@ describe("Sidebar — extras", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
       JSON.stringify({
-        savedSelections: [
-          { id: "se1", label: "Today's", paths: ["/x"] },
-        ],
+        savedSelections: [{ id: "se1", label: "Today's", paths: ["/x"] }],
       }),
     );
     r();
@@ -176,7 +175,8 @@ describe("Sidebar — extras", () => {
 
   it("Settings selected styling when page='settings'", () => {
     r({ page: "settings" });
-    const settingsItem = screen.getByText("Settings").closest("[role='button']") ??
+    const settingsItem =
+      screen.getByText("Settings").closest("[role='button']") ??
       screen.getByText("Settings").closest("li");
     expect(settingsItem).toBeTruthy();
   });
@@ -236,9 +236,7 @@ describe("Sidebar — extras", () => {
     r();
     fireEvent.contextMenu(screen.getByText("First"));
     fireEvent.click(screen.getByText("Move down"));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.bookmarks[0].label).toBe("Second");
     expect(stored.bookmarks[1].label).toBe("First");
   });
@@ -306,9 +304,7 @@ describe("Sidebar — extras", () => {
     localStorage.setItem(
       "skiff-files.settings.v1",
       JSON.stringify({
-        savedSearches: [
-          { id: "s1", label: "Find foo", path: "/", query: "foo" },
-        ],
+        savedSearches: [{ id: "s1", label: "Find foo", path: "/", query: "foo" }],
       }),
     );
     const { onSwitchPage } = r();
@@ -380,9 +376,7 @@ describe("Sidebar — extras", () => {
     r();
     fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Add to bookmarks"));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect((stored.bookmarks ?? []).length).toBe(1);
   });
 
@@ -397,9 +391,7 @@ describe("Sidebar — extras", () => {
     r();
     fireEvent.contextMenu(screen.getByText("/foo"));
     fireEvent.click(screen.getByText("Remove from recent"));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.recentPaths).toEqual(["/bar"]);
   });
 
@@ -434,13 +426,14 @@ describe("Sidebar — extras", () => {
       }),
     );
     vi.unstubAllGlobals();
-    vi.stubGlobal("prompt", vi.fn(() => "Renamed"));
+    vi.stubGlobal(
+      "prompt",
+      vi.fn(() => "Renamed"),
+    );
     r();
     fireEvent.contextMenu(screen.getByText("Old"));
     fireEvent.click(screen.getByText("Rename…"));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.bookmarks[0].label).toBe("Renamed");
   });
 });

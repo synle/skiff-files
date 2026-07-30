@@ -38,9 +38,7 @@ describe("ConnectionsPage (merged list)", () => {
   it("renders the page title + Add connection button", () => {
     r();
     expect(screen.getByText("Manage Connections")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Add connection" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add connection" })).toBeInTheDocument();
   });
 
   it("shows the empty-state copy when no connections are saved", () => {
@@ -144,9 +142,7 @@ describe("ConnectionsPage (merged list)", () => {
     await waitFor(() => {
       expect(screen.queryByText("mirror")).not.toBeInTheDocument();
     });
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.connections).toEqual([]);
   });
 

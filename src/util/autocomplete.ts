@@ -47,9 +47,7 @@ export function completePath(
   const { parent, partial } = splitForCompletion(input);
   // Prefix match (case-insensitive — Finder convention).
   const lower = partial.toLowerCase();
-  const matches = parentEntries.filter((e) =>
-    e.name.toLowerCase().startsWith(lower),
-  );
+  const matches = parentEntries.filter((e) => e.name.toLowerCase().startsWith(lower));
   if (matches.length === 0) return null;
   // Single match: complete it fully + a trailing `/` for folders so a
   // second Tab dives into them.

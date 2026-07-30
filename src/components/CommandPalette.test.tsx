@@ -5,11 +5,7 @@ import CommandPalette, { type CommandAction } from "./CommandPalette";
 
 const theme = createTheme();
 
-function renderPalette(
-  open: boolean,
-  actions: CommandAction[],
-  onClose = vi.fn(),
-) {
+function renderPalette(open: boolean, actions: CommandAction[], onClose = vi.fn()) {
   render(
     <ThemeProvider theme={theme}>
       <CommandPalette open={open} onClose={onClose} actions={actions} />
@@ -104,11 +100,7 @@ describe("CommandPalette", () => {
   it("disabled actions can't be run via click or Enter", () => {
     const run = vi.fn();
     const onClose = vi.fn();
-    renderPalette(
-      true,
-      [action({ id: "a", label: "Nope", disabled: true, run })],
-      onClose,
-    );
+    renderPalette(true, [action({ id: "a", label: "Nope", disabled: true, run })], onClose);
     fireEvent.click(screen.getByText("Nope"));
     expect(run).not.toHaveBeenCalled();
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
@@ -124,9 +116,7 @@ describe("CommandPalette", () => {
   });
 
   it("renders the action hint as secondary text when set", () => {
-    renderPalette(true, [
-      action({ id: "a", label: "Open Settings", hint: "Cmd+," }),
-    ]);
+    renderPalette(true, [action({ id: "a", label: "Open Settings", hint: "Cmd+," })]);
     expect(screen.getByText("Cmd+,")).toBeInTheDocument();
   });
 });

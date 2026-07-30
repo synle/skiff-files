@@ -86,11 +86,7 @@ import {
   parseLocation,
   type Backend,
 } from "../util/location";
-import {
-  syncStartCross,
-  syncStartLocal,
-  type JobOptions,
-} from "./sync";
+import { syncStartCross, syncStartLocal, type JobOptions } from "./sync";
 
 export type RemoteKind = Extract<Backend, { kind: "sftp" | "ftp" | "smb" }>["kind"];
 
@@ -100,10 +96,7 @@ interface DispatchSpec<T> {
   unsupportedRemote?: (kind: RemoteKind) => Error;
 }
 
-export async function dispatchByLocation<T>(
-  path: string,
-  spec: DispatchSpec<T>,
-): Promise<T> {
+export async function dispatchByLocation<T>(path: string, spec: DispatchSpec<T>): Promise<T> {
   const loc = parseLocation(path);
   if (loc.backend.kind === "local") {
     return spec.local(path);
@@ -111,36 +104,23 @@ export async function dispatchByLocation<T>(
   if (!spec.remote) {
     const kind = loc.backend.kind;
     const err =
-      spec.unsupportedRemote?.(kind) ??
-      new Error(`operation not supported on ${kind} connections`);
+      spec.unsupportedRemote?.(kind) ?? new Error(`operation not supported on ${kind} connections`);
     throw err;
   }
-  return spec.remote(
-    loc.backend.connectionId,
-    loc.remotePath,
-    loc.backend.kind,
-  );
+  return spec.remote(loc.backend.connectionId, loc.remotePath, loc.backend.kind);
 }
 
 /** Re-shape a remote Entry so its `path` field is the full
  *  `<scheme>://<id>/...` form rather than the bare server-side
  *  path. Required because the rest of the app consumes
  *  Entry.path as the destination of "open this entry". */
-function reshapeRemote(
-  e: Entry,
-  connectionId: string,
-  scheme: RemoteKind,
-): Entry {
-  const formatter =
-    scheme === "ftp" ? formatFtp : scheme === "smb" ? formatSmb : formatSftp;
+function reshapeRemote(e: Entry, connectionId: string, scheme: RemoteKind): Entry {
+  const formatter = scheme === "ftp" ? formatFtp : scheme === "smb" ? formatSmb : formatSftp;
   return { ...e, path: formatter(connectionId, e.path) };
 }
 
 /** Backend-agnostic directory listing. */
-export async function listDir(
-  path: string,
-  options?: ListOptions,
-): Promise<Entry[]> {
+export async function listDir(path: string, options?: ListOptions): Promise<Entry[]> {
   const loc = parseLocation(path);
   if (loc.backend.kind !== "local") {
     const id = loc.backend.connectionId;
@@ -195,9 +175,7 @@ export async function hashSha256(path: string): Promise<string> {
     return connHashSha256(loc.backend.connectionId, loc.remotePath);
   }
   if (loc.backend.kind === "ftp" || loc.backend.kind === "smb") {
-    throw new Error(
-      `hashSha256 not yet supported for ${loc.backend.kind} connections`,
-    );
+    throw new Error(`hashSha256 not yet supported for ${loc.backend.kind} connections`);
   }
   return fsHashSha256(path);
 }
@@ -224,11 +202,7 @@ export async function dirSummary(path: string): Promise<DirSummary> {
  *  Rust) and everything else through the local `fs_mkdir`. */
 export async function mkdir(path: string): Promise<void> {
   const loc = parseLocation(path);
-  if (
-    loc.backend.kind === "sftp" ||
-    loc.backend.kind === "ftp" ||
-    loc.backend.kind === "smb"
-  ) {
+  if (loc.backend.kind === "sftp" || loc.backend.kind === "ftp" || loc.backend.kind === "smb") {
     return connMkdir(loc.backend.connectionId, loc.remotePath);
   }
   return fsMkdir(path);
@@ -243,11 +217,7 @@ export async function mkdir(path: string): Promise<void> {
  *  the caller). */
 export async function createEmptyFile(path: string): Promise<void> {
   const loc = parseLocation(path);
-  if (
-    loc.backend.kind === "sftp" ||
-    loc.backend.kind === "ftp" ||
-    loc.backend.kind === "smb"
-  ) {
+  if (loc.backend.kind === "sftp" || loc.backend.kind === "ftp" || loc.backend.kind === "smb") {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke<void>("conn_create_empty_file", {
       id: loc.backend.connectionId,
@@ -285,15 +255,9 @@ export async function rename(from: string, to: string): Promise<void> {
       throw new Error("rename across backends is not supported");
     }
     if (fromLoc.backend.connectionId !== toLoc.backend.connectionId) {
-      throw new Error(
-        `rename across different ${fromLoc.backend.kind} connections`,
-      );
+      throw new Error(`rename across different ${fromLoc.backend.kind} connections`);
     }
-    return connRename(
-      fromLoc.backend.connectionId,
-      fromLoc.remotePath,
-      toLoc.remotePath,
-    );
+    return connRename(fromLoc.backend.connectionId, fromLoc.remotePath, toLoc.remotePath);
   }
   return fsRename(from, to);
 }
@@ -315,11 +279,7 @@ export interface SyncQueuedDetail {
  *  `sync_start_local` (kernel-accelerated copy path); anything that
  *  involves a remote endpoint routes through `sync_start_cross`. The
  *  caller doesn't need to care which is used. */
-export async function startSync(
-  src: string,
-  dest: string,
-  options?: JobOptions,
-): Promise<string> {
+export async function startSync(src: string, dest: string, options?: JobOptions): Promise<string> {
   const jobId =
     isRemote(src) || isRemote(dest)
       ? await syncStartCross(src, dest, options)
@@ -339,16 +299,12 @@ export async function startSync(
  *  variant doesn't — local paths go through the OS trash / fs_remove.
  *  Centralizing the test stops every per-path branch from forgetting
  *  to include a backend (the SMB-trash bug from before the fix). */
-function isConnectionBacked(
-  loc: ReturnType<typeof parseLocation>,
-): loc is ReturnType<typeof parseLocation> & {
+function isConnectionBacked(loc: ReturnType<typeof parseLocation>): loc is ReturnType<
+  typeof parseLocation
+> & {
   backend: { kind: "sftp" | "ftp" | "smb"; connectionId: string };
 } {
-  return (
-    loc.backend.kind === "sftp" ||
-    loc.backend.kind === "ftp" ||
-    loc.backend.kind === "smb"
-  );
+  return loc.backend.kind === "sftp" || loc.backend.kind === "ftp" || loc.backend.kind === "smb";
 }
 
 /** Multi-path delete that picks the right backend per path. Local

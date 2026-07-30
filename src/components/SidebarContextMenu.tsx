@@ -48,9 +48,7 @@ export default function SidebarContextMenu({ state, onClose }: Props) {
       open={open}
       onClose={onClose}
       anchorReference="anchorPosition"
-      anchorPosition={
-        state ? { top: state.y, left: state.x } : undefined
-      }
+      anchorPosition={state ? { top: state.y, left: state.x } : undefined}
       slotProps={{ list: { dense: true } }}
     >
       {state?.actions.map((a) => [

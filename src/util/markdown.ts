@@ -103,15 +103,9 @@ export function sanitizeHtml(input: string): string {
   if (typeof DOMParser === "undefined") {
     // jsdom-less SSR/test fallback — should not happen in the app
     // proper. Returning escaped text is the conservative behavior.
-    return input
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    return input.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
-  const doc = new DOMParser().parseFromString(
-    `<div id="root">${input}</div>`,
-    "text/html",
-  );
+  const doc = new DOMParser().parseFromString(`<div id="root">${input}</div>`, "text/html");
   const root = doc.getElementById("root");
   if (!root) return "";
   scrub(root);
@@ -129,9 +123,7 @@ function scrub(node: Element): void {
       // textContent so the markdown's natural-language content is
       // preserved while its tag goes away. This is friendlier than
       // dropping the whole subtree, which would lose user content.
-      const textNode = node.ownerDocument!.createTextNode(
-        child.textContent ?? "",
-      );
+      const textNode = node.ownerDocument!.createTextNode(child.textContent ?? "");
       node.replaceChild(textNode, child);
       continue;
     }
@@ -188,7 +180,13 @@ function safeUrl(raw: string): string | null {
   const colon = trimmed.indexOf(":");
   if (colon < 0) return trimmed; // no scheme → relative.
   const scheme = trimmed.slice(0, colon).toLowerCase();
-  if (scheme === "http" || scheme === "https" || scheme === "mailto" || scheme === "tel" || scheme === "file") {
+  if (
+    scheme === "http" ||
+    scheme === "https" ||
+    scheme === "mailto" ||
+    scheme === "tel" ||
+    scheme === "file"
+  ) {
     return trimmed;
   }
   if (scheme === "data") {

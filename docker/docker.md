@@ -4,12 +4,12 @@ Spins up real SFTP, FTP, and SMB servers on `127.0.0.1` so the app (and the inte
 
 Endpoints (all modes):
 
-| Protocol         | Host:Port           | User       | Auth                 | Path                             |
-| ---------------- | ------------------- | ---------- | -------------------- | -------------------------------- |
-| SFTP (password)  | `127.0.0.1:2222`    | `skiff`    | password `password`  | `data/` (your `${HOME}` / `D:/`) |
-| SFTP (key)       | `127.0.0.1:2223`    | `skiff`    | `~/.ssh/id_rsa`      | `data/` (your `${HOME}` / `D:/`) |
-| FTP              | `127.0.0.1:2121`    | `skiff`    | password `password`  | `/home/skiff`                    |
-| SMB              | `127.0.0.1:1445`    | `skiff`    | password `password`  | share `testshare`                |
+| Protocol        | Host:Port        | User    | Auth                | Path                             |
+| --------------- | ---------------- | ------- | ------------------- | -------------------------------- |
+| SFTP (password) | `127.0.0.1:2222` | `skiff` | password `password` | `data/` (your `${HOME}` / `D:/`) |
+| SFTP (key)      | `127.0.0.1:2223` | `skiff` | `~/.ssh/id_rsa`     | `data/` (your `${HOME}` / `D:/`) |
+| FTP             | `127.0.0.1:2121` | `skiff` | password `password` | `/home/skiff`                    |
+| SMB             | `127.0.0.1:1445` | `skiff` | password `password` | share `testshare`                |
 
 Credentials are deliberately weak and the servers only bind to `127.0.0.1` — never expose this stack to a public network.
 
@@ -71,12 +71,12 @@ Open the app → **Connections** in the sidebar → **+ Add connection** → pic
 
 ### SFTP — password
 
-| Field    | Value         |
-| -------- | ------------- |
-| Host     | `127.0.0.1`   |
-| Port     | `2222`        |
-| Username | `skiff`       |
-| Password | `password`    |
+| Field    | Value       |
+| -------- | ----------- |
+| Host     | `127.0.0.1` |
+| Port     | `2222`      |
+| Username | `skiff`     |
+| Password | `password`  |
 
 Login lands in the chroot root and shows a single `data/` directory — that's your `${HOME}` (macOS / Linux) or `D:/` (Windows) on the host. The chroot wrapper requires the user's home itself to stay root-owned, so the host folder is mounted one level deeper. In Skiff Files, expand `data/` to browse your files.
 
@@ -84,13 +84,13 @@ Login lands in the chroot root and shows a single `data/` directory — that's y
 
 Same `skiff` user, same `data/` layout, but on port **`2223`** and password auth is disabled. The compose file mounts `~/.ssh/id_rsa.pub` (macOS / Linux) or `%USERPROFILE%\.ssh\id_rsa.pub` (Windows) into the container, which `atmoz/sftp` installs as `authorized_keys` at startup.
 
-| Field      | Value                 |
-| ---------- | --------------------- |
-| Host       | `127.0.0.1`           |
-| Port       | `2223`                |
-| Username   | `skiff`               |
-| Auth       | Private key           |
-| Key file   | `~/.ssh/id_rsa`       |
+| Field    | Value           |
+| -------- | --------------- |
+| Host     | `127.0.0.1`     |
+| Port     | `2223`          |
+| Username | `skiff`         |
+| Auth     | Private key     |
+| Key file | `~/.ssh/id_rsa` |
 
 Sanity check from the terminal:
 
@@ -102,24 +102,24 @@ If your local key lives somewhere other than `~/.ssh/id_rsa.pub`, edit the secon
 
 ### FTP
 
-| Field    | Value         |
-| -------- | ------------- |
-| Host     | `127.0.0.1`   |
-| Port     | `2121`        |
-| Username | `skiff`    |
-| Password | `password`   |
+| Field    | Value       |
+| -------- | ----------- |
+| Host     | `127.0.0.1` |
+| Port     | `2121`      |
+| Username | `skiff`     |
+| Password | `password`  |
 
 Passive-mode data channel uses ports `21000–21009`, which the compose file forwards. If a corporate firewall blocks them, FTP listing will hang — switch to SFTP or SMB.
 
 ### SMB
 
-| Field           | Value         |
-| --------------- | ------------- |
-| Host            | `127.0.0.1`   |
-| Port            | `1445`        |
-| Username        | `skiff`    |
-| Password        | `password`   |
-| Share (optional)| `testshare`   |
+| Field            | Value       |
+| ---------------- | ----------- |
+| Host             | `127.0.0.1` |
+| Port             | `1445`      |
+| Username         | `skiff`     |
+| Password         | `password`  |
+| Share (optional) | `testshare` |
 
 If you leave **Share** blank, the app lists shares at the root and you can drill into `testshare` from there. The first listing after container start can be slow (~5–10 s) while Samba finishes initializing.
 
@@ -170,4 +170,4 @@ Caveats:
 
 - The bind address `127.0.0.1` is on the **Windows** host — WSL sees it via Docker Desktop's port forwarding, not as a raw Windows port. Disabling Docker Desktop breaks the route.
 - If you run Skiff Files on Windows (not inside WSL) you don't need any of this — `127.0.0.1` Just Works.
-- If you re-run the harness *inside* WSL (i.e. `docker compose up` from an Ubuntu shell using Docker Desktop's WSL backend), the volume mount should reference the Linux-side path (`/mnt/d/...` for the D drive, `$HOME` for your WSL home) — the `D:/` mount in `docker-compose.windows.yml` is for the Windows-side daemon only.
+- If you re-run the harness _inside_ WSL (i.e. `docker compose up` from an Ubuntu shell using Docker Desktop's WSL backend), the volume mount should reference the Linux-side path (`/mnt/d/...` for the D drive, `$HOME` for your WSL home) — the `D:/` mount in `docker-compose.windows.yml` is for the Windows-side daemon only.

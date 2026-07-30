@@ -30,12 +30,7 @@ interface Props {
  *  Go up + the raw error message. Shown in place of the FileList
  *  grid so users don't mistake a broken connection for an empty
  *  folder. */
-export default function UnreachableFolderPlaceholder({
-  path,
-  error,
-  onRetry,
-  onUp,
-}: Props) {
+export default function UnreachableFolderPlaceholder({ path, error, onRetry, onUp }: Props) {
   return (
     <Box
       role="alert"
@@ -51,10 +46,7 @@ export default function UnreachableFolderPlaceholder({
         minHeight: 0,
       }}
     >
-      <CloudOffIcon
-        sx={{ fontSize: 64, color: "text.disabled" }}
-        aria-hidden
-      />
+      <CloudOffIcon sx={{ fontSize: 64, color: "text.disabled" }} aria-hidden />
       <Typography variant="h6" component="h2">
         Can&rsquo;t reach this folder
       </Typography>
@@ -74,18 +66,16 @@ export default function UnreachableFolderPlaceholder({
           wordBreak: "break-word",
           p: 1,
           bgcolor: (t) =>
-            t.palette.mode === "dark"
-              ? "rgba(211, 47, 47, 0.08)"
-              : "rgba(211, 47, 47, 0.06)",
+            t.palette.mode === "dark" ? "rgba(211, 47, 47, 0.08)" : "rgba(211, 47, 47, 0.06)",
           borderRadius: 1,
         }}
       >
         {error}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
-        The connection may have dropped, credentials may have changed, or the
-        host is unreachable. Use Refresh to retry, go up to the parent folder,
-        or open Manage connections to update the saved credentials.
+        The connection may have dropped, credentials may have changed, or the host is unreachable.
+        Use Refresh to retry, go up to the parent folder, or open Manage connections to update the
+        saved credentials.
       </Typography>
       <Stack direction="row" spacing={1.5} sx={{ mt: 1 }}>
         <Button

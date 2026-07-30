@@ -1,8 +1,8 @@
 {
   "name": "skiff-files",
   "version": "0.1.1",
-  "description": "Skiff Files — fast cross-platform file explorer with FTP / SFTP / SMB and a smart-sync engine. Tauri v2 + React 19.",
   "private": true,
+  "description": "Skiff Files — fast cross-platform file explorer with FTP / SFTP / SMB and a smart-sync engine. Tauri v2 + React 19.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,10 +11,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage --exclude src/App.test.tsx",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write .",
+    "format": "oxfmt --write .",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -46,7 +47,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^4.1.5",
     "jsdom": "^29.0.2",
-    "prettier": "^3.8.2",
+    "oxfmt": "^0.61.0",
     "typescript": "~5.8",
     "vite": "^6.4.2",
     "vitest": "^4.1.5"

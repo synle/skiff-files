@@ -50,14 +50,10 @@ export default function DiffDialog({ left, right, onClose }: Props) {
     setRightFile({ text: null, error: null });
     void readText(left!)
       .then((t) => !cancelled && setLeftFile({ text: t, error: null }))
-      .catch((e) =>
-        !cancelled && setLeftFile({ text: null, error: String(e) }),
-      );
+      .catch((e) => !cancelled && setLeftFile({ text: null, error: String(e) }));
     void readText(right!)
       .then((t) => !cancelled && setRightFile({ text: t, error: null }))
-      .catch((e) =>
-        !cancelled && setRightFile({ text: null, error: String(e) }),
-      );
+      .catch((e) => !cancelled && setRightFile({ text: null, error: String(e) }));
     return () => {
       cancelled = true;
     };
@@ -93,11 +89,7 @@ export default function DiffDialog({ left, right, onClose }: Props) {
             {hunks.map((h, i) => {
               // `diff` library labels added/removed; unchanged hunks
               // have neither flag. Color-code via background tint.
-              const color = h.added
-                ? "success.main"
-                : h.removed
-                  ? "error.main"
-                  : "text.primary";
+              const color = h.added ? "success.main" : h.removed ? "error.main" : "text.primary";
               const bg = h.added
                 ? "rgba(46, 160, 67, 0.12)"
                 : h.removed

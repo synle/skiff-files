@@ -133,15 +133,10 @@ export default function PreviewWindow() {
           {entry.name}
         </Typography>
         <Tooltip title="Close (Cmd/Ctrl+W)">
-          <IconButton
-            size="small"
-            onClick={() => window.close()}
-            aria-label="Close preview window"
-          >
+          <IconButton size="small" onClick={() => window.close()} aria-label="Close preview window">
             {/* Inline close X — avoids pulling another icon import in
              *  this single-purpose page. The standard CloseIcon glyph
-             *  would render the same SVG path. */}
-            ✕
+             *  would render the same SVG path. */}✕
           </IconButton>
         </Tooltip>
       </Stack>

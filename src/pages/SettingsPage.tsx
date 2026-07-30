@@ -38,16 +38,9 @@ import {
   useSettings,
   type Settings,
 } from "../state/settings";
-import {
-  fsThumbnailClear,
-  fsThumbnailStats,
-  type ThumbnailCacheStats,
-} from "../api/fs";
+import { fsThumbnailClear, fsThumbnailStats, type ThumbnailCacheStats } from "../api/fs";
 import { credsDelete } from "../api/creds";
-import {
-  macosCheckFullDiskAccess,
-  macosOpenFullDiskAccessSettings,
-} from "../api/permissions";
+import { macosCheckFullDiskAccess, macosOpenFullDiskAccessSettings } from "../api/permissions";
 import { isMacOs } from "../util/platform";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { SUPPORTED_LOCALES, type LocaleCode } from "../i18n";
@@ -164,11 +157,7 @@ import {
   getBuildTimestamp,
 } from "../api/fs";
 import { SHORTCUT_GROUPS } from "../util/shortcuts";
-import {
-  activeCombo,
-  formatCombo,
-  keyEventToCombo,
-} from "../util/keybindings";
+import { activeCombo, formatCombo, keyEventToCombo } from "../util/keybindings";
 
 /** Generic section wrapper so spacing stays consistent across groups. */
 function Section({
@@ -207,9 +196,7 @@ function KeyboardShortcutList() {
     ? SHORTCUT_GROUPS.map((g) => ({
         ...g,
         items: g.items.filter(
-          (it) =>
-            it.keys.toLowerCase().includes(q) ||
-            it.description.toLowerCase().includes(q),
+          (it) => it.keys.toLowerCase().includes(q) || it.description.toLowerCase().includes(q),
         ),
       })).filter((g) => g.items.length > 0)
     : SHORTCUT_GROUPS;
@@ -255,9 +242,8 @@ function KeyboardShortcutList() {
         </Button>
       </Box>
       <Typography variant="caption" color="text.secondary">
-        Shortcuts marked with an Edit button are rebindable. The rest are
-        documentation-only — their handlers will migrate to the rebindable
-        framework in future releases.
+        Shortcuts marked with an Edit button are rebindable. The rest are documentation-only — their
+        handlers will migrate to the rebindable framework in future releases.
       </Typography>
       {groups.length === 0 ? (
         <Typography variant="caption" color="text.secondary">
@@ -273,18 +259,11 @@ function KeyboardShortcutList() {
               {g.items.map((it) => {
                 const rebindable = !!it.actionId && !!it.defaultCombo;
                 const live = rebindable
-                  ? activeCombo(
-                      it.actionId!,
-                      it.defaultCombo!,
-                      settings.shortcutOverrides,
-                    )
+                  ? activeCombo(it.actionId!, it.defaultCombo!, settings.shortcutOverrides)
                   : null;
                 const isOverridden =
                   rebindable &&
-                  Object.prototype.hasOwnProperty.call(
-                    settings.shortcutOverrides,
-                    it.actionId!,
-                  );
+                  Object.prototype.hasOwnProperty.call(settings.shortcutOverrides, it.actionId!);
                 return (
                   <Box
                     key={it.keys + it.description}
@@ -303,17 +282,9 @@ function KeyboardShortcutList() {
                         color: "text.primary",
                       }}
                     >
-                      {rebindable
-                        ? live === null
-                          ? "(disabled)"
-                          : formatCombo(live)
-                        : it.keys}
+                      {rebindable ? (live === null ? "(disabled)" : formatCombo(live)) : it.keys}
                     </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ flex: 1 }}
-                    >
+                    <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
                       {it.description}
                     </Typography>
                     {rebindable && (
@@ -328,9 +299,7 @@ function KeyboardShortcutList() {
                         <Button
                           size="small"
                           variant="text"
-                          onClick={() =>
-                            updateOverride(it.actionId!, null)
-                          }
+                          onClick={() => updateOverride(it.actionId!, null)}
                           disabled={live === null}
                         >
                           Disable
@@ -411,11 +380,7 @@ function KeyRecorderDialog({
         >
           {captured ? formatCombo(captured) : "—"}
         </Typography>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", mt: 1 }}
-        >
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
           Esc cancels. Press the same combo again to confirm.
         </Typography>
         <Box sx={{ mt: 2, display: "flex", justifyContent: "center", gap: 1 }}>
@@ -458,21 +423,14 @@ function CrashReportingBlock() {
         control={
           <Switch
             checked={settings.crashReportsEnabled}
-            onChange={(e) =>
-              update("crashReportsEnabled", e.target.checked)
-            }
+            onChange={(e) => update("crashReportsEnabled", e.target.checked)}
           />
         }
         label="Save crash logs (opt-in, local only)"
       />
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: "block", mb: 1 }}
-      >
-        Writes one log per Rust panic to{" "}
-        <code>app_data/crashes/&lt;ts&gt;.log</code>. Local-only — never
-        submitted anywhere. Toggle takes effect on the next app launch.
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+        Writes one log per Rust panic to <code>app_data/crashes/&lt;ts&gt;.log</code>. Local-only —
+        never submitted anywhere. Toggle takes effect on the next app launch.
         {count !== null && count > 0 && ` ${count} log${count === 1 ? "" : "s"} saved.`}
       </Typography>
       <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
@@ -526,14 +484,9 @@ function ThumbnailCacheBlock() {
       <Typography variant="body2" sx={{ mb: 0.5 }}>
         Thumbnail cache
       </Typography>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: "block", mb: 1 }}
-      >
-        SQLite-backed cache used by Tile + Gallery views. Keyed by
-        (path, mtime, size, requested size) so edits invalidate
-        automatically.
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+        SQLite-backed cache used by Tile + Gallery views. Keyed by (path, mtime, size, requested
+        size) so edits invalidate automatically.
         {unavailable
           ? " (unavailable — cache failed to initialize)"
           : stats
@@ -603,8 +556,8 @@ function CustomFileKindsEditor() {
     <Box>
       <Typography variant="subtitle2">Custom file-kind icons</Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-        Map an extension to a different icon kind. Useful when the
-        built-in detection treats your favorite extension as binary.
+        Map an extension to a different icon kind. Useful when the built-in detection treats your
+        favorite extension as binary.
       </Typography>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1, flexWrap: "wrap" }}>
         <TextField
@@ -615,10 +568,7 @@ function CustomFileKindsEditor() {
           sx={{ maxWidth: 120 }}
         />
         <FormControl size="small" sx={{ minWidth: 160 }}>
-          <Select
-            value={kindInput}
-            onChange={(e) => setKindInput(e.target.value)}
-          >
+          <Select value={kindInput} onChange={(e) => setKindInput(e.target.value)}>
             {KINDS.map((k) => (
               <MenuItem key={k} value={k}>
                 {k}
@@ -678,11 +628,7 @@ function SavedDataEditor() {
   const { settings, update } = useSettings();
 
   const renameItem = <
-    K extends
-      | "tabWorkspaces"
-      | "savedSelections"
-      | "savedSearches"
-      | "savedSyncJobs",
+    K extends "tabWorkspaces" | "savedSelections" | "savedSearches" | "savedSyncJobs",
   >(
     key: K,
     id: string,
@@ -693,19 +639,10 @@ function SavedDataEditor() {
     const trimmed = next.trim();
     if (!trimmed) return;
     const list = settings[key] as Array<{ id: string; label: string }>;
-    update(
-      key,
-      list.map((x) =>
-        x.id === id ? { ...x, label: trimmed } : x,
-      ) as Settings[K],
-    );
+    update(key, list.map((x) => (x.id === id ? { ...x, label: trimmed } : x)) as Settings[K]);
   };
   const deleteItem = <
-    K extends
-      | "tabWorkspaces"
-      | "savedSelections"
-      | "savedSearches"
-      | "savedSyncJobs",
+    K extends "tabWorkspaces" | "savedSelections" | "savedSearches" | "savedSyncJobs",
   >(
     key: K,
     id: string,
@@ -763,11 +700,7 @@ function SavedDataEditor() {
                   </Typography>
                 )}
               </Box>
-              <Button
-                size="small"
-                variant="text"
-                onClick={() => onRename(it.id, it.label)}
-              >
+              <Button size="small" variant="text" onClick={() => onRename(it.id, it.label)}>
                 Rename
               </Button>
               <Button
@@ -804,9 +737,7 @@ function SavedDataEditor() {
         onDelete={(id, label) => deleteItem("savedSelections", id, label)}
         secondary={(it) => {
           const sel = settings.savedSelections.find((x) => x.id === it.id);
-          return sel
-            ? `${sel.paths.length} path${sel.paths.length === 1 ? "" : "s"}`
-            : "";
+          return sel ? `${sel.paths.length} path${sel.paths.length === 1 ? "" : "s"}` : "";
         }}
       />
       <Block
@@ -849,7 +780,10 @@ function SavedDataEditor() {
  * triple as a string, e.g. `"0.2.302"`.
  */
 function normalizeVersion(v: string): string {
-  return v.replace(/^v/, "").replace(/\s*\[DEV\]\s*$/, "").trim();
+  return v
+    .replace(/^v/, "")
+    .replace(/\s*\[DEV\]\s*$/, "")
+    .trim();
 }
 
 /**
@@ -859,8 +793,12 @@ function normalizeVersion(v: string): string {
  * the Up-to-date / Update-available badge in Settings → About.
  */
 function compareVersions(a: string, b: string): number {
-  const pa = normalizeVersion(a).split(".").map((s) => Number.parseInt(s, 10) || 0);
-  const pb = normalizeVersion(b).split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const pa = normalizeVersion(a)
+    .split(".")
+    .map((s) => Number.parseInt(s, 10) || 0);
+  const pb = normalizeVersion(b)
+    .split(".")
+    .map((s) => Number.parseInt(s, 10) || 0);
   const n = Math.max(pa.length, pb.length);
   for (let i = 0; i < n; i++) {
     const ai = pa[i] ?? 0;
@@ -912,9 +850,7 @@ function formatReleaseTimestamp(iso: string | null): string | null {
  *   - "error"    — IPC failed (running outside Tauri, for example).
  */
 function MacosPermissionsSection() {
-  const [status, setStatus] = useState<
-    "checking" | "granted" | "denied" | "error"
-  >("checking");
+  const [status, setStatus] = useState<"checking" | "granted" | "denied" | "error">("checking");
   const refresh = () => {
     setStatus("checking");
     macosCheckFullDiskAccess()
@@ -962,12 +898,7 @@ function MacosPermissionsSection() {
         {statusChip}
       </Stack>
       <Stack direction="row" spacing={1}>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={refresh}
-          disabled={status === "checking"}
-        >
+        <Button variant="outlined" size="small" onClick={refresh} disabled={status === "checking"}>
           Refresh status
         </Button>
         <Button
@@ -985,9 +916,9 @@ function MacosPermissionsSection() {
       </Stack>
       {status === "denied" && (
         <Typography variant="caption" color="text.secondary">
-          Toggle <strong>Skiff Files</strong> on in System Settings → Privacy &
-          Security → Full Disk Access, then relaunch the app. Click{" "}
-          <strong>Refresh status</strong> after relaunch to confirm.
+          Toggle <strong>Skiff Files</strong> on in System Settings → Privacy & Security → Full Disk
+          Access, then relaunch the app. Click <strong>Refresh status</strong> after relaunch to
+          confirm.
         </Typography>
       )}
     </Section>
@@ -1007,9 +938,7 @@ export default function SettingsPage() {
   // fetch failed (offline, rate limit, etc.); the About row falls back
   // to "unknown" rather than rendering an error chip.
   const [latestTag, setLatestTag] = useState<string | null>(null);
-  const [latestPublishedAt, setLatestPublishedAt] = useState<string | null>(
-    null,
-  );
+  const [latestPublishedAt, setLatestPublishedAt] = useState<string | null>(null);
   const [latestStatus, setLatestStatus] = useState<
     "checking" | "up-to-date" | "behind" | "ahead" | "error"
   >("checking");
@@ -1073,1295 +1002,1180 @@ export default function SettingsPage() {
   return (
     <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
       <Box sx={{ maxWidth: 720, mx: "auto" }}>
-      <Typography variant="h4" gutterBottom>
-        Settings
-      </Typography>
-      <Box sx={{ mb: 2 }}>
-        <Stack direction="row" spacing={1} sx={{ mb: 0.5, alignItems: "center" }}>
-          <Typography variant="caption" color="text.secondary">
-            Skiff Files
+        <Typography variant="h4" gutterBottom>
+          Settings
+        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <Stack direction="row" spacing={1} sx={{ mb: 0.5, alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary">
+              Skiff Files
+            </Typography>
+            {statusBadge}
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            Version: {normalizeVersion(version)}
+            {builtAt ? ` (${builtAt})` : ""}
           </Typography>
-          {statusBadge}
-        </Stack>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          Version: {normalizeVersion(version)}
-          {builtAt ? ` (${builtAt})` : ""}
-        </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          Latest: {latestVersionLabel}
-          {latestPublishedLabel ? ` (${latestPublishedLabel})` : ""}
-        </Typography>
-      </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            Latest: {latestVersionLabel}
+            {latestPublishedLabel ? ` (${latestPublishedLabel})` : ""}
+          </Typography>
+        </Box>
 
-      <Stack spacing={4}>
-        <Section
-          title="Appearance"
-          description="Theme follows your operating system by default."
-        >
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="theme-mode-label">Theme</InputLabel>
-            <Select
-              labelId="theme-mode-label"
-              label="Theme"
-              value={settings.themeMode}
-              onChange={(e) =>
-                update("themeMode", e.target.value as typeof settings.themeMode)
+        <Stack spacing={4}>
+          <Section title="Appearance" description="Theme follows your operating system by default.">
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="theme-mode-label">Theme</InputLabel>
+              <Select
+                labelId="theme-mode-label"
+                label="Theme"
+                value={settings.themeMode}
+                onChange={(e) => update("themeMode", e.target.value as typeof settings.themeMode)}
+              >
+                <MenuItem value="system">System</MenuItem>
+                <MenuItem value="light">Light</MenuItem>
+                <MenuItem value="dark">Dark</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="language-label">Language</InputLabel>
+              <Select
+                labelId="language-label"
+                label="Language"
+                value={settings.language}
+                onChange={(e) => update("language", e.target.value)}
+              >
+                {SUPPORTED_LOCALES.map((code) => (
+                  <MenuItem key={code} value={code}>
+                    {LOCALE_LABELS[code] ?? code}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="font-size-label">Font size</InputLabel>
+              <Select
+                labelId="font-size-label"
+                label="Font size"
+                value={settings.fontSize}
+                onChange={(e) => update("fontSize", e.target.value as typeof settings.fontSize)}
+              >
+                <MenuItem value="small">Small</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="large">Large</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="density-label">Density</InputLabel>
+              <Select
+                labelId="density-label"
+                label="Density"
+                value={settings.density}
+                onChange={(e) => update("density", e.target.value as typeof settings.density)}
+              >
+                <MenuItem value="comfortable">Comfortable</MenuItem>
+                <MenuItem value="compact">Compact</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="date-format-label">Date format</InputLabel>
+              <Select
+                labelId="date-format-label"
+                label="Date format"
+                value={settings.dateFormat}
+                onChange={(e) => update("dateFormat", e.target.value as typeof settings.dateFormat)}
+              >
+                <MenuItem value="locale">Locale (default)</MenuItem>
+                <MenuItem value="iso">ISO-8601 (sortable)</MenuItem>
+                <MenuItem value="short">Short (YYYY-MM-DD HH:mm)</MenuItem>
+                <MenuItem value="relative">Relative (5m ago)</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.showFullPathInTitle}
+                  onChange={(e) => update("showFullPathInTitle", e.target.checked)}
+                />
               }
-            >
-              <MenuItem value="system">System</MenuItem>
-              <MenuItem value="light">Light</MenuItem>
-              <MenuItem value="dark">Dark</MenuItem>
-            </Select>
-          </FormControl>
+              label="Show full path in window title"
+            />
 
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="language-label">Language</InputLabel>
-            <Select
-              labelId="language-label"
-              label="Language"
-              value={settings.language}
-              onChange={(e) => update("language", e.target.value)}
-            >
-              {SUPPORTED_LOCALES.map((code) => (
-                <MenuItem key={code} value={code}>
-                  {LOCALE_LABELS[code] ?? code}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="font-size-label">Font size</InputLabel>
-            <Select
-              labelId="font-size-label"
-              label="Font size"
-              value={settings.fontSize}
-              onChange={(e) =>
-                update("fontSize", e.target.value as typeof settings.fontSize)
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.alwaysOnTop}
+                  onChange={(e) => update("alwaysOnTop", e.target.checked)}
+                />
               }
-            >
-              <MenuItem value="small">Small</MenuItem>
-              <MenuItem value="medium">Medium</MenuItem>
-              <MenuItem value="large">Large</MenuItem>
-            </Select>
-          </FormControl>
+              label="Keep window always on top"
+            />
 
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="density-label">Density</InputLabel>
-            <Select
-              labelId="density-label"
-              label="Density"
-              value={settings.density}
-              onChange={(e) =>
-                update("density", e.target.value as typeof settings.density)
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.reduceMotion}
+                  onChange={(e) => update("reduceMotion", e.target.checked)}
+                />
               }
-            >
-              <MenuItem value="comfortable">Comfortable</MenuItem>
-              <MenuItem value="compact">Compact</MenuItem>
-            </Select>
-          </FormControl>
+              label="Reduce motion (also auto-detects from OS)"
+            />
 
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="date-format-label">Date format</InputLabel>
-            <Select
-              labelId="date-format-label"
-              label="Date format"
-              value={settings.dateFormat}
-              onChange={(e) =>
-                update(
-                  "dateFormat",
-                  e.target.value as typeof settings.dateFormat,
-                )
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.showStatusBar}
+                  onChange={(e) => update("showStatusBar", e.target.checked)}
+                />
               }
-            >
-              <MenuItem value="locale">Locale (default)</MenuItem>
-              <MenuItem value="iso">ISO-8601 (sortable)</MenuItem>
-              <MenuItem value="short">Short (YYYY-MM-DD HH:mm)</MenuItem>
-              <MenuItem value="relative">Relative (5m ago)</MenuItem>
-            </Select>
-          </FormControl>
+              label="Show status bar"
+            />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.showFullPathInTitle}
+            <TextField
+              label="Default start path"
+              size="small"
+              value={settings.startPath}
+              onChange={(e) => update("startPath", e.target.value)}
+              placeholder="(empty = home directory)"
+              helperText="Where new tabs / launches open. Leave blank to use the home directory."
+              sx={{ maxWidth: 480 }}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.openNewTabAtCurrent}
+                  onChange={(e) => update("openNewTabAtCurrent", e.target.checked)}
+                />
+              }
+              label="New tabs open at the active tab's path (instead of home)"
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.twoPaneMode}
+                  onChange={(e) => update("twoPaneMode", e.target.checked)}
+                />
+              }
+              label="Two-pane mode (split view, FileZilla-style — Cmd/Ctrl+\\ toggles)"
+            />
+
+            <FormControl size="small" sx={{ maxWidth: 360 }}>
+              <InputLabel id="bulk-bar-labels">Action bar labels</InputLabel>
+              <Select
+                labelId="bulk-bar-labels"
+                label="Action bar labels"
+                value={settings.bulkActionBarLabels}
                 onChange={(e) =>
-                  update("showFullPathInTitle", e.target.checked)
+                  update(
+                    "bulkActionBarLabels",
+                    e.target.value as typeof settings.bulkActionBarLabels,
+                  )
                 }
-              />
-            }
-            label="Show full path in window title"
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.alwaysOnTop}
-                onChange={(e) => update("alwaysOnTop", e.target.checked)}
-              />
-            }
-            label="Keep window always on top"
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.reduceMotion}
-                onChange={(e) => update("reduceMotion", e.target.checked)}
-              />
-            }
-            label="Reduce motion (also auto-detects from OS)"
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.showStatusBar}
-                onChange={(e) => update("showStatusBar", e.target.checked)}
-              />
-            }
-            label="Show status bar"
-          />
-
-          <TextField
-            label="Default start path"
-            size="small"
-            value={settings.startPath}
-            onChange={(e) => update("startPath", e.target.value)}
-            placeholder="(empty = home directory)"
-            helperText="Where new tabs / launches open. Leave blank to use the home directory."
-            sx={{ maxWidth: 480 }}
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.openNewTabAtCurrent}
-                onChange={(e) =>
-                  update("openNewTabAtCurrent", e.target.checked)
-                }
-              />
-            }
-            label="New tabs open at the active tab's path (instead of home)"
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.twoPaneMode}
-                onChange={(e) => update("twoPaneMode", e.target.checked)}
-              />
-            }
-            label="Two-pane mode (split view, FileZilla-style — Cmd/Ctrl+\\ toggles)"
-          />
-
-          <FormControl size="small" sx={{ maxWidth: 360 }}>
-            <InputLabel id="bulk-bar-labels">Action bar labels</InputLabel>
-            <Select
-              labelId="bulk-bar-labels"
-              label="Action bar labels"
-              value={settings.bulkActionBarLabels}
-              onChange={(e) =>
-                update(
-                  "bulkActionBarLabels",
-                  e.target.value as typeof settings.bulkActionBarLabels,
-                )
-              }
-            >
-              {/* "auto" mirrors the 0.2.270 behavior: text+icon in
+              >
+                {/* "auto" mirrors the 0.2.270 behavior: text+icon in
                   single-pane, icon-only in two-pane (where labels
                   would otherwise wrap into the right pane). The two
                   explicit modes pin it regardless of pane mode. */}
-              <MenuItem value="auto">Auto (icons in split view, labels otherwise)</MenuItem>
-              <MenuItem value="labels">Always show labels</MenuItem>
-              <MenuItem value="icons">Always icon-only (tooltips on hover)</MenuItem>
-            </Select>
-          </FormControl>
+                <MenuItem value="auto">Auto (icons in split view, labels otherwise)</MenuItem>
+                <MenuItem value="labels">Always show labels</MenuItem>
+                <MenuItem value="icons">Always icon-only (tooltips on hover)</MenuItem>
+              </Select>
+            </FormControl>
 
-          <Divider sx={{ my: 1 }} />
-          <Typography variant="subtitle2">Custom palette</Typography>
-          <Typography variant="caption" color="text.secondary">
-            Pick a preset per mode, or fine-tune individual slots below.
-            Leave a swatch on the default to inherit the built-in color.
-          </Typography>
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="subtitle2">Custom palette</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Pick a preset per mode, or fine-tune individual slots below. Leave a swatch on the
+              default to inherit the built-in color.
+            </Typography>
 
-          {(
-            [
-              ["customLightPalette", "Light mode", "light-preset-label"],
-              ["customDarkPalette", "Dark mode", "dark-preset-label"],
-            ] as const
-          ).map(([key, label, labelId]) => {
-            const palette = settings[key];
-            // A preset is "active" when every slot in the saved palette
-            // matches the preset's hex. This lets us select the dropdown
-            // option the user picked even after a reload. Empty palette =
-            // "Default" (inherit built-in). Any partial / hand-edited
-            // palette shows as "Custom".
-            const isEmpty =
-              !palette.primaryMain &&
-              !palette.backgroundDefault &&
-              !palette.backgroundPaper &&
-              !palette.textPrimary &&
-              !palette.textSecondary;
-            const activePresetId = PRESETS.find(
-              (p) =>
-                palette.primaryMain.toLowerCase() === p.primaryMain.toLowerCase() &&
-                palette.backgroundDefault.toLowerCase() ===
-                  p.backgroundDefault.toLowerCase() &&
-                palette.backgroundPaper.toLowerCase() ===
-                  p.backgroundPaper.toLowerCase() &&
-                palette.textPrimary.toLowerCase() === p.textPrimary.toLowerCase() &&
-                palette.textSecondary.toLowerCase() ===
-                  p.textSecondary.toLowerCase(),
-            )?.id;
-            const selectValue = isEmpty
-              ? "__default__"
-              : (activePresetId ?? "__custom__");
-            return (
-              <Box key={key}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    flexWrap: "wrap",
-                    mb: 0.75,
-                  }}
-                >
-                  <Typography variant="body2" sx={{ minWidth: 80 }} id={labelId}>
-                    {label}
-                  </Typography>
-                  <FormControl size="small" sx={{ minWidth: 220 }}>
-                    <Select
-                      aria-labelledby={labelId}
-                      value={selectValue}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "__default__") {
-                          // Default clears this mode's palette so the
-                          // built-in slots win. Replaces the old global
-                          // Reset palette button.
-                          update(key, {
-                            primaryMain: "",
-                            backgroundDefault: "",
-                            backgroundPaper: "",
-                            textPrimary: "",
-                            textSecondary: "",
-                          });
-                          return;
-                        }
-                        if (v === "__custom__") return; // read-only marker
-                        const p = PRESETS.find((x) => x.id === v);
-                        if (!p) return;
-                        update(key, {
-                          primaryMain: p.primaryMain,
-                          backgroundDefault: p.backgroundDefault,
-                          backgroundPaper: p.backgroundPaper,
-                          textPrimary: p.textPrimary,
-                          textSecondary: p.textSecondary,
-                        });
-                        // Selecting a preset implies the user wants the
-                        // custom palette on; the previous explicit
-                        // toggle was a useless click before reaching
-                        // the dropdown.
-                        update("useCustomTheme", true);
-                      }}
-                    >
-                      <MenuItem value="__default__">Default</MenuItem>
-                      {selectValue === "__custom__" && (
-                        <MenuItem value="__custom__">Custom</MenuItem>
-                      )}
-                      {PRESETS.map((p) => (
-                        <MenuItem key={p.id} value={p.id}>
-                          {p.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  {(
-                    [
-                      ["primaryMain", "Primary"],
-                      ["backgroundDefault", "Background"],
-                      ["backgroundPaper", "Paper"],
-                      ["textPrimary", "Text"],
-                      ["textSecondary", "Text dim"],
-                    ] as const
-                  ).map(([slot, slotLabel]) => {
-                    const value = palette[slot] || "";
-                    return (
-                      <Box
-                        key={slot}
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                      >
-                        <input
-                          type="color"
-                          value={value || "#000000"}
-                          onChange={(e) =>
+            {(
+              [
+                ["customLightPalette", "Light mode", "light-preset-label"],
+                ["customDarkPalette", "Dark mode", "dark-preset-label"],
+              ] as const
+            ).map(([key, label, labelId]) => {
+              const palette = settings[key];
+              // A preset is "active" when every slot in the saved palette
+              // matches the preset's hex. This lets us select the dropdown
+              // option the user picked even after a reload. Empty palette =
+              // "Default" (inherit built-in). Any partial / hand-edited
+              // palette shows as "Custom".
+              const isEmpty =
+                !palette.primaryMain &&
+                !palette.backgroundDefault &&
+                !palette.backgroundPaper &&
+                !palette.textPrimary &&
+                !palette.textSecondary;
+              const activePresetId = PRESETS.find(
+                (p) =>
+                  palette.primaryMain.toLowerCase() === p.primaryMain.toLowerCase() &&
+                  palette.backgroundDefault.toLowerCase() === p.backgroundDefault.toLowerCase() &&
+                  palette.backgroundPaper.toLowerCase() === p.backgroundPaper.toLowerCase() &&
+                  palette.textPrimary.toLowerCase() === p.textPrimary.toLowerCase() &&
+                  palette.textSecondary.toLowerCase() === p.textSecondary.toLowerCase(),
+              )?.id;
+              const selectValue = isEmpty ? "__default__" : (activePresetId ?? "__custom__");
+              return (
+                <Box key={key}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      flexWrap: "wrap",
+                      mb: 0.75,
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ minWidth: 80 }} id={labelId}>
+                      {label}
+                    </Typography>
+                    <FormControl size="small" sx={{ minWidth: 220 }}>
+                      <Select
+                        aria-labelledby={labelId}
+                        value={selectValue}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "__default__") {
+                            // Default clears this mode's palette so the
+                            // built-in slots win. Replaces the old global
+                            // Reset palette button.
                             update(key, {
-                              ...palette,
-                              [slot]: e.target.value,
-                            })
+                              primaryMain: "",
+                              backgroundDefault: "",
+                              backgroundPaper: "",
+                              textPrimary: "",
+                              textSecondary: "",
+                            });
+                            return;
                           }
-                          style={{
-                            width: 32,
-                            height: 32,
-                            padding: 0,
-                            border: "none",
-                            background: "none",
-                          }}
-                        />
-                        <Typography variant="caption">{slotLabel}</Typography>
-                      </Box>
-                    );
-                  })}
+                          if (v === "__custom__") return; // read-only marker
+                          const p = PRESETS.find((x) => x.id === v);
+                          if (!p) return;
+                          update(key, {
+                            primaryMain: p.primaryMain,
+                            backgroundDefault: p.backgroundDefault,
+                            backgroundPaper: p.backgroundPaper,
+                            textPrimary: p.textPrimary,
+                            textSecondary: p.textSecondary,
+                          });
+                          // Selecting a preset implies the user wants the
+                          // custom palette on; the previous explicit
+                          // toggle was a useless click before reaching
+                          // the dropdown.
+                          update("useCustomTheme", true);
+                        }}
+                      >
+                        <MenuItem value="__default__">Default</MenuItem>
+                        {selectValue === "__custom__" && (
+                          <MenuItem value="__custom__">Custom</MenuItem>
+                        )}
+                        {PRESETS.map((p) => (
+                          <MenuItem key={p.id} value={p.id}>
+                            {p.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    {(
+                      [
+                        ["primaryMain", "Primary"],
+                        ["backgroundDefault", "Background"],
+                        ["backgroundPaper", "Paper"],
+                        ["textPrimary", "Text"],
+                        ["textSecondary", "Text dim"],
+                      ] as const
+                    ).map(([slot, slotLabel]) => {
+                      const value = palette[slot] || "";
+                      return (
+                        <Box key={slot} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <input
+                            type="color"
+                            value={value || "#000000"}
+                            onChange={(e) =>
+                              update(key, {
+                                ...palette,
+                                [slot]: e.target.value,
+                              })
+                            }
+                            style={{
+                              width: 32,
+                              height: 32,
+                              padding: 0,
+                              border: "none",
+                              background: "none",
+                            }}
+                          />
+                          <Typography variant="caption">{slotLabel}</Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
                 </Box>
-              </Box>
-            );
-          })}
-        </Section>
+              );
+            })}
+          </Section>
 
-        {isMacOs() && (
-          <>
-            <Divider />
-            <MacosPermissionsSection />
-          </>
-        )}
+          {isMacOs() && (
+            <>
+              <Divider />
+              <MacosPermissionsSection />
+            </>
+          )}
 
-        <Divider />
+          <Divider />
 
-        <Section
-          title="Default view"
-          description="Used for folders without a saved per-folder preference. Each folder otherwise remembers its own view mode, sort key, and sort direction independently — use “Apply to all folders” below to reset every per-folder override and force the global default everywhere."
-        >
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="view-mode-label">View mode</InputLabel>
-            <Select
-              labelId="view-mode-label"
-              label="View mode"
-              value={settings.defaultView}
-              onChange={(e) =>
-                update("defaultView", e.target.value as typeof settings.defaultView)
-              }
-            >
-              {/* Same four icons the Toolbar's view-mode toggle uses
+          <Section
+            title="Default view"
+            description="Used for folders without a saved per-folder preference. Each folder otherwise remembers its own view mode, sort key, and sort direction independently — use “Apply to all folders” below to reset every per-folder override and force the global default everywhere."
+          >
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="view-mode-label">View mode</InputLabel>
+              <Select
+                labelId="view-mode-label"
+                label="View mode"
+                value={settings.defaultView}
+                onChange={(e) =>
+                  update("defaultView", e.target.value as typeof settings.defaultView)
+                }
+              >
+                {/* Same four icons the Toolbar's view-mode toggle uses
                   (ViewListIcon / ViewModuleIcon / ViewCarouselIcon /
                   ViewColumnIcon) so the Settings dropdown reads as a
                   cousin of the inline toggle, not a parallel surface
                   with different visuals. */}
-              <MenuItem value="list">
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <ViewListIcon fontSize="small" />
-                  List
-                </Box>
-              </MenuItem>
-              <MenuItem value="tile">
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <ViewModuleIcon fontSize="small" />
-                  Tile
-                </Box>
-              </MenuItem>
-              <MenuItem value="gallery">
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <ViewCarouselIcon fontSize="small" />
-                  Gallery
-                </Box>
-              </MenuItem>
-              <MenuItem value="column">
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <ViewColumnIcon fontSize="small" />
-                  Column
-                </Box>
-              </MenuItem>
-            </Select>
-          </FormControl>
-
-          <Stack direction="row" spacing={2}>
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel id="default-sort-key-label">Default sort</InputLabel>
-              <Select
-                labelId="default-sort-key-label"
-                label="Default sort"
-                value={settings.defaultSortKey}
-                onChange={(e) =>
-                  update(
-                    "defaultSortKey",
-                    e.target.value as typeof settings.defaultSortKey,
-                  )
-                }
-              >
-                <MenuItem value="name">Name</MenuItem>
-                <MenuItem value="size">Size</MenuItem>
-                <MenuItem value="mtime">Modified</MenuItem>
-                <MenuItem value="ctime">Created</MenuItem>
-                <MenuItem value="kind">Kind</MenuItem>
+                <MenuItem value="list">
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ViewListIcon fontSize="small" />
+                    List
+                  </Box>
+                </MenuItem>
+                <MenuItem value="tile">
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ViewModuleIcon fontSize="small" />
+                    Tile
+                  </Box>
+                </MenuItem>
+                <MenuItem value="gallery">
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ViewCarouselIcon fontSize="small" />
+                    Gallery
+                  </Box>
+                </MenuItem>
+                <MenuItem value="column">
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <ViewColumnIcon fontSize="small" />
+                    Column
+                  </Box>
+                </MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel id="default-sort-dir-label">Direction</InputLabel>
-              <Select
-                labelId="default-sort-dir-label"
-                label="Direction"
-                value={settings.defaultSortDir}
-                onChange={(e) =>
-                  update(
-                    "defaultSortDir",
-                    e.target.value as typeof settings.defaultSortDir,
-                  )
-                }
-              >
-                {/* Same up / down arrow icons the FileList header
+
+            <Stack direction="row" spacing={2}>
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel id="default-sort-key-label">Default sort</InputLabel>
+                <Select
+                  labelId="default-sort-key-label"
+                  label="Default sort"
+                  value={settings.defaultSortKey}
+                  onChange={(e) =>
+                    update("defaultSortKey", e.target.value as typeof settings.defaultSortKey)
+                  }
+                >
+                  <MenuItem value="name">Name</MenuItem>
+                  <MenuItem value="size">Size</MenuItem>
+                  <MenuItem value="mtime">Modified</MenuItem>
+                  <MenuItem value="ctime">Created</MenuItem>
+                  <MenuItem value="kind">Kind</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel id="default-sort-dir-label">Direction</InputLabel>
+                <Select
+                  labelId="default-sort-dir-label"
+                  label="Direction"
+                  value={settings.defaultSortDir}
+                  onChange={(e) =>
+                    update("defaultSortDir", e.target.value as typeof settings.defaultSortDir)
+                  }
+                >
+                  {/* Same up / down arrow icons the FileList header
                     column uses to mark the active sort direction, so
                     the Settings picker reads as the same affordance
                     rather than a parallel surface. */}
-                <MenuItem value="asc">
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <ArrowUpwardIcon fontSize="small" />
-                    Ascending
-                  </Box>
-                </MenuItem>
-                <MenuItem value="desc">
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <ArrowDownwardIcon fontSize="small" />
-                    Descending
-                  </Box>
-                </MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
+                  <MenuItem value="asc">
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <ArrowUpwardIcon fontSize="small" />
+                      Ascending
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="desc">
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <ArrowDownwardIcon fontSize="small" />
+                      Descending
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
 
-          {/* Default zoom — same global zoom Settings.viewZoom that
+            {/* Default zoom — same global zoom Settings.viewZoom that
               the status-bar +/- cluster mutates. Surfacing it here as
               a dropdown is the discoverable surface; the status bar
               is the one-click adjustment. Steps match the StatusBar
               clamp (50 / 75 / 100 / 125 / 150 / 175 / 200). */}
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="default-zoom-label">Default zoom</InputLabel>
-            <Select
-              labelId="default-zoom-label"
-              label="Default zoom"
-              value={String(settings.viewZoom ?? 1)}
-              onChange={(e) => update("viewZoom", Number(e.target.value))}
-            >
-              {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((z) => (
-                <MenuItem key={z} value={String(z)}>
-                  {Math.round(z * 100)}%
-                  {z === 1 ? " (default)" : ""}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="default-zoom-label">Default zoom</InputLabel>
+              <Select
+                labelId="default-zoom-label"
+                label="Default zoom"
+                value={String(settings.viewZoom ?? 1)}
+                onChange={(e) => update("viewZoom", Number(e.target.value))}
+              >
+                {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((z) => (
+                  <MenuItem key={z} value={String(z)}>
+                    {Math.round(z * 100)}%{z === 1 ? " (default)" : ""}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.groupFoldersFirst}
-                onChange={(e) =>
-                  update("groupFoldersFirst", e.target.checked)
-                }
-              />
-            }
-            label="Group folders before files"
-          />
-
-          <Box>
-            <Typography variant="body2" sx={{ mb: 0.5 }}>
-              List view columns
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {(["size", "modified", "kind"] as const).map((col) => (
-                <FormControlLabel
-                  key={col}
-                  control={
-                    <Switch
-                      checked={!settings.hideColumns[col]}
-                      onChange={(e) =>
-                        update("hideColumns", {
-                          ...settings.hideColumns,
-                          [col]: !e.target.checked,
-                        })
-                      }
-                    />
-                  }
-                  label={col.charAt(0).toUpperCase() + col.slice(1)}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.groupFoldersFirst}
+                  onChange={(e) => update("groupFoldersFirst", e.target.checked)}
                 />
-              ))}
+              }
+              label="Group folders before files"
+            />
+
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>
+                List view columns
+              </Typography>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                {(["size", "modified", "kind"] as const).map((col) => (
+                  <FormControlLabel
+                    key={col}
+                    control={
+                      <Switch
+                        checked={!settings.hideColumns[col]}
+                        onChange={(e) =>
+                          update("hideColumns", {
+                            ...settings.hideColumns,
+                            [col]: !e.target.checked,
+                          })
+                        }
+                      />
+                    }
+                    label={col.charAt(0).toUpperCase() + col.slice(1)}
+                  />
+                ))}
+              </Box>
             </Box>
-          </Box>
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.showHidden}
-                onChange={(e) => update("showHidden", e.target.checked)}
-              />
-            }
-            label="Show hidden files (dotfiles)"
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.hideSystemFiles}
-                onChange={(e) => update("hideSystemFiles", e.target.checked)}
-              />
-            }
-            label="Hide system files (.DS_Store, Thumbs.db, desktop.ini)"
-          />
-
-          <FormControl size="small" sx={{ maxWidth: 280 }}>
-            <InputLabel id="show-ext-label">Show file extensions</InputLabel>
-            <Select
-              labelId="show-ext-label"
-              label="Show file extensions"
-              value={settings.showExtensions}
-              onChange={(e) =>
-                update(
-                  "showExtensions",
-                  e.target.value as typeof settings.showExtensions,
-                )
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.showHidden}
+                  onChange={(e) => update("showHidden", e.target.checked)}
+                />
               }
-            >
-              <MenuItem value="always">Always</MenuItem>
-              <MenuItem value="never">Never</MenuItem>
-              <MenuItem value="whenAmbiguous">When ambiguous</MenuItem>
-            </Select>
-          </FormControl>
+              label="Show hidden files (dotfiles)"
+            />
 
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="preview-mode-label">Preview pane</InputLabel>
-            <Select
-              labelId="preview-mode-label"
-              label="Preview pane"
-              value={settings.previewMode}
-              onChange={(e) =>
-                update(
-                  "previewMode",
-                  e.target.value as typeof settings.previewMode,
-                )
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.hideSystemFiles}
+                  onChange={(e) => update("hideSystemFiles", e.target.checked)}
+                />
               }
-            >
-              <MenuItem value="off">Off</MenuItem>
-              <MenuItem value="imagesOnly">Images only</MenuItem>
-              <MenuItem value="always">Always show</MenuItem>
-            </Select>
-          </FormControl>
+              label="Hide system files (.DS_Store, Thumbs.db, desktop.ini)"
+            />
 
-          {/* "Apply to all folders" — wipes every per-folder override
+            <FormControl size="small" sx={{ maxWidth: 280 }}>
+              <InputLabel id="show-ext-label">Show file extensions</InputLabel>
+              <Select
+                labelId="show-ext-label"
+                label="Show file extensions"
+                value={settings.showExtensions}
+                onChange={(e) =>
+                  update("showExtensions", e.target.value as typeof settings.showExtensions)
+                }
+              >
+                <MenuItem value="always">Always</MenuItem>
+                <MenuItem value="never">Never</MenuItem>
+                <MenuItem value="whenAmbiguous">When ambiguous</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="preview-mode-label">Preview pane</InputLabel>
+              <Select
+                labelId="preview-mode-label"
+                label="Preview pane"
+                value={settings.previewMode}
+                onChange={(e) =>
+                  update("previewMode", e.target.value as typeof settings.previewMode)
+                }
+              >
+                <MenuItem value="off">Off</MenuItem>
+                <MenuItem value="imagesOnly">Images only</MenuItem>
+                <MenuItem value="always">Always show</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* "Apply to all folders" — wipes every per-folder override
               for view mode + sort, forcing the global defaults set
               above to take effect everywhere. Same intent as Finder's
               "Use as Defaults" button at the bottom of the View
               Options panel. The count makes the destructive scope
               explicit so users don't trigger it expecting only a
               future-folders preference flip. */}
-          {(() => {
-            const folderViewCount = Object.keys(
-              settings.folderViewMode ?? {},
-            ).length;
-            const folderSortCount = Object.keys(
-              settings.folderSort ?? {},
-            ).length;
-            const total = folderViewCount + folderSortCount;
-            return (
-              <Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={total === 0}
-                  onClick={() => {
-                    update("folderViewMode", {});
-                    update("folderSort", {});
-                  }}
-                >
-                  {total === 0
-                    ? "No per-folder overrides to reset"
-                    : `Apply default to all folders (clears ${folderViewCount} view + ${folderSortCount} sort override${total === 1 ? "" : "s"})`}
-                </Button>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 0.5, display: "block" }}
-                >
-                  Mirrors Finder's “Use as Defaults”. New folders always
-                  start with the global defaults above; this only
-                  matters when you've changed view / sort in one or
-                  more specific folders since.
-                </Typography>
-              </Box>
-            );
-          })()}
-        </Section>
+            {(() => {
+              const folderViewCount = Object.keys(settings.folderViewMode ?? {}).length;
+              const folderSortCount = Object.keys(settings.folderSort ?? {}).length;
+              const total = folderViewCount + folderSortCount;
+              return (
+                <Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={total === 0}
+                    onClick={() => {
+                      update("folderViewMode", {});
+                      update("folderSort", {});
+                    }}
+                  >
+                    {total === 0
+                      ? "No per-folder overrides to reset"
+                      : `Apply default to all folders (clears ${folderViewCount} view + ${folderSortCount} sort override${total === 1 ? "" : "s"})`}
+                  </Button>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    Mirrors Finder's “Use as Defaults”. New folders always start with the global
+                    defaults above; this only matters when you've changed view / sort in one or more
+                    specific folders since.
+                  </Typography>
+                </Box>
+              );
+            })()}
+          </Section>
 
-        <Divider />
+          <Divider />
 
-        <Section
-          title="Sidebar"
-          description="Hide sections you never use. Hidden sections drop both their header and contents."
-        >
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.sidebarAccordion}
-                onChange={(e) =>
-                  update("sidebarAccordion", e.target.checked)
-                }
-              />
-            }
-            label="Accordion mode (only one section open at a time)"
-          />
+          <Section
+            title="Sidebar"
+            description="Hide sections you never use. Hidden sections drop both their header and contents."
+          >
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.sidebarAccordion}
+                  onChange={(e) => update("sidebarAccordion", e.target.checked)}
+                />
+              }
+              label="Accordion mode (only one section open at a time)"
+            />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.sidebarShowStatusDots}
-                onChange={(e) =>
-                  update("sidebarShowStatusDots", e.target.checked)
-                }
-              />
-            }
-            label="Show connection-status dots"
-          />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.sidebarShowStatusDots}
+                  onChange={(e) => update("sidebarShowStatusDots", e.target.checked)}
+                />
+              }
+              label="Show connection-status dots"
+            />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.sidebarIconOnly}
-                onChange={(e) =>
-                  update("sidebarIconOnly", e.target.checked)
-                }
-              />
-            }
-            label="Icon-only sidebar (hide labels)"
-          />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.sidebarIconOnly}
+                  onChange={(e) => update("sidebarIconOnly", e.target.checked)}
+                />
+              }
+              label="Icon-only sidebar (hide labels)"
+            />
 
-          <TextField
-            label="Recent paths shown in sidebar"
-            size="small"
-            type="number"
-            value={settings.recentPathsMax}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              if (!Number.isFinite(n)) return;
-              update("recentPathsMax", Math.max(0, Math.min(50, Math.floor(n))));
-            }}
-            helperText="0 disables recent-path tracking. The full history (up to 200) is always accessible via the sidebar's “Show more” button."
-            sx={{ maxWidth: 320 }}
-          />
+            <TextField
+              label="Recent paths shown in sidebar"
+              size="small"
+              type="number"
+              value={settings.recentPathsMax}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n)) return;
+                update("recentPathsMax", Math.max(0, Math.min(50, Math.floor(n))));
+              }}
+              helperText="0 disables recent-path tracking. The full history (up to 200) is always accessible via the sidebar's “Show more” button."
+              sx={{ maxWidth: 320 }}
+            />
 
-          {SIDEBAR_SECTION_DEFAULT_ORDER.map((id) => {
-            const visible = settings.sidebarSectionsVisible[id] !== false;
-            return (
-              <FormControlLabel
-                key={id}
-                control={
-                  <Switch
-                    checked={visible}
-                    onChange={(e) =>
-                      update("sidebarSectionsVisible", {
-                        ...settings.sidebarSectionsVisible,
-                        [id]: e.target.checked,
-                      })
-                    }
-                  />
-                }
-                label={`Show ${SIDEBAR_SECTION_LABELS[id]}`}
-              />
-            );
-          })}
+            {SIDEBAR_SECTION_DEFAULT_ORDER.map((id) => {
+              const visible = settings.sidebarSectionsVisible[id] !== false;
+              return (
+                <FormControlLabel
+                  key={id}
+                  control={
+                    <Switch
+                      checked={visible}
+                      onChange={(e) =>
+                        update("sidebarSectionsVisible", {
+                          ...settings.sidebarSectionsVisible,
+                          [id]: e.target.checked,
+                        })
+                      }
+                    />
+                  }
+                  label={`Show ${SIDEBAR_SECTION_LABELS[id]}`}
+                />
+              );
+            })}
 
-          {/* Section order — up/down buttons. Lives next to the
+            {/* Section order — up/down buttons. Lives next to the
               show/hide switches because the two surfaces fight for
               the same mental model ("which sections do I see, and
               in what order?"). Effective order seeds from the
               built-in default whenever `sidebarSectionOrder` is
               empty, then the user's first reorder freezes their
               full ordering into the array. */}
-          <Box sx={{ pt: 2 }}>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              Section order
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mb: 1 }}
-            >
-              Drag isn't wired here yet — use the arrows.
-              "Reset" restores the built-in order.
-            </Typography>
-            {(() => {
-              // Effective order = saved order first, then any
-              // default ids missing from the saved list (so a
-              // future-added section appears at the bottom rather
-              // than disappearing on an old settings.json).
-              const saved = settings.sidebarSectionOrder;
-              const merged: string[] = [];
-              const seen = new Set<string>();
-              for (const id of saved) {
-                if (
-                  (SIDEBAR_SECTION_DEFAULT_ORDER as readonly string[]).includes(
-                    id,
-                  ) &&
-                  !seen.has(id)
-                ) {
-                  merged.push(id);
-                  seen.add(id);
-                }
-              }
-              for (const id of SIDEBAR_SECTION_DEFAULT_ORDER) {
-                if (!seen.has(id)) {
-                  merged.push(id);
-                  seen.add(id);
-                }
-              }
-              const move = (idx: number, delta: number) => {
-                const next = [...merged];
-                const target = idx + delta;
-                if (target < 0 || target >= next.length) return;
-                [next[idx], next[target]] = [next[target], next[idx]];
-                update("sidebarSectionOrder", next);
-              };
-              return (
-                <List dense disablePadding sx={{ maxWidth: 320 }}>
-                  {merged.map((id, idx) => (
-                    <ListItem
-                      key={id}
-                      disablePadding
-                      sx={{
-                        border: 1,
-                        borderColor: "divider",
-                        borderRadius: 1,
-                        mb: 0.5,
-                        px: 1,
-                        py: 0.5,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ flex: 1 }}>
-                        {SIDEBAR_SECTION_LABELS[id] ?? id}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        disabled={idx === 0}
-                        onClick={() => move(idx, -1)}
-                        aria-label={`Move ${SIDEBAR_SECTION_LABELS[id]} up`}
-                      >
-                        <ArrowUpwardIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        disabled={idx === merged.length - 1}
-                        onClick={() => move(idx, 1)}
-                        aria-label={`Move ${SIDEBAR_SECTION_LABELS[id]} down`}
-                      >
-                        <ArrowDownwardIcon fontSize="small" />
-                      </IconButton>
-                    </ListItem>
-                  ))}
-                </List>
-              );
-            })()}
-            <Button
-              size="small"
-              variant="outlined"
-              sx={{ mt: 1 }}
-              disabled={settings.sidebarSectionOrder.length === 0}
-              onClick={() => update("sidebarSectionOrder", [])}
-            >
-              Reset section order
-            </Button>
-          </Box>
-
-          {settings.hiddenFavorites.length > 0 && (
-            <Box sx={{ pt: 1 }}>
+            <Box sx={{ pt: 2 }}>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Hidden favorites: {settings.hiddenFavorites.join(", ")}
+                Section order
               </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Drag isn't wired here yet — use the arrows. "Reset" restores the built-in order.
+              </Typography>
+              {(() => {
+                // Effective order = saved order first, then any
+                // default ids missing from the saved list (so a
+                // future-added section appears at the bottom rather
+                // than disappearing on an old settings.json).
+                const saved = settings.sidebarSectionOrder;
+                const merged: string[] = [];
+                const seen = new Set<string>();
+                for (const id of saved) {
+                  if (
+                    (SIDEBAR_SECTION_DEFAULT_ORDER as readonly string[]).includes(id) &&
+                    !seen.has(id)
+                  ) {
+                    merged.push(id);
+                    seen.add(id);
+                  }
+                }
+                for (const id of SIDEBAR_SECTION_DEFAULT_ORDER) {
+                  if (!seen.has(id)) {
+                    merged.push(id);
+                    seen.add(id);
+                  }
+                }
+                const move = (idx: number, delta: number) => {
+                  const next = [...merged];
+                  const target = idx + delta;
+                  if (target < 0 || target >= next.length) return;
+                  [next[idx], next[target]] = [next[target], next[idx]];
+                  update("sidebarSectionOrder", next);
+                };
+                return (
+                  <List dense disablePadding sx={{ maxWidth: 320 }}>
+                    {merged.map((id, idx) => (
+                      <ListItem
+                        key={id}
+                        disablePadding
+                        sx={{
+                          border: 1,
+                          borderColor: "divider",
+                          borderRadius: 1,
+                          mb: 0.5,
+                          px: 1,
+                          py: 0.5,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          {SIDEBAR_SECTION_LABELS[id] ?? id}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          disabled={idx === 0}
+                          onClick={() => move(idx, -1)}
+                          aria-label={`Move ${SIDEBAR_SECTION_LABELS[id]} up`}
+                        >
+                          <ArrowUpwardIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          disabled={idx === merged.length - 1}
+                          onClick={() => move(idx, 1)}
+                          aria-label={`Move ${SIDEBAR_SECTION_LABELS[id]} down`}
+                        >
+                          <ArrowDownwardIcon fontSize="small" />
+                        </IconButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                );
+              })()}
               <Button
                 size="small"
                 variant="outlined"
-                onClick={() => update("hiddenFavorites", [])}
+                sx={{ mt: 1 }}
+                disabled={settings.sidebarSectionOrder.length === 0}
+                onClick={() => update("sidebarSectionOrder", [])}
               >
-                Restore all hidden favorites
+                Reset section order
               </Button>
             </Box>
-          )}
-        </Section>
 
-        <Divider />
-
-        <Section
-          title="Saved data"
-          description="Review and clean up the named items you've saved (workspaces, selections, searches)."
-        >
-          <SavedDataEditor />
-        </Section>
-
-        <Divider />
-
-        <Section
-          title="Network"
-          description="Where saved-connection passwords get persisted when Remember password is enabled."
-        >
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.saveCredentialsToKeychain}
-                onChange={(e) =>
-                  update("saveCredentialsToKeychain", e.target.checked)
-                }
-              />
-            }
-            label={
-              <Box>
-                <Box>Use the OS keychain for saved passwords</Box>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block" }}
-                >
-                  When on, Remember-password values ride in macOS
-                  Keychain / Windows Credential Manager / Linux
-                  libsecret instead of <code>settings.json</code>. When
-                  off, they fall back to plaintext alongside the rest
-                  of the connection row. Existing entries migrate to
-                  the new store the next time you save them from the
-                  connect dialog.
+            {settings.hiddenFavorites.length > 0 && (
+              <Box sx={{ pt: 1 }}>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  Hidden favorites: {settings.hiddenFavorites.join(", ")}
                 </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => update("hiddenFavorites", [])}
+                >
+                  Restore all hidden favorites
+                </Button>
               </Box>
-            }
-          />
-        </Section>
+            )}
+          </Section>
 
-        <Divider />
+          <Divider />
 
-        <Section
-          title="Transfers"
-          description="Defaults applied to new Skiffsync jobs. Saved templates keep their own values regardless."
-        >
-          <FormControl size="small" sx={{ maxWidth: 280 }}>
-            <InputLabel id="sync-conflict-label">Conflict policy</InputLabel>
-            <Select
-              labelId="sync-conflict-label"
-              label="Conflict policy"
-              value={settings.syncDefaultConflictPolicy}
-              onChange={(e) =>
-                update(
-                  "syncDefaultConflictPolicy",
-                  e.target.value as typeof settings.syncDefaultConflictPolicy,
-                )
+          <Section
+            title="Saved data"
+            description="Review and clean up the named items you've saved (workspaces, selections, searches)."
+          >
+            <SavedDataEditor />
+          </Section>
+
+          <Divider />
+
+          <Section
+            title="Network"
+            description="Where saved-connection passwords get persisted when Remember password is enabled."
+          >
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.saveCredentialsToKeychain}
+                  onChange={(e) => update("saveCredentialsToKeychain", e.target.checked)}
+                />
               }
-            >
-              <MenuItem value="skip">Skip</MenuItem>
-              <MenuItem value="overwrite">Overwrite</MenuItem>
-              <MenuItem value="keepBoth">Keep both</MenuItem>
-              <MenuItem value="overwriteOlder">Overwrite older</MenuItem>
-              <MenuItem value="replaceSmaller">Replace smaller</MenuItem>
-              <MenuItem value="replaceIfSizeDifferent">
-                Replace if size differs
-              </MenuItem>
-              <MenuItem value="renameTarget">Rename target</MenuItem>
-              <MenuItem value="renameOlderTarget">
-                Rename older target
-              </MenuItem>
-              <MenuItem value="prompt">Ask each time…</MenuItem>
-            </Select>
-          </FormControl>
-
-          <TextField
-            label="Max size (GB)"
-            size="small"
-            type="number"
-            value={settings.syncDefaultMaxSizeGb}
-            onChange={(e) =>
-              update(
-                "syncDefaultMaxSizeGb",
-                Math.max(1, Number(e.target.value) || 1),
-              )
-            }
-            sx={{ maxWidth: 180 }}
-          />
-          <TextField
-            label="Lookback days"
-            size="small"
-            type="number"
-            value={settings.syncDefaultLookbackDays}
-            onChange={(e) =>
-              update(
-                "syncDefaultLookbackDays",
-                Math.max(0, Number(e.target.value) || 0),
-              )
-            }
-            sx={{ maxWidth: 180 }}
-          />
-          <TextField
-            label="Bandwidth cap (KB/s)"
-            size="small"
-            type="number"
-            value={settings.syncDefaultBandwidthKbps}
-            onChange={(e) =>
-              update(
-                "syncDefaultBandwidthKbps",
-                Math.max(0, Number(e.target.value) || 0),
-              )
-            }
-            helperText="0 = unlimited. Local-to-local jobs skip the kernel-accelerated copy when this is set."
-            sx={{ maxWidth: 240 }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.syncDefaultVerifyAfterCopy}
-                onChange={(e) =>
-                  update("syncDefaultVerifyAfterCopy", e.target.checked)
-                }
-              />
-            }
-            label="Verify after copy (re-stat dest size)"
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.syncSuppressConflictPrompts}
-                onChange={(e) =>
-                  update("syncSuppressConflictPrompts", e.target.checked)
-                }
-              />
-            }
-            label="Never show conflict prompt (auto-skip)"
-          />
-        </Section>
-
-        <Divider />
-
-        <Section
-          title="Keyboard"
-          description="Read-only listing of every shortcut the app honors. Press ? anywhere to open this as an overlay. Rebinding lands in a future release."
-        >
-          <KeyboardShortcutList />
-        </Section>
-
-        <Divider />
-
-        <Section
-          title="Advanced"
-          description="Reveal the on-disk settings file or wipe everything back to defaults."
-        >
-          <CustomFileKindsEditor />
-          <FormControl size="small" sx={{ maxWidth: 240 }}>
-            <InputLabel id="log-level-label">Log level</InputLabel>
-            <Select
-              labelId="log-level-label"
-              label="Log level"
-              value={settings.logLevel}
-              onChange={(e) =>
-                update("logLevel", e.target.value as typeof settings.logLevel)
+              label={
+                <Box>
+                  <Box>Use the OS keychain for saved passwords</Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                    When on, Remember-password values ride in macOS Keychain / Windows Credential
+                    Manager / Linux libsecret instead of <code>settings.json</code>. When off, they
+                    fall back to plaintext alongside the rest of the connection row. Existing
+                    entries migrate to the new store the next time you save them from the connect
+                    dialog.
+                  </Typography>
+                </Box>
               }
-            >
-              <MenuItem value="off">Off</MenuItem>
-              <MenuItem value="error">Error</MenuItem>
-              <MenuItem value="warn">Warn</MenuItem>
-              <MenuItem value="info">Info</MenuItem>
-              <MenuItem value="debug">Debug</MenuItem>
-            </Select>
-          </FormControl>
+            />
+          </Section>
 
-          <CrashReportingBlock />
+          <Divider />
 
-          <ThumbnailCacheBlock />
-
-          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={async () => {
-                const dir = await appDataDir();
-                if (dir) {
-                  void fsRevealInOs(dir);
-                }
-              }}
-            >
-              Reveal app data folder
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={async () => {
-                // Open settings.json in the OS default text editor.
-                // appDataDir() returns the parent; settings.json lives
-                // at <appDataDir>/settings.json (created on first save
-                // by the Rust command).
-                const dir = await appDataDir();
-                if (dir) {
-                  // Use forward-slash join — `open` crate handles
-                  // both separator conventions cross-platform.
-                  void fsOpenWithDefault(`${dir}/settings.json`);
-                }
-              }}
-            >
-              Open settings.json
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={async () => {
-                // Re-read settings.json + apply. Useful when the user
-                // edited the file externally (e.g. via "Open
-                // settings.json" + a text editor) and wants the app
-                // to pick up the changes without a relaunch.
-                const fromDisk = await loadSettingsFromDisk();
-                if (fromDisk) setSettings(fromDisk);
-              }}
-            >
-              Reload from disk
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                // Until the Tauri updater is wired (needs signing
-                // keys), the in-app shortcut to "check for updates"
-                // is a hand-off to the GitHub Releases page. Routes
-                // through the existing `fs_open_with_default` Tauri
-                // command, which uses the `open` crate — works for
-                // URLs as well as files. URL is hard-coded, no
-                // injection risk.
-                void fsOpenWithDefault(
-                  "https://github.com/synle/skiff-files/releases",
-                );
-              }}
-            >
-              Check for updates
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                void fsOpenWithDefault(
-                  "http://127.0.0.1:39871/ping",
-                );
-              }}
-            >
-              Health check
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              disabled={settings.recentPaths.length === 0}
-              onClick={() => update("recentPaths", [])}
-            >
-              Clear recent paths
-              {settings.recentPaths.length > 0
-                ? ` (${settings.recentPaths.length})`
-                : ""}
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              disabled={settings.bookmarks.length === 0}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Delete all ${settings.bookmarks.length} bookmark${settings.bookmarks.length === 1 ? "" : "s"}?`,
+          <Section
+            title="Transfers"
+            description="Defaults applied to new Skiffsync jobs. Saved templates keep their own values regardless."
+          >
+            <FormControl size="small" sx={{ maxWidth: 280 }}>
+              <InputLabel id="sync-conflict-label">Conflict policy</InputLabel>
+              <Select
+                labelId="sync-conflict-label"
+                label="Conflict policy"
+                value={settings.syncDefaultConflictPolicy}
+                onChange={(e) =>
+                  update(
+                    "syncDefaultConflictPolicy",
+                    e.target.value as typeof settings.syncDefaultConflictPolicy,
                   )
-                ) {
-                  update("bookmarks", []);
                 }
-              }}
-            >
-              Clear bookmarks
-              {settings.bookmarks.length > 0
-                ? ` (${settings.bookmarks.length})`
-                : ""}
-            </Button>
-            <Button
-              variant="outlined"
-              color="warning"
+              >
+                <MenuItem value="skip">Skip</MenuItem>
+                <MenuItem value="overwrite">Overwrite</MenuItem>
+                <MenuItem value="keepBoth">Keep both</MenuItem>
+                <MenuItem value="overwriteOlder">Overwrite older</MenuItem>
+                <MenuItem value="replaceSmaller">Replace smaller</MenuItem>
+                <MenuItem value="replaceIfSizeDifferent">Replace if size differs</MenuItem>
+                <MenuItem value="renameTarget">Rename target</MenuItem>
+                <MenuItem value="renameOlderTarget">Rename older target</MenuItem>
+                <MenuItem value="prompt">Ask each time…</MenuItem>
+              </Select>
+            </FormControl>
+
+            <TextField
+              label="Max size (GB)"
               size="small"
-              disabled={settings.searchHistory.length === 0}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Clear ${settings.searchHistory.length} search ${settings.searchHistory.length === 1 ? "query" : "queries"}?`,
-                  )
-                ) {
-                  update("searchHistory", []);
-                }
-              }}
-            >
-              Clear search history
-              {settings.searchHistory.length > 0
-                ? ` (${settings.searchHistory.length})`
-                : ""}
-            </Button>
-            <Button
-              variant="outlined"
+              type="number"
+              value={settings.syncDefaultMaxSizeGb}
+              onChange={(e) =>
+                update("syncDefaultMaxSizeGb", Math.max(1, Number(e.target.value) || 1))
+              }
+              sx={{ maxWidth: 180 }}
+            />
+            <TextField
+              label="Lookback days"
               size="small"
-              disabled={settings.bookmarks.length === 0}
-              onClick={() => {
-                if (
-                  typeof navigator !== "undefined" &&
-                  navigator.clipboard
-                ) {
-                  void navigator.clipboard.writeText(
-                    JSON.stringify(settings.bookmarks, null, 2),
-                  );
-                }
-              }}
-            >
-              Export bookmarks (clipboard)
-            </Button>
-            <Button
-              variant="outlined"
+              type="number"
+              value={settings.syncDefaultLookbackDays}
+              onChange={(e) =>
+                update("syncDefaultLookbackDays", Math.max(0, Number(e.target.value) || 0))
+              }
+              sx={{ maxWidth: 180 }}
+            />
+            <TextField
+              label="Bandwidth cap (KB/s)"
               size="small"
-              onClick={() => {
-                if (
-                  typeof navigator !== "undefined" &&
-                  navigator.clipboard
-                ) {
-                  // Whole settings round-trip: useful for cross-
-                  // machine sync via a dotfile repo or Slack paste.
-                  // We export the WHOLE settings object — the
-                  // bookmarks-only export above is kept for users
-                  // who only want to share that subset.
-                  void navigator.clipboard.writeText(
-                    JSON.stringify(settings, null, 2),
-                  );
-                }
-              }}
-            >
-              Export all settings (clipboard)
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                const raw = window.prompt(
-                  "Paste settings JSON. Replaces ALL current settings:",
-                );
-                if (!raw) return;
-                try {
-                  const parsed = JSON.parse(raw) as unknown;
-                  if (
-                    typeof parsed !== "object" ||
-                    parsed === null ||
-                    Array.isArray(parsed)
-                  ) {
-                    window.alert("Settings JSON must be an object.");
-                    return;
+              type="number"
+              value={settings.syncDefaultBandwidthKbps}
+              onChange={(e) =>
+                update("syncDefaultBandwidthKbps", Math.max(0, Number(e.target.value) || 0))
+              }
+              helperText="0 = unlimited. Local-to-local jobs skip the kernel-accelerated copy when this is set."
+              sx={{ maxWidth: 240 }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.syncDefaultVerifyAfterCopy}
+                  onChange={(e) => update("syncDefaultVerifyAfterCopy", e.target.checked)}
+                />
+              }
+              label="Verify after copy (re-stat dest size)"
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.syncSuppressConflictPrompts}
+                  onChange={(e) => update("syncSuppressConflictPrompts", e.target.checked)}
+                />
+              }
+              label="Never show conflict prompt (auto-skip)"
+            />
+          </Section>
+
+          <Divider />
+
+          <Section
+            title="Keyboard"
+            description="Read-only listing of every shortcut the app honors. Press ? anywhere to open this as an overlay. Rebinding lands in a future release."
+          >
+            <KeyboardShortcutList />
+          </Section>
+
+          <Divider />
+
+          <Section
+            title="Advanced"
+            description="Reveal the on-disk settings file or wipe everything back to defaults."
+          >
+            <CustomFileKindsEditor />
+            <FormControl size="small" sx={{ maxWidth: 240 }}>
+              <InputLabel id="log-level-label">Log level</InputLabel>
+              <Select
+                labelId="log-level-label"
+                label="Log level"
+                value={settings.logLevel}
+                onChange={(e) => update("logLevel", e.target.value as typeof settings.logLevel)}
+              >
+                <MenuItem value="off">Off</MenuItem>
+                <MenuItem value="error">Error</MenuItem>
+                <MenuItem value="warn">Warn</MenuItem>
+                <MenuItem value="info">Info</MenuItem>
+                <MenuItem value="debug">Debug</MenuItem>
+              </Select>
+            </FormControl>
+
+            <CrashReportingBlock />
+
+            <ThumbnailCacheBlock />
+
+            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={async () => {
+                  const dir = await appDataDir();
+                  if (dir) {
+                    void fsRevealInOs(dir);
                   }
+                }}
+              >
+                Reveal app data folder
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={async () => {
+                  // Open settings.json in the OS default text editor.
+                  // appDataDir() returns the parent; settings.json lives
+                  // at <appDataDir>/settings.json (created on first save
+                  // by the Rust command).
+                  const dir = await appDataDir();
+                  if (dir) {
+                    // Use forward-slash join — `open` crate handles
+                    // both separator conventions cross-platform.
+                    void fsOpenWithDefault(`${dir}/settings.json`);
+                  }
+                }}
+              >
+                Open settings.json
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={async () => {
+                  // Re-read settings.json + apply. Useful when the user
+                  // edited the file externally (e.g. via "Open
+                  // settings.json" + a text editor) and wants the app
+                  // to pick up the changes without a relaunch.
+                  const fromDisk = await loadSettingsFromDisk();
+                  if (fromDisk) setSettings(fromDisk);
+                }}
+              >
+                Reload from disk
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  // Until the Tauri updater is wired (needs signing
+                  // keys), the in-app shortcut to "check for updates"
+                  // is a hand-off to the GitHub Releases page. Routes
+                  // through the existing `fs_open_with_default` Tauri
+                  // command, which uses the `open` crate — works for
+                  // URLs as well as files. URL is hard-coded, no
+                  // injection risk.
+                  void fsOpenWithDefault("https://github.com/synle/skiff-files/releases");
+                }}
+              >
+                Check for updates
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  void fsOpenWithDefault("http://127.0.0.1:39871/ping");
+                }}
+              >
+                Health check
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={settings.recentPaths.length === 0}
+                onClick={() => update("recentPaths", [])}
+              >
+                Clear recent paths
+                {settings.recentPaths.length > 0 ? ` (${settings.recentPaths.length})` : ""}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={settings.bookmarks.length === 0}
+                onClick={() => {
                   if (
-                    !window.confirm(
-                      "Replace ALL current settings with the pasted JSON? This drops your bookmarks, recent paths, saved tabs, theme, and every other persisted tweak.",
+                    window.confirm(
+                      `Delete all ${settings.bookmarks.length} bookmark${settings.bookmarks.length === 1 ? "" : "s"}?`,
                     )
                   ) {
-                    return;
+                    update("bookmarks", []);
                   }
-                  // Merge against the current settings so any keys
-                  // the JSON omits keep their current values rather
-                  // than reverting to DEFAULTS — friendlier when the
-                  // user only wanted to share a subset of fields.
-                  // Goes through setSettings (not update) so the
-                  // whole-object swap is one persist tick instead of
-                  // N piecemeal writes.
-                  setSettings({
-                    ...settings,
-                    ...(parsed as Partial<typeof settings>),
-                  });
-                } catch (e) {
-                  window.alert(`Couldn't parse JSON: ${String(e)}`);
-                }
-              }}
-            >
-              Import all settings (paste JSON)
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                // Paste back the JSON to merge into the current
-                // bookmark list. Validates shape minimally — entries
-                // need string `id`, `label`, and `path`. New entries
-                // get fresh ids so collisions across machines don't
-                // overwrite. Existing paths are skipped to keep the
-                // operation idempotent.
-                const raw = window.prompt(
-                  "Paste bookmarks JSON (array). Existing paths are skipped:",
-                );
-                if (!raw) return;
-                try {
-                  const parsed = JSON.parse(raw) as unknown;
-                  if (!Array.isArray(parsed)) {
-                    window.alert("Bookmarks JSON must be an array.");
-                    return;
-                  }
-                  const existing = new Set(
-                    settings.bookmarks.map((b) => b.path),
-                  );
-                  const incoming = parsed
-                    .filter(
-                      (e): e is { id?: string; label: string; path: string } =>
-                        typeof e === "object" &&
-                        e !== null &&
-                        typeof (e as Record<string, unknown>).label ===
-                          "string" &&
-                        typeof (e as Record<string, unknown>).path === "string",
+                }}
+              >
+                Clear bookmarks
+                {settings.bookmarks.length > 0 ? ` (${settings.bookmarks.length})` : ""}
+              </Button>
+              <Button
+                variant="outlined"
+                color="warning"
+                size="small"
+                disabled={settings.searchHistory.length === 0}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Clear ${settings.searchHistory.length} search ${settings.searchHistory.length === 1 ? "query" : "queries"}?`,
                     )
-                    .filter((e) => !existing.has(e.path))
-                    .map((e) => ({
-                      id: crypto.randomUUID(),
-                      label: e.label,
-                      path: e.path,
-                    }));
-                  if (incoming.length === 0) {
-                    window.alert("No new bookmarks to import.");
-                    return;
+                  ) {
+                    update("searchHistory", []);
                   }
-                  update("bookmarks", [...settings.bookmarks, ...incoming]);
-                } catch (e) {
-                  window.alert(`Couldn't parse JSON: ${String(e)}`);
+                }}
+              >
+                Clear search history
+                {settings.searchHistory.length > 0 ? ` (${settings.searchHistory.length})` : ""}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={settings.bookmarks.length === 0}
+                onClick={() => {
+                  if (typeof navigator !== "undefined" && navigator.clipboard) {
+                    void navigator.clipboard.writeText(JSON.stringify(settings.bookmarks, null, 2));
+                  }
+                }}
+              >
+                Export bookmarks (clipboard)
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  if (typeof navigator !== "undefined" && navigator.clipboard) {
+                    // Whole settings round-trip: useful for cross-
+                    // machine sync via a dotfile repo or Slack paste.
+                    // We export the WHOLE settings object — the
+                    // bookmarks-only export above is kept for users
+                    // who only want to share that subset.
+                    void navigator.clipboard.writeText(JSON.stringify(settings, null, 2));
+                  }
+                }}
+              >
+                Export all settings (clipboard)
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  const raw = window.prompt("Paste settings JSON. Replaces ALL current settings:");
+                  if (!raw) return;
+                  try {
+                    const parsed = JSON.parse(raw) as unknown;
+                    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+                      window.alert("Settings JSON must be an object.");
+                      return;
+                    }
+                    if (
+                      !window.confirm(
+                        "Replace ALL current settings with the pasted JSON? This drops your bookmarks, recent paths, saved tabs, theme, and every other persisted tweak.",
+                      )
+                    ) {
+                      return;
+                    }
+                    // Merge against the current settings so any keys
+                    // the JSON omits keep their current values rather
+                    // than reverting to DEFAULTS — friendlier when the
+                    // user only wanted to share a subset of fields.
+                    // Goes through setSettings (not update) so the
+                    // whole-object swap is one persist tick instead of
+                    // N piecemeal writes.
+                    setSettings({
+                      ...settings,
+                      ...(parsed as Partial<typeof settings>),
+                    });
+                  } catch (e) {
+                    window.alert(`Couldn't parse JSON: ${String(e)}`);
+                  }
+                }}
+              >
+                Import all settings (paste JSON)
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  // Paste back the JSON to merge into the current
+                  // bookmark list. Validates shape minimally — entries
+                  // need string `id`, `label`, and `path`. New entries
+                  // get fresh ids so collisions across machines don't
+                  // overwrite. Existing paths are skipped to keep the
+                  // operation idempotent.
+                  const raw = window.prompt(
+                    "Paste bookmarks JSON (array). Existing paths are skipped:",
+                  );
+                  if (!raw) return;
+                  try {
+                    const parsed = JSON.parse(raw) as unknown;
+                    if (!Array.isArray(parsed)) {
+                      window.alert("Bookmarks JSON must be an array.");
+                      return;
+                    }
+                    const existing = new Set(settings.bookmarks.map((b) => b.path));
+                    const incoming = parsed
+                      .filter(
+                        (e): e is { id?: string; label: string; path: string } =>
+                          typeof e === "object" &&
+                          e !== null &&
+                          typeof (e as Record<string, unknown>).label === "string" &&
+                          typeof (e as Record<string, unknown>).path === "string",
+                      )
+                      .filter((e) => !existing.has(e.path))
+                      .map((e) => ({
+                        id: crypto.randomUUID(),
+                        label: e.label,
+                        path: e.path,
+                      }));
+                    if (incoming.length === 0) {
+                      window.alert("No new bookmarks to import.");
+                      return;
+                    }
+                    update("bookmarks", [...settings.bookmarks, ...incoming]);
+                  } catch (e) {
+                    window.alert(`Couldn't parse JSON: ${String(e)}`);
+                  }
+                }}
+              >
+                Import bookmarks (paste JSON)
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={
+                  Object.keys(settings.folderViewMode).length === 0 &&
+                  Object.keys(settings.folderSort).length === 0
                 }
-              }}
-            >
-              Import bookmarks (paste JSON)
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              disabled={
-                Object.keys(settings.folderViewMode).length === 0 &&
-                Object.keys(settings.folderSort).length === 0
-              }
-              onClick={() => {
-                const total =
-                  Object.keys(settings.folderViewMode).length +
-                  Object.keys(settings.folderSort).length;
-                if (
-                  window.confirm(
-                    `Forget per-folder view + sort overrides for ${total} folder${total === 1 ? "" : "s"}?`,
-                  )
-                ) {
-                  update("folderViewMode", {});
-                  update("folderSort", {});
-                }
-              }}
-            >
-              Forget per-folder overrides
-            </Button>
-            <Button
-              variant="outlined"
-              color="warning"
-              onClick={() => setResetConfirmOpen(true)}
-              size="small"
-            >
-              Reset all settings
-            </Button>
-          </Box>
-        </Section>
-      </Stack>
+                onClick={() => {
+                  const total =
+                    Object.keys(settings.folderViewMode).length +
+                    Object.keys(settings.folderSort).length;
+                  if (
+                    window.confirm(
+                      `Forget per-folder view + sort overrides for ${total} folder${total === 1 ? "" : "s"}?`,
+                    )
+                  ) {
+                    update("folderViewMode", {});
+                    update("folderSort", {});
+                  }
+                }}
+              >
+                Forget per-folder overrides
+              </Button>
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={() => setResetConfirmOpen(true)}
+                size="small"
+              >
+                Reset all settings
+              </Button>
+            </Box>
+          </Section>
+        </Stack>
       </Box>
       <ConfirmDialog
         open={resetConfirmOpen}

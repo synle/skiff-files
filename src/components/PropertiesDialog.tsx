@@ -34,11 +34,7 @@ interface Props {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <Box sx={{ display: "flex", gap: 1.5 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ width: 96, flexShrink: 0 }}
-      >
+      <Typography variant="caption" color="text.secondary" sx={{ width: 96, flexShrink: 0 }}>
         {label}
       </Typography>
       <Typography variant="caption" sx={{ wordBreak: "break-all" }}>
@@ -93,11 +89,7 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
           <IconForKind kind={entry.kind} fontSize="medium" />
           <Box sx={{ wordBreak: "break-all" }}>{entry.name}</Box>
         </Box>
-        <IconButton
-          size="small"
-          onClick={onClose}
-          aria-label="Close properties"
-        >
+        <IconButton size="small" onClick={onClose} aria-label="Close properties">
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -116,10 +108,7 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
           />
           <Field label="Modified" value={formatMtime(entry.mtime)} />
           {entry.mode != null && (
-            <Field
-              label="Mode"
-              value={`0${entry.mode.toString(8).slice(-3)}`}
-            />
+            <Field label="Mode" value={`0${entry.mode.toString(8).slice(-3)}`} />
           )}
           {entry.isSymlink && <Field label="Symlink" value="yes" />}
           {entry.isHidden && <Field label="Hidden" value="yes" />}
@@ -150,10 +139,7 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
               size="small"
               startIcon={<ContentCopyIcon fontSize="small" />}
               onClick={() => {
-                if (
-                  typeof navigator !== "undefined" &&
-                  navigator.clipboard
-                ) {
+                if (typeof navigator !== "undefined" && navigator.clipboard) {
                   // JSON dump of the metadata block. Useful for
                   // bug reports / Slack pastes / pasting into
                   // scripts (jq-friendly). Folder sizes flow in
@@ -163,12 +149,8 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
                       {
                         name: entry.name,
                         kind: entry.kind,
-                        size: entry.isDir
-                          ? summary?.totalSize ?? null
-                          : entry.size,
-                        items: entry.isDir
-                          ? summary?.entries ?? null
-                          : null,
+                        size: entry.isDir ? (summary?.totalSize ?? null) : entry.size,
+                        items: entry.isDir ? (summary?.entries ?? null) : null,
                         modified: entry.mtime,
                         mode: entry.mode,
                         isSymlink: entry.isSymlink,

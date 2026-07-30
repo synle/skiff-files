@@ -95,18 +95,12 @@ export default function TransfersPage() {
   const [src, setSrc] = useState("");
   const [dest, setDest] = useState("");
   const [maxSizeGb, setMaxSizeGb] = useState(settings.syncDefaultMaxSizeGb);
-  const [lookbackDays, setLookbackDays] = useState(
-    settings.syncDefaultLookbackDays,
-  );
+  const [lookbackDays, setLookbackDays] = useState(settings.syncDefaultLookbackDays);
   const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>(
     settings.syncDefaultConflictPolicy,
   );
-  const [bandwidthKbps, setBandwidthKbps] = useState(
-    settings.syncDefaultBandwidthKbps,
-  );
-  const [verifyAfterCopy, setVerifyAfterCopy] = useState(
-    settings.syncDefaultVerifyAfterCopy,
-  );
+  const [bandwidthKbps, setBandwidthKbps] = useState(settings.syncDefaultBandwidthKbps);
+  const [verifyAfterCopy, setVerifyAfterCopy] = useState(settings.syncDefaultVerifyAfterCopy);
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
   const [planner, setPlanner] = useState<"local" | "repo">("local");
@@ -122,14 +116,10 @@ export default function TransfersPage() {
   // settings.json. Saving does not start the job; clicking Run on a
   // saved entry fills the form with its values and starts immediately.
   const savedJobs = settings.savedSyncJobs as SavedJob[];
-  const setSavedJobs = (
-    arg: SavedJob[] | ((prev: SavedJob[]) => SavedJob[]),
-  ) => {
+  const setSavedJobs = (arg: SavedJob[] | ((prev: SavedJob[]) => SavedJob[])) => {
     const next =
       typeof arg === "function"
-        ? (arg as (prev: SavedJob[]) => SavedJob[])(
-            settings.savedSyncJobs as SavedJob[],
-          )
+        ? (arg as (prev: SavedJob[]) => SavedJob[])(settings.savedSyncJobs as SavedJob[])
         : arg;
     update("savedSyncJobs", next as unknown as SavedSyncJob[]);
   };
@@ -162,11 +152,7 @@ export default function TransfersPage() {
       try {
         const list = await syncList();
         if (!mounted.current) return;
-        setJobs(
-          Object.fromEntries(
-            list.map((info) => [info.id, { info } as JobUiState]),
-          ),
-        );
+        setJobs(Object.fromEntries(list.map((info) => [info.id, { info } as JobUiState])));
       } catch {
         /* page renders fine empty */
       }
@@ -236,15 +222,11 @@ export default function TransfersPage() {
   // (saved job already deleted) silently no-ops.
   useEffect(() => {
     const onRun = (e: Event) => {
-      const detail = (
-        e as CustomEvent<string | { id: string; dryRun?: boolean }>
-      ).detail;
+      const detail = (e as CustomEvent<string | { id: string; dryRun?: boolean }>).detail;
       const id = typeof detail === "string" ? detail : detail?.id;
       const dryRun = typeof detail === "string" ? false : !!detail?.dryRun;
       if (!id) return;
-      const job = (settings.savedSyncJobs as SavedJob[]).find(
-        (j) => j.id === id,
-      );
+      const job = (settings.savedSyncJobs as SavedJob[]).find((j) => j.id === id);
       if (job) void handleRunSavedJob(job, dryRun);
     };
     window.addEventListener("skiff:run-sync-job", onRun);
@@ -389,8 +371,7 @@ export default function TransfersPage() {
         // current Settings default rather than 0 so existing saves
         // honor the user's current cap.
         bandwidthKbps: j.bandwidthKbps ?? settings.syncDefaultBandwidthKbps,
-        verifyAfterCopy:
-          j.verifyAfterCopy ?? settings.syncDefaultVerifyAfterCopy,
+        verifyAfterCopy: j.verifyAfterCopy ?? settings.syncDefaultVerifyAfterCopy,
       });
       setJobs((prev) => ({
         ...prev,
@@ -405,355 +386,325 @@ export default function TransfersPage() {
     }
   };
 
-  const jobList = Object.values(jobs).sort((a, b) =>
-    a.info.id.localeCompare(b.info.id),
-  );
+  const jobList = Object.values(jobs).sort((a, b) => a.info.id.localeCompare(b.info.id));
 
   return (
     <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>
       <Box sx={{ maxWidth: 880, mx: "auto" }}>
-      <Typography variant="h4" gutterBottom>
-        Transfers
-      </Typography>
+        <Typography variant="h4" gutterBottom>
+          Transfers
+        </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Stack spacing={4}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            New Skiffsync job
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Local-to-local copy with skip-if-unchanged. Cross-protocol
-            (SFTP / FTP / SMB) jobs come in Phase 4b.
-          </Typography>
-          <Stack spacing={2}>
-            <FormControl size="small" sx={{ maxWidth: 280 }}>
-              <InputLabel id="planner-label">Mode</InputLabel>
-              <Select
-                labelId="planner-label"
-                label="Mode"
-                value={planner}
-                onChange={(e) =>
-                  setPlanner(e.target.value as "local" | "repo")
-                }
-              >
-                <MenuItem value="local">
-                  Local copy (everything in src)
-                </MenuItem>
-                <MenuItem value="repo">
-                  Repo copy (only git ls-files)
-                </MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              label="Source"
-              size="small"
-              value={src}
-              onChange={(e) => setSrc(e.target.value)}
-              placeholder="/Users/you/projects/foo"
-            />
-            <TextField
-              label="Destination"
-              size="small"
-              value={dest}
-              onChange={(e) => setDest(e.target.value)}
-              placeholder="/Volumes/Backup/foo"
-            />
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Max size (GB)"
-                size="small"
-                type="number"
-                value={maxSizeGb}
-                onChange={(e) => setMaxSizeGb(Number(e.target.value) || 1)}
-                sx={{ width: 140 }}
-              />
-              <TextField
-                label="Lookback days"
-                size="small"
-                type="number"
-                value={lookbackDays}
-                onChange={(e) => setLookbackDays(Number(e.target.value) || 0)}
-                sx={{ width: 140 }}
-              />
-              <TextField
-                label="Bandwidth (KB/s)"
-                size="small"
-                type="number"
-                value={bandwidthKbps}
-                onChange={(e) =>
-                  setBandwidthKbps(Math.max(0, Number(e.target.value) || 0))
-                }
-                helperText="0 = unlimited"
-                sx={{ width: 160 }}
-              />
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel id="conflict-policy-label">Conflict policy</InputLabel>
-                <Select
-                  labelId="conflict-policy-label"
-                  label="Conflict policy"
-                  value={conflictPolicy}
-                  onChange={(e) =>
-                    setConflictPolicy(e.target.value as ConflictPolicy)
-                  }
-                >
-                  <MenuItem value="skip">Skip</MenuItem>
-                  <MenuItem value="overwrite">Overwrite</MenuItem>
-                  <MenuItem value="keepBoth">Keep both (rename copied)</MenuItem>
-                  <MenuItem value="overwriteOlder">
-                    Overwrite older files
-                  </MenuItem>
-                  <MenuItem value="replaceSmaller">Replace smaller files</MenuItem>
-                  <MenuItem value="replaceIfSizeDifferent">
-                    Replace if size differs
-                  </MenuItem>
-                  <MenuItem value="renameTarget">
-                    Rename existing target → (old)
-                  </MenuItem>
-                  <MenuItem value="renameOlderTarget">
-                    Rename older target → (old)
-                  </MenuItem>
-                  <MenuItem value="prompt">Ask each time…</MenuItem>
-                </Select>
-              </FormControl>
-            </Stack>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={dryRun}
-                  onChange={(e) => setDryRun(e.target.checked)}
-                />
-              }
-              label="Dry run (report what would happen, write nothing)"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={verifyAfterCopy}
-                  onChange={(e) => setVerifyAfterCopy(e.target.checked)}
-                />
-              }
-              label="Verify after copy (re-stat dest size)"
-            />
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="contained"
-                disabled={busy || !src || !dest}
-                onClick={() => void handleStart()}
-              >
-                Start
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<SaveIcon />}
-                disabled={!src || !dest}
-                onClick={handleSaveJob}
-              >
-                Save as template
-              </Button>
-            </Stack>
-          </Stack>
-        </Paper>
-
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Stamped copy (cpstamp)
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Copy a single file with a <code>YYYY_MM_DD_HH_MM</code>{" "}
-            suffix — handy for "snapshot this config before I touch it".
-          </Typography>
-          <Stack spacing={2}>
-            <TextField
-              label="Source file"
-              size="small"
-              value={stampSrc}
-              onChange={(e) => setStampSrc(e.target.value)}
-              placeholder="/Users/you/.zshrc"
-            />
-            <TextField
-              label="Destination folder"
-              size="small"
-              value={stampDestDir}
-              onChange={(e) => setStampDestDir(e.target.value)}
-              placeholder="/Volumes/Backup/configs"
-            />
-            <Box>
-              <Button
-                variant="outlined"
-                disabled={!stampSrc || !stampDestDir}
-                onClick={() => void handleCpstamp()}
-              >
-                Stamp + copy
-              </Button>
-            </Box>
-            {stampResult && (
-              <Alert severity="success" onClose={() => setStampResult(null)}>
-                Wrote <code>{stampResult}</code>
-              </Alert>
-            )}
-          </Stack>
-        </Paper>
-
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            De-duplicate folder
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Recursively scans a folder, finds byte-identical duplicates
-            (md5 + size), and moves the extras into{" "}
-            <code>&lt;folder&gt;/_recycleBin/</code>. Idempotent — run again
-            to verify nothing else is left to remove.
-          </Typography>
-          <Stack spacing={2}>
-            <TextField
-              label="Folder"
-              size="small"
-              value={dedupRoot}
-              onChange={(e) => setDedupRoot(e.target.value)}
-              placeholder="/Users/you/Downloads"
-            />
-            <Box>
-              <Button
-                variant="outlined"
-                color="warning"
-                disabled={!dedupRoot}
-                onClick={() => void handleDedup()}
-              >
-                Find + move duplicates
-              </Button>
-            </Box>
-            {dedupResult && (
-              <Alert
-                severity={dedupResult.duplicates > 0 ? "warning" : "info"}
-                onClose={() => setDedupResult(null)}
-              >
-                Scanned {dedupResult.scanned} files,{" "}
-                {dedupResult.duplicates} duplicates moved (
-                {formatBytes(dedupResult.bytesFreed)} freed).
-                {dedupResult.duplicates > 0 && (
-                  <>
-                    {" "}
-                    Review at <code>{dedupResult.recycleBin}</code>.
-                  </>
-                )}
-              </Alert>
-            )}
-          </Stack>
-        </Paper>
-
-        {savedJobs.length > 0 && (
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Saved templates
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Click ▶ to run a saved job with its stored options.
-            </Typography>
-            <List dense>
-              {savedJobs.map((j) => (
-                <ListItem
-                  key={j.id}
-                  secondaryAction={
-                    <Stack direction="row">
-                      <IconButton
-                        edge="end"
-                        onClick={() => void handleRunSavedJob(j)}
-                        disabled={busy}
-                        aria-label={`Run ${j.label}`}
-                      >
-                        <PlayArrowIcon />
-                      </IconButton>
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleDeleteSavedJob(j.id)}
-                        aria-label={`Delete saved job ${j.label}`}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Stack>
-                  }
-                >
-                  <ListItemText
-                    primary={j.label}
-                    secondary={`${j.planner} · max ${j.maxSizeGb} GB · ${j.conflictPolicy}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
         )}
 
-        <Box>
-          <Typography variant="h6" gutterBottom>
-            Jobs
-          </Typography>
-          {jobList.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No jobs yet.
+        <Stack spacing={4}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              New Skiffsync job
             </Typography>
-          ) : (
-            <Stack spacing={1}>
-              {jobList.map((j) => {
-                const p = j.progress;
-                const running =
-                  j.info.state === "running" || j.info.state === "planning";
-                const paused = j.info.state === "paused";
-                const inFlight = running || paused;
-                // Terminal — kills the indeterminate spinner +
-                // "0 of 0 files" placeholder on jobs the backend
-                // already wrapped up (especially SMB jobs that
-                // skipped emitting per-file progress events).
-                const isDone =
-                  j.info.state === "done" ||
-                  j.info.state === "cancelled" ||
-                  j.info.state === "failed";
-                const buf = samplesRef.current[j.info.id] ?? [];
-                const eta = computeEta(buf, p?.bytesTotal);
-                return (
-                  <Paper
-                    key={j.info.id}
-                    variant="outlined"
-                    sx={{ p: 1.5 }}
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Local-to-local copy with skip-if-unchanged. Cross-protocol (SFTP / FTP / SMB) jobs
+              come in Phase 4b.
+            </Typography>
+            <Stack spacing={2}>
+              <FormControl size="small" sx={{ maxWidth: 280 }}>
+                <InputLabel id="planner-label">Mode</InputLabel>
+                <Select
+                  labelId="planner-label"
+                  label="Mode"
+                  value={planner}
+                  onChange={(e) => setPlanner(e.target.value as "local" | "repo")}
+                >
+                  <MenuItem value="local">Local copy (everything in src)</MenuItem>
+                  <MenuItem value="repo">Repo copy (only git ls-files)</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                label="Source"
+                size="small"
+                value={src}
+                onChange={(e) => setSrc(e.target.value)}
+                placeholder="/Users/you/projects/foo"
+              />
+              <TextField
+                label="Destination"
+                size="small"
+                value={dest}
+                onChange={(e) => setDest(e.target.value)}
+                placeholder="/Volumes/Backup/foo"
+              />
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="Max size (GB)"
+                  size="small"
+                  type="number"
+                  value={maxSizeGb}
+                  onChange={(e) => setMaxSizeGb(Number(e.target.value) || 1)}
+                  sx={{ width: 140 }}
+                />
+                <TextField
+                  label="Lookback days"
+                  size="small"
+                  type="number"
+                  value={lookbackDays}
+                  onChange={(e) => setLookbackDays(Number(e.target.value) || 0)}
+                  sx={{ width: 140 }}
+                />
+                <TextField
+                  label="Bandwidth (KB/s)"
+                  size="small"
+                  type="number"
+                  value={bandwidthKbps}
+                  onChange={(e) => setBandwidthKbps(Math.max(0, Number(e.target.value) || 0))}
+                  helperText="0 = unlimited"
+                  sx={{ width: 160 }}
+                />
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel id="conflict-policy-label">Conflict policy</InputLabel>
+                  <Select
+                    labelId="conflict-policy-label"
+                    label="Conflict policy"
+                    value={conflictPolicy}
+                    onChange={(e) => setConflictPolicy(e.target.value as ConflictPolicy)}
                   >
-                    <ProgressWidget
-                      label={`${j.info.src} → ${j.info.dest} · ${j.info.state}`}
-                      filesDone={p?.filesDone ?? 0}
-                      filesTotal={p?.filesTotal ?? 0}
-                      bytesDone={p?.bytesDone}
-                      bytesTotal={p?.bytesTotal}
-                      currentItem={p?.last?.dest}
-                      etaSeconds={eta.etaSeconds}
-                      bytesPerSec={eta.bytesPerSec}
-                      paused={paused}
-                      onPause={inFlight && !paused ? () => void handlePause(j.info.id) : undefined}
-                      onResume={paused ? () => void handleResume(j.info.id) : undefined}
-                      onCancel={inFlight ? () => void handleCancel(j.info.id) : undefined}
-                      error={j.error ?? null}
-                      done={isDone}
-                    />
-                    {j.summary && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block", mt: 0.5 }}
-                      >
-                        {j.summary.copied} copied, {j.summary.skipped} skipped,{" "}
-                        {j.summary.conflicts} conflicts, {j.summary.errors} errors
-                      </Typography>
-                    )}
-                  </Paper>
-                );
-              })}
+                    <MenuItem value="skip">Skip</MenuItem>
+                    <MenuItem value="overwrite">Overwrite</MenuItem>
+                    <MenuItem value="keepBoth">Keep both (rename copied)</MenuItem>
+                    <MenuItem value="overwriteOlder">Overwrite older files</MenuItem>
+                    <MenuItem value="replaceSmaller">Replace smaller files</MenuItem>
+                    <MenuItem value="replaceIfSizeDifferent">Replace if size differs</MenuItem>
+                    <MenuItem value="renameTarget">Rename existing target → (old)</MenuItem>
+                    <MenuItem value="renameOlderTarget">Rename older target → (old)</MenuItem>
+                    <MenuItem value="prompt">Ask each time…</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
+              <FormControlLabel
+                control={<Switch checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />}
+                label="Dry run (report what would happen, write nothing)"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={verifyAfterCopy}
+                    onChange={(e) => setVerifyAfterCopy(e.target.checked)}
+                  />
+                }
+                label="Verify after copy (re-stat dest size)"
+              />
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="contained"
+                  disabled={busy || !src || !dest}
+                  onClick={() => void handleStart()}
+                >
+                  Start
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<SaveIcon />}
+                  disabled={!src || !dest}
+                  onClick={handleSaveJob}
+                >
+                  Save as template
+                </Button>
+              </Stack>
             </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Stamped copy (cpstamp)
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Copy a single file with a <code>YYYY_MM_DD_HH_MM</code> suffix — handy for "snapshot
+              this config before I touch it".
+            </Typography>
+            <Stack spacing={2}>
+              <TextField
+                label="Source file"
+                size="small"
+                value={stampSrc}
+                onChange={(e) => setStampSrc(e.target.value)}
+                placeholder="/Users/you/.zshrc"
+              />
+              <TextField
+                label="Destination folder"
+                size="small"
+                value={stampDestDir}
+                onChange={(e) => setStampDestDir(e.target.value)}
+                placeholder="/Volumes/Backup/configs"
+              />
+              <Box>
+                <Button
+                  variant="outlined"
+                  disabled={!stampSrc || !stampDestDir}
+                  onClick={() => void handleCpstamp()}
+                >
+                  Stamp + copy
+                </Button>
+              </Box>
+              {stampResult && (
+                <Alert severity="success" onClose={() => setStampResult(null)}>
+                  Wrote <code>{stampResult}</code>
+                </Alert>
+              )}
+            </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              De-duplicate folder
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Recursively scans a folder, finds byte-identical duplicates (md5 + size), and moves
+              the extras into <code>&lt;folder&gt;/_recycleBin/</code>. Idempotent — run again to
+              verify nothing else is left to remove.
+            </Typography>
+            <Stack spacing={2}>
+              <TextField
+                label="Folder"
+                size="small"
+                value={dedupRoot}
+                onChange={(e) => setDedupRoot(e.target.value)}
+                placeholder="/Users/you/Downloads"
+              />
+              <Box>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  disabled={!dedupRoot}
+                  onClick={() => void handleDedup()}
+                >
+                  Find + move duplicates
+                </Button>
+              </Box>
+              {dedupResult && (
+                <Alert
+                  severity={dedupResult.duplicates > 0 ? "warning" : "info"}
+                  onClose={() => setDedupResult(null)}
+                >
+                  Scanned {dedupResult.scanned} files, {dedupResult.duplicates} duplicates moved (
+                  {formatBytes(dedupResult.bytesFreed)} freed).
+                  {dedupResult.duplicates > 0 && (
+                    <>
+                      {" "}
+                      Review at <code>{dedupResult.recycleBin}</code>.
+                    </>
+                  )}
+                </Alert>
+              )}
+            </Stack>
+          </Paper>
+
+          {savedJobs.length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Saved templates
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Click ▶ to run a saved job with its stored options.
+              </Typography>
+              <List dense>
+                {savedJobs.map((j) => (
+                  <ListItem
+                    key={j.id}
+                    secondaryAction={
+                      <Stack direction="row">
+                        <IconButton
+                          edge="end"
+                          onClick={() => void handleRunSavedJob(j)}
+                          disabled={busy}
+                          aria-label={`Run ${j.label}`}
+                        >
+                          <PlayArrowIcon />
+                        </IconButton>
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleDeleteSavedJob(j.id)}
+                          aria-label={`Delete saved job ${j.label}`}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Stack>
+                    }
+                  >
+                    <ListItemText
+                      primary={j.label}
+                      secondary={`${j.planner} · max ${j.maxSizeGb} GB · ${j.conflictPolicy}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
           )}
-        </Box>
-      </Stack>
+
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Jobs
+            </Typography>
+            {jobList.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No jobs yet.
+              </Typography>
+            ) : (
+              <Stack spacing={1}>
+                {jobList.map((j) => {
+                  const p = j.progress;
+                  const running = j.info.state === "running" || j.info.state === "planning";
+                  const paused = j.info.state === "paused";
+                  const inFlight = running || paused;
+                  // Terminal — kills the indeterminate spinner +
+                  // "0 of 0 files" placeholder on jobs the backend
+                  // already wrapped up (especially SMB jobs that
+                  // skipped emitting per-file progress events).
+                  const isDone =
+                    j.info.state === "done" ||
+                    j.info.state === "cancelled" ||
+                    j.info.state === "failed";
+                  const buf = samplesRef.current[j.info.id] ?? [];
+                  const eta = computeEta(buf, p?.bytesTotal);
+                  return (
+                    <Paper key={j.info.id} variant="outlined" sx={{ p: 1.5 }}>
+                      <ProgressWidget
+                        label={`${j.info.src} → ${j.info.dest} · ${j.info.state}`}
+                        filesDone={p?.filesDone ?? 0}
+                        filesTotal={p?.filesTotal ?? 0}
+                        bytesDone={p?.bytesDone}
+                        bytesTotal={p?.bytesTotal}
+                        currentItem={p?.last?.dest}
+                        etaSeconds={eta.etaSeconds}
+                        bytesPerSec={eta.bytesPerSec}
+                        paused={paused}
+                        onPause={
+                          inFlight && !paused ? () => void handlePause(j.info.id) : undefined
+                        }
+                        onResume={paused ? () => void handleResume(j.info.id) : undefined}
+                        onCancel={inFlight ? () => void handleCancel(j.info.id) : undefined}
+                        error={j.error ?? null}
+                        done={isDone}
+                      />
+                      {j.summary && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "block", mt: 0.5 }}
+                        >
+                          {j.summary.copied} copied, {j.summary.skipped} skipped,{" "}
+                          {j.summary.conflicts} conflicts, {j.summary.errors} errors
+                        </Typography>
+                      )}
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+        </Stack>
       </Box>
     </Box>
   );

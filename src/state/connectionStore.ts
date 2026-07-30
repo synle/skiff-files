@@ -20,11 +20,7 @@
 // in `app_data_dir` (per-user OS-protected dir), not the source
 // tree, but keychain is the right long-term home.
 
-import type {
-  FtpDraft,
-  SftpDraft,
-  SmbDraft,
-} from "./connectionDrafts";
+import type { FtpDraft, SftpDraft, SmbDraft } from "./connectionDrafts";
 
 /** Mirror of `crate::fs::registry::ConnectionKind`. */
 export type ConnectionKind = "sftp" | "ftp" | "smb";
@@ -183,9 +179,7 @@ function readLegacyJson<T>(key: string): T[] {
  *  write the result back to settings and (optionally) delete the
  *  legacy keys. Old keys are kept around for now in case a
  *  downgrade scenario needs them — they're harmless. */
-export function migrateLegacyDrafts(
-  existing: SavedConnection[],
-): SavedConnection[] {
+export function migrateLegacyDrafts(existing: SavedConnection[]): SavedConnection[] {
   const merged: SavedConnection[] = [...existing];
   const seen = new Set(merged.map(connKey));
   for (const d of readLegacyJson<SftpDraft>(LEGACY_SFTP_KEY)) {
@@ -207,12 +201,7 @@ export function migrateLegacyDrafts(
   // dropped (the entry is unrecoverable).
   const rawSmb = readLegacyJson<Record<string, unknown>>(LEGACY_SMB_KEY);
   for (const r of rawSmb) {
-    const host =
-      typeof r.host === "string"
-        ? r.host
-        : typeof r.server === "string"
-          ? r.server
-          : "";
+    const host = typeof r.host === "string" ? r.host : typeof r.server === "string" ? r.server : "";
     if (!host) continue;
     const conn: SavedConnection = {
       id: typeof r.id === "string" ? r.id : `smb-${Date.now()}-${Math.random()}`,
@@ -264,10 +253,7 @@ export function addOrUpdateConnection(
 }
 
 /** Remove a connection by id. Returns a new array. */
-export function removeConnection(
-  list: SavedConnection[],
-  id: string,
-): SavedConnection[] {
+export function removeConnection(list: SavedConnection[], id: string): SavedConnection[] {
   return list.filter((c) => c.id !== id);
 }
 

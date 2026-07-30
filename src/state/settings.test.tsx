@@ -32,10 +32,7 @@ describe("loadSettings / saveSettings", () => {
   });
 
   it("merges partial saved payloads against DEFAULTS", () => {
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ themeMode: "light" }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ themeMode: "light" }));
     expect(loadSettings()).toEqual({ ...DEFAULTS, themeMode: "light" });
   });
 
@@ -63,10 +60,7 @@ describe("loadSettings / saveSettings", () => {
             rememberPassword: false,
           },
         ],
-        recentPaths: [
-          "smb://smb-1779235589933/G/folder",
-          "/Users/syle/Desktop",
-        ],
+        recentPaths: ["smb://smb-1779235589933/G/folder", "/Users/syle/Desktop"],
         bookmarks: [
           {
             id: "b1",
@@ -81,10 +75,7 @@ describe("loadSettings / saveSettings", () => {
     );
     const s = loadSettings();
     expect(s.connections[0].id).toBe("admin@192.168.1.1");
-    expect(s.recentPaths).toEqual([
-      "smb://admin@192.168.1.1/G/folder",
-      "/Users/syle/Desktop",
-    ]);
+    expect(s.recentPaths).toEqual(["smb://admin@192.168.1.1/G/folder", "/Users/syle/Desktop"]);
     expect(s.bookmarks[0].path).toBe("smb://admin@192.168.1.1/G");
     expect(s.fileTags["smb://admin@192.168.1.1/G/file.png"]).toBe("red");
   });
@@ -108,9 +99,7 @@ describe("loadSettings / saveSettings", () => {
 describe("rewritePathIds", () => {
   it("rewrites `<scheme>://<oldId>/...` to use the new id", () => {
     const r = new Map([["smb-old", "admin@host"]]);
-    expect(rewritePathIds("smb://smb-old/share/file", r)).toBe(
-      "smb://admin@host/share/file",
-    );
+    expect(rewritePathIds("smb://smb-old/share/file", r)).toBe("smb://admin@host/share/file");
   });
 
   it("rewrites a bare `<scheme>://<oldId>` with no trailing path", () => {
@@ -124,18 +113,14 @@ describe("rewritePathIds", () => {
   });
 
   it("is a no-op when renamed map is empty", () => {
-    expect(rewritePathIds("smb://anything/path", new Map())).toBe(
-      "smb://anything/path",
-    );
+    expect(rewritePathIds("smb://anything/path", new Map())).toBe("smb://anything/path");
   });
 
   it("doesn't rewrite an id that's a prefix of a different id", () => {
     // `smb-old` mustn't match `smb-older` in the URL — the `/`
     // anchor guards against this.
     const r = new Map([["smb-old", "admin@host"]]);
-    expect(rewritePathIds("smb://smb-older/path", r)).toBe(
-      "smb://smb-older/path",
-    );
+    expect(rewritePathIds("smb://smb-older/path", r)).toBe("smb://smb-older/path");
   });
 });
 
@@ -234,10 +219,7 @@ describe("loadSettingsFromDisk / saveSettingsToDisk", () => {
   });
 
   it("saved settings without folderViewMode get merged against DEFAULTS", () => {
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ themeMode: "dark" }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ themeMode: "dark" }));
     const out = loadSettings();
     expect(out.themeMode).toBe("dark");
     expect(out.folderViewMode).toEqual({});
@@ -261,10 +243,7 @@ describe("persist effect dedup (regression for the cross-window loop)", () => {
   function PersistProbe({
     onReady,
   }: {
-    onReady: (api: {
-      setSettings: (s: typeof DEFAULTS) => void;
-      updateTheme: () => void;
-    }) => void;
+    onReady: (api: { setSettings: (s: typeof DEFAULTS) => void; updateTheme: () => void }) => void;
   }) {
     const { settings, setSettings, update } = useSettings();
     // Surface both APIs to the test the first time we render.
@@ -353,9 +332,7 @@ describe("persist effect dedup (regression for the cross-window loop)", () => {
       api!.setSettings({ ...DEFAULTS, themeMode: "light" });
       await Promise.resolve();
     });
-    const saveCalls = mocked.mock.calls.filter(
-      ([cmd]) => cmd === "settings_save",
-    ).length;
+    const saveCalls = mocked.mock.calls.filter(([cmd]) => cmd === "settings_save").length;
     expect(saveCalls).toBeGreaterThan(0);
   });
 });

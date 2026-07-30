@@ -48,11 +48,7 @@ export default function ShortcutsModal() {
       if (!isF1 && !isCombo) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
-      if (
-        tag === "input" ||
-        tag === "textarea" ||
-        t?.isContentEditable
-      ) {
+      if (tag === "input" || tag === "textarea" || t?.isContentEditable) {
         return;
       }
       e.preventDefault();
@@ -70,15 +66,9 @@ export default function ShortcutsModal() {
       fullWidth
       aria-label="Keyboard shortcuts"
     >
-      <DialogTitle
-        sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
-      >
+      <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         Keyboard shortcuts
-        <IconButton
-          onClick={() => setOpen(false)}
-          size="small"
-          aria-label="Close shortcuts"
-        >
+        <IconButton onClick={() => setOpen(false)} size="small" aria-label="Close shortcuts">
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -123,8 +113,8 @@ export default function ShortcutsModal() {
             </Box>
           ))}
           <Typography variant="caption" color="text.secondary">
-            Bindings are fixed in this build — Phase 6 will let you rebind
-            them in Settings → Keyboard.
+            Bindings are fixed in this build — Phase 6 will let you rebind them in Settings →
+            Keyboard.
           </Typography>
         </Stack>
       </DialogContent>

@@ -46,10 +46,7 @@ export interface SftpConfig {
  *  the backend registry slot adopts it instead of minting a fresh
  *  UUID, keeping `saved.id === live.id`. Omit for a brand-new
  *  connection with no saved row yet. */
-export const connCreateSftp = (
-  config: SftpConfig,
-  connectionId?: string,
-): Promise<string> =>
+export const connCreateSftp = (config: SftpConfig, connectionId?: string): Promise<string> =>
   invoke<string>("conn_create_sftp", { config, connectionId });
 
 /** Mirror of `crate::fs::ftp::FtpConfig`. Phase 3a (0.2.246) ships
@@ -65,10 +62,7 @@ export interface FtpConfig {
 
 /** See `connCreateSftp` — pass `connectionId` to align the live slot
  *  with an existing saved row. */
-export const connCreateFtp = (
-  config: FtpConfig,
-  connectionId?: string,
-): Promise<string> =>
+export const connCreateFtp = (config: FtpConfig, connectionId?: string): Promise<string> =>
   invoke<string>("conn_create_ftp", { config, connectionId });
 
 /** Mirror of `crate::fs::smb::SmbConfig` (0.2.265 Phase 3c).
@@ -86,10 +80,7 @@ export interface SmbConfig {
 
 /** See `connCreateSftp` — pass `connectionId` to align the live slot
  *  with an existing saved row. */
-export const connCreateSmb = (
-  config: SmbConfig,
-  connectionId?: string,
-): Promise<string> =>
+export const connCreateSmb = (config: SmbConfig, connectionId?: string): Promise<string> =>
   invoke<string>("conn_create_smb", { config, connectionId });
 
 /** Probe an SMB server for the list of disk shares the supplied
@@ -109,14 +100,9 @@ export const smbListShares = (
 export const connDisconnect = (id: string): Promise<void> =>
   invoke<void>("conn_disconnect", { id });
 
-export const connList = (): Promise<ConnectionInfo[]> =>
-  invoke<ConnectionInfo[]>("conn_list");
+export const connList = (): Promise<ConnectionInfo[]> => invoke<ConnectionInfo[]>("conn_list");
 
-export const connListDir = (
-  id: string,
-  path: string,
-  options?: ListOptions,
-): Promise<Entry[]> =>
+export const connListDir = (id: string, path: string, options?: ListOptions): Promise<Entry[]> =>
   invoke<Entry[]>("conn_list_dir", { id, path, options });
 
 export const connStat = (id: string, path: string): Promise<Entry> =>
@@ -128,21 +114,16 @@ export const connReadText = (id: string, path: string): Promise<string> =>
 export const connReadBase64 = (id: string, path: string): Promise<string> =>
   invoke<string>("conn_read_base64", { id, path });
 
-export const connDirSummary = (
-  id: string,
-  path: string,
-): Promise<DirSummary> => invoke<DirSummary>("conn_dir_summary", { id, path });
+export const connDirSummary = (id: string, path: string): Promise<DirSummary> =>
+  invoke<DirSummary>("conn_dir_summary", { id, path });
 
 /** Create a directory on a remote (recursive, idempotent). */
 export const connMkdir = (id: string, path: string): Promise<void> =>
   invoke<void>("conn_mkdir", { id, path });
 
 /** Rename / same-FS move on a remote. */
-export const connRename = (
-  id: string,
-  from: string,
-  to: string,
-): Promise<void> => invoke<void>("conn_rename", { id, from, to });
+export const connRename = (id: string, from: string, to: string): Promise<void> =>
+  invoke<void>("conn_rename", { id, from, to });
 
 /** Recursive remove on a remote. Permanent — there's no server-side
  *  trash; the frontend should confirm before invoking. */

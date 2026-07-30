@@ -20,10 +20,7 @@ let current: FileClipboardEntry | null = null;
 /** Custom DOM event fired when the clipboard changes. */
 export const FILE_CLIPBOARD_EVENT = "skiff:file-clipboard";
 
-export function setFileClipboard(
-  paths: string[],
-  operation: FileClipboardOperation,
-): void {
+export function setFileClipboard(paths: string[], operation: FileClipboardOperation): void {
   current = paths.length > 0 ? { paths: [...paths], operation } : null;
   window.dispatchEvent(new CustomEvent(FILE_CLIPBOARD_EVENT));
 }

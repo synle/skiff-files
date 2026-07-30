@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: 'Commit SHA to build from. Leave empty to use HEAD.'
+        description: "Commit SHA to build from. Leave empty to use HEAD."
         required: false
-        default: ''
+        default: ""
       notes:
-        description: 'Custom release notes (optional). Prepended before the changelog.'
+        description: "Custom release notes (optional). Prepended before the changelog."
         required: false
-        default: ''
+        default: ""
 
 permissions:
   contents: write
@@ -88,8 +88,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ needs.prepare.outputs.tag }}
-          releaseName: 'Skiff Files Beta (${{ needs.prepare.outputs.tag }})'
-          releaseBody: 'Build in progress...'
+          releaseName: "Skiff Files Beta (${{ needs.prepare.outputs.tag }})"
+          releaseBody: "Build in progress..."
           releaseDraft: true
           prerelease: true
           args: ${{ matrix.args }}

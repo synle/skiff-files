@@ -26,40 +26,40 @@ Two layers, one IPC channel:
 
 ## Key Directories
 
-| Path | Contents |
-|---|---|
-| `src/` | React frontend (TypeScript) |
-| `src/pages/` | Browser, Connections, Transfers, Settings routes |
-| `src/components/` | FileList, Toolbar, PathBar, Sidebar, Modals, BrowserTabs |
-| `src/state/` | `SettingsProvider` — the only Context |
-| `src/api/` | Typed `invoke` wrappers: `fs.ts`, `conn.ts`, `sync.ts`, `client.ts` |
-| `src/util/` | Pure helpers (no React/api/state imports) — `location.ts` etc. |
-| `src/i18n/`, `src/theme/`, `src/test/` | Translations, MUI theme, test helpers |
-| `src-tauri/` | Rust backend + Tauri config |
-| `src-tauri/src/fs/` | `local.rs` (std::fs), `sftp.rs` (russh + russh-sftp), `ftp.rs` (suppaftp), `smb.rs` (smb2 — pure-Rust SMB 2/3), `registry.rs` (connection map), `ssh_config.rs`, `known_hosts.rs`, `watch.rs` (notify-based), `thumbnail.rs` (SQLite cache), `types.rs`, `icons.rs` |
-| `src-tauri/src/sync/` | `plan.rs`, `engine.rs` (local, sync), `cross_engine.rs` + `backend.rs` (async tokio), `resolver.rs`, `stamp.rs`, `dedup.rs`, `repo.rs`, `registry.rs` (jobs), `types.rs` |
-| `src-tauri/src/{creds,crash,health,permissions,win_cmd}.rs` | OS keychain wrapper (`creds`), opt-in local crash log hook (`crash`), `127.0.0.1:39871` ping server (`health`), macOS Full Disk Access TCC probe + System Settings deep-link (`permissions`), Windows `CREATE_NO_WINDOW` spawn helper (`win_cmd`) |
-| `src-tauri/capabilities/` | Tauri v2 capability allowlists |
-| `.github/workflows/` | `build.yml`, `integration.yml`, `release-official.yml`, `release-beta.yml`, `automerge.yml` |
-| `docker/` | Local test fixtures (SFTP / FTP / SMB servers) |
+| Path                                                        | Contents                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/`                                                      | React frontend (TypeScript)                                                                                                                                                                                                                                         |
+| `src/pages/`                                                | Browser, Connections, Transfers, Settings routes                                                                                                                                                                                                                    |
+| `src/components/`                                           | FileList, Toolbar, PathBar, Sidebar, Modals, BrowserTabs                                                                                                                                                                                                            |
+| `src/state/`                                                | `SettingsProvider` — the only Context                                                                                                                                                                                                                               |
+| `src/api/`                                                  | Typed `invoke` wrappers: `fs.ts`, `conn.ts`, `sync.ts`, `client.ts`                                                                                                                                                                                                 |
+| `src/util/`                                                 | Pure helpers (no React/api/state imports) — `location.ts` etc.                                                                                                                                                                                                      |
+| `src/i18n/`, `src/theme/`, `src/test/`                      | Translations, MUI theme, test helpers                                                                                                                                                                                                                               |
+| `src-tauri/`                                                | Rust backend + Tauri config                                                                                                                                                                                                                                         |
+| `src-tauri/src/fs/`                                         | `local.rs` (std::fs), `sftp.rs` (russh + russh-sftp), `ftp.rs` (suppaftp), `smb.rs` (smb2 — pure-Rust SMB 2/3), `registry.rs` (connection map), `ssh_config.rs`, `known_hosts.rs`, `watch.rs` (notify-based), `thumbnail.rs` (SQLite cache), `types.rs`, `icons.rs` |
+| `src-tauri/src/sync/`                                       | `plan.rs`, `engine.rs` (local, sync), `cross_engine.rs` + `backend.rs` (async tokio), `resolver.rs`, `stamp.rs`, `dedup.rs`, `repo.rs`, `registry.rs` (jobs), `types.rs`                                                                                            |
+| `src-tauri/src/{creds,crash,health,permissions,win_cmd}.rs` | OS keychain wrapper (`creds`), opt-in local crash log hook (`crash`), `127.0.0.1:39871` ping server (`health`), macOS Full Disk Access TCC probe + System Settings deep-link (`permissions`), Windows `CREATE_NO_WINDOW` spawn helper (`win_cmd`)                   |
+| `src-tauri/capabilities/`                                   | Tauri v2 capability allowlists                                                                                                                                                                                                                                      |
+| `.github/workflows/`                                        | `build.yml`, `integration.yml`, `release-official.yml`, `release-beta.yml`, `automerge.yml`                                                                                                                                                                         |
+| `docker/`                                                   | Local test fixtures (SFTP / FTP / SMB servers)                                                                                                                                                                                                                      |
 
 ## Important Files
 
-| File | Role |
-|---|---|
-| `src-tauri/tauri.conf.json` | Single source of truth for `version`; bundle targets `dmg / nsis / deb / appimage`; window config; identifier `com.synle.skiff-files` |
-| `src-tauri/Cargo.toml` | Rust deps (`tauri`, `tokio`, `russh` + `russh-sftp` for SFTP, `suppaftp` for FTP, `smb2` for SMB, `notify` for fs watching, `rusqlite` for the thumbnail cache, `md5`) |
-| `src-tauri/build.rs` | Exposes `APP_VERSION` from `tauri.conf.json` to Rust via `env!()`; dev builds append `[DEV]`, CI sets `TAURI_RELEASE=true` for clean strings |
-| `src-tauri/src/main.rs` | Thin entry — calls `skiff_files_lib::run()` |
-| `src-tauri/src/lib.rs` | `tauri::Builder` + `invoke_handler!` registration |
-| `src-tauri/src/commands.rs` | The only file with `#[tauri::command]`; thin adapters returning `FsResult<T>` (= `Result<T, String>`) |
-| `src/main.tsx` | React entry; mounts `HashRouter` (required under `tauri://`) |
-| `src/App.tsx` | Route table, root-mounted modals (`ShortcutsModal`, `ConflictModal`, `QuickJump`), `buildCommandActions` dispatch site for `skiff:*` window CustomEvents |
-| `src/api/client.ts` | Backend-agnostic dispatch via `dispatchByLocation`; regression suite in `client.test.ts` pins 69 per-backend routes |
-| `src/state/settings.tsx` | Seeds from `localStorage`, rehydrates from disk via `settings_load`; every change writes to both |
-| `package.json` | Scripts: `dev`, `build`, `tauri:dev`, `tauri:build`, `test` (vitest), `test:coverage`, `typecheck`, `format` |
-| `vite.config.ts`, `tsconfig.json` | Frontend build / TS config |
-| `index.html` | Vite entry |
+| File                              | Role                                                                                                                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/tauri.conf.json`       | Single source of truth for `version`; bundle targets `dmg / nsis / deb / appimage`; window config; identifier `com.synle.skiff-files`                                  |
+| `src-tauri/Cargo.toml`            | Rust deps (`tauri`, `tokio`, `russh` + `russh-sftp` for SFTP, `suppaftp` for FTP, `smb2` for SMB, `notify` for fs watching, `rusqlite` for the thumbnail cache, `md5`) |
+| `src-tauri/build.rs`              | Exposes `APP_VERSION` from `tauri.conf.json` to Rust via `env!()`; dev builds append `[DEV]`, CI sets `TAURI_RELEASE=true` for clean strings                           |
+| `src-tauri/src/main.rs`           | Thin entry — calls `skiff_files_lib::run()`                                                                                                                            |
+| `src-tauri/src/lib.rs`            | `tauri::Builder` + `invoke_handler!` registration                                                                                                                      |
+| `src-tauri/src/commands.rs`       | The only file with `#[tauri::command]`; thin adapters returning `FsResult<T>` (= `Result<T, String>`)                                                                  |
+| `src/main.tsx`                    | React entry; mounts `HashRouter` (required under `tauri://`)                                                                                                           |
+| `src/App.tsx`                     | Route table, root-mounted modals (`ShortcutsModal`, `ConflictModal`, `QuickJump`), `buildCommandActions` dispatch site for `skiff:*` window CustomEvents               |
+| `src/api/client.ts`               | Backend-agnostic dispatch via `dispatchByLocation`; regression suite in `client.test.ts` pins 69 per-backend routes                                                    |
+| `src/state/settings.tsx`          | Seeds from `localStorage`, rehydrates from disk via `settings_load`; every change writes to both                                                                       |
+| `package.json`                    | Scripts: `dev`, `build`, `tauri:dev`, `tauri:build`, `test` (vitest), `test:coverage`, `typecheck`, `format`                                                           |
+| `vite.config.ts`, `tsconfig.json` | Frontend build / TS config                                                                                                                                             |
+| `index.html`                      | Vite entry                                                                                                                                                             |
 
 ## Sync Engine Detail
 
@@ -82,12 +82,12 @@ Three surfaces, one `<Body>` dispatch:
 
 `Body` (in `components/PreviewPane.tsx`) routes by kind:
 
-| Kind | Body component |
-|---|---|
-| folder | `FolderBody` (recursive scan) |
-| image | `ImageBody` (EXIF auto-orient + rotate + zoom + drag-pan) |
-| audio / video | `preview/MediaBody` (custom seekbar + play / pause / volume) |
-| pdf | `PdfBody` (webview's native PDF viewer) |
+| Kind                | Body component                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| folder              | `FolderBody` (recursive scan)                                                                                                  |
+| image               | `ImageBody` (EXIF auto-orient + rotate + zoom + drag-pan)                                                                      |
+| audio / video       | `preview/MediaBody` (custom seekbar + play / pause / volume)                                                                   |
+| pdf                 | `PdfBody` (webview's native PDF viewer)                                                                                        |
 | **everything else** | `preview/TextBody` (lossy UTF-8 + Prism highlight + markdown toggle + in-body search + virtualized renderer for files > 64 KB) |
 
 `isPreviewableEntry` collapses to "anything-not-folder" — text fallback ensures every file kind has a useful preview.

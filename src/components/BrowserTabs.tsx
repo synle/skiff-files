@@ -7,17 +7,7 @@
 // selection, multi-select — everything that lives in Browser's local
 // useState. The tab itself only carries a label + the path it last
 // opened, used for the tab strip.
-import {
-  Box,
-  Chip,
-  Divider,
-  IconButton,
-  Menu,
-  MenuItem,
-  Tab,
-  Tabs,
-  Tooltip,
-} from "@mui/material";
+import { Box, Chip, Divider, IconButton, Menu, MenuItem, Tab, Tabs, Tooltip } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -81,25 +71,16 @@ function labelFor(path: string): string {
   return segs[segs.length - 1] ?? path;
 }
 
-export default function BrowserTabs({
-  home,
-  pane = "main",
-  isFocusedPane = true,
-}: Props) {
+export default function BrowserTabs({ home, pane = "main", isFocusedPane = true }: Props) {
   // Seed tabs from persisted settings. Empty saved list → spawn the
   // default Home tab. Settings is also our write-back target so the
   // tabs survive restart. Per-pane keys: the right pane uses the
   // `*Right` field family so the two pane tab lists don't collide.
   const { settings, update } = useSettings();
   const savedTabsKey = pane === "right" ? "savedTabsRight" : "savedTabs";
-  const savedActiveTabIdKey =
-    pane === "right" ? "savedActiveTabIdRight" : "savedActiveTabId";
-  const seedTabs =
-    pane === "right" ? settings.savedTabsRight : settings.savedTabs;
-  const seedActive =
-    pane === "right"
-      ? settings.savedActiveTabIdRight
-      : settings.savedActiveTabId;
+  const savedActiveTabIdKey = pane === "right" ? "savedActiveTabIdRight" : "savedActiveTabId";
+  const seedTabs = pane === "right" ? settings.savedTabsRight : settings.savedTabs;
+  const seedActive = pane === "right" ? settings.savedActiveTabIdRight : settings.savedActiveTabId;
   const initTabs = (() => {
     // Boot-time URL hash override: when the window was spawned via
     // window_open_at(path), the Rust side encoded the path into the
@@ -151,8 +132,7 @@ export default function BrowserTabs({
   })();
   const [tabs, setTabs] = useState<TabRow[]>(initTabs);
   const [activeId, setActiveId] = useState<string>(() => {
-    if (seedActive && seedTabs.some((t) => t.id === seedActive))
-      return seedActive;
+    if (seedActive && seedTabs.some((t) => t.id === seedActive)) return seedActive;
     // Derive from the already-computed initial tabs so the very
     // first render has a matching value. The old code fell back
     // to "" and relied on a useEffect to patch it — MUI Tabs in
@@ -295,10 +275,7 @@ export default function BrowserTabs({
       if (nextPinned) {
         // Insert AFTER the last existing pinned tab so multiple
         // pinned tabs cluster in pin order.
-        const lastPinIdx = others.reduce(
-          (acc, t, i) => (t.pinned ? i : acc),
-          -1,
-        );
+        const lastPinIdx = others.reduce((acc, t, i) => (t.pinned ? i : acc), -1);
         const insertAt = lastPinIdx + 1;
         return [
           ...others.slice(0, insertAt),
@@ -350,11 +327,7 @@ export default function BrowserTabs({
       if (
         matchesCombo(
           e,
-          activeCombo(
-            "tabs.restoreClosedTab",
-            "cmd+shift+t",
-            settings.shortcutOverrides,
-          ),
+          activeCombo("tabs.restoreClosedTab", "cmd+shift+t", settings.shortcutOverrides),
         )
       ) {
         if (!isFocusedPane) return;
@@ -362,23 +335,13 @@ export default function BrowserTabs({
         restoreClosedTab();
         return;
       }
-      if (
-        matchesCombo(
-          e,
-          activeCombo("tabs.newTab", "cmd+t", settings.shortcutOverrides),
-        )
-      ) {
+      if (matchesCombo(e, activeCombo("tabs.newTab", "cmd+t", settings.shortcutOverrides))) {
         if (!isFocusedPane) return;
         e.preventDefault();
         addTab();
         return;
       }
-      if (
-        matchesCombo(
-          e,
-          activeCombo("tabs.closeTab", "cmd+w", settings.shortcutOverrides),
-        )
-      ) {
+      if (matchesCombo(e, activeCombo("tabs.closeTab", "cmd+w", settings.shortcutOverrides))) {
         if (!isFocusedPane) return;
         e.preventDefault();
         closeTab(activeId);
@@ -393,11 +356,7 @@ export default function BrowserTabs({
       for (let i = 1; i <= 9; i++) {
         const matched = matchesCombo(
           e,
-          activeCombo(
-            `tabs.switchTo${i}`,
-            `cmd+${i}`,
-            settings.shortcutOverrides,
-          ),
+          activeCombo(`tabs.switchTo${i}`, `cmd+${i}`, settings.shortcutOverrides),
         );
         if (matched) {
           if (tabs[i - 1]) {
@@ -410,11 +369,7 @@ export default function BrowserTabs({
       if (
         matchesCombo(
           e,
-          activeCombo(
-            "tabs.moveLeft",
-            "cmd+shift+arrowleft",
-            settings.shortcutOverrides,
-          ),
+          activeCombo("tabs.moveLeft", "cmd+shift+arrowleft", settings.shortcutOverrides),
         )
       ) {
         e.preventDefault();
@@ -422,32 +377,14 @@ export default function BrowserTabs({
       } else if (
         matchesCombo(
           e,
-          activeCombo(
-            "tabs.moveRight",
-            "cmd+shift+arrowright",
-            settings.shortcutOverrides,
-          ),
+          activeCombo("tabs.moveRight", "cmd+shift+arrowright", settings.shortcutOverrides),
         )
       ) {
         e.preventDefault();
         moveActiveTab("right");
       } else if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "tabs.cyclePrev",
-            "cmd+shift+[",
-            settings.shortcutOverrides,
-          ),
-        ) ||
-        matchesCombo(
-          e,
-          activeCombo(
-            "tabs.cycleNext",
-            "cmd+shift+]",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("tabs.cyclePrev", "cmd+shift+[", settings.shortcutOverrides)) ||
+        matchesCombo(e, activeCombo("tabs.cycleNext", "cmd+shift+]", settings.shortcutOverrides))
       ) {
         // Browser muscle memory: Cmd/Ctrl+Shift+[ / ] cycles between
         // tabs. Wraps at the ends. Distinct from plain Cmd+[/] which
@@ -457,11 +394,7 @@ export default function BrowserTabs({
           e.preventDefault();
           const isPrev = matchesCombo(
             e,
-            activeCombo(
-              "tabs.cyclePrev",
-              "cmd+shift+[",
-              settings.shortcutOverrides,
-            ),
+            activeCombo("tabs.cyclePrev", "cmd+shift+[", settings.shortcutOverrides),
           );
           const delta = isPrev ? -1 : 1;
           const next = (idx + delta + tabs.length) % tabs.length;
@@ -477,8 +410,7 @@ export default function BrowserTabs({
 
   // Pre-compute active path so addTab below can read it without
   // relying on a forward-declared const.
-  const activePathForSeed =
-    tabs.find((t) => t.id === activeId)?.currentPath ?? "";
+  const activePathForSeed = tabs.find((t) => t.id === activeId)?.currentPath ?? "";
 
   const addTab = (initialPath?: string) => {
     const id = crypto.randomUUID();
@@ -486,9 +418,7 @@ export default function BrowserTabs({
     // path" setting > home directory.
     const seed =
       initialPath ??
-      (settings.openNewTabAtCurrent && activePathForSeed
-        ? activePathForSeed
-        : home ?? "");
+      (settings.openNewTabAtCurrent && activePathForSeed ? activePathForSeed : (home ?? ""));
     setTabs((prev) => [
       ...prev,
       {
@@ -550,9 +480,7 @@ export default function BrowserTabs({
               label: closed.label,
               initialPath: closed.currentPath,
             },
-            ...settings.recentlyClosedTabs.filter(
-              (t) => t.initialPath !== closed.currentPath,
-            ),
+            ...settings.recentlyClosedTabs.filter((t) => t.initialPath !== closed.currentPath),
           ].slice(0, 10),
         );
       }
@@ -590,9 +518,7 @@ export default function BrowserTabs({
    *  "Maximum update depth exceeded". */
   const updateLabel = useCallback((id: string, path: string) => {
     setTabs((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, label: labelFor(path), currentPath: path } : t,
-      ),
+      prev.map((t) => (t.id === id ? { ...t, label: labelFor(path), currentPath: path } : t)),
     );
   }, []);
 
@@ -604,9 +530,7 @@ export default function BrowserTabs({
   // connections light up immediately. Outside Tauri (test runs) the
   // initial `connList()` rejects and we keep the empty map — tabs
   // gracefully fall back to the UUID in `labelFor`.
-  const [connMap, setConnMap] = useState<Map<string, ConnectionInfo>>(
-    new Map(),
-  );
+  const [connMap, setConnMap] = useState<Map<string, ConnectionInfo>>(new Map());
   useEffect(() => {
     const refresh = () => {
       void connList()
@@ -619,8 +543,7 @@ export default function BrowserTabs({
     };
     refresh();
     window.addEventListener("skiff:connections-changed", refresh);
-    return () =>
-      window.removeEventListener("skiff:connections-changed", refresh);
+    return () => window.removeEventListener("skiff:connections-changed", refresh);
   }, []);
 
   // Active sync job count — reflected in the window title so users
@@ -638,11 +561,7 @@ export default function BrowserTabs({
         const list = await syncList();
         const inFlight = new Set<string>();
         for (const j of list) {
-          if (
-            j.state === "running" ||
-            j.state === "paused" ||
-            j.state === "planning"
-          ) {
+          if (j.state === "running" || j.state === "paused" || j.state === "planning") {
             inFlight.add(j.id);
           }
         }
@@ -689,8 +608,7 @@ export default function BrowserTabs({
   // Wrapped in try/catch + dynamic import so tests + browser-mode dev
   // (no Tauri runtime) silently no-op. Active job count gets prefixed
   // when there's transfer activity so users notice from the taskbar.
-  const activePath =
-    tabs.find((t) => t.id === activeId)?.currentPath ?? "";
+  const activePath = tabs.find((t) => t.id === activeId)?.currentPath ?? "";
   useEffect(() => {
     void (async () => {
       try {
@@ -700,8 +618,7 @@ export default function BrowserTabs({
           settings.showFullPathInTitle && activePath
             ? `${activePath} — Skiff Files`
             : "Skiff Files";
-        const next =
-          activeJobs.size > 0 ? `(${activeJobs.size}) ${base}` : base;
+        const next = activeJobs.size > 0 ? `(${activeJobs.size}) ${base}` : base;
         await win.setTitle(next);
       } catch {
         /* outside Tauri — no-op */
@@ -747,9 +664,7 @@ export default function BrowserTabs({
             // Local + customLabel tabs keep their existing label
             // unchanged.
             const conn =
-              loc.backend.kind !== "local"
-                ? connMap.get(loc.backend.connectionId)
-                : null;
+              loc.backend.kind !== "local" ? connMap.get(loc.backend.connectionId) : null;
             const friendlyTabLabel =
               t.customLabel ||
               (conn
@@ -777,168 +692,161 @@ export default function BrowserTabs({
               />
             ) : null;
             return (
-            <Tab
-              key={t.id}
-              value={t.id}
-              // Native title tooltip on hover — shows the full path so
-              // users can disambiguate two tabs with the same basename
-              // (e.g. two `src` folders from different repos) without
-              // clicking through to read the breadcrumbs.
-              title={t.currentPath || t.initialPath || t.label}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setTabMenu({ anchor: e.currentTarget, tabId: t.id });
-              }}
-              // Middle-click closes the tab — browser muscle memory.
-              // Skip pinned tabs to mirror the × button's hide behavior.
-              onAuxClick={(e: ReactMouseEvent) => {
-                if (e.button !== 1 || t.pinned) return;
-                e.preventDefault();
-                closeTab(t.id);
-              }}
-              // Drag-to-reorder. Browser muscle memory: Chrome / Firefox
-              // / Edge / Safari all support dragging tabs in the strip.
-              // Uses a custom MIME so the OS drag-drop into the Browser
-              // pane (which expects `application/x-skiff-paths`) doesn't
-              // get confused. A separate handler also activates the tab
-              // when the user hovers over it during a FILE drag — lets
-              // them drop a multi-selection into a different tab's
-              // folder without juggling the active-tab switch by hand.
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData("application/x-skiff-tab", t.id);
-                e.dataTransfer.effectAllowed = "move";
-              }}
-              onDragOver={(e) => {
-                const types = e.dataTransfer.types;
-                if (types.includes("application/x-skiff-tab")) {
-                  // Tab-on-tab drag: prepare a reorder drop.
+              <Tab
+                key={t.id}
+                value={t.id}
+                // Native title tooltip on hover — shows the full path so
+                // users can disambiguate two tabs with the same basename
+                // (e.g. two `src` folders from different repos) without
+                // clicking through to read the breadcrumbs.
+                title={t.currentPath || t.initialPath || t.label}
+                onContextMenu={(e) => {
                   e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  return;
-                }
-                if (types.includes("application/x-skiff-paths")) {
-                  // File drag hovering a non-active tab: arm a hover
-                  // timer that switches to it after 700ms. Browser
-                  // muscle memory ("hover-switch"). Already-active
-                  // tabs no-op the timer so we don't repeatedly
-                  // re-set the same active id.
+                  setTabMenu({ anchor: e.currentTarget, tabId: t.id });
+                }}
+                // Middle-click closes the tab — browser muscle memory.
+                // Skip pinned tabs to mirror the × button's hide behavior.
+                onAuxClick={(e: ReactMouseEvent) => {
+                  if (e.button !== 1 || t.pinned) return;
                   e.preventDefault();
-                  e.dataTransfer.dropEffect = "copy";
-                  if (t.id !== activeId && hoverTimerRef.current === null) {
-                    hoverTimerRef.current = window.setTimeout(() => {
-                      setActiveId(t.id);
-                      hoverTimerRef.current = null;
-                    }, 700);
+                  closeTab(t.id);
+                }}
+                // Drag-to-reorder. Browser muscle memory: Chrome / Firefox
+                // / Edge / Safari all support dragging tabs in the strip.
+                // Uses a custom MIME so the OS drag-drop into the Browser
+                // pane (which expects `application/x-skiff-paths`) doesn't
+                // get confused. A separate handler also activates the tab
+                // when the user hovers over it during a FILE drag — lets
+                // them drop a multi-selection into a different tab's
+                // folder without juggling the active-tab switch by hand.
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-skiff-tab", t.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragOver={(e) => {
+                  const types = e.dataTransfer.types;
+                  if (types.includes("application/x-skiff-tab")) {
+                    // Tab-on-tab drag: prepare a reorder drop.
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    return;
                   }
-                }
-              }}
-              onDragLeave={() => {
-                if (hoverTimerRef.current !== null) {
-                  window.clearTimeout(hoverTimerRef.current);
-                  hoverTimerRef.current = null;
-                }
-              }}
-              onDrop={(e) => {
-                if (hoverTimerRef.current !== null) {
-                  window.clearTimeout(hoverTimerRef.current);
-                  hoverTimerRef.current = null;
-                }
-                const sourceId = e.dataTransfer.getData(
-                  "application/x-skiff-tab",
-                );
-                if (!sourceId || sourceId === t.id) return;
-                e.preventDefault();
-                setTabs((prev) => {
-                  const sourceIdx = prev.findIndex((x) => x.id === sourceId);
-                  const targetIdx = prev.findIndex((x) => x.id === t.id);
-                  if (sourceIdx < 0 || targetIdx < 0) return prev;
-                  const next = [...prev];
-                  const [moved] = next.splice(sourceIdx, 1);
-                  // Insert AT the target index — when dragging to the
-                  // right, the splice has already shifted everything
-                  // down by 1, so this lands the source where the
-                  // target was.
-                  next.splice(targetIdx, 0, moved);
-                  return next;
-                });
-              }}
-              sx={{
-                minHeight: 36,
-                py: 0.5,
-                textTransform: "none",
-                // Pinned tabs render slimmer + icon-only — same idea
-                // as Chrome's "fav-icon-only" pinned tabs. Saves
-                // horizontal real estate when many tabs are pinned.
-                ...(t.pinned ? { minWidth: 56, px: 1 } : {}),
-                // Remote tabs get a left border in primary tint so
-                // they read as visually distinct from local tabs at
-                // a glance. Width is small (3px) so it doesn't move
-                // the label.
-                ...(isRemote
-                  ? {
-                      borderLeft: 3,
-                      borderColor: "primary.main",
-                      pl: 1.5,
+                  if (types.includes("application/x-skiff-paths")) {
+                    // File drag hovering a non-active tab: arm a hover
+                    // timer that switches to it after 700ms. Browser
+                    // muscle memory ("hover-switch"). Already-active
+                    // tabs no-op the timer so we don't repeatedly
+                    // re-set the same active id.
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "copy";
+                    if (t.id !== activeId && hoverTimerRef.current === null) {
+                      hoverTimerRef.current = window.setTimeout(() => {
+                        setActiveId(t.id);
+                        hoverTimerRef.current = null;
+                      }, 700);
                     }
-                  : {}),
-              }}
-              label={
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  {t.pinned && (
-                    <PushPinIcon
-                      sx={{
-                        fontSize: 12,
-                        color: "primary.main",
-                        transform: "rotate(45deg)",
-                      }}
-                    />
-                  )}
-                  {/* Protocol chip (SFTP / FTP / SMB) sits before
-                   *  the label so users can tell the connection's
-                   *  protocol at a glance. Local tabs render no
-                   *  chip — file-system is the implicit default. */}
-                  {!t.pinned && protocolChip}
-                  {/* Hide the label on pinned tabs to keep them slim,
-                   *  similar to Chrome. The full path stays accessible
-                   *  via the title tooltip + right-click menu. */}
-                  {!t.pinned && friendlyTabLabel}
-                  {tabs.length > 1 && !t.pinned && (
-                    <CloseIcon
-                      fontSize="inherit"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeTab(t.id);
-                      }}
-                      aria-label={`Close tab ${t.label}`}
-                      role="button"
-                      sx={{
-                        ml: 0.5,
-                        fontSize: 14,
-                        opacity: 0.6,
-                        "&:hover": { opacity: 1 },
-                      }}
-                    />
-                  )}
-                </Box>
-              }
-            />
+                  }
+                }}
+                onDragLeave={() => {
+                  if (hoverTimerRef.current !== null) {
+                    window.clearTimeout(hoverTimerRef.current);
+                    hoverTimerRef.current = null;
+                  }
+                }}
+                onDrop={(e) => {
+                  if (hoverTimerRef.current !== null) {
+                    window.clearTimeout(hoverTimerRef.current);
+                    hoverTimerRef.current = null;
+                  }
+                  const sourceId = e.dataTransfer.getData("application/x-skiff-tab");
+                  if (!sourceId || sourceId === t.id) return;
+                  e.preventDefault();
+                  setTabs((prev) => {
+                    const sourceIdx = prev.findIndex((x) => x.id === sourceId);
+                    const targetIdx = prev.findIndex((x) => x.id === t.id);
+                    if (sourceIdx < 0 || targetIdx < 0) return prev;
+                    const next = [...prev];
+                    const [moved] = next.splice(sourceIdx, 1);
+                    // Insert AT the target index — when dragging to the
+                    // right, the splice has already shifted everything
+                    // down by 1, so this lands the source where the
+                    // target was.
+                    next.splice(targetIdx, 0, moved);
+                    return next;
+                  });
+                }}
+                sx={{
+                  minHeight: 36,
+                  py: 0.5,
+                  textTransform: "none",
+                  // Pinned tabs render slimmer + icon-only — same idea
+                  // as Chrome's "fav-icon-only" pinned tabs. Saves
+                  // horizontal real estate when many tabs are pinned.
+                  ...(t.pinned ? { minWidth: 56, px: 1 } : {}),
+                  // Remote tabs get a left border in primary tint so
+                  // they read as visually distinct from local tabs at
+                  // a glance. Width is small (3px) so it doesn't move
+                  // the label.
+                  ...(isRemote
+                    ? {
+                        borderLeft: 3,
+                        borderColor: "primary.main",
+                        pl: 1.5,
+                      }
+                    : {}),
+                }}
+                label={
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                    }}
+                  >
+                    {t.pinned && (
+                      <PushPinIcon
+                        sx={{
+                          fontSize: 12,
+                          color: "primary.main",
+                          transform: "rotate(45deg)",
+                        }}
+                      />
+                    )}
+                    {/* Protocol chip (SFTP / FTP / SMB) sits before
+                     *  the label so users can tell the connection's
+                     *  protocol at a glance. Local tabs render no
+                     *  chip — file-system is the implicit default. */}
+                    {!t.pinned && protocolChip}
+                    {/* Hide the label on pinned tabs to keep them slim,
+                     *  similar to Chrome. The full path stays accessible
+                     *  via the title tooltip + right-click menu. */}
+                    {!t.pinned && friendlyTabLabel}
+                    {tabs.length > 1 && !t.pinned && (
+                      <CloseIcon
+                        fontSize="inherit"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeTab(t.id);
+                        }}
+                        aria-label={`Close tab ${t.label}`}
+                        role="button"
+                        sx={{
+                          ml: 0.5,
+                          fontSize: 14,
+                          opacity: 0.6,
+                          "&:hover": { opacity: 1 },
+                        }}
+                      />
+                    )}
+                  </Box>
+                }
+              />
             );
           })}
         </Tabs>
         <Tooltip title="New tab (Cmd/Ctrl+T)">
-          <IconButton
-            size="small"
-            onClick={() => addTab()}
-            aria-label="New tab"
-            sx={{ mx: 0.5 }}
-          >
+          <IconButton size="small" onClick={() => addTab()} aria-label="New tab" sx={{ mx: 0.5 }}>
             <AddIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -965,10 +873,7 @@ export default function BrowserTabs({
               >
                 {pinned ? (
                   <>
-                    <PushPinOutlinedIcon
-                      fontSize="small"
-                      sx={{ mr: 1 }}
-                    />
+                    <PushPinOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
                     Unpin
                   </>
                 ) : (
@@ -982,9 +887,7 @@ export default function BrowserTabs({
           })()}
         <MenuItem
           onClick={() => {
-            const target = tabMenu
-              ? tabs.find((t) => t.id === tabMenu.tabId)
-              : null;
+            const target = tabMenu ? tabs.find((t) => t.id === tabMenu.tabId) : null;
             if (!target || !tabMenu) return;
             // Native prompt is suppressed in the Tauri webview; we
             // use a tiny inline approach here — push a custom label
@@ -993,17 +896,12 @@ export default function BrowserTabs({
             // basename-derived suggestion. Keeps the implementation
             // narrow without lifting yet another modal into App.
             const current = target.customLabel ?? "";
-            const next = window.prompt(
-              "Tab name (leave empty to reset):",
-              current,
-            );
+            const next = window.prompt("Tab name (leave empty to reset):", current);
             if (next === null) return; // user cancelled
             const trimmed = next.trim();
             setTabs((prev) =>
               prev.map((t) =>
-                t.id === tabMenu.tabId
-                  ? { ...t, customLabel: trimmed || undefined }
-                  : t,
+                t.id === tabMenu.tabId ? { ...t, customLabel: trimmed || undefined } : t,
               ),
             );
             setTabMenu(null);
@@ -1012,11 +910,7 @@ export default function BrowserTabs({
           Rename tab…
         </MenuItem>
         <MenuItem
-          disabled={
-            tabMenu
-              ? !!tabs.find((t) => t.id === tabMenu.tabId)?.pinned
-              : false
-          }
+          disabled={tabMenu ? !!tabs.find((t) => t.id === tabMenu.tabId)?.pinned : false}
           onClick={() => {
             if (tabMenu) closeTab(tabMenu.tabId);
             setTabMenu(null);
@@ -1042,12 +936,8 @@ export default function BrowserTabs({
             if (!tabMenu) return;
             const idx = tabs.findIndex((t) => t.id === tabMenu.tabId);
             if (idx >= 0) {
-              setTabs((prev) =>
-                prev.filter((t, i) => i <= idx || t.pinned),
-              );
-              const surviving = tabs.filter(
-                (t, i) => i <= idx || t.pinned,
-              );
+              setTabs((prev) => prev.filter((t, i) => i <= idx || t.pinned));
+              const surviving = tabs.filter((t, i) => i <= idx || t.pinned);
               if (!surviving.some((t) => t.id === activeId)) {
                 setActiveId(tabMenu.tabId);
               }
@@ -1065,12 +955,8 @@ export default function BrowserTabs({
             if (!tabMenu) return;
             const idx = tabs.findIndex((t) => t.id === tabMenu.tabId);
             if (idx >= 0) {
-              setTabs((prev) =>
-                prev.filter((t, i) => i >= idx || t.pinned),
-              );
-              const surviving = tabs.filter(
-                (t, i) => i >= idx || t.pinned,
-              );
+              setTabs((prev) => prev.filter((t, i) => i >= idx || t.pinned));
+              const surviving = tabs.filter((t, i) => i >= idx || t.pinned);
               if (!surviving.some((t) => t.id === activeId)) {
                 setActiveId(tabMenu.tabId);
               }
@@ -1100,22 +986,17 @@ export default function BrowserTabs({
             onClick={() => {
               setTabMenu(null);
               const allPinned = tabs.every((t) => t.pinned);
-              setTabs((prev) =>
-                prev.map((t) => ({ ...t, pinned: !allPinned })),
-              );
+              setTabs((prev) => prev.map((t) => ({ ...t, pinned: !allPinned })));
             }}
           >
             {tabs.every((t) => t.pinned) ? "Unpin all" : "Pin all"}
           </MenuItem>
         )}
         {(() => {
-          const target = tabMenu
-            ? tabs.find((t) => t.id === tabMenu.tabId)
-            : null;
+          const target = tabMenu ? tabs.find((t) => t.id === tabMenu.tabId) : null;
           const targetPath = target?.currentPath || target?.initialPath;
           const alreadyBookmarked =
-            !!targetPath &&
-            settings.bookmarks.some((b) => b.path === targetPath);
+            !!targetPath && settings.bookmarks.some((b) => b.path === targetPath);
           return (
             target && (
               <MenuItem
@@ -1123,9 +1004,7 @@ export default function BrowserTabs({
                 onClick={() => {
                   setTabMenu(null);
                   if (!targetPath || alreadyBookmarked) return;
-                  const segs = targetPath
-                    .split(/[\\/]/)
-                    .filter(Boolean);
+                  const segs = targetPath.split(/[\\/]/).filter(Boolean);
                   const label = segs.at(-1) || targetPath;
                   update("bookmarks", [
                     ...settings.bookmarks,

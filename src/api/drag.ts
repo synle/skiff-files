@@ -40,10 +40,7 @@ interface DragCallback {
  *
  *  No-op / silent failure when the plugin isn't available (test
  *  environments, browser dev mode). */
-export async function startNativeDrag(
-  files: string[],
-  options: DragOptions = {},
-): Promise<void> {
+export async function startNativeDrag(files: string[], options: DragOptions = {}): Promise<void> {
   if (files.length === 0) return;
   const channel = new Channel<DragCallback>();
   if (options.onEnd) {

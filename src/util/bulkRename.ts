@@ -66,9 +66,7 @@ export function applyBulkRename(
   let pattern: RegExp | null = null;
   if (hasFind) {
     try {
-      pattern = regex
-        ? new RegExp(find, "g")
-        : new RegExp(escapeForRegex(find), "g");
+      pattern = regex ? new RegExp(find, "g") : new RegExp(escapeForRegex(find), "g");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "invalid regex";
       return names.map((n) => ({

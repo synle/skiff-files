@@ -62,9 +62,7 @@ describe("App", () => {
   it("renders the Settings page when the Settings sidebar link is clicked", () => {
     render(frame("/"));
     fireEvent.click(screen.getByText("Settings"));
-    expect(
-      screen.getByRole("heading", { name: "Settings", level: 4 }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Settings", level: 4 })).toBeInTheDocument();
   });
 
   it("Settings page has the theme selector", () => {
@@ -117,9 +115,7 @@ describe("App", () => {
     // Side effect: showHidden flips. The provider persists to
     // localStorage so we can assert against that without scraping the
     // FileList — keeps the test layout-free.
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.showHidden).toBe(true);
   });
 
@@ -130,18 +126,13 @@ describe("App", () => {
       ctrlKey: true,
       shiftKey: true,
     });
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.showHidden).toBe(true);
   });
 
   it("two-pane mode renders a draggable split-bar separator", async () => {
     // Enable two-pane mode before mount so the divider is in the tree.
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ twoPaneMode: true }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ twoPaneMode: true }));
     render(frame("/"));
     const sep = await screen.findByRole("separator", { name: /Resize panes/ });
     expect(sep).toBeInTheDocument();
@@ -159,9 +150,7 @@ describe("App", () => {
     fireEvent.mouseDown(sep, { clientX: 400 });
     fireEvent(window, new MouseEvent("mousemove", { clientX: 600 }));
     fireEvent(window, new MouseEvent("mouseup"));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.twoPaneSplitRatio).toBeCloseTo(0.75, 5);
   });
 
@@ -176,9 +165,7 @@ describe("App", () => {
     // Yank far left — would compute negative ratio; clamp floors at 0.15.
     fireEvent(window, new MouseEvent("mousemove", { clientX: -500 }));
     fireEvent(window, new MouseEvent("mouseup"));
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.twoPaneSplitRatio).toBeCloseTo(0.15, 5);
   });
 
@@ -189,12 +176,8 @@ describe("App", () => {
     // dialog content rather than the underlying window.close() mock
     // because the Tauri window mock factory is closure-free per
     // setup.ts; the dialog presence is the user-visible contract.
-    expect(
-      await screen.findByRole("heading", { name: /Quit Skiff Files/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Quit window/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Quit Skiff Files/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Quit window/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Cancel/i })).toBeInTheDocument();
   });
 
@@ -204,9 +187,7 @@ describe("App", () => {
     const cancel = await screen.findByRole("button", { name: /Cancel/i });
     fireEvent.click(cancel);
     await waitFor(() => {
-      expect(
-        screen.queryByRole("heading", { name: /Quit Skiff Files/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /Quit Skiff Files/i })).not.toBeInTheDocument();
     });
   });
 
@@ -220,9 +201,7 @@ describe("App", () => {
     // it's a one-line wrapper and the dialog's onConfirm is the
     // user-observable contract.
     await waitFor(() => {
-      expect(
-        screen.queryByRole("heading", { name: /Quit Skiff Files/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /Quit Skiff Files/i })).not.toBeInTheDocument();
     });
   });
 
@@ -234,9 +213,7 @@ describe("App", () => {
       ctrlKey: true,
       shiftKey: true,
     });
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.showHidden).toBe(true);
   });
 });

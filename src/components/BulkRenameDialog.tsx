@@ -34,11 +34,7 @@ interface Props {
   onDone: () => void;
 }
 
-export default function BulkRenameDialog({
-  entries,
-  onClose,
-  onDone,
-}: Props) {
+export default function BulkRenameDialog({ entries, onClose, onDone }: Props) {
   const [find, setFind] = useState("");
   const [replace, setReplace] = useState("");
   const [prefix, setPrefix] = useState("");
@@ -50,9 +46,7 @@ export default function BulkRenameDialog({
    *  override automatically (the row simply disappears). */
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
-    null,
-  );
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Reset state every time the dialog re-opens with a new selection
@@ -165,12 +159,7 @@ export default function BulkRenameDialog({
             />
           </Stack>
           <FormControlLabel
-            control={
-              <Switch
-                checked={regex}
-                onChange={(e) => setRegex(e.target.checked)}
-              />
-            }
+            control={<Switch checked={regex} onChange={(e) => setRegex(e.target.checked)} />}
             label="Regular expression (use $1, $2 for capture groups)"
           />
           <Stack direction="row" spacing={2}>
@@ -192,8 +181,8 @@ export default function BulkRenameDialog({
             />
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            Tip: <code>{"{n}"}</code> in the Replace field expands to
-            a sequence number (1, 2, 3, …). Use <code>{"{n:03}"}</code>
+            Tip: <code>{"{n}"}</code> in the Replace field expands to a sequence number (1, 2, 3,
+            …). Use <code>{"{n:03}"}</code>
             for zero-padded (001, 002, …).
           </Typography>
           {regexErr && (
@@ -203,17 +192,14 @@ export default function BulkRenameDialog({
           )}
           {collisionCount > 0 && !regexErr && (
             <Typography variant="caption" color="warning.main">
-              {collisionCount} entries would collide on the same new name —
-              fix the pattern or duplicates will be skipped.
+              {collisionCount} entries would collide on the same new name — fix the pattern or
+              duplicates will be skipped.
             </Typography>
           )}
 
           <FormControlLabel
             control={
-              <Switch
-                checked={inlineEdit}
-                onChange={(e) => setInlineEdit(e.target.checked)}
-              />
+              <Switch checked={inlineEdit} onChange={(e) => setInlineEdit(e.target.checked)} />
             }
             label="Inline edit (tweak individual results before applying)"
           />
@@ -255,10 +241,7 @@ export default function BulkRenameDialog({
                     >
                       {r.oldName}
                     </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{ flexShrink: 0, color: "text.secondary" }}
-                    >
+                    <Typography variant="caption" sx={{ flexShrink: 0, color: "text.secondary" }}>
                       →
                     </Typography>
                     <TextField
@@ -316,9 +299,7 @@ export default function BulkRenameDialog({
               <LinearProgress
                 variant="determinate"
                 value={
-                  progress.total === 0
-                    ? 0
-                    : Math.round((progress.done / progress.total) * 100)
+                  progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100)
                 }
               />
             </Box>

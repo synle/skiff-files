@@ -51,12 +51,7 @@ import {
   connDisconnect,
   smbListShares,
 } from "../api/conn";
-import {
-  credsCapable,
-  credsDelete,
-  credsLoad,
-  credsStore,
-} from "../api/creds";
+import { credsCapable, credsDelete, credsLoad, credsStore } from "../api/creds";
 import PathPickerField from "./PathPickerField";
 import { useSettings } from "../state/settings";
 import {
@@ -68,11 +63,7 @@ import {
   type SavedConnection,
 } from "../state/connectionStore";
 import { connectionId } from "../util/connectionUrl";
-import type {
-  FtpDraft,
-  SftpDraft,
-  SmbDraft,
-} from "../state/connectionDrafts";
+import type { FtpDraft, SftpDraft, SmbDraft } from "../state/connectionDrafts";
 
 /** Build the friendly registry label. Mirrors the Rust-side
  *  `conn_create_*` label format so sidebar tooltip / tab strip /
@@ -93,9 +84,7 @@ function computeLabel(args: {
     return smbShare ? `${base}/${smbShare}` : base;
   }
   if (scheme === "ftp") {
-    return user && user !== "anonymous"
-      ? `${user}@${host}:${port}`
-      : `${host}:${port}`;
+    return user && user !== "anonymous" ? `${user}@${host}:${port}` : `${host}:${port}`;
   }
   return `${user || "user"}@${host}:${port}`;
 }
@@ -156,11 +145,7 @@ function PasswordVisibilityToggle({
           tabIndex={-1}
           aria-label={visible ? "Hide password" : "Show password"}
         >
-          {visible ? (
-            <VisibilityOffIcon fontSize="small" />
-          ) : (
-            <VisibilityIcon fontSize="small" />
-          )}
+          {visible ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
         </IconButton>
       </Tooltip>
     </InputAdornment>
@@ -243,14 +228,7 @@ export default function RemoteConnectDialog({
     if (!open || !request) return;
     setScheme(request.scheme);
     setHost(request.host);
-    setPort(
-      request.port ??
-        (request.scheme === "sftp"
-          ? 22
-          : request.scheme === "smb"
-            ? 445
-            : 21),
-    );
+    setPort(request.port ?? (request.scheme === "sftp" ? 22 : request.scheme === "smb" ? 445 : 21));
     setUser(request.user ?? (request.scheme === "ftp" ? "anonymous" : ""));
     setPassword(request.scheme === "ftp" ? "anonymous@" : "");
     setAuthMode("password");
@@ -290,9 +268,7 @@ export default function RemoteConnectDialog({
     // tracked via `selectedDraftId` so the connect flow knows to
     // update-in-place vs. insert.
     if (editingConnectionId) {
-      const saved = settings.connections.find(
-        (c) => c.id === editingConnectionId,
-      );
+      const saved = settings.connections.find((c) => c.id === editingConnectionId);
       if (saved) {
         setScheme(saved.kind);
         setHost(saved.host);
@@ -375,11 +351,12 @@ export default function RemoteConnectDialog({
   }, [scheme, host, port, user, password, smbDomain]);
 
   const matches = useMemo(() => {
-    if (!request) return [] as Array<
-      | { kind: "sftp"; draft: SftpDraft }
-      | { kind: "ftp"; draft: FtpDraft }
-      | { kind: "smb"; draft: SmbDraft }
-    >;
+    if (!request)
+      return [] as Array<
+        | { kind: "sftp"; draft: SftpDraft }
+        | { kind: "ftp"; draft: FtpDraft }
+        | { kind: "smb"; draft: SmbDraft }
+      >;
     // Only surface drafts matching the URL's scheme — typing `ftp://`
     // shouldn't suggest SSH credentials and vice-versa. Source of
     // truth is now `Settings.connections`; we project to the legacy
@@ -491,10 +468,8 @@ export default function RemoteConnectDialog({
             port,
             user,
             password: authMode === "password" ? password : undefined,
-            privateKeyPath:
-              authMode === "privateKey" ? privateKeyPath : undefined,
-            privateKeyPassphrase:
-              authMode === "privateKey" ? privateKeyPassphrase : undefined,
+            privateKeyPath: authMode === "privateKey" ? privateKeyPath : undefined,
+            privateKeyPassphrase: authMode === "privateKey" ? privateKeyPassphrase : undefined,
             useAgent: authMode === "agent",
           },
           connId,
@@ -550,10 +525,7 @@ export default function RemoteConnectDialog({
         port,
         user: user || (scheme === "ftp" ? "anonymous" : ""),
         authMode: scheme === "sftp" ? authMode : undefined,
-        privateKeyPath:
-          scheme === "sftp" && authMode === "privateKey"
-            ? privateKeyPath
-            : undefined,
+        privateKeyPath: scheme === "sftp" && authMode === "privateKey" ? privateKeyPath : undefined,
         share: scheme === "smb" ? smbShare : undefined,
         domain: scheme === "smb" ? smbDomain : undefined,
         rememberPassword,
@@ -573,9 +545,7 @@ export default function RemoteConnectDialog({
       // leave a stale copy behind. The new row is inserted below.
       let nextConnections = settings.connections;
       if (isEditing && selectedDraftId !== computedId) {
-        nextConnections = nextConnections.filter(
-          (c) => c.id !== selectedDraftId,
-        );
+        nextConnections = nextConnections.filter((c) => c.id !== selectedDraftId);
         void credsDelete(selectedDraftId, "auth").catch(() => {});
         // Drop the old live-registry slot too so the sidebar doesn't
         // show a ghost entry for the pre-rename id. Fire-and-forget;
@@ -583,10 +553,7 @@ export default function RemoteConnectDialog({
         void connDisconnect(selectedDraftId).catch(() => {});
       }
       const rotatedConn: SavedConnection = { ...newConn, id: computedId };
-      update(
-        "connections",
-        addOrUpdateConnection(nextConnections, rotatedConn),
-      );
+      update("connections", addOrUpdateConnection(nextConnections, rotatedConn));
       const persistId = computedId;
       // Cross-store cleanup — fire-and-forget. Errors here are
       // non-fatal: a missing keychain entry returns Ok() silently,
@@ -686,11 +653,7 @@ export default function RemoteConnectDialog({
               <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                 Use a saved connection
               </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mb: 1 }}
-              >
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
                 {matches.length === 1
                   ? "One saved match for this host:"
                   : `${matches.length} saved matches for this host — pick one or fill in a new connection below.`}
@@ -899,9 +862,7 @@ export default function RemoteConnectDialog({
                   value={user}
                   onChange={(e) => setUser(e.target.value)}
                   helperText={
-                    scheme === "ftp"
-                      ? "Leave as 'anonymous' for public FTP mirrors."
-                      : undefined
+                    scheme === "ftp" ? "Leave as 'anonymous' for public FTP mirrors." : undefined
                   }
                   sx={{ flex: 1 }}
                 />
@@ -920,9 +881,7 @@ export default function RemoteConnectDialog({
                   // static "Never persisted." string was stale once
                   // the keychain arm landed.
                   helperText={
-                    scheme === "ftp"
-                      ? "Leave as 'anonymous@' for public mirrors."
-                      : undefined
+                    scheme === "ftp" ? "Leave as 'anonymous@' for public mirrors." : undefined
                   }
                   slotProps={{
                     input: {
@@ -1015,11 +974,7 @@ export default function RemoteConnectDialog({
               label={
                 <Box>
                   <Box>Remember password</Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block" }}
-                  >
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                     {rememberPassword
                       ? settings.saveCredentialsToKeychain && keychainAvailable
                         ? "Stored in the OS keychain."
@@ -1046,21 +1001,13 @@ export default function RemoteConnectDialog({
               <Switch
                 checked={autoConnect}
                 onChange={(e) => setAutoConnect(e.target.checked)}
-                disabled={
-                  scheme === "sftp" && authMode !== "password"
-                    ? false
-                    : !rememberPassword
-                }
+                disabled={scheme === "sftp" && authMode !== "password" ? false : !rememberPassword}
               />
             }
             label={
               <Box>
                 <Box>Auto-connect on app start</Box>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block" }}
-                >
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                   {scheme === "sftp" && authMode !== "password"
                     ? "Reconnects silently on every launch using the saved key / agent."
                     : rememberPassword

@@ -37,12 +37,7 @@ interface Props {
  *  Matches RECENT_PATHS_TRACK_MAX in settings.tsx. */
 const DIALOG_LIMIT = 200;
 
-export default function RecentPathsDialog({
-  open,
-  paths,
-  onClose,
-  onNavigate,
-}: Props) {
+export default function RecentPathsDialog({ open, paths, onClose, onNavigate }: Props) {
   const [query, setQuery] = useState("");
 
   // Substring match, case-insensitive. The full path is shown so
@@ -88,23 +83,14 @@ export default function RecentPathsDialog({
             slotProps={{
               input: {
                 startAdornment: (
-                  <SearchIcon
-                    fontSize="small"
-                    sx={{ color: "text.secondary", mr: 1 }}
-                  />
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary", mr: 1 }} />
                 ),
               },
             }}
           />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mt: 0.5 }}
-          >
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
             {filtered.length} of {Math.min(paths.length, DIALOG_LIMIT)} shown
-            {paths.length > DIALOG_LIMIT
-              ? ` (capped at ${DIALOG_LIMIT})`
-              : ""}
+            {paths.length > DIALOG_LIMIT ? ` (capped at ${DIALOG_LIMIT})` : ""}
           </Typography>
         </Box>
         {filtered.length === 0 ? (
@@ -126,10 +112,7 @@ export default function RecentPathsDialog({
                     }}
                   >
                     <ListItemIcon sx={{ minWidth: 32 }}>
-                      <HistoryIcon
-                        fontSize="small"
-                        sx={{ color: "text.secondary" }}
-                      />
+                      <HistoryIcon fontSize="small" sx={{ color: "text.secondary" }} />
                     </ListItemIcon>
                     <ListItemText
                       primary={p}

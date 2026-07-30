@@ -102,8 +102,7 @@ export default function QuickJump({ open, onClose, onJump, home }: Props) {
     if (!query) return items;
     const q = query.toLowerCase();
     return items.filter(
-      (i) =>
-        i.label.toLowerCase().includes(q) || i.path.toLowerCase().includes(q),
+      (i) => i.label.toLowerCase().includes(q) || i.path.toLowerCase().includes(q),
     );
   }, [items, query]);
 

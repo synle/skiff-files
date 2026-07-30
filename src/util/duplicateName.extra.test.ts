@@ -29,22 +29,17 @@ describe("uniqueDuplicateName — collision walk", () => {
   });
 
   it("collision suffix on a folder lands at the very end (no ext split)", () => {
-    const taken = new Set([
-      "Project-copy-2026-05-08-13-22",
-      "Project-copy-2026-05-08-13-22-2",
-    ]);
-    expect(
-      uniqueDuplicateName("Project", taken, { isDir: true, now: NOW }),
-    ).toBe("Project-copy-2026-05-08-13-22-3");
+    const taken = new Set(["Project-copy-2026-05-08-13-22", "Project-copy-2026-05-08-13-22-2"]);
+    expect(uniqueDuplicateName("Project", taken, { isDir: true, now: NOW })).toBe(
+      "Project-copy-2026-05-08-13-22-3",
+    );
   });
 
   it("dotfile collisions append the suffix at the end (no ext split)", () => {
     const taken = new Set([".env-copy-2026-05-08-13-22"]);
     // Dotfiles have empty ext via splitExt (dot index 0 → stem only),
     // so the collision suffix lands at the bare end.
-    expect(uniqueDuplicateName(".env", taken, { now: NOW })).toBe(
-      ".env-copy-2026-05-08-13-22-2",
-    );
+    expect(uniqueDuplicateName(".env", taken, { now: NOW })).toBe(".env-copy-2026-05-08-13-22-2");
   });
 });
 
@@ -63,8 +58,6 @@ describe("duplicateName — default-options branches", () => {
     // tail because lastIndexOf finds the dot before `gz`.
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2030, 0, 2, 3, 4));
-    expect(duplicateName("archive.tar.gz")).toBe(
-      "archive.tar-copy-2030-01-02-03-04.gz",
-    );
+    expect(duplicateName("archive.tar.gz")).toBe("archive.tar-copy-2030-01-02-03-04.gz");
   });
 });

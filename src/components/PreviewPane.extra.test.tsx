@@ -63,9 +63,7 @@ describe("PreviewPane — extras", () => {
 
   it("displays the path tooltip with the full path", () => {
     r(entry({ name: "long.txt", path: "/some/long/path/long.txt", kind: "text" }));
-    expect(
-      screen.getByText("/some/long/path/long.txt"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("/some/long/path/long.txt")).toBeInTheDocument();
   });
 
   it("renders symlink kind without a body crash", () => {

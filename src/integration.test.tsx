@@ -6,22 +6,8 @@
 // participant (PathBar event, Browser listener, OperationsDrawer
 // SYNC_QUEUED handler, pasteFlow orchestrator) fails for the
 // right reason.
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { ThemeProvider, createTheme } from "@mui/material";
 import { invoke } from "@tauri-apps/api/core";
@@ -29,9 +15,7 @@ import Browser from "./pages/Browser";
 import PathBar from "./components/PathBar";
 import Sidebar from "./components/Sidebar";
 import OperationsDrawer from "./components/OperationsDrawer";
-import RemoteConnectDialog, {
-  type RemoteConnectRequest,
-} from "./components/RemoteConnectDialog";
+import RemoteConnectDialog, { type RemoteConnectRequest } from "./components/RemoteConnectDialog";
 import { SettingsProvider } from "./state/settings";
 import { setFileClipboard, clearFileClipboard } from "./util/fileClipboard";
 import { runPaste, type PasteDeps } from "./util/pasteFlow";
@@ -120,11 +104,7 @@ describe("Cmd+V paste → OperationsDrawer row → sync:done → refresh", () =>
       render(
         <ThemeProvider theme={theme}>
           <SettingsProvider>
-            <Browser
-              initialPath="/home/test/Documents"
-              isActive
-              onPathChange={vi.fn()}
-            />
+            <Browser initialPath="/home/test/Documents" isActive onPathChange={vi.fn()} />
             <OperationsDrawer />
           </SettingsProvider>
         </ThemeProvider>,
@@ -146,9 +126,7 @@ describe("Cmd+V paste → OperationsDrawer row → sync:done → refresh", () =>
     // startSync emitted SYNC_QUEUED_EVENT → drawer renders the row.
     await waitFor(() => {
       expect(
-        screen.getByLabelText(
-          /Toggle \/src\/src\.txt → \/home\/test\/Documents/,
-        ),
+        screen.getByLabelText(/Toggle \/src\/src\.txt → \/home\/test\/Documents/),
       ).toBeInTheDocument();
     });
 
@@ -190,16 +168,11 @@ describe("PathBar `ftp://host/` → RemoteConnectDialog opens via window event",
           setReq(detail);
         };
         window.addEventListener("skiff:connect-to-remote", onConnect);
-        return () =>
-          window.removeEventListener("skiff:connect-to-remote", onConnect);
+        return () => window.removeEventListener("skiff:connect-to-remote", onConnect);
       }, []);
       return (
         <>
-          <PathBar
-            path="/Users/test"
-            onNavigate={vi.fn()}
-            onHome={vi.fn()}
-          />
+          <PathBar path="/Users/test" onNavigate={vi.fn()} onHome={vi.fn()} />
           <RemoteConnectDialog
             open={req != null}
             request={req}
@@ -237,9 +210,7 @@ describe("PathBar `ftp://host/` → RemoteConnectDialog opens via window event",
     });
     // The dialog is open (it renders its DialogTitle once `open === true`).
     // Dialog title text is "Connect to remote".
-    expect(
-      await screen.findByRole("dialog"),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });
 
@@ -315,11 +286,7 @@ describe("runPaste — default 30-minute per-job watchdog", () => {
       // NO perJobTimeoutMs override — exercises the 30 * 60_000ms
       // default constant inside pasteFlow.ts.
     };
-    const promise = runPaste(
-      { paths: ["/src/a", "/src/b"], operation: "copy" },
-      "/dest",
-      deps,
-    );
+    const promise = runPaste({ paths: ["/src/a", "/src/b"], operation: "copy" }, "/dest", deps);
     // Drain pasteFlow's pre-await async chain (await stat, await
     // startSync, await onDone) before time advances, then advance
     // past the first watchdog window. Repeat for the second source.

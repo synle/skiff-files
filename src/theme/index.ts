@@ -48,9 +48,7 @@ export const darkTheme: Theme = createTheme({
 export function resolveEffective(mode: ThemeMode): EffectiveMode {
   if (mode === "light" || mode === "dark") return mode;
   if (typeof window === "undefined" || !window.matchMedia) return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 /**
@@ -60,9 +58,7 @@ export function resolveEffective(mode: ThemeMode): EffectiveMode {
  * subscriptions after the user picks a fixed mode.
  */
 export function useEffectiveMode(mode: ThemeMode): EffectiveMode {
-  const [effective, setEffective] = useState<EffectiveMode>(() =>
-    resolveEffective(mode),
-  );
+  const [effective, setEffective] = useState<EffectiveMode>(() => resolveEffective(mode));
 
   useEffect(() => {
     setEffective(resolveEffective(mode));
@@ -108,10 +104,7 @@ export function usePrefersReducedMotion(): boolean {
  *  `createTheme` call so transitions actually take effect — wrapping
  *  an already-baked theme would leave precomputed transition strings
  *  on individual components. */
-export function themeForWithMotion(
-  effective: EffectiveMode,
-  reducedMotion: boolean,
-): Theme {
+export function themeForWithMotion(effective: EffectiveMode, reducedMotion: boolean): Theme {
   if (!reducedMotion) return themeFor(effective);
   return createTheme({
     palette: effective === "dark" ? darkPalette : lightPalette,
@@ -125,9 +118,7 @@ export function themeForWithMotion(
 
 /** Maps the user's font-size choice to MUI's base font size in pixels.
  *  MUI's default is 14; we step ±2 for S/L. */
-export function fontSizePx(
-  size: "small" | "medium" | "large",
-): number {
+export function fontSizePx(size: "small" | "medium" | "large"): number {
   if (size === "small") return 12;
   if (size === "large") return 16;
   return 14;
@@ -188,9 +179,7 @@ export function themeForFull(
     palette: applyCustomPalette(basePalette, customPalette),
     typography: { ...baseTypography, fontSize: fontSizePx(fontSize) },
     shape: baseShape,
-    ...(reducedMotion
-      ? { transitions: { create: () => "none" } }
-      : {}),
+    ...(reducedMotion ? { transitions: { create: () => "none" } } : {}),
     components: {
       // Apply the user's font size at the document root too — MUI's
       // typography variants scale via pxToRem, so they need both
@@ -221,34 +210,34 @@ export function themeForFull(
           // Selectors are `.token.<type>` per Prism's standard markup.
           ...(effective === "dark"
             ? {
-                ".token.comment, .token.prolog, .token.doctype, .token.cdata":
-                  { color: "#6a7280", fontStyle: "italic" },
+                ".token.comment, .token.prolog, .token.doctype, .token.cdata": {
+                  color: "#6a7280",
+                  fontStyle: "italic",
+                },
                 ".token.punctuation": { color: "#cbd5e1" },
                 ".token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol, .token.deleted":
                   { color: "#fca5a5" },
                 ".token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted":
                   { color: "#86efac" },
-                ".token.operator, .token.entity, .token.url, .token.variable":
-                  { color: "#fcd34d" },
-                ".token.atrule, .token.attr-value, .token.keyword":
-                  { color: "#93c5fd" },
+                ".token.operator, .token.entity, .token.url, .token.variable": { color: "#fcd34d" },
+                ".token.atrule, .token.attr-value, .token.keyword": { color: "#93c5fd" },
                 ".token.function, .token.class-name": { color: "#c4b5fd" },
                 ".token.regex, .token.important": { color: "#f9a8d4" },
                 ".token.important, .token.bold": { fontWeight: 600 },
                 ".token.italic": { fontStyle: "italic" },
               }
             : {
-                ".token.comment, .token.prolog, .token.doctype, .token.cdata":
-                  { color: "#6b7280", fontStyle: "italic" },
+                ".token.comment, .token.prolog, .token.doctype, .token.cdata": {
+                  color: "#6b7280",
+                  fontStyle: "italic",
+                },
                 ".token.punctuation": { color: "#475569" },
                 ".token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol, .token.deleted":
                   { color: "#b91c1c" },
                 ".token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted":
                   { color: "#15803d" },
-                ".token.operator, .token.entity, .token.url, .token.variable":
-                  { color: "#a16207" },
-                ".token.atrule, .token.attr-value, .token.keyword":
-                  { color: "#1d4ed8" },
+                ".token.operator, .token.entity, .token.url, .token.variable": { color: "#a16207" },
+                ".token.atrule, .token.attr-value, .token.keyword": { color: "#1d4ed8" },
                 ".token.function, .token.class-name": { color: "#6d28d9" },
                 ".token.regex, .token.important": { color: "#be185d" },
                 ".token.important, .token.bold": { fontWeight: 600 },
@@ -259,16 +248,12 @@ export function themeForFull(
           // pops on both themes without re-deriving the hex inline.
           ".skiff-search-hit": {
             backgroundColor:
-              effective === "dark"
-                ? "rgba(250, 204, 21, 0.32)"
-                : "rgba(250, 204, 21, 0.55)",
+              effective === "dark" ? "rgba(250, 204, 21, 0.32)" : "rgba(250, 204, 21, 0.55)",
             borderRadius: 2,
           },
           ".skiff-search-hit-active": {
             backgroundColor:
-              effective === "dark"
-                ? "rgba(249, 115, 22, 0.55)"
-                : "rgba(249, 115, 22, 0.75)",
+              effective === "dark" ? "rgba(249, 115, 22, 0.55)" : "rgba(249, 115, 22, 0.75)",
             outline:
               effective === "dark"
                 ? "1px solid rgba(249, 115, 22, 0.85)"
@@ -293,27 +278,21 @@ export function themeForFull(
             "& h4, & h5, & h6": { fontSize: "1em" },
             "& p": { margin: "0.6em 0" },
             "& code": {
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
               fontSize: "0.92em",
               padding: "0.1em 0.3em",
               borderRadius: 3,
               backgroundColor:
-                effective === "dark"
-                  ? "rgba(148, 163, 184, 0.18)"
-                  : "rgba(15, 23, 42, 0.08)",
+                effective === "dark" ? "rgba(148, 163, 184, 0.18)" : "rgba(15, 23, 42, 0.08)",
             },
             "& pre": {
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
               fontSize: "0.9em",
               padding: "0.75em",
               borderRadius: 6,
               overflowX: "auto",
               backgroundColor:
-                effective === "dark"
-                  ? "rgba(15, 23, 42, 0.55)"
-                  : "rgba(15, 23, 42, 0.05)",
+                effective === "dark" ? "rgba(15, 23, 42, 0.55)" : "rgba(15, 23, 42, 0.05)",
             },
             "& pre code": {
               padding: 0,

@@ -26,9 +26,7 @@ export const resources = {
  *  these as a dropdown; any other value in `Settings.language`
  *  falls back to English at lookup time via i18next's `fallbackLng`. */
 export type LocaleCode = keyof typeof resources;
-export const SUPPORTED_LOCALES: LocaleCode[] = Object.keys(
-  resources,
-) as LocaleCode[];
+export const SUPPORTED_LOCALES: LocaleCode[] = Object.keys(resources) as LocaleCode[];
 
 /** Initialize i18next once at module-import time. Idempotent — calling
  *  this from multiple entry points (main.tsx + tests) is safe. */

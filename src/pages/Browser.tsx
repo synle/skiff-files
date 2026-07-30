@@ -27,9 +27,7 @@ import KindFilterBar, {
 import type { TagColor } from "../state/settings";
 import FileList, { type SortDir, type SortKey } from "../components/FileList";
 import StatusBar from "../components/StatusBar";
-import RemoteConnectDialog, {
-  type RemoteConnectRequest,
-} from "../components/RemoteConnectDialog";
+import RemoteConnectDialog, { type RemoteConnectRequest } from "../components/RemoteConnectDialog";
 import PreviewPane, { isPreviewableEntry } from "../components/PreviewPane";
 import PreviewModal from "../components/PreviewModal";
 import { parseLocation } from "../util/location";
@@ -139,9 +137,7 @@ export default function Browser({
    *  window" button, the modifier-down keyboard chord, and the
    *  network-drive `onOpenFile` fallback (when osOpen has no native
    *  handler for the backend). */
-  const [previewModalEntry, setPreviewModalEntry] = useState<Entry | null>(
-    null,
-  );
+  const [previewModalEntry, setPreviewModalEntry] = useState<Entry | null>(null);
   /** Ref-mirror of `previewModalEntry` so keyboard handlers can read
    *  the live value inside their stable-closure useEffect bodies
    *  without re-binding the handler on every modal-state flip. */
@@ -157,16 +153,13 @@ export default function Browser({
   // folderViewMode).
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
   /** When set, the archive-viewer dialog is open against this path. */
-  const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(
-    null,
-  );
+  const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(null);
   /** Address-bar resolver dialog (0.2.264). PathBar dispatches
    *  `skiff:connect-to-remote` when the user types a host-form
    *  remote URL — we open RemoteConnectDialog with the parsed
    *  request, then navigate to the canonical `<scheme>://<uuid>/...`
    *  URL the dialog resolves to. */
-  const [remoteConnectReq, setRemoteConnectReq] =
-    useState<RemoteConnectRequest | null>(null);
+  const [remoteConnectReq, setRemoteConnectReq] = useState<RemoteConnectRequest | null>(null);
   /** Transient toast surfaced while a non-Skiffsync operation (delete /
    *  paste / extract / compress) is in flight. The Operations drawer
    *  already covers Skiffsync; this picks up the synchronous flows
@@ -175,9 +168,7 @@ export default function Browser({
   /** Per-session toggle of the preview pane, seeded from the persisted
    *  policy. The toolbar eye icon flips this; closing-then-reopening
    *  doesn't change Settings. */
-  const [previewOpen, setPreviewOpen] = useState<boolean>(
-    () => settings.previewMode !== "off",
-  );
+  const [previewOpen, setPreviewOpen] = useState<boolean>(() => settings.previewMode !== "off");
   /** In-folder search query. Pure client-side filter when
    *  `searchRecursive` is false; otherwise we dispatch `fs_find` and
    *  show its results until the user navigates / clears. */
@@ -432,8 +423,7 @@ export default function Browser({
       if (detail) setRemoteConnectReq(detail);
     };
     window.addEventListener("skiff:connect-to-remote", onConnect);
-    return () =>
-      window.removeEventListener("skiff:connect-to-remote", onConnect);
+    return () => window.removeEventListener("skiff:connect-to-remote", onConnect);
   }, [isActive]);
 
   // Fetch disk space for the current path. Skipped for sftp:// paths
@@ -556,10 +546,7 @@ export default function Browser({
       return;
     }
     if (settings.recentPaths[0] === path) return;
-    const next = [
-      path,
-      ...settings.recentPaths.filter((p) => p !== path),
-    ].slice(0, cap);
+    const next = [path, ...settings.recentPaths.filter((p) => p !== path)].slice(0, cap);
     update("recentPaths", next);
     // We deliberately don't depend on `settings.recentPaths` — the
     // update function reads its current value through useState, and
@@ -590,8 +577,7 @@ export default function Browser({
       } else if (raw && typeof raw === "object") {
         const obj = raw as { path?: unknown; pane?: unknown };
         if (typeof obj.path === "string") target = obj.path;
-        if (obj.pane === "main" || obj.pane === "right")
-          targetPane = obj.pane;
+        if (obj.pane === "main" || obj.pane === "right") targetPane = obj.pane;
       }
       if (!target) return;
       // If the event names a target pane and this Browser isn't in
@@ -619,11 +605,8 @@ export default function Browser({
     // selection when nothing is multi-selected).
     const onTagSelection = (e: Event) => {
       const color = (e as CustomEvent<TagColor | null>).detail;
-      const targets = selectedPaths.length > 0
-        ? selectedPaths
-        : primarySelected
-          ? [primarySelected.path]
-          : [];
+      const targets =
+        selectedPaths.length > 0 ? selectedPaths : primarySelected ? [primarySelected.path] : [];
       if (targets.length === 0) return;
       const next = { ...settings.fileTags };
       for (const p of targets) {
@@ -771,13 +754,7 @@ export default function Browser({
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (
-        !matchesCombo(
-          e,
-          activeCombo("browser.rename", "f2", settings.shortcutOverrides),
-        )
-      )
-        return;
+      if (!matchesCombo(e, activeCombo("browser.rename", "f2", settings.shortcutOverrides))) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
@@ -822,53 +799,27 @@ export default function Browser({
       // User-rebindable: refresh, new folder, preview toggle. Each
       // routes through activeCombo so a Settings → Keyboard rebind
       // takes effect here automatically.
-      if (
-        matchesCombo(
-          e,
-          activeCombo("browser.refresh", "cmd+r", settings.shortcutOverrides),
-        )
-      ) {
+      if (matchesCombo(e, activeCombo("browser.refresh", "cmd+r", settings.shortcutOverrides))) {
         e.preventDefault();
         if (path) void refresh(path);
         return;
       }
       if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "browser.newFolder",
-            "cmd+shift+n",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("browser.newFolder", "cmd+shift+n", settings.shortcutOverrides))
       ) {
         e.preventDefault();
         void handleNewFolder();
         return;
       }
       if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "browser.togglePreview",
-            "cmd+i",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("browser.togglePreview", "cmd+i", settings.shortcutOverrides))
       ) {
         e.preventDefault();
         setPreviewOpen((o) => !o);
         return;
       }
       if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "browser.focusPathBar",
-            "cmd+l",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("browser.focusPathBar", "cmd+l", settings.shortcutOverrides))
       ) {
         // Browser muscle memory: Cmd/Ctrl+L = jump to address bar.
         e.preventDefault();
@@ -876,14 +827,7 @@ export default function Browser({
         return;
       }
       if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "browser.bookmarkCurrent",
-            "cmd+d",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("browser.bookmarkCurrent", "cmd+d", settings.shortcutOverrides))
       ) {
         // Browser muscle memory: Cmd/Ctrl+D = bookmark current page.
         // No-op when the current path is already bookmarked.
@@ -892,10 +836,7 @@ export default function Browser({
         if (settings.bookmarks.some((b) => b.path === path)) return;
         const segs = path.split(/[\\/]/).filter(Boolean);
         const label = segs.at(-1) || path;
-        update("bookmarks", [
-          ...settings.bookmarks,
-          { id: crypto.randomUUID(), label, path },
-        ]);
+        update("bookmarks", [...settings.bookmarks, { id: crypto.randomUUID(), label, path }]);
         return;
       }
       // Windows Explorer navigation keys: Alt+Left = Back, Alt+Right =
@@ -906,37 +847,19 @@ export default function Browser({
       // path below — these are additive aliases, not replacements.
       // Routed BEFORE the `!(metaKey || ctrlKey) return` gate because
       // Alt is neither.
-      if (
-        e.altKey &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.shiftKey &&
-        e.key === "ArrowLeft"
-      ) {
+      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.key === "ArrowLeft") {
         if (history.back.length <= 1) return;
         e.preventDefault();
         goBack();
         return;
       }
-      if (
-        e.altKey &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.shiftKey &&
-        e.key === "ArrowRight"
-      ) {
+      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.key === "ArrowRight") {
         if (history.forward.length === 0) return;
         e.preventDefault();
         goForward();
         return;
       }
-      if (
-        e.altKey &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.shiftKey &&
-        e.key === "ArrowUp"
-      ) {
+      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.key === "ArrowUp") {
         if (!path || parentPath(path) === path) return;
         e.preventDefault();
         goUp();
@@ -954,13 +877,7 @@ export default function Browser({
       // out into its OWN dedicated preview window (via
       // `windowOpenPreview`). Lets the user stack multiple previews
       // side-by-side without juggling the single-modal slot.
-      if (
-        e.altKey &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.shiftKey &&
-        e.key === "ArrowDown"
-      ) {
+      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.key === "ArrowDown") {
         if (!primarySelected) return;
         e.preventDefault();
         if (primarySelected.isDir) {
@@ -998,10 +915,7 @@ export default function Browser({
         // Cmd+← stays as a hardcoded alias for back regardless of
         // any browser.back rebind — Finder convention is universal.
         (e.key === "ArrowLeft" && !e.shiftKey) ||
-        matchesCombo(
-          e,
-          activeCombo("browser.back", "cmd+[", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("browser.back", "cmd+[", settings.shortcutOverrides))
       ) {
         if (history.back.length <= 1) return;
         e.preventDefault();
@@ -1009,10 +923,7 @@ export default function Browser({
       } else if (
         // Cmd+→ stays as a hardcoded alias for forward.
         (e.key === "ArrowRight" && !e.shiftKey) ||
-        matchesCombo(
-          e,
-          activeCombo("browser.forward", "cmd+]", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("browser.forward", "cmd+]", settings.shortcutOverrides))
       ) {
         if (history.forward.length === 0) return;
         e.preventDefault();
@@ -1110,12 +1021,7 @@ export default function Browser({
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (
-        !matchesCombo(
-          e,
-          activeCombo("browser.trash", "delete", settings.shortcutOverrides),
-        )
-      )
+      if (!matchesCombo(e, activeCombo("browser.trash", "delete", settings.shortcutOverrides)))
         return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
@@ -1134,9 +1040,7 @@ export default function Browser({
         onConfirm: () => {
           setConfirmDialog(null);
           pushTrashBatch(selectedPaths);
-          setOpToast(
-            `${verb}: ${count} item${count === 1 ? "" : "s"}…`,
-          );
+          setOpToast(`${verb}: ${count} item${count === 1 ? "" : "s"}…`);
           void removeOrTrashMany(selectedPaths)
             .then(() => {
               if (path) void refresh(path);
@@ -1162,11 +1066,7 @@ export default function Browser({
       if (
         !matchesCombo(
           e,
-          activeCombo(
-            "browser.permanentDelete",
-            "cmd+shift+backspace",
-            settings.shortcutOverrides,
-          ),
+          activeCombo("browser.permanentDelete", "cmd+shift+backspace", settings.shortcutOverrides),
         )
       )
         return;
@@ -1201,12 +1101,7 @@ export default function Browser({
   useEffect(() => {
     if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if (
-        !matchesCombo(
-          e,
-          activeCombo("browser.undoTrash", "cmd+z", settings.shortcutOverrides),
-        )
-      )
+      if (!matchesCombo(e, activeCombo("browser.undoTrash", "cmd+z", settings.shortcutOverrides)))
         return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
@@ -1266,29 +1161,26 @@ export default function Browser({
    *  right-click history dropdowns. `steps` is the 1-indexed count
    *  in the chosen direction (so 1 == one step back == clicking the
    *  back arrow). */
-  const jumpHistory = useCallback(
-    (direction: "back" | "forward", steps: number) => {
-      setHistory((h) => {
-        if (direction === "back") {
-          if (steps <= 0 || steps >= h.back.length) return h;
-          // Take the top `steps` entries off `back`, push them onto
-          // `forward` (in reverse so the most-recent is at the head).
-          const moved = h.back.slice(h.back.length - steps).reverse();
-          return {
-            back: h.back.slice(0, h.back.length - steps),
-            forward: [...moved, ...h.forward],
-          };
-        }
-        if (steps <= 0 || steps > h.forward.length) return h;
-        const moved = h.forward.slice(0, steps);
+  const jumpHistory = useCallback((direction: "back" | "forward", steps: number) => {
+    setHistory((h) => {
+      if (direction === "back") {
+        if (steps <= 0 || steps >= h.back.length) return h;
+        // Take the top `steps` entries off `back`, push them onto
+        // `forward` (in reverse so the most-recent is at the head).
+        const moved = h.back.slice(h.back.length - steps).reverse();
         return {
-          back: [...h.back, ...moved],
-          forward: h.forward.slice(steps),
+          back: h.back.slice(0, h.back.length - steps),
+          forward: [...moved, ...h.forward],
         };
-      });
-    },
-    [],
-  );
+      }
+      if (steps <= 0 || steps > h.forward.length) return h;
+      const moved = h.forward.slice(0, steps);
+      return {
+        back: [...h.back, ...moved],
+        forward: h.forward.slice(steps),
+      };
+    });
+  }, []);
 
   const goUp = useCallback(() => {
     if (!path) return;
@@ -1382,7 +1274,9 @@ export default function Browser({
       // significantly more complex.
       setTimeout(() => {
         void removeOrTrashMany(remoteCutPaths)
-          .catch(() => {/* engine errors surface in TransfersPage */})
+          .catch(() => {
+            /* engine errors surface in TransfersPage */
+          })
           .finally(() => {
             clearFileClipboard();
             if (path) void refresh(path);
@@ -1482,8 +1376,7 @@ export default function Browser({
     // Recursive find is only meaningful with a query — when the toggle
     // is on but the input is empty, fall back to the local listing
     // so the pane doesn't show "Empty folder" out of the blue.
-    let base =
-      searchRecursive && findResults && search ? findResults : entries;
+    let base = searchRecursive && findResults && search ? findResults : entries;
     if (settings.hideSystemFiles) {
       base = base.filter((e) => !SYSTEM_NAMES.has(e.name));
     }
@@ -1519,9 +1412,7 @@ export default function Browser({
     }
     const q = searchCaseSensitive ? search : search.toLowerCase();
     return base.filter((e) =>
-      searchCaseSensitive
-        ? e.name.includes(q)
-        : e.name.toLowerCase().includes(q),
+      searchCaseSensitive ? e.name.includes(q) : e.name.toLowerCase().includes(q),
     );
   }, [
     entries,
@@ -1751,31 +1642,21 @@ export default function Browser({
         sortKey={sortKey}
         sortDir={sortDir}
         onSortChange={handleSort}
-        onSortDirToggle={() =>
-          setSortDir((d) => (d === "asc" ? "desc" : "asc"))
-        }
+        onSortDirToggle={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
         showHidden={settings.showHidden}
         onShowHiddenToggle={() => update("showHidden", !settings.showHidden)}
         density={settings.density}
         onDensityToggle={() =>
-          update(
-            "density",
-            settings.density === "compact" ? "comfortable" : "compact",
-          )
+          update("density", settings.density === "compact" ? "comfortable" : "compact")
         }
         kindFilterOpen={kindFilterOpen}
         onKindFilterToggle={() => setKindFilterOpen((o) => !o)}
-        kindFilterActiveCount={
-          kindFilter.length + tagFilter.length + (recencyFilter ? 1 : 0)
-        }
+        kindFilterActiveCount={kindFilter.length + tagFilter.length + (recencyFilter ? 1 : 0)}
         searchHistory={settings.searchHistory}
         onSearchCommit={(q) => {
           // Push to head, dedup, cap at SEARCH_HISTORY_MAX (10). Most-
           // recent first matches typical recall patterns.
-          const next = [
-            q,
-            ...settings.searchHistory.filter((x) => x !== q),
-          ].slice(0, 10);
+          const next = [q, ...settings.searchHistory.filter((x) => x !== q)].slice(0, 10);
           if (
             next.length !== settings.searchHistory.length ||
             next[0] !== settings.searchHistory[0]
@@ -1814,9 +1695,7 @@ export default function Browser({
           const cb = getFileClipboard();
           if (cb) void handlePaste(cb);
         }}
-        onClearSelection={() =>
-          window.dispatchEvent(new CustomEvent("skiff:clear-selection"))
-        }
+        onClearSelection={() => window.dispatchEvent(new CustomEvent("skiff:clear-selection"))}
         onCopy={() => setFileClipboard(selectedPaths, "copy")}
         onCut={() => setFileClipboard(selectedPaths, "cut")}
         onDelete={() => {
@@ -1926,16 +1805,14 @@ export default function Browser({
             openEntry(e);
           }}
           onOpenDirInNewTab={(e) => {
-            window.dispatchEvent(
-              new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
-            );
+            window.dispatchEvent(new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }));
           }}
           onPrimarySelect={setPrimarySelected}
           onSelectionChange={setSelectedPaths}
           onContext={(entry, x, y) => setContextMenu({ entry, x, y })}
           isActive={isActive}
           density={settings.density}
-        zoom={settings.viewZoom}
+          zoom={settings.viewZoom}
           showExtensions={settings.showExtensions}
           groupFoldersFirst={settings.groupFoldersFirst}
           highlightQuery={search}
@@ -1949,13 +1826,8 @@ export default function Browser({
           path={path}
           onRename={async (entry, newName) => {
             // Build the new full path under the same parent dir.
-            const sep = entry.path.includes("\\") && !entry.path.includes("/")
-              ? "\\"
-              : "/";
-            const idx = Math.max(
-              entry.path.lastIndexOf("/"),
-              entry.path.lastIndexOf("\\"),
-            );
+            const sep = entry.path.includes("\\") && !entry.path.includes("/") ? "\\" : "/";
+            const idx = Math.max(entry.path.lastIndexOf("/"), entry.path.lastIndexOf("\\"));
             const parent = idx >= 0 ? entry.path.slice(0, idx) : entry.path;
             const newPath = `${parent}${sep}${newName}`;
             try {
@@ -1988,86 +1860,70 @@ export default function Browser({
           // default for arrow-step granularity inside the modal,
           // which doesn't see the underlying layout.
           kind:
-            (settings.folderViewMode[path] ?? settings.defaultView) === "list"
-              ? "list"
-              : "grid",
+            (settings.folderViewMode[path] ?? settings.defaultView) === "list" ? "list" : "grid",
           gridCols: 4,
         }}
         onNavigate={(e) => setPreviewModalEntry(e)}
       />
-      {settings.showStatusBar && <StatusBar
-        totalEntries={
-          searchRecursive && findResults && search
-            ? findResults.length
-            : entries.length
-        }
-        folderCount={totals.folderCount}
-        fileCount={totals.fileCount}
-        selectedEntries={selectionStats.count}
-        selectedSize={
-          selectionStats.count > 0 ? selectionStats.size : totals.totalSize
-        }
-        errorMessage={searchError ?? error}
-        onDismissError={() => {
-          setError(null);
-          setSearchError(null);
-        }}
-        diskFree={diskSpace?.free ?? null}
-        diskTotal={diskSpace?.total ?? null}
-        findActive={searchRecursive && findResults != null && !!search}
-        // The Rust-side cap is 1000 results; reaching it is the
-        // user's signal to refine the query.
-        findHitCap={!!findResults && findResults.length >= 1000}
-        clipboardHint={
-          clipboardSnap
-            ? { count: clipboardSnap.paths.length, op: clipboardSnap.operation }
-            : null
-        }
-        selectedName={
-          selectionStats.count === 1 && primarySelected
-            ? primarySelected.name
-            : null
-        }
-        taggedCount={
-          // Count how many *visible* (post-filter) entries carry a tag.
-          // Cheap O(n) scan — n is bounded by the listing window the
-          // user has open. Recomputes on entries / fileTags change.
-          visibleEntries.reduce(
-            (acc, e) => (settings.fileTags[e.path] ? acc + 1 : acc),
-            0,
-          )
-        }
-        hiddenByFilter={
-          // entries.length - visibleEntries.length is the count of
-          // rows the active filter (kind / tag / recency / search /
-          // hidden / system files) is dropping. The recursive-find
-          // case is special — entries doesn't reflect the find result,
-          // so we skip the indicator there.
-          searchRecursive && findResults && search
-            ? 0
-            : Math.max(0, entries.length - visibleEntries.length)
-        }
-        viewZoom={settings.viewZoom}
-        onZoomStep={(delta) => {
-          // 25 % steps clamped to [0.5, 2.0]. Step-based rather than a
-          // continuous slider so the % readout stays at round values
-          // (50 / 75 / 100 / 125 / 150 / 175 / 200) — easier to reason
-          // about and matches Finder's icon-size discrete stops.
-          const next = Math.min(
-            2,
-            Math.max(0.5, (settings.viewZoom ?? 1) + delta * 0.25),
-          );
-          update("viewZoom", Math.round(next * 100) / 100);
-        }}
-        onZoomReset={() => update("viewZoom", 1)}
-      />}
+      {settings.showStatusBar && (
+        <StatusBar
+          totalEntries={
+            searchRecursive && findResults && search ? findResults.length : entries.length
+          }
+          folderCount={totals.folderCount}
+          fileCount={totals.fileCount}
+          selectedEntries={selectionStats.count}
+          selectedSize={selectionStats.count > 0 ? selectionStats.size : totals.totalSize}
+          errorMessage={searchError ?? error}
+          onDismissError={() => {
+            setError(null);
+            setSearchError(null);
+          }}
+          diskFree={diskSpace?.free ?? null}
+          diskTotal={diskSpace?.total ?? null}
+          findActive={searchRecursive && findResults != null && !!search}
+          // The Rust-side cap is 1000 results; reaching it is the
+          // user's signal to refine the query.
+          findHitCap={!!findResults && findResults.length >= 1000}
+          clipboardHint={
+            clipboardSnap
+              ? { count: clipboardSnap.paths.length, op: clipboardSnap.operation }
+              : null
+          }
+          selectedName={selectionStats.count === 1 && primarySelected ? primarySelected.name : null}
+          taggedCount={
+            // Count how many *visible* (post-filter) entries carry a tag.
+            // Cheap O(n) scan — n is bounded by the listing window the
+            // user has open. Recomputes on entries / fileTags change.
+            visibleEntries.reduce((acc, e) => (settings.fileTags[e.path] ? acc + 1 : acc), 0)
+          }
+          hiddenByFilter={
+            // entries.length - visibleEntries.length is the count of
+            // rows the active filter (kind / tag / recency / search /
+            // hidden / system files) is dropping. The recursive-find
+            // case is special — entries doesn't reflect the find result,
+            // so we skip the indicator there.
+            searchRecursive && findResults && search
+              ? 0
+              : Math.max(0, entries.length - visibleEntries.length)
+          }
+          viewZoom={settings.viewZoom}
+          onZoomStep={(delta) => {
+            // 25 % steps clamped to [0.5, 2.0]. Step-based rather than a
+            // continuous slider so the % readout stays at round values
+            // (50 / 75 / 100 / 125 / 150 / 175 / 200) — easier to reason
+            // about and matches Finder's icon-size discrete stops.
+            const next = Math.min(2, Math.max(0.5, (settings.viewZoom ?? 1) + delta * 0.25));
+            update("viewZoom", Math.round(next * 100) / 100);
+          }}
+          onZoomReset={() => update("viewZoom", 1)}
+        />
+      )}
       <Menu
         open={emptyMenu !== null}
         onClose={() => setEmptyMenu(null)}
         anchorReference="anchorPosition"
-        anchorPosition={
-          emptyMenu ? { top: emptyMenu.y, left: emptyMenu.x } : undefined
-        }
+        anchorPosition={emptyMenu ? { top: emptyMenu.y, left: emptyMenu.x } : undefined}
         slotProps={{ list: { dense: true } }}
       >
         <MenuItem
@@ -2125,15 +1981,11 @@ export default function Browser({
           // back to single-entry trash when the right-clicked row
           // isn't in the selection (or nothing is selected).
           const targets =
-            selectedPaths.length > 0 && selectedPaths.includes(e.path)
-              ? selectedPaths
-              : [e.path];
+            selectedPaths.length > 0 && selectedPaths.includes(e.path) ? selectedPaths : [e.path];
           const hasRemote = targets.some((p) => p.startsWith("sftp://"));
           const verb = hasRemote ? "Permanently delete" : "Move to Trash";
           const message =
-            targets.length === 1
-              ? `${verb} "${e.name}"?`
-              : `${verb} ${targets.length} items?`;
+            targets.length === 1 ? `${verb} "${e.name}"?` : `${verb} ${targets.length} items?`;
           setConfirmDialog({
             title: verb,
             message,
@@ -2158,18 +2010,14 @@ export default function Browser({
           }
         }}
         onProperties={(e) => setPropertiesTarget(e)}
-        currentTag={
-          contextMenu ? settings.fileTags[contextMenu.entry.path] ?? null : null
-        }
+        currentTag={contextMenu ? (settings.fileTags[contextMenu.entry.path] ?? null) : null}
         onSetTag={(e, color) => {
           // When the right-clicked entry is part of the current
           // multi-selection, tag the whole selection — same gesture
           // semantics as the trash + bookmark right-click flows.
           // Otherwise just the right-clicked entry.
           const targets =
-            selectedPaths.length > 1 && selectedPaths.includes(e.path)
-              ? selectedPaths
-              : [e.path];
+            selectedPaths.length > 1 && selectedPaths.includes(e.path) ? selectedPaths : [e.path];
           const next = { ...settings.fileTags };
           for (const p of targets) {
             if (color === null) delete next[p];
@@ -2198,9 +2046,7 @@ export default function Browser({
           void fsOpenInTerminal(e.path).catch((err) => setError(String(err)));
         }}
         onOpenInNewTab={(e) => {
-          window.dispatchEvent(
-            new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }),
-          );
+          window.dispatchEvent(new CustomEvent(OPEN_IN_TAB_EVENT, { detail: e.path }));
         }}
         onViewArchive={(e) => setArchiveViewerPath(e.path)}
         onExtractZip={(e) => {
@@ -2232,15 +2078,12 @@ export default function Browser({
           // the whole selection. Otherwise just the right-clicked
           // entry. Names the archive after the first source —
           // "<basename>.zip" with collision-aware fallback.
-          const sources = selectedPaths.length > 0 && selectedPaths.includes(e.path)
-            ? selectedPaths
-            : [e.path];
+          const sources =
+            selectedPaths.length > 0 && selectedPaths.includes(e.path) ? selectedPaths : [e.path];
           const sep = e.path.lastIndexOf("/");
           const parent = sep > 0 ? e.path.slice(0, sep) : "";
           const baseName =
-            sources.length === 1
-              ? (e.name.replace(/\.[^.]+$/, "") || "archive")
-              : "archive";
+            sources.length === 1 ? e.name.replace(/\.[^.]+$/, "") || "archive" : "archive";
           const existing = new Set(entries.map((x) => x.name));
           let candidate = `${baseName}.zip`;
           let n = 2;
@@ -2320,10 +2163,7 @@ export default function Browser({
           ]);
         }}
       />
-      <PropertiesDialog
-        entry={propertiesTarget}
-        onClose={() => setPropertiesTarget(null)}
-      />
+      <PropertiesDialog entry={propertiesTarget} onClose={() => setPropertiesTarget(null)} />
       <DiffDialog
         left={diffBase}
         right={diffOther}
@@ -2374,11 +2214,7 @@ export default function Browser({
         originalName={renameTarget?.name ?? ""}
         originalPath={renameTarget?.path ?? ""}
         existingNames={
-          new Set(
-            entries
-              .filter((x) => x.path !== renameTarget?.path)
-              .map((x) => x.name),
-          )
+          new Set(entries.filter((x) => x.path !== renameTarget?.path).map((x) => x.name))
         }
         onClose={() => setRenameTarget(null)}
         onRename={async (newName) => {
@@ -2387,8 +2223,7 @@ export default function Browser({
           // For sftp paths the address-bar form is `sftp://<id>/...`
           // — splitting on the last separator works for both shapes.
           const sep = renameTarget.path.lastIndexOf("/");
-          const parent =
-            sep > 0 ? renameTarget.path.slice(0, sep) : renameTarget.path;
+          const parent = sep > 0 ? renameTarget.path.slice(0, sep) : renameTarget.path;
           const dest = `${parent}/${newName}`;
           await clientRename(renameTarget.path, dest);
           if (path) await refresh(path);

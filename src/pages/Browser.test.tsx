@@ -32,12 +32,7 @@ function r(over: Partial<Parameters<typeof Browser>[0]> = {}) {
   return render(
     <ThemeProvider theme={theme}>
       <SettingsProvider>
-        <Browser
-          initialPath="/home/test"
-          isActive
-          onPathChange={vi.fn()}
-          {...over}
-        />
+        <Browser initialPath="/home/test" isActive onPathChange={vi.fn()} {...over} />
       </SettingsProvider>
     </ThemeProvider>,
   );
@@ -49,68 +44,47 @@ describe("Browser smoke", () => {
       r();
     });
     // The toolbar's search box is the easiest stable marker.
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("renders with a remote path as initialPath", async () => {
     await act(async () => {
       r({ initialPath: "sftp://test-conn-id/home" });
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("renders inactive tabs without keyboard handlers", async () => {
     await act(async () => {
       r({ isActive: false });
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("renders with preview pane enabled in settings", async () => {
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ previewMode: "always" }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ previewMode: "always" }));
     await act(async () => {
       r();
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("renders with two-pane mode enabled in settings", async () => {
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ twoPaneMode: true }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ twoPaneMode: true }));
     await act(async () => {
       r();
     });
     // Two-pane mode renders an extra Browser; the search box should
     // still be present in at least one.
-    expect(
-      screen.getAllByLabelText(/Search current folder/i).length,
-    ).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByLabelText(/Search current folder/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders with gallery default view", async () => {
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ defaultView: "gallery" }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ defaultView: "gallery" }));
     await act(async () => {
       r();
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("toolbar exposes the search input as a labelled element", async () => {
@@ -145,9 +119,7 @@ describe("Browser smoke", () => {
     await act(async () => {
       r();
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching NAVIGATE_EVENT triggers navigation in active Browser", async () => {
@@ -162,9 +134,7 @@ describe("Browser smoke", () => {
       );
     });
     // No crash + still rendering — the event was handled.
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching skiff:refresh on the active Browser is a no-op smoke", async () => {
@@ -174,9 +144,7 @@ describe("Browser smoke", () => {
     await act(async () => {
       window.dispatchEvent(new CustomEvent("skiff:refresh"));
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Cmd/Ctrl+F focuses the search input via keyboard", async () => {
@@ -185,9 +153,7 @@ describe("Browser smoke", () => {
     });
     fireEvent.keyDown(window, { key: "f", code: "KeyF", ctrlKey: true });
     // Active element is the search input after the keybind.
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching skiff:tag-selection on the active Browser is handled", async () => {
@@ -195,13 +161,9 @@ describe("Browser smoke", () => {
       r();
     });
     await act(async () => {
-      window.dispatchEvent(
-        new CustomEvent("skiff:tag-selection", { detail: { color: "red" } }),
-      );
+      window.dispatchEvent(new CustomEvent("skiff:tag-selection", { detail: { color: "red" } }));
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Cmd/Ctrl+Shift+F toggles recursive search mode", async () => {
@@ -214,9 +176,7 @@ describe("Browser smoke", () => {
       ctrlKey: true,
       shiftKey: true,
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching skiff:run-saved-search executes the saved query", async () => {
@@ -230,9 +190,7 @@ describe("Browser smoke", () => {
         }),
       );
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("F5 triggers a refresh", async () => {
@@ -240,9 +198,7 @@ describe("Browser smoke", () => {
       r();
     });
     fireEvent.keyDown(window, { key: "F5" });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Backspace navigates up one folder", async () => {
@@ -250,9 +206,7 @@ describe("Browser smoke", () => {
       r({ initialPath: "/home/test/Documents" });
     });
     fireEvent.keyDown(window, { key: "Backspace" });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Cmd+L focuses the path bar editor", async () => {
@@ -260,9 +214,7 @@ describe("Browser smoke", () => {
       r();
     });
     fireEvent.keyDown(window, { key: "l", ctrlKey: true });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Cmd+Shift+N opens the new-folder dialog", async () => {
@@ -275,9 +227,7 @@ describe("Browser smoke", () => {
       ctrlKey: true,
       shiftKey: true,
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Cmd+I toggles the preview pane", async () => {
@@ -285,9 +235,7 @@ describe("Browser smoke", () => {
       r();
     });
     fireEvent.keyDown(window, { key: "i", ctrlKey: true });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Cmd+R triggers a refresh", async () => {
@@ -295,9 +243,7 @@ describe("Browser smoke", () => {
       r();
     });
     fireEvent.keyDown(window, { key: "r", ctrlKey: true });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching skiff:new-folder opens the new-folder dialog", async () => {
@@ -307,9 +253,7 @@ describe("Browser smoke", () => {
     await act(async () => {
       window.dispatchEvent(new CustomEvent("skiff:new-folder"));
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching skiff:restore-selection seeds the multi-select set", async () => {
@@ -323,9 +267,7 @@ describe("Browser smoke", () => {
         }),
       );
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching skiff:refresh-all hits the all-tab branch", async () => {
@@ -335,22 +277,15 @@ describe("Browser smoke", () => {
     await act(async () => {
       window.dispatchEvent(new CustomEvent("skiff:refresh-all"));
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("renders with showFullPathInTitle setting on", async () => {
-    localStorage.setItem(
-      "skiff-files.settings.v1",
-      JSON.stringify({ showFullPathInTitle: true }),
-    );
+    localStorage.setItem("skiff-files.settings.v1", JSON.stringify({ showFullPathInTitle: true }));
     await act(async () => {
       r();
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("Cmd+Shift+. toggles hidden-file visibility", async () => {
@@ -363,9 +298,7 @@ describe("Browser smoke", () => {
       ctrlKey: true,
       shiftKey: true,
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 
   it("dispatching FILE_CLIPBOARD_EVENT refreshes the paste affordance", async () => {
@@ -375,8 +308,6 @@ describe("Browser smoke", () => {
     await act(async () => {
       window.dispatchEvent(new CustomEvent("skiff:file-clipboard"));
     });
-    expect(
-      screen.getByLabelText(/Search current folder/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search current folder/i)).toBeInTheDocument();
   });
 });

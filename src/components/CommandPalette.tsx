@@ -126,10 +126,9 @@ export default function CommandPalette({ open, onClose, actions }: Props) {
               "aria-expanded": open,
               "aria-controls": "command-palette-listbox",
               "aria-autocomplete": "list",
-              "aria-activedescendant":
-                filtered[highlight]?.id
-                  ? `command-palette-option-${filtered[highlight].id}`
-                  : undefined,
+              "aria-activedescendant": filtered[highlight]?.id
+                ? `command-palette-option-${filtered[highlight].id}`
+                : undefined,
               "aria-label": "Command palette",
             },
           }}

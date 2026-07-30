@@ -125,18 +125,14 @@ describe("OperationsDrawer", () => {
   it("Hide button drops the drawer until a new job emits", async () => {
     mockedInvoke.mockImplementation(async (cmd) => {
       if (cmd === "sync_list") {
-        return [
-          { id: "j", src: "/s", dest: "/d", state: "running" },
-        ];
+        return [{ id: "j", src: "/s", dest: "/d", state: "running" }];
       }
       return null;
     });
     await act(async () => {
       r();
     });
-    const hideBtn = await waitFor(() =>
-      screen.getByLabelText("Hide operations drawer"),
-    );
+    const hideBtn = await waitFor(() => screen.getByLabelText("Hide operations drawer"));
     fireEvent.click(hideBtn);
     expect(screen.queryByText(/operation/i)).toBeNull();
   });

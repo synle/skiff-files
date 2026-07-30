@@ -42,9 +42,7 @@ export default function ConfirmDialog({
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
-        <DialogContentText
-          sx={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}
-        >
+        <DialogContentText sx={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
           {message}
         </DialogContentText>
       </DialogContent>
@@ -52,11 +50,7 @@ export default function ConfirmDialog({
         <Button onClick={onCancel} autoFocus>
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          color={destructive ? "warning" : "primary"}
-          onClick={onConfirm}
-        >
+        <Button variant="contained" color={destructive ? "warning" : "primary"} onClick={onConfirm}>
           {confirmLabel}
         </Button>
       </DialogActions>

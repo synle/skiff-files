@@ -32,11 +32,7 @@ describe("ArchiveViewerDialog", () => {
   it("renders nothing when closed", () => {
     const { container } = render(
       <ThemeProvider theme={theme}>
-        <ArchiveViewerDialog
-          open={false}
-          archivePath={null}
-          onClose={vi.fn()}
-        />
+        <ArchiveViewerDialog open={false} archivePath={null} onClose={vi.fn()} />
       </ThemeProvider>,
     );
     expect(container.querySelector("[role=dialog]")).toBeNull();

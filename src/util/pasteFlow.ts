@@ -140,7 +140,11 @@ export async function runPaste(
       // sees the listing grow as files arrive. Skipped when the
       // user has navigated away.
       if (deps.currentPath() === destFolder) {
-        try { await deps.refresh(destFolder); } catch { /* tolerated */ }
+        try {
+          await deps.refresh(destFolder);
+        } catch {
+          /* tolerated */
+        }
       }
     } catch (e) {
       deps.onError(String(e));
@@ -148,7 +152,11 @@ export async function runPaste(
   }
 
   if (unlisten) {
-    try { unlisten(); } catch { /* ignore */ }
+    try {
+      unlisten();
+    } catch {
+      /* ignore */
+    }
   }
 
   // Cut-mode cleanup: remove the sources once every copy is done.
@@ -160,11 +168,19 @@ export async function runPaste(
        * already gone from the user's POV anyway. */
     }
     if (deps.currentPath() === destFolder) {
-      try { await deps.refresh(destFolder); } catch { /* tolerated */ }
+      try {
+        await deps.refresh(destFolder);
+      } catch {
+        /* tolerated */
+      }
     }
   } else if (deps.currentPath() === destFolder) {
     // Belt-and-braces final refresh for the copy path.
-    try { await deps.refresh(destFolder); } catch { /* tolerated */ }
+    try {
+      await deps.refresh(destFolder);
+    } catch {
+      /* tolerated */
+    }
   }
 
   return { jobIds };

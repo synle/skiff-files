@@ -31,7 +31,12 @@ md5 = "0.7"
 # via D-Bus. `vendored` makes `libsecret-sys` build statically from
 # source rather than linking against the host's libsecret-1.so (which
 # may be missing on minimal Linux installs / CI images).
-keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "vendored"] }
+keyring = { version = "3", features = [
+  "apple-native",
+  "windows-native",
+  "sync-secret-service",
+  "vendored",
+] }
 chrono = "0.4"
 trash = "5"
 open = "5"
@@ -58,7 +63,13 @@ kamadak-exif = "0.6"
 # AVIF / HEIF / TIFF / PNM decoders we don't need — keeps bundle
 # size tight (TODO/BUNDLE_SIZE.md is the audit baseline). Same
 # format list as the PreviewPane image-format support.
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
+image = { version = "0.25", default-features = false, features = [
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+  "bmp",
+] }
 # SQLite for the thumbnail cache. `bundled` builds libsqlite from
 # source so we don't depend on the OS-installed copy — saves
 # packaging headaches across macOS / Windows / Linux.

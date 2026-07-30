@@ -61,9 +61,7 @@ export function formatMtimeAs(
  * without parsing a locale timestamp. Future-dated mtimes (clock skew)
  * fall through to "in the future".
  */
-export function formatMtimeRelative(
-  unixSeconds: number | null | undefined,
-): string {
+export function formatMtimeRelative(unixSeconds: number | null | undefined): string {
   if (unixSeconds == null) return "—";
   const nowSec = Date.now() / 1000;
   const diff = nowSec - unixSeconds;
@@ -73,8 +71,7 @@ export function formatMtimeRelative(
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
-  if (diff < 86400 * 365)
-    return `${Math.floor(diff / (86400 * 30))}mo ago`;
+  if (diff < 86400 * 365) return `${Math.floor(diff / (86400 * 30))}mo ago`;
   return `${Math.floor(diff / (86400 * 365))}y ago`;
 }
 

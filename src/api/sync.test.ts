@@ -108,9 +108,9 @@ describe("api/sync typed wrappers", () => {
       return () => {};
     });
     await onProgress(cb);
-    registered({ payload: { jobId: "j", filesTotal: 1, filesDone: 0, bytesTotal: 1, bytesDone: 0, last: null } });
-    expect(cb).toHaveBeenCalledWith(
-      expect.objectContaining({ jobId: "j", filesTotal: 1 }),
-    );
+    registered({
+      payload: { jobId: "j", filesTotal: 1, filesDone: 0, bytesTotal: 1, bytesDone: 0, last: null },
+    });
+    expect(cb).toHaveBeenCalledWith(expect.objectContaining({ jobId: "j", filesTotal: 1 }));
   });
 });

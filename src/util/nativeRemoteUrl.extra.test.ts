@@ -58,8 +58,6 @@ describe("toNativeRemoteUrl — special-char escaping", () => {
   it("URL-encodes share names that contain spaces", () => {
     const conn: SavedConnection = { ...SMB, share: "Public Share" };
     const got = toNativeRemoteUrl("smb://smb-x/file.png", [conn]);
-    expect(got.url).toBe(
-      "smb://admin@nas.local/Public%20Share/file.png",
-    );
+    expect(got.url).toBe("smb://admin@nas.local/Public%20Share/file.png");
   });
 });

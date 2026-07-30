@@ -34,10 +34,7 @@ export interface NativeUrlResult {
 /** Translate an internal `<scheme>://<uuid>/<path>` URL into the
  *  OS-native form. Returns `{ url: null, reason }` when the scheme
  *  has no native handler; the local-path case passes through. */
-export function toNativeRemoteUrl(
-  path: string,
-  connections: SavedConnection[],
-): NativeUrlResult {
+export function toNativeRemoteUrl(path: string, connections: SavedConnection[]): NativeUrlResult {
   if (!path) return { url: "" };
   const loc = parseLocation(path);
   // Local paths pass through unchanged.

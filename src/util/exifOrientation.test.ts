@@ -2,10 +2,7 @@
 // Covers the 8 valid orientation values + the no-op fallthroughs
 // (null / undefined / out-of-range).
 import { describe, expect, it } from "vitest";
-import {
-  orientationSwapsDimensions,
-  orientationToCssTransform,
-} from "./exifOrientation";
+import { orientationSwapsDimensions, orientationToCssTransform } from "./exifOrientation";
 
 describe("orientationToCssTransform", () => {
   it("returns null for upright (1) and missing orientations", () => {

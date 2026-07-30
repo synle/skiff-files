@@ -59,8 +59,7 @@ export function shortPath(path: string, home: string): string {
   // which connection they were at.
   if (isRemote(path)) {
     const loc = parseLocation(path);
-    const connId =
-      "connectionId" in loc.backend ? loc.backend.connectionId : "";
+    const connId = "connectionId" in loc.backend ? loc.backend.connectionId : "";
     const segs = loc.remotePath.split("/").filter(Boolean);
     const scheme = path.slice(0, path.indexOf("://") + 3);
     if (segs.length === 0) {

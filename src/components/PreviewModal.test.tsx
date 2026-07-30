@@ -14,9 +14,7 @@ import { SettingsProvider } from "../state/settings";
 // Body components ping the api/client read* helpers — stub them out
 // so the modal renders without a Tauri bridge.
 vi.mock("../api/client", async () => {
-  const actual = await vi.importActual<typeof import("../api/client")>(
-    "../api/client",
-  );
+  const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
   return {
     ...actual,
     readBase64: vi.fn().mockResolvedValue(""),
@@ -153,12 +151,8 @@ describe("isPreviewableEntry", () => {
   });
   it("returns true for text-ish kinds (markdown / code / text)", () => {
     expect(isPreviewableEntry(txt)).toBe(true);
-    expect(
-      isPreviewableEntry({ ...txt, kind: "code", name: "x.ts" }),
-    ).toBe(true);
-    expect(
-      isPreviewableEntry({ ...txt, kind: "text", name: "x.log" }),
-    ).toBe(true);
+    expect(isPreviewableEntry({ ...txt, kind: "code", name: "x.ts" })).toBe(true);
+    expect(isPreviewableEntry({ ...txt, kind: "text", name: "x.log" })).toBe(true);
   });
   it("returns true for audio / video / pdf", () => {
     expect(isPreviewableEntry({ ...txt, kind: "audio" })).toBe(true);

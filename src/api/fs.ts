@@ -49,14 +49,12 @@ export interface ListOptions {
 // a typed function surface instead of stringly-typed `invoke` calls scattered
 // through components.
 
-export const getAppVersion = (): Promise<string> =>
-  invoke<string>("get_app_version");
+export const getAppVersion = (): Promise<string> => invoke<string>("get_app_version");
 
 /** UTC build timestamp formatted as `YYYY-MM-DD HH:MM`. Baked in by
  *  `src-tauri/build.rs` so it reflects when the installed binary was
  *  compiled, not when it was launched. Surfaced in Settings → About. */
-export const getBuildTimestamp = (): Promise<string> =>
-  invoke<string>("get_build_timestamp");
+export const getBuildTimestamp = (): Promise<string> => invoke<string>("get_build_timestamp");
 
 /** Shape we keep from the GitHub Releases API for the "Latest" row in
  *  Settings → About. We only need the tag and the published-at — the
@@ -84,10 +82,9 @@ export interface LatestRelease {
  */
 export async function fetchLatestRelease(): Promise<LatestRelease | null> {
   try {
-    const res = await fetch(
-      "https://api.github.com/repos/synle/skiff-files/releases/latest",
-      { headers: { Accept: "application/vnd.github+json" } },
-    );
+    const res = await fetch("https://api.github.com/repos/synle/skiff-files/releases/latest", {
+      headers: { Accept: "application/vnd.github+json" },
+    });
     if (!res.ok) return null;
     const json = (await res.json()) as {
       tag_name?: unknown;
@@ -96,8 +93,7 @@ export async function fetchLatestRelease(): Promise<LatestRelease | null> {
     if (typeof json.tag_name !== "string") return null;
     return {
       tagName: json.tag_name,
-      publishedAt:
-        typeof json.published_at === "string" ? json.published_at : null,
+      publishedAt: typeof json.published_at === "string" ? json.published_at : null,
     };
   } catch {
     return null;
@@ -109,8 +105,7 @@ export const fsHomeDir = (): Promise<string> => invoke<string>("fs_home_dir");
 /** Spawn a new top-level Skiff Files window. Used by the Cmd/Ctrl+N
  *  shortcut so the user can hold multiple windows open against the
  *  same install. Resolves once the window has been created. */
-export const windowOpenNew = (): Promise<void> =>
-  invoke<void>("window_open_new");
+export const windowOpenNew = (): Promise<void> => invoke<void>("window_open_new");
 
 /** Spawn a new window pre-seeded at `path`. The Rust side encodes
  *  the path into the URL fragment (`#path=<urlEncoded>`) so the
@@ -132,34 +127,26 @@ export const windowOpenPreview = (path: string): Promise<void> =>
  *  Browser can auto-refresh without polling. Call on every navigation
  *  (Browser does this in a useEffect tied to `path`). Errors silently
  *  — a watcher failure shouldn't block navigation. */
-export const fsWatchSet = (path: string): Promise<void> =>
-  invoke<void>("fs_watch_set", { path });
+export const fsWatchSet = (path: string): Promise<void> => invoke<void>("fs_watch_set", { path });
 
 /** Stop the watcher. Called when navigating to a remote (`sftp://…`)
  *  path where local fs notifications don't apply. */
-export const fsWatchClear = (): Promise<void> =>
-  invoke<void>("fs_watch_clear");
+export const fsWatchClear = (): Promise<void> => invoke<void>("fs_watch_clear");
 
-export const fsListDir = (
-  path: string,
-  options?: ListOptions,
-): Promise<Entry[]> => invoke<Entry[]>("fs_list_dir", { path, options });
+export const fsListDir = (path: string, options?: ListOptions): Promise<Entry[]> =>
+  invoke<Entry[]>("fs_list_dir", { path, options });
 
-export const fsStat = (path: string): Promise<Entry> =>
-  invoke<Entry>("fs_stat", { path });
+export const fsStat = (path: string): Promise<Entry> => invoke<Entry>("fs_stat", { path });
 
-export const fsMkdir = (path: string): Promise<void> =>
-  invoke<void>("fs_mkdir", { path });
+export const fsMkdir = (path: string): Promise<void> => invoke<void>("fs_mkdir", { path });
 
 export const fsRename = (from: string, to: string): Promise<void> =>
   invoke<void>("fs_rename", { from, to });
 
-export const fsRemove = (path: string): Promise<void> =>
-  invoke<void>("fs_remove", { path });
+export const fsRemove = (path: string): Promise<void> => invoke<void>("fs_remove", { path });
 
 /** Send a single path to the OS trash. Cross-platform. */
-export const fsTrash = (path: string): Promise<void> =>
-  invoke<void>("fs_trash", { path });
+export const fsTrash = (path: string): Promise<void> => invoke<void>("fs_trash", { path });
 
 /** Multi-path trash — one IPC round-trip for a multi-selection delete. */
 export const fsTrashMany = (paths: string[]): Promise<void> =>
@@ -215,24 +202,17 @@ export const fsCopyRecursive = (from: string, to: string): Promise<void> =>
  *  Linux: ~/.local/share/Trash/files. Windows: `null` (Recycle Bin
  *  isn't a real filesystem path). Frontend hides the Trash favorite
  *  on null. */
-export const fsTrashPath = (): Promise<string | null> =>
-  invoke<string | null>("fs_trash_path");
+export const fsTrashPath = (): Promise<string | null> => invoke<string | null>("fs_trash_path");
 
 /** Bundle one or more local paths into a zip archive at `destZip`.
  *  Folders walk recursively. Errors if `destZip` already exists. */
-export const fsCompressZip = (
-  paths: string[],
-  destZip: string,
-): Promise<void> =>
+export const fsCompressZip = (paths: string[], destZip: string): Promise<void> =>
   invoke<void>("fs_compress_zip", { paths, destZip });
 
 /** Extract a zip archive into `destDir`. Creates `destDir` if needed.
  *  Path-traversal entries (absolute paths, `..` components) are
  *  silently skipped. */
-export const fsExtractZip = (
-  zipPath: string,
-  destDir: string,
-): Promise<void> =>
+export const fsExtractZip = (zipPath: string, destDir: string): Promise<void> =>
   invoke<void>("fs_extract_zip", { zipPath, destDir });
 
 /** Mirror of `crate::commands::MountedVolume`. Used by the Sidebar's
@@ -248,8 +228,7 @@ export interface MountedVolume {
 
 /** List user-facing mounted volumes (system disk + any USB / external
  *  drives). Pseudo-filesystems are filtered server-side. */
-export const fsMounts = (): Promise<MountedVolume[]> =>
-  invoke<MountedVolume[]>("fs_mounts");
+export const fsMounts = (): Promise<MountedVolume[]> => invoke<MountedVolume[]>("fs_mounts");
 
 /** Compute the SHA-256 hash of a local file. Streams the file in
  *  chunks so large files don't load into memory; returns hex-encoded. */
@@ -274,10 +253,8 @@ export const fsImageRotate = (path: string, degrees: number): Promise<void> =>
  *  into a `data:image/png;base64,…` URL. The Rust side keeps a
  *  SQLite-backed cache keyed by (path, mtime, size, sizePx) so a
  *  re-render of the same file at the same size is one DB lookup. */
-export const fsThumbnail = (
-  path: string,
-  sizePx: number,
-): Promise<string> => invoke<string>("fs_thumbnail", { path, sizePx });
+export const fsThumbnail = (path: string, sizePx: number): Promise<string> =>
+  invoke<string>("fs_thumbnail", { path, sizePx });
 
 /** Stats for the thumbnail cache (row count + on-disk byte size).
  *  Used by the Settings → Advanced row that surfaces a "Clear
@@ -293,8 +270,7 @@ export const fsThumbnailStats = (): Promise<ThumbnailCacheStats> =>
 /** Wipe every cached thumbnail. Returns the number of rows that
  *  were dropped (the Settings UI shows it as a confirmation
  *  toast). */
-export const fsThumbnailClear = (): Promise<number> =>
-  invoke<number>("fs_thumbnail_clear");
+export const fsThumbnailClear = (): Promise<number> => invoke<number>("fs_thumbnail_clear");
 
 /** Filesystem totals for the partition that hosts `path`. Bytes. */
 export interface DiskSpace {

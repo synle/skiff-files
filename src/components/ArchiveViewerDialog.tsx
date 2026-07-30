@@ -42,12 +42,7 @@ interface Props {
   onExtracted?: () => void;
 }
 
-export default function ArchiveViewerDialog({
-  open,
-  archivePath,
-  onClose,
-  onExtracted,
-}: Props) {
+export default function ArchiveViewerDialog({ open, archivePath, onClose, onExtracted }: Props) {
   const [entries, setEntries] = useState<ArchiveEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -93,9 +88,7 @@ export default function ArchiveViewerDialog({
 
   const filtered =
     entries && filter
-      ? entries.filter((e) =>
-          e.name.toLowerCase().includes(filter.toLowerCase()),
-        )
+      ? entries.filter((e) => e.name.toLowerCase().includes(filter.toLowerCase()))
       : entries;
 
   return (
@@ -103,10 +96,7 @@ export default function ArchiveViewerDialog({
       <DialogTitle>
         Archive contents
         {archivePath && (
-          <Typography
-            variant="caption"
-            sx={{ display: "block", color: "text.secondary" }}
-          >
+          <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
             {archivePath}
           </Typography>
         )}

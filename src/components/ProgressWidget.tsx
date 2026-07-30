@@ -8,13 +8,7 @@
 // determinate / indeterminate bar + files counter + ETA + current
 // item + pause/cancel. Don't own state; the consumer is responsible
 // for tracking samples (see useEtaTracker).
-import {
-  Box,
-  IconButton,
-  LinearProgress,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, IconButton, LinearProgress, Tooltip, Typography } from "@mui/material";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
@@ -89,21 +83,22 @@ export default function ProgressWidget({
   } else if (etaSeconds == null) {
     etaLine = "Calculating ETA…";
   } else {
-    const rate =
-      bytesPerSec != null && bytesPerSec > 0
-        ? ` · ${formatBytes(bytesPerSec)}/s`
-        : "";
+    const rate = bytesPerSec != null && bytesPerSec > 0 ? ` · ${formatBytes(bytesPerSec)}/s` : "";
     etaLine = `${formatEtaSeconds(etaSeconds)} remaining · done at ${formatCompletionTime(etaSeconds)}${rate}`;
   }
 
   return (
     <Box sx={{ width: "100%" }}>
-      <Box
-        sx={{ mb: 0.5, display: "flex", alignItems: "center", gap: 1 }}
-      >
+      <Box sx={{ mb: 0.5, display: "flex", alignItems: "center", gap: 1 }}>
         <Typography
           variant={dense ? "body2" : "subtitle2"}
-          sx={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
         >
           {label}
         </Typography>
@@ -123,11 +118,7 @@ export default function ProgressWidget({
         {onCancel && (
           <Tooltip title="Cancel">
             <span>
-              <IconButton
-                size="small"
-                onClick={onCancel}
-                aria-label="Cancel"
-              >
+              <IconButton size="small" onClick={onCancel} aria-label="Cancel">
                 <StopIcon fontSize="small" />
               </IconButton>
             </span>
@@ -141,17 +132,13 @@ export default function ProgressWidget({
         sx={{ height: dense ? 4 : 6, borderRadius: 1 }}
       />
 
-      <Box
-        sx={{ mt: 0.5, color: "text.secondary", display: "flex", gap: 2 }}
-      >
+      <Box sx={{ mt: 0.5, color: "text.secondary", display: "flex", gap: 2 }}>
         <Typography variant="caption" sx={{ flexShrink: 0 }}>
           {/* Suppress "0 of 0 files" placeholder when the job already
               finished — the TransfersPage shows the summary line
               ("N copied, M skipped …") right below this widget for
               done jobs, so this counter line is just noise. */}
-          {done && filesTotal === 0
-            ? "Finished"
-            : `${filesDone} of ${filesTotal} files`}
+          {done && filesTotal === 0 ? "Finished" : `${filesDone} of ${filesTotal} files`}
           {bytesTotal != null && bytesTotal > 0 && bytesDone != null
             ? ` · ${formatBytes(bytesDone)} of ${formatBytes(bytesTotal)}`
             : ""}
@@ -160,7 +147,13 @@ export default function ProgressWidget({
         {etaLine && (
           <Typography
             variant="caption"
-            sx={{ flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            sx={{
+              flex: 1,
+              textAlign: "right",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
           >
             {paused ? "Paused" : etaLine}
           </Typography>

@@ -67,18 +67,10 @@ export default function RenameDialog({
   }, [open, originalName]);
 
   const trimmed = name.trim();
-  const collides =
-    trimmed.length > 0 &&
-    trimmed !== originalName &&
-    !!existingNames?.has(trimmed);
-  const hasSeparator =
-    trimmed.includes("/") || trimmed.includes("\\");
+  const collides = trimmed.length > 0 && trimmed !== originalName && !!existingNames?.has(trimmed);
+  const hasSeparator = trimmed.includes("/") || trimmed.includes("\\");
   const submitDisabled =
-    busy ||
-    trimmed.length === 0 ||
-    trimmed === originalName ||
-    collides ||
-    hasSeparator;
+    busy || trimmed.length === 0 || trimmed === originalName || collides || hasSeparator;
 
   const submit = async () => {
     if (submitDisabled) {
@@ -102,11 +94,7 @@ export default function RenameDialog({
       <DialogTitle>Rename</DialogTitle>
       <DialogContent>
         <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ wordBreak: "break-all" }}
-          >
+          <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-all" }}>
             {originalPath}
           </Typography>
           <TextField
@@ -134,9 +122,7 @@ export default function RenameDialog({
                 // Pre-select the stem so the user can replace it
                 // immediately. Setting selection on focus is the
                 // simplest cross-platform way to do this.
-                onFocus: (
-                  e: React.FocusEvent<HTMLInputElement>,
-                ) => {
+                onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
                   const el = e.target;
                   el.setSelectionRange(0, stemEnd(originalName));
                 },
@@ -149,11 +135,7 @@ export default function RenameDialog({
         <Button onClick={onClose} disabled={busy}>
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => void submit()}
-          disabled={submitDisabled}
-        >
+        <Button variant="contained" onClick={() => void submit()} disabled={submitDisabled}>
           Rename
         </Button>
       </DialogActions>

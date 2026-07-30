@@ -5,11 +5,7 @@
 // when no grammar is registered (so the caller can pass it through
 // dangerouslySetInnerHTML without re-escaping).
 import { describe, expect, it } from "vitest";
-import {
-  escapeHtml,
-  highlightSource,
-  pickLanguage,
-} from "./syntaxHighlight";
+import { escapeHtml, highlightSource, pickLanguage } from "./syntaxHighlight";
 
 describe("pickLanguage", () => {
   it("maps standard extensions to Prism grammar ids", () => {

@@ -51,7 +51,9 @@ function makeDeps(over: Partial<PasteDeps> = {}) {
   });
   const onDone = vi.fn(async (cb: (s: Summary) => void) => {
     doneListener = cb;
-    return () => { doneListener = null; };
+    return () => {
+      doneListener = null;
+    };
   });
   const deps: PasteDeps = {
     stat,
@@ -91,7 +93,9 @@ async function pumpPaste(
   fireDone: (id: string) => void,
 ): Promise<{ jobIds: Set<string> }> {
   let done = false;
-  promise.finally(() => { done = true; });
+  promise.finally(() => {
+    done = true;
+  });
   // Round-trip the microtask queue until the paste resolves or we
   // exhaust a generous iteration budget. Each pass drains pending
   // `startSync` resolutions; we fire `done` for each newly-started
@@ -132,11 +136,7 @@ describe("runPaste", () => {
     // "60 stuck rows" in the drawer. Serial dispatch is the fix.
     const { deps, startSync, startedJobIds, fireDone } = makeDeps();
     await pumpPaste(
-      runPaste(
-        { paths: ["/src/a", "/src/b", "/src/c"], operation: "copy" },
-        "/dest",
-        deps,
-      ),
+      runPaste({ paths: ["/src/a", "/src/b", "/src/c"], operation: "copy" }, "/dest", deps),
       startedJobIds,
       fireDone,
     );
@@ -150,11 +150,7 @@ describe("runPaste", () => {
   it("refreshes the destination after each sync:done fires", async () => {
     const { deps, refresh, startedJobIds, fireDone } = makeDeps();
     const { jobIds } = await pumpPaste(
-      runPaste(
-        { paths: ["/src/a.png", "/src/b.png"], operation: "copy" },
-        "/dest",
-        deps,
-      ),
+      runPaste({ paths: ["/src/a.png", "/src/b.png"], operation: "copy" }, "/dest", deps),
       startedJobIds,
       fireDone,
     );
@@ -174,11 +170,7 @@ describe("runPaste", () => {
       stat: customStat,
     });
     await pumpPaste(
-      runPaste(
-        { paths: ["/src/file.txt", "/src/folder"], operation: "copy" },
-        "/dest",
-        deps,
-      ),
+      runPaste({ paths: ["/src/file.txt", "/src/folder"], operation: "copy" }, "/dest", deps),
       startedJobIds,
       fireDone,
     );
@@ -190,11 +182,7 @@ describe("runPaste", () => {
   it("cut-mode removes sources after every copy lands", async () => {
     const { deps, removeOrTrashMany, startedJobIds, fireDone } = makeDeps();
     await pumpPaste(
-      runPaste(
-        { paths: ["/src/a", "/src/b"], operation: "cut" },
-        "/dest",
-        deps,
-      ),
+      runPaste({ paths: ["/src/a", "/src/b"], operation: "cut" }, "/dest", deps),
       startedJobIds,
       fireDone,
     );
@@ -224,11 +212,7 @@ describe("runPaste", () => {
       }),
     });
     await pumpPaste(
-      runPaste(
-        { paths: ["/src/bad", "/src/good"], operation: "copy" },
-        "/dest",
-        deps,
-      ),
+      runPaste({ paths: ["/src/bad", "/src/good"], operation: "copy" }, "/dest", deps),
       startedJobIds,
       fireDone,
     );
@@ -276,11 +260,7 @@ describe("runPaste", () => {
       perJobTimeoutMs: 30,
     });
     // Don't fire any done events — let the watchdog do the work.
-    await runPaste(
-      { paths: ["/src/a", "/src/b"], operation: "copy" },
-      "/dest",
-      deps,
-    );
+    await runPaste({ paths: ["/src/a", "/src/b"], operation: "copy" }, "/dest", deps);
     // Both syncs still kicked, just spaced out by the watchdog.
     expect(startSync).toHaveBeenCalledTimes(2);
     expect(startedJobIds).toHaveLength(2);
@@ -320,11 +300,7 @@ describe("runPaste", () => {
       refresh,
       currentPath: () => nowAt,
     });
-    const promise = runPaste(
-      { paths: ["/src/a", "/src/b"], operation: "cut" },
-      "/dest",
-      deps,
-    );
+    const promise = runPaste({ paths: ["/src/a", "/src/b"], operation: "cut" }, "/dest", deps);
     // After the first startSync resolves, navigate away. The pump
     // loop will then fire done events with nowAt === "/elsewhere",
     // so refresh must NOT be called again.
@@ -336,10 +312,7 @@ describe("runPaste", () => {
       await new Promise((r) => setTimeout(r, 5));
       nowAt = "/elsewhere";
     })();
-    await Promise.all([
-      navigateAfter,
-      pumpPaste(promise, startedJobIds, fireDone),
-    ]);
+    await Promise.all([navigateAfter, pumpPaste(promise, startedJobIds, fireDone)]);
     void pumped;
     // Cut-cleanup must still run — sources removed regardless of
     // where the user navigated.
@@ -374,7 +347,9 @@ describe("runPaste", () => {
     });
     const onDone = vi.fn(async (cb: (s: Summary) => void) => {
       doneListenerRef.current = cb;
-      return () => { doneListenerRef.current = null; };
+      return () => {
+        doneListenerRef.current = null;
+      };
     });
     const deps: PasteDeps = {
       stat: vi.fn(async (p: string) => ({
@@ -390,15 +365,13 @@ describe("runPaste", () => {
       currentPath: () => nowAt,
       perJobTimeoutMs: 5_000,
     };
-    const promise = runPaste(
-      { paths: ["/a", "/b", "/c"], operation: "copy" },
-      "/dest",
-      deps,
-    );
+    const promise = runPaste({ paths: ["/a", "/b", "/c"], operation: "copy" }, "/dest", deps);
     // Drive the pump.
     let fired = 0;
     let done = false;
-    promise.finally(() => { done = true; });
+    promise.finally(() => {
+      done = true;
+    });
     for (let i = 0; i < 100 && !done; i++) {
       await new Promise((r) => setTimeout(r, 0));
       while (fired < startedJobIds.length) {
@@ -437,7 +410,9 @@ describe("runPaste", () => {
     });
     const onDone = vi.fn(async (cb: (s: Summary) => void) => {
       doneListenerRef.current = cb;
-      return () => { doneListenerRef.current = null; };
+      return () => {
+        doneListenerRef.current = null;
+      };
     });
     const deps: PasteDeps = {
       stat: vi.fn(async (p: string) => ({
@@ -454,16 +429,14 @@ describe("runPaste", () => {
       perJobTimeoutMs: 10_000,
     };
     const sources = Array.from({ length: 10 }, (_, i) => `/src/f${i}`);
-    const promise = runPaste(
-      { paths: sources, operation: "copy" },
-      "/dest",
-      deps,
-    );
+    const promise = runPaste({ paths: sources, operation: "copy" }, "/dest", deps);
     // Drive the pump: after each startSync, fire its done so the
     // next one unblocks.
     let fired = 0;
     let done = false;
-    promise.finally(() => { done = true; });
+    promise.finally(() => {
+      done = true;
+    });
     for (let i = 0; i < 200 && !done; i++) {
       await new Promise((r) => setTimeout(r, 0));
       while (fired < startedJobIds.length) {
@@ -492,12 +465,8 @@ describe("runPaste", () => {
     expect(dones.length).toBe(10);
     for (let i = 1; i < starts.length; i++) {
       // The done for job-i must appear before the start for job-(i+1).
-      const doneIdx = order.findIndex(
-        (o) => o.kind === "done" && o.id === starts[i - 1].id,
-      );
-      const nextStartIdx = order.findIndex(
-        (o) => o.kind === "start" && o.id === starts[i].id,
-      );
+      const doneIdx = order.findIndex((o) => o.kind === "done" && o.id === starts[i - 1].id);
+      const nextStartIdx = order.findIndex((o) => o.kind === "start" && o.id === starts[i].id);
       expect(doneIdx).toBeLessThan(nextStartIdx);
     }
   });

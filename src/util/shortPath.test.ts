@@ -5,9 +5,9 @@ describe("shortPath", () => {
   const HOME = "/Users/syle";
 
   it("replaces the home prefix with ~ and abbreviates middle segs", () => {
-    expect(
-      shortPath("/Users/syle/git/file-explorer/src-tauri/icons/android", HOME),
-    ).toBe("~/g/f/s/i/android");
+    expect(shortPath("/Users/syle/git/file-explorer/src-tauri/icons/android", HOME)).toBe(
+      "~/g/f/s/i/android",
+    );
   });
 
   it("returns ~ for the home dir itself", () => {
@@ -23,22 +23,14 @@ describe("shortPath", () => {
 
   it("compacts Windows paths and keeps the drive letter", () => {
     expect(shortPath("c:/Users/Syle/xxx/yyy/zzz", "")).toBe("c:/U/S/x/y/zzz");
-    expect(shortPath("C:\\Users\\Syle\\xxx\\yyy\\zzz", "")).toBe(
-      "c:/U/S/x/y/zzz",
-    );
+    expect(shortPath("C:\\Users\\Syle\\xxx\\yyy\\zzz", "")).toBe("c:/U/S/x/y/zzz");
     expect(shortPath("D:/", "")).toBe("d:/");
   });
 
   it("compacts remote paths, preserving the scheme://<id>", () => {
-    expect(shortPath("sftp://abc-123/home/user/foo/bar", HOME)).toBe(
-      "sftp://abc-123/h/u/f/bar",
-    );
-    expect(shortPath("ftp://m1/pub/file.txt", HOME)).toBe(
-      "ftp://m1/p/file.txt",
-    );
-    expect(shortPath("smb://server/share/dir/file", HOME)).toBe(
-      "smb://server/s/d/file",
-    );
+    expect(shortPath("sftp://abc-123/home/user/foo/bar", HOME)).toBe("sftp://abc-123/h/u/f/bar");
+    expect(shortPath("ftp://m1/pub/file.txt", HOME)).toBe("ftp://m1/p/file.txt");
+    expect(shortPath("smb://server/share/dir/file", HOME)).toBe("smb://server/s/d/file");
   });
 
   it("leaves a remote root unchanged-but-normalized", () => {
@@ -50,9 +42,9 @@ describe("shortPath", () => {
   });
 
   it("keeps the last segment full even when long", () => {
-    expect(
-      shortPath("/Users/syle/Downloads/very-long-filename.tar.gz", HOME),
-    ).toBe("~/D/very-long-filename.tar.gz");
+    expect(shortPath("/Users/syle/Downloads/very-long-filename.tar.gz", HOME)).toBe(
+      "~/D/very-long-filename.tar.gz",
+    );
   });
 });
 

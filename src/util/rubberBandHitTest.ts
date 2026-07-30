@@ -34,12 +34,7 @@ export function shouldStartRubberBand(
 ): boolean {
   const { rect } = container;
   // Outside the container's page-space rect → no.
-  if (
-    clientX < rect.left ||
-    clientX > rect.right ||
-    clientY < rect.top ||
-    clientY > rect.bottom
-  ) {
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
     return false;
   }
   // On the vertical scrollbar gutter (right of `clientWidth`) or

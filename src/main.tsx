@@ -15,19 +15,14 @@ import { loadSettings, SettingsProvider, useSettings } from "./state/settings";
 // shell. The full app is heavy (sidebar, tabs, command palette,
 // settings store hydration); the preview window only needs to
 // render one file's body and a header.
-const isPreviewBoot =
-  typeof window !== "undefined" && /[#&]preview=/.test(window.location.hash);
+const isPreviewBoot = typeof window !== "undefined" && /[#&]preview=/.test(window.location.hash);
 
 // Boot i18next BEFORE React mounts so `useTranslation` reads from a
 // populated bundle on the first render. We seed from the persisted
 // `Settings.language` (synchronous localStorage read) so the user
 // doesn't see an English flash before their preferred locale loads.
 initI18n(loadSettings().language);
-import {
-  themeForFull,
-  useEffectiveMode,
-  usePrefersReducedMotion,
-} from "./theme";
+import { themeForFull, useEffectiveMode, usePrefersReducedMotion } from "./theme";
 
 /**
  * Reads `themeMode` from settings and resolves it to a concrete MUI theme.

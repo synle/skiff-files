@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  formatFtp,
-  formatLocation,
-  formatSftp,
-  isRemote,
-  parseLocation,
-} from "./location";
+import { formatFtp, formatLocation, formatSftp, isRemote, parseLocation } from "./location";
 
 describe("parseLocation", () => {
   it("treats a POSIX path as local", () => {

@@ -73,9 +73,7 @@ describe("Sidebar", () => {
     const { onNavigate } = r({ home: "/home/test" });
     // Inside Favorites, click Home — it should fire onNavigate
     // with the home path (basename mode).
-    const favsList = screen
-      .getByText("Favorites")
-      .parentElement?.parentElement;
+    const favsList = screen.getByText("Favorites").parentElement?.parentElement;
     if (!favsList) throw new Error("Favorites group not found");
     fireEvent.click(within(favsList).getByText("Home"));
     expect(onNavigate).toHaveBeenCalled();
@@ -105,9 +103,7 @@ describe("Sidebar", () => {
     // The hide icon has aria-label "Hide Favorites section".
     const hideBtn = screen.getByLabelText("Hide Favorites section");
     fireEvent.click(hideBtn);
-    const stored = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const stored = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     expect(stored.sidebarSectionsVisible.favorites).toBe(false);
     // The Favorites label should also disappear from the DOM.
     expect(screen.queryByText("Favorites")).not.toBeInTheDocument();

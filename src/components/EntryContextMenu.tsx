@@ -1,14 +1,7 @@
 // Right-click context menu for a FileList row. Pure presentation:
 // the Browser owns the action handlers and the entry the menu acts
 // on; this component just renders the menu at the click coordinates.
-import {
-  Divider,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Typography,
-} from "@mui/material";
+import { Divider, ListItemIcon, ListItemText, Menu, MenuItem, Typography } from "@mui/material";
 import OpenIcon from "@mui/icons-material/FolderOpen";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -149,9 +142,7 @@ export default function EntryContextMenu({
       open={open}
       onClose={onClose}
       anchorReference="anchorPosition"
-      anchorPosition={
-        open ? { top: state!.y, left: state!.x } : undefined
-      }
+      anchorPosition={open ? { top: state!.y, left: state!.x } : undefined}
       slotProps={{ list: { dense: true } }}
     >
       {state?.entry.isDir && (
@@ -193,9 +184,7 @@ export default function EntryContextMenu({
             // we don't yet round-trip connection state to a freshly
             // spawned window.
             void import("../api/fs")
-              .then(({ windowOpenAt }) =>
-                windowOpenAt(state!.entry.path).catch(() => {}),
-              )
+              .then(({ windowOpenAt }) => windowOpenAt(state!.entry.path).catch(() => {}))
               .catch(() => {
                 /* dynamic import failure — best effort, ignore */
               });
@@ -305,9 +294,7 @@ export default function EntryContextMenu({
           <ListItemIcon>
             <ContentPasteIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>
-            {`Paste ${pasteCount} item${pasteCount === 1 ? "" : "s"}`}
-          </ListItemText>
+          <ListItemText>{`Paste ${pasteCount} item${pasteCount === 1 ? "" : "s"}`}</ListItemText>
           {shortcut("⌘V")}
         </MenuItem>
       )}
@@ -350,10 +337,7 @@ export default function EntryContextMenu({
             // Strip the basename to get the parent directory. Works
             // for both forward and backward slashes.
             const path = state.entry.path;
-            const lastSep = Math.max(
-              path.lastIndexOf("/"),
-              path.lastIndexOf("\\"),
-            );
+            const lastSep = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
             const parent = lastSep > 0 ? path.slice(0, lastSep) : path;
             void navigator.clipboard.writeText(parent);
           }
@@ -371,9 +355,7 @@ export default function EntryContextMenu({
             if (state && navigator?.clipboard) {
               // file:// URI for the entry. Encode each path segment
               // (preserves Unicode + spaces) but keep the slashes.
-              const segs = state.entry.path.split("/").map((s) =>
-                s ? encodeURIComponent(s) : s,
-              );
+              const segs = state.entry.path.split("/").map((s) => (s ? encodeURIComponent(s) : s));
               void navigator.clipboard.writeText(`file://${segs.join("/")}`);
             }
             onClose();
@@ -459,9 +441,7 @@ export default function EntryContextMenu({
           <ListItemIcon>
             <CompareArrowsIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>
-            {comparePending ? "Compare with this file" : "Compare with…"}
-          </ListItemText>
+          <ListItemText>{comparePending ? "Compare with this file" : "Compare with…"}</ListItemText>
         </MenuItem>
       )}
       {state?.entry.isDir && (

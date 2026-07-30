@@ -48,9 +48,7 @@ describe("formatMtimeRelative", () => {
     const now = 1_700_000_000_000;
     vi.useFakeTimers();
     vi.setSystemTime(now);
-    expect(formatMtimeRelative(Math.floor(now / 1000) + 60)).toBe(
-      "in the future",
-    );
+    expect(formatMtimeRelative(Math.floor(now / 1000) + 60)).toBe("in the future");
   });
 });
 
@@ -76,9 +74,7 @@ describe("formatMtimeAs", () => {
     const now = 1_700_000_000_000;
     vi.useFakeTimers();
     vi.setSystemTime(now);
-    expect(formatMtimeAs(Math.floor(now / 1000) - 10, "relative")).toBe(
-      "10s ago",
-    );
+    expect(formatMtimeAs(Math.floor(now / 1000) - 10, "relative")).toBe("10s ago");
   });
 
   it("locale format yields a non-empty string for a valid timestamp", () => {

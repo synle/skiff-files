@@ -192,18 +192,14 @@ export default function PathPickerField({
                   <CircularProgress size={14} thickness={5} />
                 </Box>
               )}
-              <Tooltip
-                title={mode === "directory" ? "Choose folder…" : "Choose file…"}
-              >
+              <Tooltip title={mode === "directory" ? "Choose folder…" : "Choose file…"}>
                 <span>
                   <IconButton
                     size="small"
                     edge="end"
                     onClick={browse}
                     disabled={disabled}
-                    aria-label={
-                      mode === "directory" ? "Browse for folder" : "Browse for file"
-                    }
+                    aria-label={mode === "directory" ? "Browse for folder" : "Browse for file"}
                   >
                     <FolderOpenIcon fontSize="small" />
                   </IconButton>

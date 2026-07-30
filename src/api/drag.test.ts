@@ -7,9 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 // a minimal Channel stub on top of the existing invoke mock.
 vi.mock("@tauri-apps/api/core", async () => {
   const actual =
-    await vi.importActual<typeof import("@tauri-apps/api/core")>(
-      "@tauri-apps/api/core",
-    );
+    await vi.importActual<typeof import("@tauri-apps/api/core")>("@tauri-apps/api/core");
   class FakeChannel<T> {
     onmessage?: (msg: T) => void;
   }

@@ -102,23 +102,13 @@ describe("PathBar — extras", () => {
   it("focusRequest pulses flip into edit mode", async () => {
     const { rerender } = render(
       <ThemeProvider theme={theme}>
-        <PathBar
-          path="/x"
-          onNavigate={vi.fn()}
-          onHome={vi.fn()}
-          focusRequest={0}
-        />
+        <PathBar path="/x" onNavigate={vi.fn()} onHome={vi.fn()} focusRequest={0} />
       </ThemeProvider>,
     );
     expect(screen.queryByRole("textbox")).toBeNull();
     rerender(
       <ThemeProvider theme={theme}>
-        <PathBar
-          path="/x"
-          onNavigate={vi.fn()}
-          onHome={vi.fn()}
-          focusRequest={1}
-        />
+        <PathBar path="/x" onNavigate={vi.fn()} onHome={vi.fn()} focusRequest={1} />
       </ThemeProvider>,
     );
     await waitFor(() => {

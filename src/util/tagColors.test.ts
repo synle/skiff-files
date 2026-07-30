@@ -3,15 +3,7 @@ import { TAG_COLORS, tagColorHex, tagColorLabel } from "./tagColors";
 
 describe("TAG_COLORS", () => {
   it("ships the seven canonical Finder colors in display order", () => {
-    expect(TAG_COLORS).toEqual([
-      "red",
-      "orange",
-      "yellow",
-      "green",
-      "blue",
-      "purple",
-      "gray",
-    ]);
+    expect(TAG_COLORS).toEqual(["red", "orange", "yellow", "green", "blue", "purple", "gray"]);
   });
 });
 

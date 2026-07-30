@@ -21,8 +21,7 @@ const FTP_PREFIX = "ftp://";
 /** UUIDv4 with the hyphens (the registry's id format). Anything that
  *  matches this is assumed to be a registered connection id and is
  *  passed through untouched. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface HostishUrl {
   user: string;

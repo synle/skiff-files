@@ -20,10 +20,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ThemeMode } from "../theme";
 import type { ConflictPolicy } from "../api/sync";
 import type { SortDir, SortKey } from "../components/FileList";
-import {
-  migrateLegacyDrafts,
-  type SavedConnection,
-} from "./connectionStore";
+import { migrateLegacyDrafts, type SavedConnection } from "./connectionStore";
 import { connectionId } from "../util/connectionUrl";
 
 /** What rendering style the file list uses. Per-folder overrides land later. */
@@ -432,14 +429,7 @@ export type DateFormat = "locale" | "iso" | "short" | "relative";
 /** Finder's seven-color palette. Stored as an enum so the colors
  *  themselves can shift with the active theme without touching every
  *  user's settings.json. */
-export type TagColor =
-  | "red"
-  | "orange"
-  | "yellow"
-  | "green"
-  | "blue"
-  | "purple"
-  | "gray";
+export type TagColor = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "gray";
 
 /** User-editable palette slots. Maps directly onto MUI's `palette`
  *  options; theme builder spreads them in when `useCustomTheme` is
@@ -648,10 +638,7 @@ const STORAGE_KEY = "skiff-files.settings.v1";
  *  id. Walks the path once for each renamed connection. No-op when
  *  `renamed` is empty (the common steady-state case after the first
  *  post-upgrade run). Pure helper — exported for tests. */
-export function rewritePathIds(
-  path: string,
-  renamed: Map<string, string>,
-): string {
+export function rewritePathIds(path: string, renamed: Map<string, string>): string {
   if (!path || renamed.size === 0) return path;
   for (const [oldId, newId] of renamed) {
     // Match `<scheme>://<oldId>` followed by `/` or end-of-string.
@@ -675,9 +662,10 @@ export function rewritePathIds(
  *  list plus a `renamed` map old→new so caller can fix up any path
  *  references in other settings surfaces. Idempotent — entries whose
  *  id is already the canonical form pass through unchanged. */
-export function migrateConnectionIds(
-  list: SavedConnection[],
-): { connections: SavedConnection[]; renamed: Map<string, string> } {
+export function migrateConnectionIds(list: SavedConnection[]): {
+  connections: SavedConnection[];
+  renamed: Map<string, string>;
+} {
   const renamed = new Map<string, string>();
   const seen = new Set<string>();
   const out: SavedConnection[] = [];
@@ -731,8 +719,7 @@ function migrate(parsed: Record<string, unknown>): Partial<Settings> {
     // may not have every key in the expected shape.
     const rewriteStr = (p: unknown): unknown =>
       typeof p === "string" ? rewritePathIds(p, renamed) : p;
-    const rewriteArr = (arr: unknown): unknown =>
-      Array.isArray(arr) ? arr.map(rewriteStr) : arr;
+    const rewriteArr = (arr: unknown): unknown => (Array.isArray(arr) ? arr.map(rewriteStr) : arr);
     parsed.recentPaths = rewriteArr(parsed.recentPaths);
     parsed.searchHistory = rewriteArr(parsed.searchHistory);
     if (typeof parsed.startPath === "string") {
@@ -752,9 +739,7 @@ function migrate(parsed: Record<string, unknown>): Partial<Settings> {
             if (t && typeof t === "object" && "initialPath" in t) {
               return {
                 ...t,
-                initialPath: rewriteStr(
-                  (t as { initialPath: unknown }).initialPath,
-                ),
+                initialPath: rewriteStr((t as { initialPath: unknown }).initialPath),
               };
             }
             return t;
@@ -820,9 +805,7 @@ export function loadSettings(): Settings {
     // first-launch upgrades from older builds (which kept per-kind
     // drafts in separate localStorage keys) still pick up the
     // legacy entries.
-    const parsed = migrate(
-      raw ? (JSON.parse(raw) as Record<string, unknown>) : {},
-    );
+    const parsed = migrate(raw ? (JSON.parse(raw) as Record<string, unknown>) : {});
     return { ...DEFAULTS, ...parsed };
   } catch {
     // Corrupt JSON should not brick the app — fall back to defaults silently.
@@ -982,9 +965,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [settings, update, reset],
   );
 
-  return (
-    <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
-  );
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
 /** Access the settings context. Throws if used outside the provider — that's

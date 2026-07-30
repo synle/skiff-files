@@ -12,12 +12,7 @@
 //     `.extra.test.ts` suite covered the parentPath side; this pads
 //     out the segments-side branch.
 import { describe, expect, it, vi, afterEach } from "vitest";
-import {
-  formatMtime,
-  formatMtimeAs,
-  formatMtimeRelative,
-  pathSegments,
-} from "./format";
+import { formatMtime, formatMtimeAs, formatMtimeRelative, pathSegments } from "./format";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -69,18 +64,14 @@ describe("pathSegments — smb:// scheme", () => {
   });
 
   it("renders an smb root with just the id", () => {
-    expect(pathSegments("smb://nas-1/")).toEqual([
-      { label: "nas-1", path: "smb://nas-1/" },
-    ]);
+    expect(pathSegments("smb://nas-1/")).toEqual([{ label: "nas-1", path: "smb://nas-1/" }]);
   });
 
   it("handles smb without trailing slash (single-token after scheme)", () => {
     // Edge case from the address bar — user typed `smb://host` with
     // no trailing `/`. Should still produce the root segment so the
     // breadcrumb renders.
-    expect(pathSegments("smb://host")).toEqual([
-      { label: "host", path: "smb://host/" },
-    ]);
+    expect(pathSegments("smb://host")).toEqual([{ label: "host", path: "smb://host/" }]);
   });
 });
 

@@ -24,8 +24,6 @@ describe("completePath — no-parent branch", () => {
   });
 
   it("emits the tail with a trailing / for single-dir match when parent is empty", () => {
-    expect(
-      completePath("sr", [{ name: "src", isDir: true }]),
-    ).toBe("src/");
+    expect(completePath("sr", [{ name: "src", isDir: true }])).toBe("src/");
   });
 });

@@ -32,12 +32,8 @@ describe("UnreachableFolderPlaceholder", () => {
     r();
     expect(screen.getByText(/Can.?t reach this folder/i)).toBeInTheDocument();
     expect(screen.getByText("ftp://abc/home")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Broken pipe \(os error 32\)/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Retry connection/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Broken pipe \(os error 32\)/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Retry connection/i })).toBeInTheDocument();
   });
 
   it("Retry fires onRetry", () => {
@@ -56,9 +52,7 @@ describe("UnreachableFolderPlaceholder", () => {
 
   it("Go up is hidden when onUp is omitted (root of a remote)", () => {
     r();
-    expect(
-      screen.queryByRole("button", { name: /Go up/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Go up/i })).not.toBeInTheDocument();
   });
 
   it("renders the alert role so screen readers announce the failure", () => {

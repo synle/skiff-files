@@ -30,11 +30,7 @@ function r(entries: Entry[]) {
   const onDone = vi.fn();
   render(
     <ThemeProvider theme={theme}>
-      <BulkRenameDialog
-        entries={entries}
-        onClose={onClose}
-        onDone={onDone}
-      />
+      <BulkRenameDialog entries={entries} onClose={onClose} onDone={onDone} />
     </ThemeProvider>,
   );
   return { onClose, onDone };
@@ -51,10 +47,7 @@ describe("BulkRenameDialog", () => {
   });
 
   it("shows the count of items being renamed", () => {
-    r([
-      entry({ name: "a.txt", path: "/a.txt" }),
-      entry({ name: "b.txt", path: "/b.txt" }),
-    ]);
+    r([entry({ name: "a.txt", path: "/a.txt" }), entry({ name: "b.txt", path: "/b.txt" })]);
     expect(screen.getByText("Rename 2 items")).toBeInTheDocument();
   });
 
@@ -73,9 +66,8 @@ describe("BulkRenameDialog", () => {
     // `{old} → {new}` interpolation. Match on a function combining
     // child text since the arrow + names land as one text node.
     expect(
-      screen.getAllByText((_, el) =>
-        (el?.textContent ?? "").includes("alpha.txt → beta.txt"),
-      ).length,
+      screen.getAllByText((_, el) => (el?.textContent ?? "").includes("alpha.txt → beta.txt"))
+        .length,
     ).toBeGreaterThan(0);
   });
 
@@ -113,9 +105,7 @@ describe("BulkRenameDialog", () => {
       target: { value: "pre-" },
     });
     expect(
-      screen.getAllByText((_, el) =>
-        (el?.textContent ?? "").includes("a.txt → pre-a.txt"),
-      ).length,
+      screen.getAllByText((_, el) => (el?.textContent ?? "").includes("a.txt → pre-a.txt")).length,
     ).toBeGreaterThan(0);
   });
 
@@ -131,9 +121,7 @@ describe("BulkRenameDialog", () => {
       target: { value: "-v2" },
     });
     expect(
-      screen.getAllByText((_, el) =>
-        (el?.textContent ?? "").includes("a.txt → a-v2.txt"),
-      ).length,
+      screen.getAllByText((_, el) => (el?.textContent ?? "").includes("a.txt → a-v2.txt")).length,
     ).toBeGreaterThan(0);
   });
 
@@ -148,9 +136,7 @@ describe("BulkRenameDialog", () => {
 
   it("preview prompt appears when find is empty and inline edit is off", () => {
     r([entry({ name: "a.txt", path: "/a.txt" })]);
-    expect(
-      screen.getByText(/Enter a Find pattern/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Enter a Find pattern/i)).toBeInTheDocument();
   });
 
   it("Cancel button fires onClose", () => {
@@ -161,8 +147,6 @@ describe("BulkRenameDialog", () => {
 
   it("Apply button is disabled when there are no changes", () => {
     r([entry({})]);
-    expect(
-      screen.getByRole("button", { name: /Rename 0 items/ }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Rename 0 items/ })).toBeDisabled();
   });
 });

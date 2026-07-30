@@ -17,10 +17,7 @@ const SCHEMES = ["sftp://", "ftp://", "smb://"] as const;
 
 /** Replace `<scheme>://<uuid>` in `path` with `<scheme>://<label>`
  *  when a label is known. The remote path tail is preserved as-is. */
-export function humanizeRemoteUrl(
-  path: string,
-  labels: Map<string, string>,
-): string {
+export function humanizeRemoteUrl(path: string, labels: Map<string, string>): string {
   if (!path) return path;
   const loc = parseLocation(path);
   if (loc.backend.kind === "local") return path;
@@ -34,10 +31,7 @@ export function humanizeRemoteUrl(
  *  for its friendly label. Anchored on UUIDv4 shape so we don't
  *  accidentally rewrite hex content that happens to share a prefix
  *  with a connection id. */
-export function humanizeMessage(
-  msg: string,
-  labels: Map<string, string>,
-): string {
+export function humanizeMessage(msg: string, labels: Map<string, string>): string {
   if (!msg) return msg;
   // UUIDv4: 8-4-4-4-12 hex, case-insensitive. Global match so every
   // occurrence in the message gets swapped (errors sometimes echo

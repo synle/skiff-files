@@ -18,14 +18,7 @@
 // WebKitGTK on Linux is the weakest (H.264 only when the system
 // codec is installed). We don't transcode — surface a "no decoder"
 // fallback when the element errors.
-import {
-  Box,
-  IconButton,
-  Slider,
-  Stack,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, IconButton, Slider, Stack, Tooltip, Typography } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
@@ -108,9 +101,7 @@ export default function MediaBody({ entry, mode = "inline" }: Props) {
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onError = () => {
-      setError(
-        "Codec not supported by the system webview. Try opening in the OS default app.",
-      );
+      setError("Codec not supported by the system webview. Try opening in the OS default app.");
     };
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("loadedmetadata", onMeta);
@@ -230,37 +221,23 @@ export default function MediaBody({ entry, mode = "inline" }: Props) {
             variant="body2"
             sx={{
               color: "text.secondary",
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
             }}
           >
             {playing ? "▶" : "❚❚"} {entry.name}
           </Typography>
         </Box>
       )}
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ mt: 1, alignItems: "center" }}
-      >
+      <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: "center" }}>
         <Tooltip title={playing ? "Pause (Space)" : "Play (Space)"}>
-          <IconButton
-            size="small"
-            onClick={togglePlay}
-            aria-label={playing ? "Pause" : "Play"}
-          >
-            {playing ? (
-              <PauseIcon fontSize="small" />
-            ) : (
-              <PlayArrowIcon fontSize="small" />
-            )}
+          <IconButton size="small" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
+            {playing ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
         <Typography
           variant="caption"
           sx={{
-            fontFamily:
-              "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
             color: "text.secondary",
             minWidth: 88,
             textAlign: "right",
@@ -286,10 +263,7 @@ export default function MediaBody({ entry, mode = "inline" }: Props) {
             if (!el) return;
             if (e.key === "ArrowLeft") {
               e.preventDefault();
-              el.currentTime = Math.max(
-                0,
-                el.currentTime - (e.shiftKey ? 15 : 5),
-              );
+              el.currentTime = Math.max(0, el.currentTime - (e.shiftKey ? 15 : 5));
             } else if (e.key === "ArrowRight") {
               e.preventDefault();
               el.currentTime = Math.min(
@@ -306,11 +280,7 @@ export default function MediaBody({ entry, mode = "inline" }: Props) {
             onClick={() => setMuted((m) => !m)}
             aria-label={muted ? "Unmute" : "Mute"}
           >
-            {muted ? (
-              <VolumeOffIcon fontSize="small" />
-            ) : (
-              <VolumeUpIcon fontSize="small" />
-            )}
+            {muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
         <Slider

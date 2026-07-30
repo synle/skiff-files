@@ -37,12 +37,8 @@ function r(props: Partial<Parameters<typeof BulkActionBar>[0]>) {
 describe("BulkActionBar", () => {
   it("renders New folder + New file buttons with zero selection", () => {
     r({ count: 0 });
-    expect(
-      screen.getByRole("button", { name: "New folder" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "New file" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New file" })).toBeInTheDocument();
   });
 
   it("does not render the bulk-selection cluster with zero selection", () => {
@@ -56,18 +52,14 @@ describe("BulkActionBar", () => {
     // surface — the bulk cluster is for multi-select only.
     r({ count: 1 });
     expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "New folder" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New folder" })).toBeInTheDocument();
   });
 
   it("renders bulk verbs once 2+ rows are selected", () => {
     r({ count: 2 });
     expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cut" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Compress" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Compress" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });

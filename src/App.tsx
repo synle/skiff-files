@@ -13,23 +13,11 @@ import OperationsDrawer from "./components/OperationsDrawer";
 import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import TransfersPage from "./pages/TransfersPage";
-import {
-  connCreateFtp,
-  connCreateSftp,
-  connCreateSmb,
-} from "./api/conn";
+import { connCreateFtp, connCreateSftp, connCreateSmb } from "./api/conn";
 import { credsLoad } from "./api/creds";
-import {
-  fsHomeDir,
-  fsStat,
-  windowOpenNew,
-  windowSetAlwaysOnTop,
-} from "./api/fs";
+import { fsHomeDir, fsStat, windowOpenNew, windowSetAlwaysOnTop } from "./api/fs";
 import { listen } from "@tauri-apps/api/event";
-import {
-  macosCheckFullDiskAccess,
-  macosOpenFullDiskAccessSettings,
-} from "./api/permissions";
+import { macosCheckFullDiskAccess, macosOpenFullDiskAccessSettings } from "./api/permissions";
 import { loadSettingsFromDisk } from "./state/settings";
 import { useSettings } from "./state/settings";
 import { pruneStaleBookmarks, pruneStalePaths } from "./util/pruneStale";
@@ -94,12 +82,7 @@ export default function App() {
       // would need to live above this line.
       if (!(e.metaKey || e.ctrlKey) && !e.shiftKey) return;
       const k = e.key.toLowerCase();
-      if (
-        matchesCombo(
-          e,
-          activeCombo("app.newWindow", "cmd+n", settings.shortcutOverrides),
-        )
-      ) {
+      if (matchesCombo(e, activeCombo("app.newWindow", "cmd+n", settings.shortcutOverrides))) {
         // Multi-window support: each spawned window is a fresh React
         // tree pointing at the same settings.json on disk; settings
         // sync across windows via the `settings:changed` Tauri event.
@@ -109,22 +92,13 @@ export default function App() {
         });
         return;
       }
-      if (
-        matchesCombo(
-          e,
-          activeCombo("app.quickJump", "cmd+k", settings.shortcutOverrides),
-        )
-      ) {
+      if (matchesCombo(e, activeCombo("app.quickJump", "cmd+k", settings.shortcutOverrides))) {
         e.preventDefault();
         setQuickJumpOpen((o) => !o);
       } else if (
         matchesCombo(
           e,
-          activeCombo(
-            "app.commandPalette",
-            "cmd+shift+p",
-            settings.shortcutOverrides,
-          ),
+          activeCombo("app.commandPalette", "cmd+shift+p", settings.shortcutOverrides),
         )
       ) {
         e.preventDefault();
@@ -136,10 +110,7 @@ export default function App() {
         e.preventDefault();
         update("sidebarVisible", !settings.sidebarVisible);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo("app.openSettings", "cmd+,", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("app.openSettings", "cmd+,", settings.shortcutOverrides))
       ) {
         // Mac convention: Cmd+, opens app preferences. We honor it
         // on Linux/Windows too via Ctrl+, since users coming from
@@ -147,10 +118,7 @@ export default function App() {
         e.preventDefault();
         setPage("settings");
       } else if (
-        matchesCombo(
-          e,
-          activeCombo("app.toggleSplit", "cmd+shift+\\", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("app.toggleSplit", "cmd+shift+\\", settings.shortcutOverrides))
       ) {
         // Cmd/Ctrl+Shift+\ toggles two-pane (split) mode. FileZilla
         // muscle memory: the second pane is for cross-protocol
@@ -159,20 +127,14 @@ export default function App() {
         e.preventDefault();
         update("twoPaneMode", !settings.twoPaneMode);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo("app.toggleSidebar", "cmd+\\", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("app.toggleSidebar", "cmd+\\", settings.shortcutOverrides))
       ) {
         // Cmd/Ctrl+\ toggles the sidebar. Cmd+B also works (kept for
         // VS Code muscle memory) — \\ is the user-preferred binding.
         e.preventDefault();
         update("sidebarVisible", !settings.sidebarVisible);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo("app.fontSizeUp", "cmd+=", settings.shortcutOverrides),
-        ) ||
+        matchesCombo(e, activeCombo("app.fontSizeUp", "cmd+=", settings.shortcutOverrides)) ||
         // Accept "+" too: on US keyboards `=` and `+` share the
         // physical key; the user might press Shift+= and get `+`.
         // We can't represent that as a single combo string so the
@@ -188,10 +150,7 @@ export default function App() {
               : "large";
         update("fontSize", next);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo("app.fontSizeDown", "cmd+-", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("app.fontSizeDown", "cmd+-", settings.shortcutOverrides))
       ) {
         e.preventDefault();
         const next =
@@ -202,24 +161,14 @@ export default function App() {
               : "small";
         update("fontSize", next);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo("app.fontSizeReset", "cmd+0", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("app.fontSizeReset", "cmd+0", settings.shortcutOverrides))
       ) {
         // Browser muscle memory: Cmd/Ctrl+0 resets zoom. Here it
         // resets font size to medium.
         e.preventDefault();
         update("fontSize", "medium");
       } else if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "app.viewZoomIn",
-            "cmd+shift+=",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("app.viewZoomIn", "cmd+shift+=", settings.shortcutOverrides))
       ) {
         // Cmd/Ctrl+Shift+= drives the same 0.25-step / [0.5, 2.0]
         // clamp the `- 100% +` widget at the bottom-right uses (see
@@ -230,35 +179,18 @@ export default function App() {
         const next = Math.min(2, (settings.viewZoom ?? 1) + 0.25);
         update("viewZoom", Math.round(next * 100) / 100);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "app.viewZoomOut",
-            "cmd+shift+-",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("app.viewZoomOut", "cmd+shift+-", settings.shortcutOverrides))
       ) {
         e.preventDefault();
         const next = Math.max(0.5, (settings.viewZoom ?? 1) - 0.25);
         update("viewZoom", Math.round(next * 100) / 100);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo(
-            "app.viewZoomReset",
-            "cmd+shift+0",
-            settings.shortcutOverrides,
-          ),
-        )
+        matchesCombo(e, activeCombo("app.viewZoomReset", "cmd+shift+0", settings.shortcutOverrides))
       ) {
         e.preventDefault();
         update("viewZoom", 1);
       } else if (
-        matchesCombo(
-          e,
-          activeCombo("app.toggleHidden", "cmd+shift+.", settings.shortcutOverrides),
-        )
+        matchesCombo(e, activeCombo("app.toggleHidden", "cmd+shift+.", settings.shortcutOverrides))
       ) {
         // Finder muscle memory: Cmd+Shift+. toggles dotfile visibility.
         // The `keyEventToCombo` helper normalizes via `code` so the
@@ -409,9 +341,7 @@ export default function App() {
           // arms all need it.
           let password = c.password ?? "";
           if (!password) {
-            const fromKeychain = await credsLoad(c.id, "auth").catch(
-              () => null,
-            );
+            const fromKeychain = await credsLoad(c.id, "auth").catch(() => null);
             if (fromKeychain) password = fromKeychain;
           }
           if (c.kind === "sftp") {
@@ -423,8 +353,7 @@ export default function App() {
                 port: c.port,
                 user: c.user,
                 password: authMode === "password" ? password : undefined,
-                privateKeyPath:
-                  authMode === "privateKey" ? c.privateKeyPath : undefined,
+                privateKeyPath: authMode === "privateKey" ? c.privateKeyPath : undefined,
                 useAgent: authMode === "agent",
               },
               c.id,
@@ -598,25 +527,18 @@ export default function App() {
                   borderColor: "divider",
                   position: "relative",
                   boxShadow: (t) =>
-                    activePane === "main"
-                      ? `inset 0 0 0 3px ${t.palette.primary.main}`
-                      : "none",
+                    activePane === "main" ? `inset 0 0 0 3px ${t.palette.primary.main}` : "none",
                   bgcolor: (t) =>
                     activePane === "main"
                       ? t.palette.mode === "dark"
                         ? "rgba(144, 202, 249, 0.04)"
                         : "rgba(25, 118, 210, 0.03)"
                       : "transparent",
-                  transition:
-                    "box-shadow 120ms ease-out, background-color 120ms ease-out",
+                  transition: "box-shadow 120ms ease-out, background-color 120ms ease-out",
                 }}
                 onMouseDown={() => setActivePane("main")}
               >
-                <BrowserTabs
-                  home={home}
-                  pane="main"
-                  isFocusedPane={activePane === "main"}
-                />
+                <BrowserTabs home={home} pane="main" isFocusedPane={activePane === "main"} />
               </Box>
               <Box
                 sx={{
@@ -626,25 +548,18 @@ export default function App() {
                   minWidth: 0,
                   position: "relative",
                   boxShadow: (t) =>
-                    activePane === "right"
-                      ? `inset 0 0 0 3px ${t.palette.primary.main}`
-                      : "none",
+                    activePane === "right" ? `inset 0 0 0 3px ${t.palette.primary.main}` : "none",
                   bgcolor: (t) =>
                     activePane === "right"
                       ? t.palette.mode === "dark"
                         ? "rgba(144, 202, 249, 0.04)"
                         : "rgba(25, 118, 210, 0.03)"
                       : "transparent",
-                  transition:
-                    "box-shadow 120ms ease-out, background-color 120ms ease-out",
+                  transition: "box-shadow 120ms ease-out, background-color 120ms ease-out",
                 }}
                 onMouseDown={() => setActivePane("right")}
               >
-                <BrowserTabs
-                  home={home}
-                  pane="right"
-                  isFocusedPane={activePane === "right"}
-                />
+                <BrowserTabs home={home} pane="right" isFocusedPane={activePane === "right"} />
               </Box>
             </Box>
           ) : (
@@ -720,11 +635,7 @@ export default function App() {
             >
               Don't show again
             </Button>
-            <Button
-              size="small"
-              color="inherit"
-              onClick={() => setFdaPromptOpen(false)}
-            >
+            <Button size="small" color="inherit" onClick={() => setFdaPromptOpen(false)}>
               Dismiss
             </Button>
           </Box>
@@ -853,9 +764,7 @@ function buildCommandActions(deps: {
     // Visibility toggles
     {
       id: "toggle.hidden",
-      label: settings.showHidden
-        ? "Hide hidden files (dotfiles)"
-        : "Show hidden files (dotfiles)",
+      label: settings.showHidden ? "Hide hidden files (dotfiles)" : "Show hidden files (dotfiles)",
       hint: "Cmd+Shift+.",
       run: () => update("showHidden", !settings.showHidden),
     },
@@ -878,33 +787,23 @@ function buildCommandActions(deps: {
     },
     {
       id: "toggle.alwaysOnTop",
-      label: settings.alwaysOnTop
-        ? "Disable always-on-top window"
-        : "Enable always-on-top window",
+      label: settings.alwaysOnTop ? "Disable always-on-top window" : "Enable always-on-top window",
       keywords: "pin pinned floating sticky",
       run: () => update("alwaysOnTop", !settings.alwaysOnTop),
     },
     // Tag actions — apply to current selection. Browser listens for
     // skiff:tag-selection and routes the color through fileTags.
-    ...(["red", "orange", "yellow", "green", "blue", "purple", "gray"] as const).map(
-      (c) => ({
-        id: `tag.${c}`,
-        label: `Tag selection: ${c.charAt(0).toUpperCase() + c.slice(1)}`,
-        keywords: `color tag finder ${c}`,
-        run: () =>
-          window.dispatchEvent(
-            new CustomEvent("skiff:tag-selection", { detail: c }),
-          ),
-      }),
-    ),
+    ...(["red", "orange", "yellow", "green", "blue", "purple", "gray"] as const).map((c) => ({
+      id: `tag.${c}`,
+      label: `Tag selection: ${c.charAt(0).toUpperCase() + c.slice(1)}`,
+      keywords: `color tag finder ${c}`,
+      run: () => window.dispatchEvent(new CustomEvent("skiff:tag-selection", { detail: c })),
+    })),
     {
       id: "tag.clear",
       label: "Tag selection: Clear",
       keywords: "color tag finder remove",
-      run: () =>
-        window.dispatchEvent(
-          new CustomEvent("skiff:tag-selection", { detail: null }),
-        ),
+      run: () => window.dispatchEvent(new CustomEvent("skiff:tag-selection", { detail: null })),
     },
     // Tab workspaces — restore replaces the current tab strip.
     // Confirm before firing since it's destructive.
@@ -921,9 +820,7 @@ function buildCommandActions(deps: {
           if (!ok) return;
           setPage("browser");
           queueMicrotask(() =>
-            window.dispatchEvent(
-              new CustomEvent("skiff:restore-workspace", { detail: ws }),
-            ),
+            window.dispatchEvent(new CustomEvent("skiff:restore-workspace", { detail: ws })),
           );
         },
       },
@@ -935,9 +832,7 @@ function buildCommandActions(deps: {
         run: () => {
           setPage("browser");
           queueMicrotask(() =>
-            window.dispatchEvent(
-              new CustomEvent("skiff:append-workspace", { detail: ws }),
-            ),
+            window.dispatchEvent(new CustomEvent("skiff:append-workspace", { detail: ws })),
           );
         },
       },
@@ -977,15 +872,11 @@ function buildCommandActions(deps: {
         hint: `${j.src} → ${j.dest} · ${j.conflictPolicy}`,
         keywords: `sync skiffsync transfer copy ${j.label}`,
         run: () => {
-          const ok = window.confirm(
-            `Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`,
-          );
+          const ok = window.confirm(`Run sync job "${j.label}"?\n\n${j.src} → ${j.dest}`);
           if (!ok) return;
           setPage("transfers");
           queueMicrotask(() =>
-            window.dispatchEvent(
-              new CustomEvent("skiff:run-sync-job", { detail: j.id }),
-            ),
+            window.dispatchEvent(new CustomEvent("skiff:run-sync-job", { detail: j.id })),
           );
         },
       },
@@ -1016,9 +907,7 @@ function buildCommandActions(deps: {
       run: () => {
         setPage("browser");
         queueMicrotask(() =>
-          window.dispatchEvent(
-            new CustomEvent("skiff:restore-selection", { detail: s.paths }),
-          ),
+          window.dispatchEvent(new CustomEvent("skiff:restore-selection", { detail: s.paths })),
         );
       },
     })),
@@ -1065,9 +954,7 @@ function buildCommandActions(deps: {
       keywords: "reload list_dir",
       run: () => {
         setPage("browser");
-        queueMicrotask(() =>
-          window.dispatchEvent(new CustomEvent("skiff:refresh")),
-        );
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent("skiff:refresh")));
       },
     },
     {
@@ -1076,9 +963,7 @@ function buildCommandActions(deps: {
       keywords: "reload all tabs list_dir",
       run: () => {
         setPage("browser");
-        queueMicrotask(() =>
-          window.dispatchEvent(new CustomEvent("skiff:refresh-all")),
-        );
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent("skiff:refresh-all")));
       },
     },
     {
@@ -1095,9 +980,7 @@ function buildCommandActions(deps: {
       keywords: "mkdir create",
       run: () => {
         setPage("browser");
-        queueMicrotask(() =>
-          window.dispatchEvent(new CustomEvent("skiff:new-folder")),
-        );
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent("skiff:new-folder")));
       },
     },
     {
@@ -1107,9 +990,7 @@ function buildCommandActions(deps: {
       keywords: "tab",
       run: () => {
         setPage("browser");
-        queueMicrotask(() =>
-          window.dispatchEvent(new CustomEvent("skiff:new-tab")),
-        );
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent("skiff:new-tab")));
       },
     },
     {
@@ -1119,9 +1000,7 @@ function buildCommandActions(deps: {
       keywords: "tab undo",
       run: () => {
         setPage("browser");
-        queueMicrotask(() =>
-          window.dispatchEvent(new CustomEvent("skiff:restore-closed-tab")),
-        );
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent("skiff:restore-closed-tab")));
       },
     },
     {

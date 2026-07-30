@@ -94,9 +94,7 @@ describe("TransfersPage", () => {
         destDir: "/backup",
       });
     });
-    expect(
-      await screen.findByText(/Wrote/, { exact: false }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Wrote/, { exact: false })).toBeInTheDocument();
   });
 
   it("invokes sync_dedup when Find + move duplicates is clicked", async () => {
@@ -108,9 +106,7 @@ describe("TransfersPage", () => {
     await waitFor(() => {
       expect(mocked).toHaveBeenCalledWith("sync_dedup", { path: "/downloads" });
     });
-    expect(
-      await screen.findByText(/Scanned 5 files/, { exact: false }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Scanned 5 files/, { exact: false })).toBeInTheDocument();
   });
 
   it("Save as template persists a saved job", async () => {
@@ -129,9 +125,7 @@ describe("TransfersPage", () => {
     // 0.2.228 migrated savedJobs from localStorage to settings.json
     // (Settings.savedSyncJobs). The settings store also persists to
     // localStorage as a hot cache; we read that to assert the save.
-    const settingsRaw = JSON.parse(
-      localStorage.getItem("skiff-files.settings.v1") ?? "{}",
-    );
+    const settingsRaw = JSON.parse(localStorage.getItem("skiff-files.settings.v1") ?? "{}");
     const stored = settingsRaw.savedSyncJobs ?? [];
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ src: "/a", dest: "/b" });
@@ -175,9 +169,7 @@ describe("TransfersPage", () => {
     });
     fireEvent.click(screen.getByText("Start"));
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Pause" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     await waitFor(() => {
@@ -185,9 +177,7 @@ describe("TransfersPage", () => {
     });
     // After pause the row should now expose a Resume button.
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Resume" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Resume" })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
     await waitFor(() => {

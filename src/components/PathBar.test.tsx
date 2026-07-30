@@ -33,11 +33,7 @@ function renderBar(props: {
   const onHome = props.onHome ?? vi.fn();
   render(
     <ThemeProvider theme={theme}>
-      <PathBar
-        path={props.path ?? "/Users/syle/git"}
-        onNavigate={onNavigate}
-        onHome={onHome}
-      />
+      <PathBar path={props.path ?? "/Users/syle/git"} onNavigate={onNavigate} onHome={onHome} />
     </ThemeProvider>,
   );
   return { onNavigate, onHome };
@@ -109,13 +105,9 @@ describe("PathBar", () => {
       { id: "sftp-id", kind: "sftp", label: "user@example.com:22" },
     ]);
     renderBar({ path: "sftp://sftp-id/home/user/file.txt" });
-    expect(
-      screen.getByLabelText(/sftp connection root/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/sftp connection root/i)).toBeInTheDocument();
     expect(screen.getByText("SFTP")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByText("user@example.com:22")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("user@example.com:22")).toBeInTheDocument());
     expect(screen.queryByText("sftp-id")).toBeNull();
     expect(screen.getByText("home")).toBeInTheDocument();
     expect(screen.getByText("file.txt")).toBeInTheDocument();
@@ -127,14 +119,10 @@ describe("PathBar", () => {
       { id: "ftp-id", kind: "ftp", label: "anonymous@mirror.kernel.org:21" },
     ]);
     renderBar({ path: "ftp://ftp-id/pub/linux/file.iso" });
-    expect(
-      screen.getByLabelText(/ftp connection root/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/ftp connection root/i)).toBeInTheDocument();
     expect(screen.getByText("FTP")).toBeInTheDocument();
     await waitFor(() =>
-      expect(
-        screen.getByText("anonymous@mirror.kernel.org:21"),
-      ).toBeInTheDocument(),
+      expect(screen.getByText("anonymous@mirror.kernel.org:21")).toBeInTheDocument(),
     );
     expect(screen.queryByText("ftp-id")).toBeNull();
     expect(screen.getByText("pub")).toBeInTheDocument();
@@ -163,9 +151,7 @@ describe("PathBar", () => {
     (connList as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     renderBar({ path: "smb://feedface-0000-0000-0000-000000000000/share/x" });
     // UUID must not be in any visible text node.
-    expect(
-      screen.queryByText(/feedface-0000-0000-0000-000000000000/),
-    ).toBeNull();
+    expect(screen.queryByText(/feedface-0000-0000-0000-000000000000/)).toBeNull();
     // But the share / file segments still render.
     expect(screen.getByText("share")).toBeInTheDocument();
     expect(screen.getByText("x")).toBeInTheDocument();
@@ -183,16 +169,10 @@ describe("PathBar", () => {
     renderBar({ path: "smb://abc-uuid/folder/file.txt" });
     // Protocol chip carries the backend kind in upper case — renders
     // synchronously regardless of connList.
-    expect(
-      screen.getByLabelText(/smb connection root/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/smb connection root/i)).toBeInTheDocument();
     expect(screen.getByText("SMB")).toBeInTheDocument();
     // Friendly label resolves async via connList — wait for it.
-    await waitFor(() =>
-      expect(
-        screen.getByText("admin@192.168.1.1:445/G"),
-      ).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("admin@192.168.1.1:445/G")).toBeInTheDocument());
     // Raw UUID is NOT in the breadcrumb (it lives in the chip
     // tooltip's hidden title attr, but no visible text node).
     expect(screen.queryByText("abc-uuid")).toBeNull();

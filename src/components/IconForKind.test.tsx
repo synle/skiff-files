@@ -31,9 +31,7 @@ describe("IconForKind", () => {
   });
 
   it("honors the fontSize prop", () => {
-    const { container } = render(
-      <IconForKind kind="folder" fontSize="large" />,
-    );
+    const { container } = render(<IconForKind kind="folder" fontSize="large" />);
     expect(container.querySelector("svg")).not.toBeNull();
   });
 });

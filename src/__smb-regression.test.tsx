@@ -95,9 +95,7 @@ describe("SMB-branch regression — SMB drafts", () => {
       // migration filter would normally reject.
       { id: "x", label: "x", share: "", user: "", domain: "", port: 445 } as unknown as SmbDraft,
     ];
-    expect(() =>
-      matchSmbDraftsForHost(malformed, "192.168.1.1", 445),
-    ).not.toThrow();
+    expect(() => matchSmbDraftsForHost(malformed, "192.168.1.1", 445)).not.toThrow();
     expect(matchSmbDraftsForHost(malformed, "192.168.1.1", 445)).toEqual([]);
   });
 
@@ -127,9 +125,7 @@ describe("SMB-branch regression — parseLocation handles all three remote schem
     const loc = parseLocation("smb://3303b0c8-2b8d-480f-a09d-0d5bca0bb6ba/G/path");
     expect(loc.backend.kind).toBe("smb");
     if (loc.backend.kind === "smb") {
-      expect(loc.backend.connectionId).toBe(
-        "3303b0c8-2b8d-480f-a09d-0d5bca0bb6ba",
-      );
+      expect(loc.backend.connectionId).toBe("3303b0c8-2b8d-480f-a09d-0d5bca0bb6ba");
     }
     expect(loc.remotePath).toBe("/G/path");
   });
@@ -204,9 +200,9 @@ describe("SMB-branch regression — client.ts routes SMB through conn_*", () => 
 
   it("rename across different SMB connection ids throws (not a silent fallthrough)", async () => {
     const { rename } = await import("./api/client");
-    await expect(
-      rename("smb://abc/a.txt", "smb://xyz/b.txt"),
-    ).rejects.toThrow(/different smb connections/);
+    await expect(rename("smb://abc/a.txt", "smb://xyz/b.txt")).rejects.toThrow(
+      /different smb connections/,
+    );
   });
 
   it("removeOrTrashMany sends SMB paths to conn_remove, not fs_trash_many", async () => {
@@ -214,10 +210,7 @@ describe("SMB-branch regression — client.ts routes SMB through conn_*", () => 
     const spy = vi.mocked(invoke);
     spy.mockClear();
     const { removeOrTrashMany } = await import("./api/client");
-    await removeOrTrashMany([
-      "smb://abc/file-a.png",
-      "smb://abc/file-b.png",
-    ]);
+    await removeOrTrashMany(["smb://abc/file-a.png", "smb://abc/file-b.png"]);
     const cmds = spy.mock.calls.map((c) => c[0]);
     expect(cmds).toContain("conn_remove");
     expect(cmds).not.toContain("fs_trash_many");

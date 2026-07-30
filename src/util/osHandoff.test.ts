@@ -46,9 +46,7 @@ describe("osOpen — internal UUID URL is rewritten to native form", () => {
 
   it("SMB: smb://<uuid>/file.png → smb://user@host:port/share/file.png", async () => {
     await osOpen("smb://smb-uuid/file.png", [SMB]);
-    expect(fsOpenWithDefault).toHaveBeenCalledWith(
-      "smb://admin@192.168.1.1/G/file.png",
-    );
+    expect(fsOpenWithDefault).toHaveBeenCalledWith("smb://admin@192.168.1.1/G/file.png");
     // The UUID form must never reach the OS call.
     const arg = fsOpenWithDefault.mock.calls[0]?.[0] ?? "";
     expect(arg).not.toContain("smb-uuid");
@@ -83,9 +81,7 @@ describe("osReveal — internal UUID URL is rewritten to native form", () => {
 
   it("SMB: rewrites the URL before fs_reveal_in_os", async () => {
     await osReveal("smb://smb-uuid/sub/file.png", [SMB]);
-    expect(fsRevealInOs).toHaveBeenCalledWith(
-      "smb://admin@192.168.1.1/G/sub/file.png",
-    );
+    expect(fsRevealInOs).toHaveBeenCalledWith("smb://admin@192.168.1.1/G/sub/file.png");
   });
 
   it("SFTP routes to onError instead of an IPC call", async () => {

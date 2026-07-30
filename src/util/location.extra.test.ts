@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatLocation,
-  formatSmb,
-  isRemote,
-  parseLocation,
-} from "./location";
+import { formatLocation, formatSmb, isRemote, parseLocation } from "./location";
 
 describe("location — SMB backend", () => {
   it("parseLocation routes smb:// to the smb backend", () => {
