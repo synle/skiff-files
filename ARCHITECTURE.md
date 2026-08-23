@@ -57,7 +57,7 @@ Two layers, one IPC channel:
 | `src/App.tsx`                     | Route table, root-mounted modals (`ShortcutsModal`, `ConflictModal`, `QuickJump`), `buildCommandActions` dispatch site for `skiff:*` window CustomEvents               |
 | `src/api/client.ts`               | Backend-agnostic dispatch via `dispatchByLocation`; regression suite in `client.test.ts` pins 69 per-backend routes                                                    |
 | `src/state/settings.tsx`          | Seeds from `localStorage`, rehydrates from disk via `settings_load`; every change writes to both                                                                       |
-| `package.json`                    | Scripts: `dev`, `build`, `tauri:dev`, `tauri:build`, `test` (vitest), `test:coverage`, `typecheck`, `format`                                                           |
+| `package.json`                    | Scripts: `dev`, `build`, `tauri:dev`, `tauri:build`, `test` (vitest), `test:coverage`, `typecheck`, `format` / `format:check` (oxfmt)                                 |
 | `vite.config.ts`, `tsconfig.json` | Frontend build / TS config                                                                                                                                             |
 | `index.html`                      | Vite entry                                                                                                                                                             |
 

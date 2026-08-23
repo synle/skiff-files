@@ -68,12 +68,11 @@ The biggest single function is the Tauri command-builder closure (111 KiB) — e
 
 In rough order of effort vs. payoff:
 
-1. **Drop unused imports** — `commands.rs:520` has a known `use std::io::Read;` rustc flags as unused. One-line fix; saves nothing in binary terms but cleans the build log. Not addressed in this audit (separate hygiene PR).
-2. **Audit regex usage** — `regex_automata + regex_syntax + aho_corasick` total **~382 KiB / 9.4%**. We use regex for find-in-path. If we move to literal/fast-path matching for the common case (substring / case-insensitive substring) and only bring up regex when the user actually types regex syntax, we could cut a chunk. Won't pursue without a clear user complaint.
-3. **Crypto algorithm pruning** — `russh` brings every supported curve / cipher (`p521`, `num_bigint_dig`, all of `ssh_key`'s formats). russh feature-flags some of these. Combined potential savings: ~150 KiB. Risky — users have keys we shouldn't break.
-4. **Compression dedup** — `zopfli` is in the build via `tauri-utils` (compression of resources). Can't easily strip without losing tauri-utils features.
-5. **`opt-level = "z"`** — currently `opt-level = "s"` (size). Switching to `"z"` typically shaves ~5%. Already on size opt, so the win is marginal vs. the perf hit.
-6. **`strip = "symbols"`** in `[profile.release]` — already implicit via `cargo build --release`. The 6.4 MB stripped figure assumes `strip` runs in CI; verify the bundler does.
+1. **Audit regex usage** — `regex_automata + regex_syntax + aho_corasick` total **~382 KiB / 9.4%**. We use regex for find-in-path. If we move to literal/fast-path matching for the common case (substring / case-insensitive substring) and only bring up regex when the user actually types regex syntax, we could cut a chunk. Won't pursue without a clear user complaint.
+2. **Crypto algorithm pruning** — `russh` brings every supported curve / cipher (`p521`, `num_bigint_dig`, all of `ssh_key`'s formats). russh feature-flags some of these. Combined potential savings: ~150 KiB. Risky — users have keys we shouldn't break.
+3. **Compression dedup** — `zopfli` is in the build via `tauri-utils` (compression of resources). Can't easily strip without losing tauri-utils features.
+4. **`opt-level = "z"`** — currently `opt-level = "s"` (size). Switching to `"z"` typically shaves ~5%. Already on size opt, so the win is marginal vs. the perf hit.
+5. **`strip = "symbols"`** in `[profile.release]` — already implicit via `cargo build --release`. The 6.4 MB stripped figure assumes `strip` runs in CI; verify the bundler does.
 
 None are urgent. We're at 6.4 MB (stripped) vs. 15 MB target — ~58% of budget. Plenty of headroom for the FTP / NTFS phases.
 

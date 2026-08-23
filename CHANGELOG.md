@@ -2,7 +2,7 @@
 
 Per-version notes for Skiff Files. The most recent entries appear first inside each phase block. The single source of truth for the current version is `src-tauri/tauri.conf.json` → `version`.
 
-For higher-level context (project goals, phase exit criteria, conventions, footguns), see `CLAUDE.md`.
+For higher-level context (project goals, conventions, footguns), see `AGENTS.md`.
 
 ## Phase 0.2.x — cross-protocol Skiffsync, multi-window, polish
 

@@ -1031,7 +1031,7 @@ export default function Browser({
       const verb = hasRemote ? "Permanently delete" : "Move to Trash";
       const count = selectedPaths.length;
       // Modal-based confirm — `window.confirm` is suppressed in the
-      // Tauri webview (see CLAUDE.md → Known footguns).
+      // Tauri webview (see AGENTS.md footguns).
       setConfirmDialog({
         title: verb,
         message: `${verb} ${count} item${count === 1 ? "" : "s"}?`,

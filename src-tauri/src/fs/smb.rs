@@ -1,7 +1,7 @@
 //! SMB / Samba backend (Phase 3c). Built on the pure-Rust `smb2`
 //! crate so the binary stays a single self-contained artifact on
 //! every target OS — `pavao` would have FFI-wrapped `libsmbclient`
-//! and forced a Samba install on every machine, defeating CLAUDE.md's
+//! and forced a Samba install on every machine, defeating AGENTS.md's
 //! "no sidecar" rule.
 //!
 //! Threading: `smb2::SmbClient` and its per-share `Tree` are stateful

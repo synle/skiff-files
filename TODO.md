@@ -27,7 +27,7 @@ The look should feel familiar to anyone who's used Finder / Explorer / Files / D
 │   Home     │  ▸ src              —       2026-05-06 ...   Folder              │  ← main pane
 │   Desktop  │  ▸ src-tauri        —       2026-05-06 ...   Folder              │     (list / tile /
 │   Down…    │  • TODO.md          12 KB   2026-05-06 ...   Markdown            │      column /
-│ ▾ HOSTS    │  • README.md        3 KB    2026-05-06 ...   Markdown            │      gallery)
+│ ▾ NETWORK  │  • README.md        3 KB    2026-05-06 ...   Markdown            │      gallery)
 │   ● home-srv (sftp)              ↑ uploading 2/14 · 14 MB/s · ETA 0:02       │
 │   ○ nas (smb)                    ─                                            │
 │   ○ ftp.example.com              ─                                            │
@@ -39,7 +39,7 @@ The look should feel familiar to anyone who's used Finder / Explorer / Files / D
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Optional **two-pane mode** (split vertically) for drag-drop transfers between local ↔ remote, FileZilla-style. Toggle in toolbar or ⌘\.
+Optional **two-pane mode** (split vertically) for drag-drop transfers between local ↔ remote, FileZilla-style. Toggle with Cmd/Ctrl+Shift+\.
 
 ### View modes (per-folder, persisted)
 
@@ -49,21 +49,18 @@ Optional **two-pane mode** (split vertically) for drag-drop transfers between lo
 - **Column (Miller)** — Finder-style cascading panes for deep trees.
 - **Tree-only** — pure tree, no file pane (rare).
 
-Each folder remembers its preferred view in a small SQLite per-path table; falls back to the global default in Settings.
+Each folder remembers its preferred view + sort in `settings.json` (per-path keys); falls back to the global default in Settings.
 
 ### Left sidebar (the tree)
 
-- Three sections, all collapsible: **Favorites**, **Hosts** (your saved connections — color dot = connection state), **Devices** (mounted drives).
-- Lazy-load children on expand (no expensive recursive scan up front).
+- Sections, all collapsible + reorderable: **Favorites**, **Network** (saved connections — color dot = connection state), **Devices** (mounted drives).
 - Drag onto a host node to start a `Skiffsync` job.
-- Right-click anywhere to add a favorite, edit a connection, etc.
-- Resizable, collapsible (⌘B), persistable width.
+- Resizable, collapsible (⌘B), icon-only rail mode.
 
 ### Theme
 
-- Three modes in Settings: **Light**, **Dark**, **System** (default).
-- "System" follows the OS — listens to Tauri's `theme-changed` event so it flips live without restart.
-- MUI v9 `ThemeProvider` swap; tokens live in `src/theme/{light,dark}.ts`.
+- Three modes in Settings: **Light**, **Dark**, **System** (default). System follows the OS live.
+- MUI v9 `ThemeProvider`; tokens live in `src/theme/{light,dark}.ts`.
 - Honor `prefers-reduced-motion` and `prefers-contrast`.
 
 ### Speed targets (these are non-negotiable)
@@ -80,282 +77,44 @@ To hit those: virtualized list (`@tanstack/react-virtual`), debounced/cancellabl
 
 ## Settings Page
 
-A single `pages/Settings.tsx` route with grouped sections — saved to `app_data_dir()/settings.json` with a Rust-side validator.
+A single `pages/SettingsPage.tsx` route with grouped sections — saved to `app_data_dir()/settings.json` with a Rust-side validator.
 
-> **Familiarity bar**: model the Settings page after macOS Finder → Settings (Tabs are: General, Tags, Sidebar, Advanced) and Windows Explorer → Folder Options. Group toggles into named sections, never bury them more than one click deep, and stick to the toggle vocabulary users already know from those apps. Don't invent new names for "Show hidden files" or "Show extensions" — match the OS convention so users muscle-memory their way through.
+> **Familiarity bar**: model the Settings page after macOS Finder → Settings and Windows Explorer → Folder Options. Named sections, never buried more than one click deep, OS-convention vocabulary ("Show hidden files", not invented names).
 
-The Phase 1 page already follows this approach (Appearance / Default View / Advanced). Below is the full target surface; sections come online as later phases land.
-
-### Appearance
-
-- Theme: Light / Dark / System
-- Accent color (preset palette + custom hex)
-- Font size: S / M / L
-- Density: Comfortable / Compact (affects row height in list view)
-- Show hidden files (dotfiles): on/off — _Finder convention_
-- Show file extensions: always / never / when-ambiguous — _Finder/Explorer convention_
-- Show full path in title bar: on/off
-- Show status bar: on/off
-- Reduce motion: on/off (auto-detects)
-
-### Default View
-
-- Default view mode for new folders: List / Tile / Gallery / Column
-- Per-folder overrides: keep / forget all
-- Default sort: name / size / mtime / kind, asc/desc
-- Group folders before files: on/off (Finder default = on)
-- Show preview pane on the right: off / images-only / always
-- Default zoom for tile/gallery views
-
-### Sidebar
-
-- Sections visible: Favorites, Hosts, Devices (toggle each)
-- Show connection-status dots: on/off
-- Auto-collapse inactive sections: on/off
-
-### Transfers (Skiffsync)
-
-- Default conflict policy (TeraCopy-style — see Phase 4 for the full action list)
-- Default lookback days for "skip if unchanged" heuristic (matches `cpsync`)
-- Max parallel transfers
-- Bandwidth cap (KB/s, 0 = unlimited)
-- Verify after copy (re-stat dest size; optional MD5 for paranoid mode)
-- Show conflict dialog: always / only when policy=prompt / never
-
-### Connections
-
-- Reachable from sidebar context menu **and** Settings
-- List of saved connections with edit/delete/duplicate/test buttons
-- Import from `~/.ssh/config`
-
-### Keyboard
-
-- View, search, and edit shortcuts. Reset to defaults.
-
-### Advanced
-
-- Logging level (off / error / warn / info / debug)
-- Clear thumbnail cache
-- Reset all settings
-- Show app data directory in Files
+Shipped sections: Appearance (theme / accent / font size / language), Default view, Sidebar, Saved data, Network, Transfers (Skiffsync), Keyboard (rebindable shortcuts), Advanced (logging / caches / reset / debug utilities) — plus an About header with update check and a macOS-only permissions section. Connections live on their own page.
 
 ---
 
-## Status snapshot (as of 0.2.237)
+## Status snapshot (as of 0.2.316)
 
-| Phase                                 | Status     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 — Scaffold & repo hygiene           | ✅ shipped | Branding + CI workflows + public repo                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 1 — Core local file explorer          | ✅ shipped | Browse / mkdir / rename / remove / copy; virtualized list; light/dark/system theme; settings page                                                                                                                                                                                                                                                                                                                                        |
-| 1.5 — Preview pane                    | ✅ shipped | Image / text / markdown / folder summary at first slice; PDF (0.2.58); audio + video (0.2.38); hex preview for binaries (0.2.202, retired 0.2.316 for plain-text fallback); 0.2.316 ships Prism syntax highlight + markdown render toggle + in-body search + custom AV seekbar + EXIF auto-orient + sibling navigation in modal + dedicated preview window                                                                               |
-| 2 — Connection abstraction & SFTP     | ✅ shipped | `russh` + `russh-sftp` backend, registry as Tauri State, Connections page, sidebar live-host list, `sftp://` scheme + scheme-aware path utils, ssh-config import (0.2.12), known-hosts TOFU (0.2.76), SFTP write side (0.1.10), ssh-agent auth (0.2.85), streaming SHA-256 (0.2.102)                                                                                                                                                     |
-| 3 — FTP/FTPS + SMB                    | partial    | Plain FTP shipped 0.2.246 (`suppaftp` backend, list/stat/read). FTP write ops (mkdir / rename / remove recursive) shipped 0.2.247. SMB / Samba via OS-native handler (0.2.141). Still pending: FTPS, FTP upload via Skiffsync, in-app SMB, docker-based integration tests.                                                                                                                                                               |
-| 4 — Skiffsync (cpsync-inspired)       | ✅ shipped | 4a local-to-local: skip-if-unchanged + conflict policies (skip/overwrite/keepBoth) + dry-run + cancel + max-size guard + per-file events. 4b smart-batch policies (overwriteOlder / replaceSmaller / replaceIfSizeDifferent / renameTarget / renameOlderTarget), cross-protocol src/dest, interactive TeraCopy modal w/ apply-to-all, pause/resume, `cpstamp` / `dedup` / `cprepo` modes, saved-job templates persisted to settings.json |
-| 5 — NTFS mount support                | deferred   | Not started — optional, behind cargo feature flag                                                                                                                                                                                                                                                                                                                                                                                        |
-| 6 — Polish, performance, distribution | partial    | Most polish items shipped under 0.2.x (see below). Bundle-size budget audit, i18n scaffold, auto-updates, crash reporting still open.                                                                                                                                                                                                                                                                                                    |
-| 7 — Release pipeline                  | ✅ shipped | `build.yml` + `release-official.yml` + `release-beta.yml` + cleanup workflows; macOS arm64+x64 / Windows / Linux matrix; `/release-official` + `/release-beta` slash commands                                                                                                                                                                                                                                                            |
+| Phase                                 | Status     | Notes                                                                                                                                              |
+| ------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Scaffold & repo hygiene           | ✅ shipped | Branding + CI workflows + public repo                                                                                                              |
+| 1 — Core local file explorer          | ✅ shipped | Browse / mkdir / rename / remove / copy; virtualized list; light/dark/system theme; settings page                                                  |
+| 1.5 — Preview pane                    | ✅ shipped | All kinds via one `Body` dispatch: image (EXIF auto-orient), text (Prism highlight, search, zoom), markdown, PDF, audio/video, folder summary      |
+| 2 — Connection abstraction & SFTP     | ✅ shipped | `russh` backend, registry as Tauri State, Connections page, `sftp://` scheme, ssh-config import, known-hosts TOFU, ssh-agent auth                 |
+| 3 — FTP/FTPS + SMB                    | partial    | Plain FTP (0.2.246) + write ops (0.2.247); in-app SMB via pure-Rust `smb2` (0.2.265). Still pending: FTPS, FTP upload via Skiffsync.               |
+| 4 — Skiffsync (cpsync-inspired)       | ✅ shipped | Skip-if-unchanged, 9 conflict policies, dry-run, cancel/pause/resume, cross-protocol engine, `cpstamp`/`dedup`/`cprepo`, saved-job templates       |
+| 5 — NTFS mount support                | deferred   | Not started — optional, behind cargo feature flag                                                                                                 |
+| 6 — Polish, performance, distribution | partial    | Most polish items shipped under 0.2.x (see CHANGELOG). Still open: bundle-size budget audit, auto-updates.                                        |
+| 7 — Release pipeline                  | ✅ shipped | `build.yml`, `integration.yml`, `release-official.yml`, `release-beta.yml`, automerge; macOS arm64+x64 / Windows / Linux matrix                     |
 
-The phase-by-phase shipping notes (every 0.1.x and 0.2.x patch) live in [`CHANGELOG.md`](./CHANGELOG.md). When you ship a new patch version, append the entry there.
-
----
-
-## 0.2.x polish summary (rounds ~174 → 237)
-
-Headline themes shipped during the 0.2.x polish run:
-
-- **Saved-data parity** across workspaces / selections / searches / sync jobs / bookmarks — every type ships with all five surfaces (sidebar section, drag-reorder via custom MIME, right-click rename/delete, command palette, Settings → Saved data). See ARCHITECTURE.md "Saved-data parity".
-- **Filter trio** — kind / tag / recency, with full per-folder persistence.
-- **Rebindable shortcuts** — every documented binding rebindable from Settings → Keyboard. Cross-platform Cmd/Ctrl unification via `keyEventToCombo`. Final migration (back/forward, 0.2.236) closed the loop.
-- **Finder-style color tags** — set / filter / sort / count / palette / multi-select.
-- **Unified `ProgressWidget` + ETA tracker** (0.2.175) + global `OperationsDrawer` (0.2.188) + sync snackbar (0.2.191) — every long-running op surfaces the same widget.
-- **Built-in archive viewer** — zip (0.2.183) + tar / tar.gz (0.2.187) + 7z (0.2.190).
-- **User-customizable theme palette** — 7-color overrides + Solarized / Dracula / Nord presets (0.2.184).
-- **Hex preview for binaries** (0.2.202).
-- **Drag-out** to OS via `tauri-plugin-drag` — FileList rows + PreviewPane images.
-- **Always-on-top window** toggle.
-- **Multi-window settings sync** via `settings:changed` Tauri event + focus reload.
-- **CommandPalette** (Cmd+Shift+P) as a comprehensive omnibar across the whole app.
-- **Comprehensive right-click coverage** on every clickable surface (file rows, sidebar entries, tab strip, bulk-action bar, etc.).
-- **Live FS watcher** (0.2.140) — auto-refresh on disk changes via `notify`.
-- **Parallel stat + ctime sort** (0.2.144) — Rayon parallel `list_dir`, fast enough for 10k entries.
-- **Tab UX parity** — Bookmark / Duplicate / Close-to-the-left / Cmd+1..9 switching, Chrome / VS Code parity (0.2.232 → 0.2.237).
-- **Settings.json power-user buttons** (0.2.235) — open + reload from disk.
+The per-patch shipping notes live in [`CHANGELOG.md`](./CHANGELOG.md). When you ship a new patch version, append the entry there.
 
 ---
 
-## Phase 0 — Scaffold & Repo Hygiene
+## Shipped phases
 
-✅ **Shipped.** Goal: working empty Tauri app with the same release rails as `display-dj`, branded "Skiff Files".
-
-- [ ] Copy `tauri-desktop-raw-template` into `~/git/file-explorer` (no sidecar — keeps bundle small)
-- [ ] Rename:
-  - `package.json#name` → `skiff-files`
-  - `src-tauri/Cargo.toml [package].name` → `skiff-files` (keep `[lib].name = "app_lib"`)
-  - `src-tauri/tauri.conf.json` → `productName: "Skiff Files"`, `identifier: "com.synle.skiff-files"`, window title, `version: 0.1.0`
-  - Workflow `project_name: "Skiff Files"` strings
-  - `index.html <title>` and CLAUDE.md / README.md
-- [ ] Replace `src-tauri/icons/` (skiff/sailboat icon, generated via `npx tauri icon ./logo512.png`)
-- [ ] `LICENSE.md` (MIT)
-- [ ] Verify `npm install && npx tauri dev` boots a window
-- [ ] Verify `build.yml` PR workflow posts artifact links (matrix: macOS arm64, macOS x64, Windows x64, Linux x64)
-- [ ] Initial public GitHub repo `synle/skiff-files`, push `main`
-
-**Exit criteria:** empty branded shell builds + releases on all four targets via `/release-beta`.
+Phases 0, 1, 1.5, 2, 4, and 7 are fully shipped — see [`CHANGELOG.md`](./CHANGELOG.md) for the per-patch history and the status table above for what each delivered.
 
 ---
 
-## Phase 1 — Core Local File Explorer
+## Phase 3 — FTP & SMB/Samba (remaining)
 
-✅ **Shipped.** Goal: a usable single-pane local file manager.
-
-### Rust (`src-tauri/src/`)
-
-- [ ] `fs/local.rs` — `list_dir`, `stat`, `read_file_chunk`, `write_file`, `mkdir`, `rm`, `rename`, `move_path`, `copy_path` (use `std::fs` + `tokio::fs`; large files via streaming, never `read_to_end`)
-- [ ] `fs/types.rs` — shared `Entry { name, path, kind, size, mtime, mode, isSymlink, isHidden }` with `#[serde(rename_all = "camelCase")]`
-- [ ] `fs/watch.rs` — `notify` crate for live directory updates, emit `fs:changed` events
-- [ ] `fs/icons.rs` — extension → kind mapping for the "Kind" column
-- [ ] `commands.rs` — register all `fs_*` commands in `lib.rs#invoke_handler`
-- [ ] Path safety: canonicalize, reject `..`-escapes when a sandbox root is set
-- [ ] Unit tests for each module
-
-### Frontend (`src/`)
-
-- [ ] `HashRouter` routes — `/`, `/connections`, `/transfers`, `/settings`
-- [ ] `pages/Browser.tsx` — split layout: tree sidebar + file list
-- [ ] `components/FileList.tsx` — **virtualized** (`@tanstack/react-virtual`), sortable columns, multi-select, keyboard nav (↑↓ Enter Backspace ⌘A Space-to-preview)
-- [ ] `components/FileTile.tsx` and `FileGallery.tsx` — alternative view renderers
-- [ ] `components/PathBar.tsx` — breadcrumb + editable path field with autocomplete
-- [ ] `components/Toolbar.tsx` — back/forward/up/refresh/new-folder/upload/view-mode-toggle
-- [ ] `components/Sidebar.tsx` — Favorites / Hosts / Devices, lazy children
-- [ ] `components/StatusBar.tsx` — selection count, total size, free space, transfer summary
-- [ ] `components/ContextMenu.tsx` — copy, cut, paste, rename, delete, properties, "open in terminal", "reveal in OS"
-- [ ] `components/PreviewPane.tsx` — text/image/hex preview for files < 5 MB
-- [ ] `theme/` — light + dark MUI themes; `useSystemTheme()` hook listening to Tauri `theme-changed`
-- [ ] `state/settings.ts` — Zustand or Context store, persisted via Rust `settings::load/save`
-- [ ] Vitest tests for components (mock Tauri `invoke` per template's `src/test/setup.ts`)
-
-**Exit criteria:** can browse local FS on all 3 OSes; rename/move/delete/copy work; watcher updates UI live; theme follows system.
-
----
-
-## Phase 1.5 — Right-side Preview Pane
-
-✅ **Shipped** (image/text/markdown/folder summary in the first slice; PDF added 0.2.58; audio + video 0.2.38; hex preview for binaries 0.2.202).
-
-Goal: a Finder-style "Get Info" / "Preview" pane that opens to the right of the file list and shows the content of the currently selected file.
-
-- [ ] Toggleable via Toolbar button (eye icon) and `⌘I` keyboard shortcut
-- [ ] Persisted preference: Settings → Default View → "Show preview pane" = off / images-only / always
-- [x] **Image preview** — render directly inline; supports png, jpg/jpeg, gif, webp, bmp, svg, avif, heic/heif (heic via Rust-side decode if browser webview can't render natively)
-  - Fit-to-pane by default, explicit zoom controls + drag to pan when zoomed
-  - Show dimensions + EXIF date/camera if present (read via `kamadak-exif` crate)
-  - EXIF auto-orientation honored on first paint (0.2.316)
-- [x] **Text preview** — first 256 KB; lossy-UTF-8 fallback for binary kinds; in-body search (contains / exact / regex, case toggle, match counter); Prism syntax highlighting (0.2.316); virtualized line list above 64 KB (0.2.316)
-- [x] **Markdown preview** — rendered via `marked` + sanitizer with a raw / rendered toggle (0.2.316)
-- [x] **PDF preview** — embed via webview's native PDF viewer
-- [x] **Audio / video preview** — custom seekbar + play/pause + volume (0.2.316); replaces the legacy native controls
-- [x] **Folder summary** — item count + total size (recursive, cancellable scan)
-- [x] **Properties block** at the top of every preview: size, kind, mtime, mode, full path, "Open with…"
-- [x] Resizable pane (drag the divider); width persisted
-- [x] Cancel any in-flight preview render when selection changes
-- [x] In-app PreviewModal with sibling nav + Open-in-new-window (0.2.313, 0.2.316)
-- [x] Standalone preview window (`window_open_preview`) — same Body, no Browser shell (0.2.316)
-
-**Exit criteria:** select a 4 K image, see it in the pane within 200 ms; select a folder, see recursive size within 1 s for 10k entries.
-
----
-
-## Phase 2 — Connection Abstraction & SFTP
-
-✅ **Shipped.** SFTP backend (`russh` + `russh-sftp`), connection registry as Tauri State, Connections page, Sidebar live-host list, `sftp://<id>/<path>` scheme + scheme-aware `util/location.ts`, SFTP write side (0.1.10), ssh-config import (0.2.12), known-hosts TOFU (0.2.76), ssh-agent auth (0.2.85), streaming SHA-256 for remote files (0.2.102). Real SFTP integration tests still need the docker harness scheduled in Phase 3.
-
-Goal: introduce the remote-FS abstraction; ship SSH/SFTP as the first remote.
-
-### Backend
-
-- [ ] `RemoteFs` async trait, same surface as `fs/local.rs`
-- [ ] `fs/registry.rs` — connection pool keyed by `connection_id`; commands accept `connection_id` + path
-- [ ] `fs/sftp.rs` — **`russh`** + **`russh-sftp`** (pure-Rust, no libssh2 C dep → smaller bundles, easier cross-compile)
-- [ ] Auth: password, private key (with optional passphrase), `ssh-agent`
-- [ ] `keychain.rs` — credentials via **`keyring`** crate (Keychain / Credential Manager / Secret Service)
-- [ ] `~/.ssh/config` parsing for host autocomplete (`ssh2-config` crate)
-- [ ] Streaming download/upload with progress events
-- [ ] Reconnect-on-drop with exponential backoff
-
-### Frontend
-
-- [ ] `pages/Connections.tsx` — list/add/edit/delete/test connections (sqlui-native style)
-- [ ] `components/ConnectionForm.tsx` — protocol dropdown, host, port, user, auth picker
-- [ ] **Two-pane mode**: left = local, right = remote (drag-and-drop between panes)
-- [ ] Per-connection icon + colored stripe so users can tell sessions apart
-
-**Exit criteria:** connect to SSH host, browse, upload, download, with credentials remembered securely.
-
----
-
-## Phase 3 — FTP & SMB/Samba
-
-⏳ **Partial.** Phase 3a — plain FTP — shipped 0.2.246. SMB / Samba is reachable today via the OS-native handler shortcut (0.2.141). Phase 3b is FTPS + FTP write ops + in-app SMB + docker-based integration tests.
-
-- [x] **FTP plain** _(shipped 0.2.246)_: `suppaftp` + passive mode, anonymous + user/password, list / stat / read text/base64. `ftp://<id>/<path>` scheme; Connections page form picker; `Connection::Ftp` registry variant.
-- [x] **FTP write ops** _(shipped 0.2.247)_: mkdir (recursive, idempotent) / rename / remove (file + recursive dir). conn_mkdir / conn_rename / conn_remove dispatch on kind.
-- [ ] **FTPS** (explicit + implicit TLS): suppaftp's `secure` feature, needs rustls/native-tls.
-- [ ] **FTP upload** (PreviewPane "Save" + drag-into-Browser): needs `stor` wrapper + Skiffsync cross-engine integration.
-- [ ] **FTP / FTPS legacy line item** below: `suppaftp` with `async-tls`; passive mode default; explicit + implicit TLS
-- [ ] **SMB**: `pavao` (pure-Rust SMB2/3) — works without OS-level mounts and without admin rights on Windows
-- [ ] Auth UX: anonymous toggle for FTP, workgroup/domain field for SMB
-- [ ] Path translation: SMB shares as virtual roots (`smb://host/share/...`)
-- [ ] Per-connection bookmarks of recently-used paths
-- [ ] Integration tests against `vsftpd` and `samba` containers in CI (`docker-compose.yml` like sqlui-native)
+- [ ] **FTPS** (explicit + implicit TLS): suppaftp's `secure` feature
+- [ ] **FTP upload** (PreviewPane "Save" + drag-into-Browser): needs `stor` wrapper + Skiffsync cross-engine integration
 
 **Exit criteria:** all three remote protocols feature-equivalent with local: list, read, write, rename, delete, mkdir, stream up/down with progress.
-
----
-
-## Phase 4 — `Skiffsync` (cpsync-inspired smart copy)
-
-✅ **Shipped.** 4a (local-to-local) covers skip-if-unchanged, conflict policies (skip / overwrite / keepBoth), dry-run, cancel between files, max-size guard, per-file events. 4b adds smart-batch policies (overwriteOlder / replaceSmaller / replaceIfSizeDifferent / renameTarget / renameOlderTarget), cross-protocol src/dest via the streaming cross-engine, the interactive TeraCopy modal with apply-to-all, pause/resume, and the `cpstamp` / `dedup` / `cprepo` modes. Saved-job templates persist to `Settings.savedSyncJobs`. Transfers page drives jobs and shows progress bars / current item / ETA.
-
-Goal: port `cpsync`'s spirit to a cross-protocol, cross-platform engine. **The headline feature.**
-
-### Behavior parity with `cpsync`
-
-- [ ] **Skip-if-unchanged**: same-size binaries skip; for text, also compare wordcount + mtime within `lookbackDays`
-- [ ] **Pre-scan total size** + abort if over `max_size_gb` (default 1, cap 100)
-- [ ] **Progress + ETA**: bytes/sec rolling average, time remaining
-- [ ] **Cross-device safe**: fall back from `copy_file_range`/`FICLONE` to plain read+write on EPERM
-- [ ] **File→folder** and **folder→folder** modes; preserve relative structure on recursive copy
-
-### New for Skiff Files
-
-- [ ] **Cross-protocol**: source/dest each may be `local`, `sftp`, `ftp`, `smb`
-- [ ] **Pause / resume / cancel**
-- [ ] **TeraCopy-style conflict resolution dialog** — when a destination file already exists, present a "Destination File Already Exists" sheet with:
-  - **Per-file actions** (large primary buttons): Overwrite · Overwrite all · Skip · Skip all · Keep both (rename copied file with `(2)` suffix)
-  - **Smart-batch actions** (apply to all remaining conflicts in this job):
-    - Overwrite all older files (mtime older than source)
-    - Replace all smaller files (size < source)
-    - Replace all files if size different
-    - Rename all copied files (always keep both)
-    - Rename all target files (move existing dest to `name (old).ext`, write new file under original name)
-    - Rename all older target files (same as above, but only if the dest is older)
-  - Show source vs. dest metadata side-by-side (date, size, "Same date" / "Same size" badges where applicable)
-  - Reachable defaults from Settings → Transfers (default conflict policy)
-- [ ] **Dry-run** view: would-copy / would-skip / would-conflict / too-big, diff-style panel
-- [ ] **Saved sync jobs**: name + source + dest + options, runnable from Transfers page; queue + history
-- [ ] **`cpstamp` mode**: copy with timestamp suffix `file.ext.YYYY_MM_DD_HH_MM`
-- [ ] **`cprepo` mode**: when source is git, only sync `git ls-files` output (zip-and-ship optional)
-- [ ] **`dedup` mode**: scan a folder, MD5+size, move extras to `_recycleBin/`
-- [ ] CLI parity: a `--sync` argv path so the binary can run headless from cron
-
-### Implementation
-
-- Engine in `src-tauri/src/sync/` with a `SyncJob` builder
-- All progress/ETA via Tauri events `sync:progress`, `sync:done`, `sync:error`
-- Frontend `pages/Transfers.tsx` shows queue + per-job progress bars + log tail
-- Persist jobs in a small SQLite DB (`rusqlite`) under `app_data_dir()`
-
-**Exit criteria:** sync 5 GB folder local → SFTP → SMB and back; second run completes in seconds via skip-if-unchanged.
 
 ---
 
@@ -368,50 +127,18 @@ Goal: port `cpsync`'s spirit to a cross-protocol, cross-platform engine. **The h
 - [ ] "Mount external volume" UI that shells out with sudo prompt as needed
 - [ ] Surface read-only state clearly when no writable driver available
 - [ ] On Windows: native — drive letters in sidebar
-- [ ] Document `macFUSE` install caveat (kernel extension approval) in README
 - [ ] Feature-flag this whole module behind a `cargo` feature `ntfs`
 
 **Exit criteria:** mount and browse an NTFS USB drive on macOS + Linux from inside the app.
 
 ---
 
-## Phase 6 — Polish, Performance, Distribution
+## Phase 6 — Polish, Performance, Distribution (remaining)
 
-⏳ **Partial.** Most polish themes shipped under the 0.2.x run (see "0.2.x polish summary" above) — virtualized list, keyboard cheatsheet (`?`), tabs, drag-and-drop, OS trash via `trash` crate, configurable shortcuts, recursive find. Bundle-size audit baseline captured in [`BUNDLE_SIZE.md`](./BUNDLE_SIZE.md) (0.2.239 — 6.4 MB stripped, well under the 15 MB target). Opt-in crash reporting shipped 0.2.241. i18n scaffold (English bundle + Language picker) shipped 0.2.243. Accessibility audit baseline + top-tier fixes shipped 0.2.244 (see [`A11Y.md`](./A11Y.md)). SQLite-backed thumbnail cache shipped 0.2.245. Still open: auto-updates via Tauri updater (deferred from this run).
+Most polish themes shipped under the 0.2.x run — see [`CHANGELOG.md`](./CHANGELOG.md). Bundle-size baseline in [`BUNDLE_SIZE.md`](./BUNDLE_SIZE.md); accessibility audit in [`A11Y.md`](./A11Y.md). Still open:
 
-- [ ] **Bundle size budget**: < 15 MB on macOS, < 10 MB on Windows. Audit deps with `cargo bloat`
-- [ ] **Large-directory perf**: virtualized list smooth at 100k entries
-- [ ] **Search**: in-pane filter (instant) + recursive find (background, cancellable) using `ignore` crate
-- [ ] **Quick look / preview**: text, image, hex preview for files < 5 MB; lazy-loaded
-- [ ] **Keyboard shortcuts**: configurable, with reset-to-defaults; cheatsheet modal (?)
-- [ ] **Tabs**: multiple panes / tabs per window à la Finder
-- [ ] **Drag-and-drop**: into the app from the OS, between panes, into host nodes (triggers Skiffsync)
-- [ ] **Trash integration**: real OS trash on delete (via `trash` crate), not just `rm`
-- [ ] **Thumbnail cache**: SQLite-backed, content-addressed, evictable
-- [ ] **i18n scaffold**: English first, structure ready for more
+- [ ] **Bundle size budget**: < 15 MB on macOS, < 10 MB on Windows
 - [ ] **Auto-updates**: Tauri updater pointing at GitHub Releases
-- [ ] **Crash reporting**: opt-in, local-only by default
-- [ ] **Accessibility**: keyboard-only nav, screen reader labels, focus rings, contrast checks
-
----
-
-## Phase 7 — Release Pipeline (mirrors `display-dj` / `sqlui-native`)
-
-✅ **Shipped.** `build.yml` + `release-official.yml` + `release-beta.yml` + cleanup workflows are all live. Matrix builds macOS arm64+x64, Windows x64, Linux x64. `/release-official` and `/release-beta` slash commands wrap `gh workflow run`.
-
-- [ ] `build.yml` — `npm test`, `cargo test`, build bundle on all four targets, post PR comment with download links
-- [ ] `release-official.yml` — tag `v*` triggers matrix build via `synle/workflows/actions/release/begin-release` + `end-release`
-- [ ] `release-beta.yml` — manual `workflow_dispatch` for `release-beta-<date>-<sha>` prereleases
-- [ ] `cleanup-artifacts.yml`, `cleanup-pr-artifacts.yml`, `cleanup-releases.yml` — copy from `display-dj`
-- [ ] **Code signing**:
-  - macOS: Developer ID + notarization (`APPLE_CERTIFICATE`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`)
-  - Windows: optional Authenticode (start unsigned, sign once worth it)
-  - Linux: AppImage zsync + `.deb` + `.rpm`
-- [ ] **Artifact matrix**: dmg/app (macOS arm64+x64), nsis exe/msi (Win x64), deb/AppImage/rpm (Linux x64)
-- [ ] Slash commands `/release-beta` and `/release-official` documented in `CLAUDE.md`
-- [ ] Optional: Homebrew tap update step (like `sqlui-native`)
-
-**Exit criteria:** `git tag v0.1.0 && git push --tags` produces a signed, notarized release on all four platforms with auto-update wired up.
 
 ---
 
@@ -442,25 +169,19 @@ These are tracked here so they don't get lost, but the user has asked that they 
   - Streaming required — listings can be paginated (S3 `ListObjectsV2`) and large blobs need chunked uploads (S3 multipart, OneDrive resumable, Drive resumable). Reuse the cross-engine's `tokio::io::copy` plumbing.
   - Settings → Connections gets per-cloud "Add" buttons; each pops a provider-specific config form (OAuth flow opens system browser → loopback redirect → token exchange).
 
-- [x] **Unified progress dialogs for all in-progress operations** _(top priority backlog — first slice in 0.2.175)_ — every long-running operation (delete-to-trash, copy, cut/paste, sync jobs) should surface the **same** progress widget so the UX is deterministic. The `ProgressWidget` component + rolling-window ETA tracker shipped in 0.2.175 and is wired into TransfersPage. Snackbar-anchored variant for delete + paste flows + global "operations queue" drawer remain. Spec:
-  - **Determinate progress bar** wherever total bytes are known up-front (sync — `bytesDone / bytesTotal`); fall back to indeterminate during the pre-scan.
-  - **Files counter** — "N of M files" alongside the bar, regardless of whether the byte count is known. This is the "always-something-deterministic" anchor: even when total bytes are unknown, the user sees how many files are left.
-  - **ETA** computed from a rolling 5-second bytes-per-second window. Display as both **time remaining** ("~2 min 14 s") **and absolute completion time** ("done at 3:47 PM"). Switch to "Calculating…" for the first 5 seconds while the rolling window primes.
-  - **Current item** label below the bar (the file currently being transferred) so users know it isn't stuck.
-  - **Pause / Cancel** controls inline (already in TransfersPage for sync; needs adding to delete + paste flows).
-  - Implementation: extract a `ProgressWidget` component that takes `{ filesDone, filesTotal, bytesDone?, bytesTotal?, currentItem?, etaSeconds?, onPause?, onCancel? }`. Consumers: TransfersPage (per-row), a new toast / snackbar-anchored variant for delete + paste, and a global "operations queue" drawer (long-running ops aggregate here so closing the source page doesn't stop the bar). Engine side already emits enough for sync; delete/copy need to grow event streams that mirror `sync:progress`.
+- [x] **Unified progress dialogs** _(shipped 0.2.175)_ — one `ProgressWidget` (files counter, rolling-window ETA, pause/cancel) for every long-running op, wired into Transfers + paste/delete flows.
 
-- [x] **Built-in archive viewer (zip / tar / 7z)** _(shipped)_ — zip (0.2.183) + tar / tar.gz (0.2.187) + 7z (0.2.190). Browse archive contents inline; open files inside the archive into the preview pane; extract individual files via right-click. `zip` + `tar` + `sevenz-rust` crates power the read side.
+- [x] **Built-in archive viewer (zip / tar / 7z)** _(shipped 0.2.183–0.2.190)_
 
-- [x] **User-customizable theme** _(shipped 0.2.184)_ — 7-color palette overrides (primary / secondary / background.default / background.paper / text.primary / text.secondary / accent) + Solarized / Dracula / Nord presets, with side-by-side light/dark preview.
+- [x] **User-customizable theme** _(shipped 0.2.184)_
 
-- [ ] **Bookmark grouping / folders** _(deferred multiple times)_ — Bookmarks list grows long; visual grouping needs a `groupId` field + group management UI + drag-vs-group-boundary semantics. Has been scoped + skipped repeatedly.
+- [ ] **Bookmark grouping / folders** _(deferred multiple times)_ — needs a `groupId` field + group management UI + drag-vs-group-boundary semantics.
 
-- [x] **Sidebar section reorder** _(shipped 0.2.238)_ — `Settings.sidebarSectionOrder` drives each section's CSS `order` inside a flex-column wrapper, so JSX source order stays untouched. Settings → Sidebar gains an arrow-driven reorder list + Reset.
+- [x] **Sidebar section reorder** _(shipped 0.2.238)_
 
-- [x] **Image rotate save** _(shipped 0.2.242)_ — `fs_image_rotate(path, degrees)` Tauri command using the `image` crate (default-features=false + JPEG/PNG/GIF/WebP/BMP feature list). PreviewPane gains a Save button next to Rotate-left / Rotate-right. JPEG round-trip is lossy (documented in the tooltip); PNG / GIF / BMP / lossless-WebP are bit-perfect. EXIF-only fast-path for JPEG was scoped out — pixel rotation works uniformly across every format the preview shows.
+- [x] **Image rotate save** _(shipped 0.2.242)_
 
-- [ ] **Streaming `fs_list_dir`** — Rayon-parallel stat (0.2.144) is fast enough for 10k entries. Streaming chunks would help 50k+ folders but adds frontend buffer complexity. Wait until users hit it.
+- [ ] **Streaming `fs_list_dir`** — Rayon-parallel stat is fast enough for 10k entries. Wait until users hit it.
 
 ---
 
@@ -476,9 +197,9 @@ These are tracked here so they don't get lost, but the user has asked that they 
 | Virtualization     | `@tanstack/react-virtual`                                        | Smooth at 100k entries                                |
 | SFTP               | `russh` + `russh-sftp`                                           | Pure-Rust, no libssh2 C build pain                    |
 | FTP                | `suppaftp`                                                       | Async, FTPS-capable, maintained                       |
-| SMB                | `pavao`                                                          | No OS mount needed, no admin rights                   |
-| Watcher            | `notify`                                                         | Cross-platform standard                               |
-| Credentials        | `keyring` crate                                                  | Native Keychain / Credential Manager / Secret Service |
-| Settings + Sync DB | `rusqlite`                                                       | Tiny, embedded                                        |
+| SMB                | `smb2`                                                           | Pure-Rust SMB 2/3 — no OS mount, no Samba install                     |
+| Watcher            | `notify`                                                         | Cross-platform standard                                               |
+| Credentials        | `keyring` crate                                                  | Native Keychain / Credential Manager / Secret Service                 |
+| Thumbnail cache    | `rusqlite`                                                       | Tiny, embedded                                                        |
 | Trash              | `trash` crate                                                    | Real OS trash on all 3 OSes                           |
 | Tests              | Vitest (frontend), `cargo test` (Rust), Playwright (e2e — later) | Matches sister repos                                  |

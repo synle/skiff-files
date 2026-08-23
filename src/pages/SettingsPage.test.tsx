@@ -71,7 +71,7 @@ describe("SettingsPage smoke", () => {
     fireEvent.click(screen.getByRole("button", { name: /Reset all settings/i }));
     // 0.2.309: `window.confirm` was replaced by a real modal —
     // Tauri's webview suppresses native dialogs (footgun in
-    // CLAUDE.md). The modal renders the destructive copy and a
+    // AGENTS.md). The modal renders the destructive copy and a
     // confirm button labelled "Reset to defaults".
     expect(screen.getByText(/Reset all settings to defaults\?/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reset to defaults/i })).toBeInTheDocument();

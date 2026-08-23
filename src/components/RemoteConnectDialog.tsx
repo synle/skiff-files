@@ -124,7 +124,7 @@ type SftpAuth = "password" | "privateKey" | "agent";
 /** Eye-icon adornment that toggles a TextField between
  *  `type="password"` and `type="text"`. Declared at module scope so
  *  it isn't recreated on every dialog render — defining components
- *  inside other components is a footgun (see CLAUDE.md). */
+ *  inside other components is a footgun (see AGENTS.md). */
 function PasswordVisibilityToggle({
   visible,
   onToggle,

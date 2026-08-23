@@ -944,7 +944,7 @@ export default function SettingsPage() {
   >("checking");
   // "Reset all settings" lives behind a modal confirmation (no
   // `window.confirm` — Tauri webview suppresses it; see footgun in
-  // CLAUDE.md). Closes after the keychain wipe + settings reset
+  // AGENTS.md). Closes after the keychain wipe + settings reset
   // resolve so the user sees the destructive action complete before
   // the dialog dismisses.
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
