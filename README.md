@@ -107,6 +107,8 @@ npm run build          # Production frontend build (tsc + vite)
 npm test               # Run Vitest tests once
 npm run test:watch     # Vitest in watch mode
 npm run typecheck      # tsc --noEmit
+npm run lint           # oxlint (static analysis)
+npm run format         # oxfmt --write .
 npm run tauri:build    # Production desktop build (.dmg/.exe/.deb/.AppImage)
 cd src-tauri && cargo test  # Run Rust tests
 ```

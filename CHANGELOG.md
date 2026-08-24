@@ -6,6 +6,8 @@ For higher-level context (project goals, conventions, footguns), see `AGENTS.md`
 
 ## Phase 0.2.x — cross-protocol Skiffsync, multi-window, polish
 
+- **0.2.320** — ✅ **Oxlint wired into CI**. `build.yml` runs `npm run lint` (oxlint) on every matrix job before the frontend tests — correctness-category errors now block the build the same way tests do. README's useful-scripts list gains `lint` + `format` rows.
+
 - **0.2.319** — ✅ **Oxlint ruleset: extended categories + baseline config**. New `.oxlintrc.json`: `correctness` errors (CI-gating), `suspicious` + `perf` warnings across the `unicorn` / `typescript` / `react` plugins. `react/react-in-jsx-scope` off — repo uses the automatic JSX runtime (`tsconfig` `jsx: "react-jsx"`), so it's all false positives. Six opinionated React rules (`set-state-in-effect`, `static-components`, `no-unstable-nested-components`, `refs`, `exhaustive-deps`, `immutability`) downgraded to warn: they flag ~150 real-but-inert patterns (dialog props→state sync, MUI icon wrappers) whose fixes are a dedicated refactor pass, not lint cleanup. Zero errors today; warnings stay visible as the punch list.
 
 - **0.2.318** — ✅ **Oxlint joins the toolchain (pairs with oxfmt)**. New `oxlint` devDependency (v1.79.0, same Oxc family as the existing `oxfmt` formatter — Rust-based, ~100× faster than ESLint) with `npm run lint` / `lint:fix` scripts. Baseline is already clean: one `unicorn/no-new-array` warning in `TextBody.tsx` fixed (`new Array(n)` → `Array.from({ length: n }, () => 0)` for the pre-computed line-start offsets). CI wiring lands next patch.
