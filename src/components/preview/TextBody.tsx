@@ -660,7 +660,7 @@ function VirtualizedTextView({
   // renders fine inside a pre-wrap container.
   const lines = useMemo(() => text.split("\n"), [text]);
   const lineStarts = useMemo(() => {
-    const starts: number[] = new Array(lines.length);
+    const starts: number[] = Array.from({ length: lines.length }, () => 0);
     let off = 0;
     for (let i = 0; i < lines.length; i++) {
       starts[i] = off;
