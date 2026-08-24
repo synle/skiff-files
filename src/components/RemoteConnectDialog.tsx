@@ -185,12 +185,11 @@ export default function RemoteConnectDialog({
   // Saving is implicit now — every successful connect inserts (or
   // updates) an entry in `Settings.connections`. The old "Save this
   // connection for next time" toggle has been retired.
-  /** Toggle for plaintext-password persistence. Defaults to OFF so
-   *  existing users and brand-new connections both default to
+  /** Toggle for password persistence. Defaults to OFF so existing
+   *  users and brand-new connections both default to
    *  prompt-every-time (no silent password capture). When ON, the
-   *  saved connection includes `password` and the row connects
-   *  silently next time. Phase 2 will swap the storage for the OS
-   *  keychain — see CHANGELOG. */
+   *  secret goes to the OS keychain (creds.rs) when available, with
+   *  a plaintext fallback only when the keychain is unavailable. */
   const [rememberPassword, setRememberPassword] = useState(false);
   /** Reconnect this row on every app start. Disabled in the UI when
    *  `rememberPassword` is off — without a stored password we can't

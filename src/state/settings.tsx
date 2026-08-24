@@ -1,6 +1,7 @@
-// Settings store. Persisted to localStorage for now — Phase 6 promotes this
-// to an `app_data_dir()/settings.json` file via a Rust command pair so power
-// users can sync their settings across machines via dotfiles.
+// Settings store. Double-write: localStorage hot cache + disk via the
+// `settings_load` / `settings_save` Rust command pair (atomic temp+rename
+// under `app_data_dir()/settings.json`) so browser-dev mode and tests work
+// without disk while the desktop app persists across launches.
 //
 // We don't pull in zustand or jotai for a half-dozen booleans; a Context +
 // reducer is enough and ships zero extra weight.

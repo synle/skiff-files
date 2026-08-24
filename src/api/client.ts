@@ -5,14 +5,10 @@
 // same backend without the caller having to remember.
 //
 // ============================================================
-// TODO(consolidate-routing-on-backend): MIGRATION TARGET
+// Routing: ONE dispatcher, `dispatchByLocation`
 // ============================================================
-// Today the frontend owns the kind-dispatch for every fs verb
-// (stat, listDir, mkdir, rename, createEmptyFile, hashSha256,
-// dirSummary, removeOrTrashMany, permanentlyDeleteMany, …).
-// Each function below parses a URL, picks a Rust command, and
-// hands off. Bugs from this turn that all traced to one missed
-// `kind === "smb"` arm somewhere in this file:
+// This file once owned a hand-rolled `kind === "smb"` ternary
+// per verb; misses produced real bugs:
 //
 //   - mkdir routed only sftp → SMB New Folder no-op
 //   - createEmptyFile routed only local → SMB New File no-op
@@ -25,33 +21,17 @@
 //     ? "ftp" : "sftp"`) that defaulted SMB to sftp — same
 //     class of bug in a non-client.ts site.
 //
-// Better shape: ONE Tauri command per verb, accepts the full
-// URL (`smb://<uuid>/path`, `sftp://…`, local), parses + picks
-// the connection on the Rust side via `resolve_backend`. The
-// frontend then has zero routing logic and adding a new
-// backend means editing one Rust enum + one resolver match,
-// not ~10 ternaries scattered across JS.
+// Consolidation landed as `dispatchByLocation<T>(path, spec)`:
+// one URL parser, one router, per-verb `local` + optional
+// `remote` handlers. Adding a backend = extending the
+// `Backend` union in `util/location.ts`; TypeScript then flags
+// every verb still missing a handler. See ARCHITECTURE.md →
+// "Routing model".
 //
-// Execution plan when this lands:
-//   1. Rust: extend `resolve_backend` (already exists in
-//      `commands.rs`) to return a closure-like dispatcher
-//      that exposes every verb. OR add `fs_*_any` Tauri
-//      commands (`fs_stat_any`, `fs_mkdir_any`, etc.) that
-//      internally `match` on URL prefix.
-//   2. JS: collapse these wrappers to one-liners calling the
-//      `*_any` commands. Delete `conn_*` direct exports from
-//      `api/conn.ts` where they're only re-bundled here.
-//   3. Drop the per-kind `ListItemText.secondary` ternaries
-//      in Sidebar / RemoteConnectDialog and the scheme
-//      pickers; pass URL through to the same routing entry.
-//   4. Run the regression suite (`*.test.tsx` added this
-//      session captures the bugs that drove this TODO).
-//
-// Until then: every new file-op verb MUST handle all three
-// remote kinds (sftp, ftp, smb) explicitly in this file. The
-// `isConnectionBacked` helper below is the type-safe narrow
-// for the connection-backed case — prefer it over hand-rolled
-// `kind === "sftp" || ...` checks.
+// Rule of the road: every new file-op verb goes through
+// `dispatchByLocation` — no fresh `kind === ...` branches.
+// The `isConnectionBacked` helper below is the type-safe
+// narrow for the connection-backed case.
 // ============================================================
 import {
   fsDirSummary,

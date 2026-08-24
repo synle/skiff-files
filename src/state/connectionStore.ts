@@ -11,14 +11,13 @@
 // status pill ("Connected" / "Disconnected") computed at render
 // time from `connList()`.
 //
-// Password storage (phase 1, plaintext-in-settings.json): when a
-// connection's `rememberPassword` flag is true, the password is
-// persisted on this struct alongside the other fields. This is the
-// stopgap before OS-keychain integration (planned follow-up — see
-// the `keyring` crate plan in the project's TODO). Plaintext on
-// disk is acceptable in the short term because settings.json lives
-// in `app_data_dir` (per-user OS-protected dir), not the source
-// tree, but keychain is the right long-term home.
+// Password storage: when a connection's `rememberPassword` flag is
+// true and keychain sync is on, the password lives in the OS keychain
+// (creds.rs, `keyring` crate) and this struct carries no inline
+// `password`. The plaintext slot remains only as the legacy fallback
+// for rows saved before 0.2.306 or on systems without a keychain
+// service; settings.json lives in `app_data_dir` (per-user
+// OS-protected dir), but the keychain is the right home.
 
 import type { FtpDraft, SftpDraft, SmbDraft } from "./connectionDrafts";
 
@@ -54,9 +53,10 @@ export interface SavedConnection {
    *  to "prompt every time" (no silent password capture). The
    *  dialog surfaces a toggle to opt in.
    *
-   *  Phase 1: plaintext alongside the other fields.
-   *  Phase 2 (planned): swap to `keyring` crate → macOS Keychain /
-   *  Windows Credential Manager / Linux libsecret.
+   *  Legacy rows (pre-0.2.286) carry plaintext alongside the other
+   *  fields; current rows store the secret in the OS keychain via
+   *  `creds.rs` (`keyring` crate) → macOS Keychain / Windows
+   *  Credential Manager / Linux libsecret.
    */
   rememberPassword?: boolean;
   /** Plaintext password / passphrase. Only present when

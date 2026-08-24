@@ -496,15 +496,6 @@ export default function App() {
         {page === "browser" ? (
           settings.twoPaneMode ? (
             <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-              {/* TODO(split-pane-resize): the divider between the
-                  two panes is currently a fixed 50/50 split (each
-                  Box flex: 1). Should let users drag the divider to
-                  re-balance, with the ratio persisted to settings.
-                  Same pass should add resizable columns to FileList
-                  in list-view mode (Name / Size / Modified / Kind).
-                  Both are pure-UX work, no backend changes. Out of
-                  scope for the SMB-dialog branch — split as a
-                  follow-up so this PR stays focused. */}
               {/* Each pane in two-pane mode owns its own
                   focus-state indicator. Visual treatment:
                     - Focused pane gets a 3px primary-tinted ring on

@@ -31,7 +31,7 @@ export default defineConfig({
         "src/test/**",
         "src/main.tsx",
         "src/**/*.d.ts",
-        // Rule 41: explicit secret-fixture / binary excludes so a
+        // Explicit secret-fixture / binary excludes so a
         // future fixture under one of these paths can't slip a
         // literal-looking token into the published coverage HTML.
         ".env*",

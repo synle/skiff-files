@@ -20,13 +20,13 @@ pub struct PlannedFile {
 
 /// Walk `src` and produce a `(plan, total_bytes)` pair. `dest_root` is
 /// where each file's relative path is grafted onto. Symlinks aren't
-/// followed — they're skipped silently for now (Phase 4b adds an option).
+/// followed — they're skipped silently (no follow-symlinks option yet).
 pub fn plan(src: &Path, dest_root: &Path) -> Result<(Vec<PlannedFile>, u64), String> {
     let mut out = Vec::new();
     let mut total = 0u64;
 
-    let src_meta = fs::symlink_metadata(src)
-        .map_err(|e| format!("stat({}): {e}", src.display()))?;
+    let src_meta =
+        fs::symlink_metadata(src).map_err(|e| format!("stat({}): {e}", src.display()))?;
 
     if src_meta.is_file() {
         // file -> folder: dest is dest_root/<file_name>.

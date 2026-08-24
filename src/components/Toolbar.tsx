@@ -1,6 +1,5 @@
 // Browser toolbar: navigation history (back/forward/up), refresh, new folder,
-// view-mode toggle. Phase 1 keeps the action set minimal — drag-to-host etc.
-// land in later phases once Hosts exist.
+// new file, view-mode toggle, search.
 import {
   Box,
   CircularProgress,

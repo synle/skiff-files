@@ -1,10 +1,6 @@
 // Keyboard cheatsheet — opens on `?` (when no input is focused). Lists
-// the bindings the rest of the app already implements; this modal is
+// the current bindings (rebindable in Settings → Keyboard); this modal is
 // pure documentation, not a key router.
-//
-// Phase 6 will let users rebind keys; until then the cheatsheet is the
-// canonical reference and lives next to the code that implements each
-// binding so they don't drift.
 import {
   Box,
   Dialog,
@@ -113,8 +109,7 @@ export default function ShortcutsModal() {
             </Box>
           ))}
           <Typography variant="caption" color="text.secondary">
-            Bindings are fixed in this build — Phase 6 will let you rebind them in Settings →
-            Keyboard.
+            Rebind any of these in Settings → Keyboard.
           </Typography>
         </Stack>
       </DialogContent>

@@ -2035,8 +2035,8 @@ fn run_job(
     }
 }
 
-/// Start a local-to-local copy job. Cross-protocol jobs land in Phase 4b
-/// — for now both `src` and `dest` must be local paths. Returns the new
+/// Start a local-to-local copy job. Cross-protocol jobs go through
+/// `sync_start_cross`. Returns the new
 /// job id; progress streams via the `sync:progress` Tauri event and the
 /// final summary via `sync:done`.
 #[tauri::command]

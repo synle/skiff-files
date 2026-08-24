@@ -1,7 +1,6 @@
-// Settings UI. Phase 1 ships Appearance + Default View + a Reset button. The
-// remaining sections from TODO.md (Sidebar, Transfers, Connections, Keyboard,
-// Advanced) join in their respective phases — each one becomes a Section
-// child of this page rather than a separate route.
+// Settings UI: one page of grouped Sections (Appearance, Default view,
+// Sidebar, Saved data, Network, Transfers, Keyboard, Advanced) plus a
+// macOS-only permissions section and an About header with update check.
 import {
   Box,
   Button,

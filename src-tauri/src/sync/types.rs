@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 
 /// What to do when the destination already exists. The variants mirror
 /// the action set in the TeraCopy "Destination File Already Exists"
-/// dialog (see TODO.md → Phase 4) so the future modal can map directly
-/// onto these. Three of the names match macOS Finder, the rest match
-/// Windows Explorer / TeraCopy power-user vocabulary verbatim — no new
-/// terminology invented.
+/// dialog that `ConflictModal` renders (see ARCHITECTURE.md →
+/// "Sync Engine Detail"). Three of the names match macOS Finder, the
+/// rest match Windows Explorer / TeraCopy power-user vocabulary
+/// verbatim — no new terminology invented.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ConflictPolicy {
@@ -173,13 +173,29 @@ fn default_lookback_days() -> u64 {
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum FileOutcome {
     /// File copied (or would-have-been-copied in dry-run).
-    Copied { src: String, dest: String, bytes: u64 },
+    Copied {
+        src: String,
+        dest: String,
+        bytes: u64,
+    },
     /// Skipped because src and dest match the skip-if-unchanged heuristic.
-    Skipped { src: String, dest: String, reason: String },
+    Skipped {
+        src: String,
+        dest: String,
+        reason: String,
+    },
     /// Skipped because of the conflict policy.
-    Conflict { src: String, dest: String, reason: String },
+    Conflict {
+        src: String,
+        dest: String,
+        reason: String,
+    },
     /// Failure — typically per-file so the rest of the job continues.
-    Error { src: String, dest: String, error: String },
+    Error {
+        src: String,
+        dest: String,
+        error: String,
+    },
 }
 
 /// Aggregate progress payload, emitted after each file.
@@ -374,12 +390,27 @@ mod tests {
     /// errors alone.
     #[test]
     fn job_state_serializes_as_documented_camelcase() {
-        assert_eq!(serde_json::to_string(&JobState::Planning).unwrap(), "\"planning\"");
-        assert_eq!(serde_json::to_string(&JobState::Running).unwrap(), "\"running\"");
-        assert_eq!(serde_json::to_string(&JobState::Paused).unwrap(), "\"paused\"");
-        assert_eq!(serde_json::to_string(&JobState::Cancelled).unwrap(), "\"cancelled\"");
+        assert_eq!(
+            serde_json::to_string(&JobState::Planning).unwrap(),
+            "\"planning\""
+        );
+        assert_eq!(
+            serde_json::to_string(&JobState::Running).unwrap(),
+            "\"running\""
+        );
+        assert_eq!(
+            serde_json::to_string(&JobState::Paused).unwrap(),
+            "\"paused\""
+        );
+        assert_eq!(
+            serde_json::to_string(&JobState::Cancelled).unwrap(),
+            "\"cancelled\""
+        );
         assert_eq!(serde_json::to_string(&JobState::Done).unwrap(), "\"done\"");
-        assert_eq!(serde_json::to_string(&JobState::Failed).unwrap(), "\"failed\"");
+        assert_eq!(
+            serde_json::to_string(&JobState::Failed).unwrap(),
+            "\"failed\""
+        );
     }
 
     /// FileOutcome uses `#[serde(tag = "kind")]` for the discriminator.

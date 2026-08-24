@@ -80,7 +80,7 @@ impl Backend {
                 // can't tell "not found" apart from other failures
                 // without parsing. For now, treat any error as None so
                 // the engine treats it as "no existing dest".
-                // TODO(0.2.x): typed SFTP errors.
+                // TODO: typed SFTP errors.
                 Err(_) => Ok(None),
             },
             Backend::Smb(client) => match client.stat(path).await {

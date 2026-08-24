@@ -2,9 +2,7 @@
 // `<scheme>://<uuid>/<path>` form into the OS-native form before the
 // call. Without this translation macOS Finder / Windows Explorer /
 // Linux file managers see a UUID where they expect a hostname and
-// surface "server not found" toasts (the user-visible bug in image #3
-// of the 0.2.305 issue: clicking a file on a saved SMB connection
-// popped "There was a problem connecting to df204a67-…").
+// surface "server not found" toasts.
 //
 // Layered on top of `toNativeRemoteUrl` — that helper handles the URL
 // translation, this one wires it to the actual `fs_open_with_default`

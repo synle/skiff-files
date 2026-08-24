@@ -149,8 +149,7 @@ export default function Browser({
    *  here so the StatusBar can render N of M selected · total size. */
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   // Kind-filter chips. Visibility is per-tab session state; the active
-  // group set isn't yet persisted (TODO: per-folder LRU like
-  // folderViewMode).
+  // group set persists per folder via `folderKindFilter`.
   const [kindFilterOpen, setKindFilterOpen] = useState(false);
   /** When set, the archive-viewer dialog is open against this path. */
   const [archiveViewerPath, setArchiveViewerPath] = useState<string | null>(null);
