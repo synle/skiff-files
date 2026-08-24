@@ -462,10 +462,17 @@ function PdfBody({ entry }: { entry: Entry }) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Reset when the target file changes (render-adjust).
+  const filePath = entry.path;
+  const [prevPath, setPrevPath] = useState<string | null>(null);
+  if (filePath !== prevPath) {
+    setPrevPath(filePath);
     setSrc(null);
     setError(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     readBase64(entry.path)
       .then((b64) => {
         if (cancelled) return;
@@ -512,10 +519,17 @@ function FolderBody({ entry }: { entry: Entry }) {
   const [summary, setSummary] = useState<DirSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Reset when the target folder changes (render-adjust).
+  const folderPath = entry.path;
+  const [prevFolderPath, setPrevFolderPath] = useState<string | null>(null);
+  if (folderPath !== prevFolderPath) {
+    setPrevFolderPath(folderPath);
     setSummary(null);
     setError(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     dirSummary(entry.path)
       .then((s) => !cancelled && setSummary(s))
       .catch((e) => !cancelled && setError(String(e)));
@@ -644,8 +658,16 @@ export default function PreviewPane({ selected, width, onOpenInModal }: Props) {
   // Fetch EXIF whenever an image is selected. Best-effort — failures
   // (non-image, missing tags, remote path) silently leave EXIF null.
   // Skips remote paths since `fs_image_exif` is a local-only command.
-  useEffect(() => {
+  // Reset EXIF when the selection changes (render-adjust — stale
+  // metadata never paints).
+  const selectedPath = selected?.path ?? null;
+  const [prevSelectedPath, setPrevSelectedPath] = useState<string | null>(null);
+  if (selectedPath !== prevSelectedPath) {
+    setPrevSelectedPath(selectedPath);
     setImageExif(null);
+  }
+
+  useEffect(() => {
     if (!selected || selected.isDir) return;
     if (selected.path.startsWith("sftp://")) return;
     // Cheap mime check via the same isImage helper used to pick the

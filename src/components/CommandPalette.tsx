@@ -45,15 +45,23 @@ export default function CommandPalette({ open, onClose, actions }: Props) {
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Reset state on every open so previous usage doesn't bleed in.
-  useEffect(() => {
+  // Reset state on every open so previous usage doesn't bleed in
+  // (render-adjust pattern — no cascading effect commit).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setQuery("");
       setHighlight(0);
-      // Focus on next tick so the dialog has finished mounting.
-      const t = setTimeout(() => inputRef.current?.focus(), 0);
-      return () => clearTimeout(t);
     }
+  }
+
+  // Focus on next tick after mount so the dialog has finished
+  // mounting before we steal focus.
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 0);
+    return () => clearTimeout(t);
   }, [open]);
 
   const filtered = useMemo(() => {
@@ -65,10 +73,11 @@ export default function CommandPalette({ open, onClose, actions }: Props) {
     });
   }, [actions, query]);
 
-  // Keep the highlight in bounds when the filtered list shrinks.
-  useEffect(() => {
-    if (highlight >= filtered.length) setHighlight(0);
-  }, [filtered.length, highlight]);
+  // Keep the highlight in bounds when the filtered list shrinks
+  // (render-adjust — derived clamp, no effect needed).
+  if (highlight >= filtered.length && highlight !== 0) {
+    setHighlight(0);
+  }
 
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowDown") {

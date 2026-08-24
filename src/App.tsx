@@ -2,7 +2,7 @@
 // inside the HashRouter (set up in main.tsx), so the sidebar can use the
 // navigation hooks directly.
 import { Box, Button, Snackbar } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import ShortcutsModal from "./components/ShortcutsModal";
 import ConflictModal from "./components/ConflictModal";
@@ -67,6 +67,8 @@ export default function App() {
   // every dispatch as "main" — the right pane simply isn't mounted
   // and its listener never runs.
   const [activePane, setActivePane] = useState<"main" | "right">("main");
+  // Mount-guard for the macOS FDA probe effect below.
+  const fdaProbeRanRef = useRef(false);
   const { settings, setSettings, update } = useSettings();
 
   // Cmd/Ctrl+K → toggle the quick-jump palette. Cmd/Ctrl+B → toggle
@@ -235,11 +237,12 @@ export default function App() {
   //       "Dismiss" actions.
   // Off-platform the Rust probe always returns `true` (no equivalent
   // gate on Windows / Linux), so this effect is a no-op there.
-  // Intentionally not in the dep array so it only runs on mount —
-  // re-checking on every settings change would re-fire the prompt
-  // after the user grants FDA + relaunches.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Runs once per launch: the fdaProbeRanRef guard makes re-runs
+  // (e.g. when the user flips the dismiss flag) no-ops, so the
+  // prompt never re-fires mid-session.
   useEffect(() => {
+    if (fdaProbeRanRef.current) return;
+    fdaProbeRanRef.current = true;
     let cancelled = false;
     if (settings.macosFdaPromptDismissed) return;
     macosCheckFullDiskAccess()
@@ -260,7 +263,7 @@ export default function App() {
       cancelled = true;
     };
     // Mount-only: see comment above.
-  }, []);
+  }, [settings.macosFdaPromptDismissed]);
 
   // Apply the always-on-top setting on every change. Calling the
   // Tauri command is cheap (~µs); the noisy guard would just be the
@@ -341,12 +344,14 @@ export default function App() {
           // arms all need it.
           let password = c.password ?? "";
           if (!password) {
+            // oxlint-disable-next-line eslint/no-await-in-loop -- ordered startup awaits — later steps depend on earlier results
             const fromKeychain = await credsLoad(c.id, "auth").catch(() => null);
             if (fromKeychain) password = fromKeychain;
           }
           if (c.kind === "sftp") {
             const authMode = c.authMode ?? "password";
             if (authMode === "password" && !password) continue;
+            // oxlint-disable-next-line eslint/no-await-in-loop -- ordered startup awaits — later steps depend on earlier results
             await connCreateSftp(
               {
                 host: c.host,
@@ -360,6 +365,7 @@ export default function App() {
             );
           } else if (c.kind === "smb") {
             if (!password) continue;
+            // oxlint-disable-next-line eslint/no-await-in-loop -- ordered startup awaits — later steps depend on earlier results
             await connCreateSmb(
               {
                 host: c.host,
@@ -372,6 +378,7 @@ export default function App() {
               c.id,
             );
           } else if (c.kind === "ftp") {
+            // oxlint-disable-next-line eslint/no-await-in-loop -- ordered startup awaits — later steps depend on earlier results
             await connCreateFtp(
               {
                 host: c.host,
@@ -1003,7 +1010,7 @@ function buildCommandActions(deps: {
         // dynamic import keeps the module out of the palette's hot
         // path render — only loads when the user actually triggers it.
         void import("./api/fs")
-          .then(({ windowOpenNew }) => windowOpenNew().catch(() => {}))
+          .then(({ windowOpenNew: openWindow }) => openWindow().catch(() => {}))
           .catch(() => {
             /* dynamic import failure — best effort, ignore */
           });

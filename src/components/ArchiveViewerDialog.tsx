@@ -47,16 +47,20 @@ export default function ArchiveViewerDialog({ open, archivePath, onClose, onExtr
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
-  useEffect(() => {
-    if (!open || !archivePath) {
-      setEntries(null);
-      setError(null);
-      setFilter("");
-      return;
-    }
-    let cancelled = false;
+  // Clear state when closed and on target change (render-adjust —
+  // the empty frame paints on first commit, no effect round-trip).
+  const [prevTarget, setPrevTarget] = useState<string | null>(null);
+  const target = open && archivePath ? archivePath : null;
+  if (target !== prevTarget) {
+    setPrevTarget(target);
     setEntries(null);
     setError(null);
+    setFilter("");
+  }
+
+  useEffect(() => {
+    if (!open || !archivePath) return;
+    let cancelled = false;
     void invoke<ArchiveEntry[]>("fs_archive_list", { path: archivePath })
       .then((rs) => {
         if (!cancelled) setEntries(rs);

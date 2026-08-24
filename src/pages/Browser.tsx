@@ -479,8 +479,8 @@ export default function Browser({
     // unhandled promise rejection and pollutes test output. Log only
     // in DEV so a genuine listen failure in production stays quiet.
     void import("@tauri-apps/api/event")
-      .then(({ listen }) =>
-        listen<string>("fs:changed", (event) => {
+      .then(({ listen: listenEvent }) =>
+        listenEvent<string>("fs:changed", (event) => {
           // Filter: only react when the changed path is the one we're
           // showing. Watcher emits the path that triggered (notify
           // surfaces the file path, not the parent dir).
@@ -708,12 +708,14 @@ export default function Browser({
             const paths = event.payload?.paths ?? [];
             for (const p of paths) {
               try {
+                // oxlint-disable-next-line eslint/no-await-in-loop -- sequential refresh/summary walks — parallel fan-out would race the listing
                 const meta = await fsStat(p);
                 // For directories, nest under <currentPath>/<basename>.
                 // For files, the planner joins the basename for us.
                 const dest = meta.isDir ? `${path}/${meta.name}` : path;
                 // Cross-protocol-aware: drops onto an sftp:// folder
                 // route through the cross-engine automatically.
+                // oxlint-disable-next-line eslint/no-await-in-loop -- sequential refresh/summary walks — parallel fan-out would race the listing
                 await startSync(p, dest, {
                   maxSizeGb: 100,
                   conflictPolicy: "skip",
@@ -1166,7 +1168,7 @@ export default function Browser({
         if (steps <= 0 || steps >= h.back.length) return h;
         // Take the top `steps` entries off `back`, push them onto
         // `forward` (in reverse so the most-recent is at the head).
-        const moved = h.back.slice(h.back.length - steps).reverse();
+        const moved = h.back.slice(h.back.length - steps).toReversed();
         return {
           back: h.back.slice(0, h.back.length - steps),
           forward: [...moved, ...h.forward],
@@ -1243,9 +1245,11 @@ export default function Browser({
         // remote-source paste (the "75 items ready to move" status
         // bar would never change because removeOrTrashMany only
         // touches paths that successfully synced).
+        // oxlint-disable-next-line eslint/no-await-in-loop -- sequential refresh/summary walks — parallel fan-out would race the listing
         const meta = await clientStat(src);
         const dest = meta.isDir ? `${path}/${meta.name}` : path;
         console.log("[paste] startSync call", { src, dest, isDir: meta.isDir });
+        // oxlint-disable-next-line eslint/no-await-in-loop -- sequential refresh/summary walks — parallel fan-out would race the listing
         const jobId = await startSync(src, dest, {
           maxSizeGb: 100,
           conflictPolicy: settings.syncDefaultConflictPolicy,

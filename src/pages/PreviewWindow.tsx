@@ -37,14 +37,15 @@ function readPreviewPathFromHash(): string | null {
 export default function PreviewWindow() {
   const initialPath = readPreviewPathFromHash();
   const [entry, setEntry] = useState<Entry | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Missing-path error is known at first render — initialize it
+  // directly instead of flipping it in an effect.
+  const [error, setError] = useState<string | null>(() =>
+    initialPath ? null : "No preview path supplied (#preview=<path> missing).",
+  );
   const [imageExif, setImageExif] = useState<ImageExif | null>(null);
 
   useEffect(() => {
-    if (!initialPath) {
-      setError("No preview path supplied (#preview=<path> missing).");
-      return;
-    }
+    if (!initialPath) return;
     let cancelled = false;
     stat(initialPath)
       .then((e) => {
@@ -68,8 +69,16 @@ export default function PreviewWindow() {
   // Best-effort EXIF lookup — same gate the inline PreviewPane uses
   // so the orientation transform applies in the standalone window
   // too. Remote paths bail (the EXIF command is local-only).
-  useEffect(() => {
+  // Reset EXIF as soon as the target entry changes (render-adjust —
+  // the stale EXIF never paints).
+  const [prevExifPath, setPrevExifPath] = useState<string | null>(null);
+  const exifPath = entry?.path ?? null;
+  if (exifPath !== prevExifPath) {
+    setPrevExifPath(exifPath);
     setImageExif(null);
+  }
+
+  useEffect(() => {
     if (!entry || entry.isDir) return;
     if (entry.path.startsWith("sftp://")) return;
     if (!/\.(jpe?g|tiff?|heic|heif|webp|png)$/i.test(entry.path)) return;

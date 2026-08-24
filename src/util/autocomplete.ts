@@ -29,7 +29,7 @@ export function splitForCompletion(input: string): {
 export function longestCommonPrefix(strs: string[]): string {
   if (strs.length === 0) return "";
   if (strs.length === 1) return strs[0];
-  const sorted = [...strs].sort();
+  const sorted = strs.toSorted();
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
   let i = 0;

@@ -19,7 +19,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   onDone,
   onError,
@@ -70,7 +70,9 @@ export default function OperationsDrawer() {
    *  the first in-flight job so a single-job drawer reads as today —
    *  the user sees the progress widget without clicking. */
   const [openJobId, setOpenJobId] = useState<string | null>(null);
-  const samplesRef = useRef<Record<string, EtaSample[]>>({});
+  // ETA samples live in state (not a ref) so the render path can
+  // read them without touching mutable refs during render.
+  const [samples, setSamples] = useState<Record<string, EtaSample[]>>({});
 
   useEffect(() => {
     let unsubP: (() => void) | null = null;
@@ -92,9 +94,11 @@ export default function OperationsDrawer() {
     })();
     void (async () => {
       unsubP = await onProgress((p) => {
-        const buf = samplesRef.current[p.jobId] ?? [];
-        pushSample(buf, Date.now(), p.bytesDone);
-        samplesRef.current[p.jobId] = buf;
+        setSamples((prev) => {
+          const buf = prev[p.jobId] ?? [];
+          pushSample(buf, Date.now(), p.bytesDone);
+          return { ...prev, [p.jobId]: buf };
+        });
         setJobs((prev) => {
           const slot = prev[p.jobId] ?? {
             info: {
@@ -109,13 +113,18 @@ export default function OperationsDrawer() {
         setHidden(false); // reveal drawer when a new job emits
       });
       unsubD = await onDone((s) => {
+        setSamples((prevSamples) => {
+          if (!(s.jobId in prevSamples)) return prevSamples;
+          const nextSamples = { ...prevSamples };
+          delete nextSamples[s.jobId];
+          return nextSamples;
+        });
         setJobs((prev) => {
           // Drop the job from the drawer once it's done — the user
           // doesn't need to see "X copied, 0 errors" linger; that's
           // what the Transfers page is for.
           const next = { ...prev };
           delete next[s.jobId];
-          delete samplesRef.current[s.jobId];
           return next;
         });
       });
@@ -175,16 +184,13 @@ export default function OperationsDrawer() {
   // from `jobs`), fall back to the next in-flight job so the drawer
   // doesn't collapse to an all-closed state. The user opted into
   // "show me what's running"; surfacing whatever's left preserves
-  // that contract.
-  useEffect(() => {
-    if (jobList.length === 0) {
-      if (openJobId !== null) setOpenJobId(null);
-      return;
-    }
-    if (openJobId === null || !jobs[openJobId]) {
-      setOpenJobId(jobList[0].info.id);
-    }
-  }, [jobs, jobList, openJobId]);
+  // that contract. Render-adjust pattern: normalization happens in
+  // the render that sees the changed jobs map.
+  if (jobList.length === 0) {
+    if (openJobId !== null) setOpenJobId(null);
+  } else if (openJobId === null || !jobs[openJobId]) {
+    setOpenJobId(jobList[0].info.id);
+  }
 
   if (jobList.length === 0 || hidden) return null;
 
@@ -239,7 +245,7 @@ export default function OperationsDrawer() {
         <Box sx={{ maxHeight: "40vh", overflowY: "auto" }}>
           {jobList.map((j) => {
             const p = j.progress;
-            const buf = samplesRef.current[j.info.id] ?? [];
+            const buf = samples[j.info.id] ?? [];
             const eta = computeEta(buf, p?.bytesTotal);
             const paused = j.info.state === "paused";
             const inFlight = j.info.state === "running" || j.info.state === "planning" || paused;

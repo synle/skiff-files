@@ -49,6 +49,7 @@ export async function startNativeDrag(files: string[], options: DragOptions = {}
     // fire defensively (the plugin only emits once per drag, but
     // the callback isn't structured to be idempotent).
     let fired = false;
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener -- Channel is Tauri's IPC type, not an EventTarget; onmessage is its only API
     channel.onmessage = () => {
       if (fired) return;
       fired = true;

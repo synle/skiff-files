@@ -139,6 +139,30 @@ interface Props {
   disabled?: boolean;
 }
 
+/** Display label for the active sort. Surfaces in the history and
+ *  sort dropdown tooltips so the current state is glanceable.
+ *  Hoisted to module scope (pure). */
+function sortLabel(k: SortKey): string {
+  return k === "name"
+    ? "Name"
+    : k === "size"
+      ? "Size"
+      : k === "mtime"
+        ? "Modified"
+        : k === "ctime"
+          ? "Created"
+          : k === "tag"
+            ? "Tag"
+            : "Kind";
+}
+
+/** Last segment of a path — used as the history-menu label so the
+ *  user doesn't see the full absolute path on every line. */
+function labelFor(p: string): string {
+  const segs = p.split(/[\\/]/).filter(Boolean);
+  return segs.at(-1) ?? p;
+}
+
 /** Icon-only buttons with tooltips — keeps the toolbar dense. */
 export default function Toolbar(props: Props) {
   const {
@@ -204,34 +228,12 @@ export default function Toolbar(props: Props) {
     display: { xs: "inline-flex", md: "none" },
   } as const;
 
-  /** Display label for the active sort. Surfaces in the dropdown's
-   *  tooltip so the current state is glanceable. */
-  const sortLabel = (k: SortKey): string =>
-    k === "name"
-      ? "Name"
-      : k === "size"
-        ? "Size"
-        : k === "mtime"
-          ? "Modified"
-          : k === "ctime"
-            ? "Created"
-            : k === "tag"
-              ? "Tag"
-              : "Kind";
-
   // Anchor for the history dropdowns. We share one state slot for both
   // arrows since only one menu is ever open at a time.
   const [historyMenu, setHistoryMenu] = useState<{
     el: HTMLElement;
     direction: "back" | "forward";
   } | null>(null);
-
-  /** Last segment of a path — used as the menu label so the user
-   *  doesn't see the full absolute path on every line. */
-  const labelFor = (p: string): string => {
-    const segs = p.split(/[\\/]/).filter(Boolean);
-    return segs.at(-1) ?? p;
-  };
 
   const openBackMenu = (e: ReactMouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -299,10 +301,11 @@ export default function Toolbar(props: Props) {
         {(historyMenu?.direction === "back"
           ? // Most recent first → reverse so the closest entry is at
             //the top of the menu (clicking it = one step back).
-            [...backHistory].reverse()
+            backHistory.toReversed()
           : forwardHistory
         ).map((p, idx) => (
           <MenuItem
+            // oxlint-disable-next-line react/no-array-index-key -- a path can appear twice in history; index disambiguates duplicates
             key={`${p}-${idx}`}
             onClick={() => {
               onHistoryJump?.(historyMenu!.direction, idx + 1);

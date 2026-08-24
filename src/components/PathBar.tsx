@@ -161,7 +161,9 @@ export default function PathBar({ path, onNavigate, onHome, focusRequest }: Prop
       // label (`...:445`) for the same connection — otherwise the
       // shorter prefix would match `/G/sub` as the remote path tail
       // and we'd lose the share binding.
-      const sorted = [...connMap.entries()].sort((a, b) => b[1].label.length - a[1].label.length);
+      const sorted = [...connMap.entries()].toSorted(
+        (a, b) => b[1].label.length - a[1].label.length,
+      );
       for (const [id, info] of sorted) {
         const friendlyPrefix = `${info.kind}://${info.label}`;
         if (target === friendlyPrefix || target.startsWith(friendlyPrefix + "/")) {

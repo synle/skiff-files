@@ -95,16 +95,27 @@ export default function GalleryThumb({ path, kind, size, remote = false, fill = 
   );
   const [errored, setErrored] = useState(false);
 
-  useEffect(() => {
-    if (skipFetch) return;
-    // Fast path: cache hit.
-    const hit = getCached(path, size);
-    if (hit !== undefined) {
-      setDataUrl(hit);
-      return;
-    }
-    let cancelled = false;
+  // Cache hits resolve synchronously — take that fast path during
+  // render (render-adjust) so the thumbnail paints one commit
+  // earlier. `servedFromCache` tells the fetch effect to stand down
+  // for this target.
+  const [prevTarget, setPrevTarget] = useState<string | null>(null);
+  const [servedFromCache, setServedFromCache] = useState(false);
+  const target = `${path}|${size}`;
+  if (target !== prevTarget) {
+    setPrevTarget(target);
     setErrored(false);
+    let hit: string | undefined;
+    if (!skipFetch) {
+      hit = getCached(path, size);
+      if (hit !== undefined) setDataUrl(hit);
+    }
+    setServedFromCache(hit !== undefined);
+  }
+
+  useEffect(() => {
+    if (skipFetch || servedFromCache) return;
+    let cancelled = false;
     void fsThumbnail(path, size)
       .then((b64) => {
         if (cancelled) return;
@@ -121,7 +132,7 @@ export default function GalleryThumb({ path, kind, size, remote = false, fill = 
     return () => {
       cancelled = true;
     };
-  }, [path, size, skipFetch]);
+  }, [path, size, skipFetch, servedFromCache]);
 
   // Fallback path: render the kind icon (folder / image-without-thumb /
   // remote / errored). When `fill` is true the box stretches to its

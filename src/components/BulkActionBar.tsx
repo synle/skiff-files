@@ -69,6 +69,63 @@ const TIGHT_ICON_SX = {
   "& .MuiButton-startIcon": { mr: 0.5 /* 4px */ },
 };
 
+// Single shared helper for every text+icon action so the dense
+// (icon-only-with-tooltip) and the regular form stay in sync.
+// Tooltips wrap BOTH variants — even with the label visible,
+// pointer-hovering surfaces the keyboard hint / longer
+// description if we ever attach one. Variant defaults to "text".
+// Hoisted to module scope so it isn't recreated per render (which
+// would remount every button and drop focus/tooltip state).
+function ActionButton({
+  label,
+  icon,
+  onClick,
+  color,
+  variant,
+  onClickCapture,
+  dense,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
+  color?: "error" | "primary" | "inherit";
+  variant?: "text" | "outlined" | "contained";
+  onClickCapture?: (e: React.MouseEvent<HTMLElement>) => void;
+  /** Compact form — icons only with a tooltip label. */
+  dense?: boolean;
+}) {
+  if (dense) {
+    return (
+      <Tooltip title={label}>
+        <IconButton
+          size="small"
+          onClick={onClick}
+          onClickCapture={onClickCapture}
+          color={color}
+          aria-label={label}
+        >
+          {icon}
+        </IconButton>
+      </Tooltip>
+    );
+  }
+  return (
+    <Tooltip title={label}>
+      <Button
+        size="small"
+        variant={variant ?? "text"}
+        color={color}
+        startIcon={icon}
+        onClick={onClick}
+        onClickCapture={onClickCapture}
+        sx={TIGHT_ICON_SX}
+      >
+        {label}
+      </Button>
+    </Tooltip>
+  );
+}
+
 export default function BulkActionBar({
   count,
   onNewFolder,
@@ -88,57 +145,6 @@ export default function BulkActionBar({
   const [tagAnchor, setTagAnchor] = useState<HTMLElement | null>(null);
   const hasMultiSelection = count >= 2;
   const hasSelection = count >= 1;
-  // Single render helper for every text+icon action so the dense
-  // (icon-only-with-tooltip) and the regular form stay in sync.
-  // Tooltips wrap BOTH variants — even with the label visible,
-  // pointer-hovering surfaces the keyboard hint / longer
-  // description if we ever attach one. Variant defaults to "text".
-  const ActionButton = ({
-    label,
-    icon,
-    onClick,
-    color,
-    variant,
-    onClickCapture,
-  }: {
-    label: string;
-    icon: React.ReactNode;
-    onClick?: (e: React.MouseEvent<HTMLElement>) => void;
-    color?: "error" | "primary" | "inherit";
-    variant?: "text" | "outlined" | "contained";
-    onClickCapture?: (e: React.MouseEvent<HTMLElement>) => void;
-  }) => {
-    if (dense) {
-      return (
-        <Tooltip title={label}>
-          <IconButton
-            size="small"
-            onClick={onClick}
-            onClickCapture={onClickCapture}
-            color={color}
-            aria-label={label}
-          >
-            {icon}
-          </IconButton>
-        </Tooltip>
-      );
-    }
-    return (
-      <Tooltip title={label}>
-        <Button
-          size="small"
-          variant={variant ?? "text"}
-          color={color}
-          startIcon={icon}
-          onClick={onClick}
-          onClickCapture={onClickCapture}
-          sx={TIGHT_ICON_SX}
-        >
-          {label}
-        </Button>
-      </Tooltip>
-    );
-  };
   return (
     <Box
       sx={{
@@ -161,6 +167,7 @@ export default function BulkActionBar({
           normal browsing. */}
       {pasteCount != null && pasteCount > 0 && onPaste && (
         <ActionButton
+          dense={dense}
           label={`Paste ${pasteCount} item${pasteCount === 1 ? "" : "s"}`}
           icon={<ContentPasteIcon fontSize="small" />}
           onClick={onPaste}
@@ -169,6 +176,7 @@ export default function BulkActionBar({
       )}
       {onNewFolder && (
         <ActionButton
+          dense={dense}
           label="New folder"
           icon={<CreateNewFolderIcon fontSize="small" />}
           onClick={onNewFolder}
@@ -176,6 +184,7 @@ export default function BulkActionBar({
       )}
       {onNewFile && (
         <ActionButton
+          dense={dense}
           label="New file"
           icon={<NoteAddIcon fontSize="small" />}
           onClick={onNewFile}
@@ -183,6 +192,7 @@ export default function BulkActionBar({
       )}
       {hasSelection && onClearSelection && (
         <ActionButton
+          dense={dense}
           label="Clear"
           icon={<ClearIcon fontSize="small" />}
           onClick={onClearSelection}
@@ -190,23 +200,40 @@ export default function BulkActionBar({
       )}
       <Box sx={{ flex: 1 }} />
       {hasMultiSelection && onCopy && (
-        <ActionButton label="Copy" icon={<ContentCopyIcon fontSize="small" />} onClick={onCopy} />
+        <ActionButton
+          dense={dense}
+          label="Copy"
+          icon={<ContentCopyIcon fontSize="small" />}
+          onClick={onCopy}
+        />
       )}
       {hasMultiSelection && onCut && (
-        <ActionButton label="Cut" icon={<ContentCutIcon fontSize="small" />} onClick={onCut} />
+        <ActionButton
+          dense={dense}
+          label="Cut"
+          icon={<ContentCutIcon fontSize="small" />}
+          onClick={onCut}
+        />
       )}
       {hasMultiSelection && onCompress && (
         <ActionButton
+          dense={dense}
           label="Compress"
           icon={<ArchiveIcon fontSize="small" />}
           onClick={onCompress}
         />
       )}
       {hasMultiSelection && onBulkRename && (
-        <ActionButton label="Rename" icon={<EditIcon fontSize="small" />} onClick={onBulkRename} />
+        <ActionButton
+          dense={dense}
+          label="Rename"
+          icon={<EditIcon fontSize="small" />}
+          onClick={onBulkRename}
+        />
       )}
       {hasMultiSelection && onSaveSelectionGroup && (
         <ActionButton
+          dense={dense}
           label="Save group"
           icon={<SaveIcon fontSize="small" />}
           onClick={onSaveSelectionGroup}
@@ -215,6 +242,7 @@ export default function BulkActionBar({
       {hasMultiSelection && onSetTag && (
         <>
           <ActionButton
+            dense={dense}
             label="Tag"
             icon={<LocalOfferIcon fontSize="small" />}
             onClick={(e) => setTagAnchor(e.currentTarget as HTMLElement)}
@@ -259,6 +287,7 @@ export default function BulkActionBar({
       )}
       {hasMultiSelection && onDelete && (
         <ActionButton
+          dense={dense}
           label="Delete"
           icon={<DeleteIcon fontSize="small" />}
           onClick={onDelete}

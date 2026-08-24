@@ -101,12 +101,17 @@ export default function PathPickerField({
   // Debounce existence check so we don't fire fsStat on every
   // keystroke (which would also race itself for the result and
   // produce a flickering warning).
+  // Validation transitions with `value` (render-adjust — the
+  // idle/checking flip paints with the keystroke, no effect hop).
+  // Only the debounced fsStat probe remains an effect.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setValidation({ kind: value ? "checking" : "idle" });
+  }
+
   useEffect(() => {
-    if (!value) {
-      setValidation({ kind: "idle" });
-      return;
-    }
-    setValidation({ kind: "checking" });
+    if (!value) return;
     const probe = debounce(() => {
       // Don't capture `value` in a stale closure — read it back via
       // a fresh ref through the inner async invocation. (Effects

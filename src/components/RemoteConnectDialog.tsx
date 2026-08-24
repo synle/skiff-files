@@ -223,77 +223,95 @@ export default function RemoteConnectDialog({
   // type-discriminator keeps working; we read them through
   // `matched.map(connTo<Kind>Draft)` in the matched-drafts memo.
 
+  // Seed the form whenever the dialog opens against a new target
+  // (open + request + edit-target). Render-adjust pattern: every
+  // sync field write lands in the render that sees the new key; the
+  // async keychain probes stay in the effect below.
+  const connectionsKey = settings.connections.map((c) => c.id).join(",");
+  const seedKey = open
+    ? `${request?.host ?? ""}|${editingConnectionId ?? ""}|${connectionsKey}`
+    : null;
+  const [prevSeedKey, setPrevSeedKey] = useState<string | null>(null);
+  if (seedKey !== prevSeedKey) {
+    setPrevSeedKey(seedKey);
+    if (open && request) {
+      setScheme(request.scheme);
+      setHost(request.host);
+      setPort(
+        request.port ?? (request.scheme === "sftp" ? 22 : request.scheme === "smb" ? 445 : 21),
+      );
+      setUser(request.user ?? (request.scheme === "ftp" ? "anonymous" : ""));
+      setPassword(request.scheme === "ftp" ? "anonymous@" : "");
+      setAuthMode("password");
+      setPrivateKeyPath("");
+      setPrivateKeyPassphrase("");
+      // SMB-specific: try to pre-fill share from the typed remote
+      // path's first segment (`smb://host/share/...`). Strip the
+      // leading slash + take the first chunk. Empty stays empty so
+      // the field is editable.
+      if (request.scheme === "smb" && request.remotePath) {
+        const trimmed = request.remotePath.replace(/^\/+/, "");
+        const firstSlash = trimmed.indexOf("/");
+        setSmbShare(firstSlash >= 0 ? trimmed.slice(0, firstSlash) : trimmed);
+      } else {
+        setSmbShare("");
+      }
+      setSmbDomain("");
+      setSmbShareOptions([]);
+      setSmbShareLoading(false);
+      setRememberPassword(false);
+      setAutoConnect(false);
+      setSelectedDraftId(null);
+      setShowPassword(false);
+      setShowPassphrase(false);
+      setError(null);
+      setBusy(false);
+      // Edit mode — pre-fill fields from the saved entry (sync part).
+      // Saved values win for fields the request didn't carry. The id
+      // is tracked via `selectedDraftId` so the connect flow knows to
+      // update-in-place vs. insert.
+      if (editingConnectionId) {
+        const saved = settings.connections.find((c) => c.id === editingConnectionId);
+        if (saved) {
+          setScheme(saved.kind);
+          setHost(saved.host);
+          setPort(saved.port);
+          setUser(saved.user);
+          setPassword(saved.password ?? "");
+          setRememberPassword(!!saved.rememberPassword);
+          setAutoConnect(!!saved.autoConnect);
+          if (saved.kind === "sftp") {
+            setAuthMode(saved.authMode ?? "password");
+            setPrivateKeyPath(saved.privateKeyPath ?? "");
+          }
+          if (saved.kind === "smb") {
+            setSmbShare(saved.share ?? "");
+            setSmbDomain(saved.domain ?? "");
+          }
+          setSelectedDraftId(saved.id);
+        }
+      }
+    }
+  }
+
+  // Async half of the seed: keychain capability probe +, in edit
+  // mode, the stored password (keychain wins over plaintext legacy —
+  // pre-0.2.306 entries still load via `saved.password` above).
   useEffect(() => {
     if (!open || !request) return;
-    setScheme(request.scheme);
-    setHost(request.host);
-    setPort(request.port ?? (request.scheme === "sftp" ? 22 : request.scheme === "smb" ? 445 : 21));
-    setUser(request.user ?? (request.scheme === "ftp" ? "anonymous" : ""));
-    setPassword(request.scheme === "ftp" ? "anonymous@" : "");
-    setAuthMode("password");
-    setPrivateKeyPath("");
-    setPrivateKeyPassphrase("");
-    // SMB-specific: try to pre-fill share from the typed remote
-    // path's first segment (`smb://host/share/...`). Strip the leading
-    // slash + take the first chunk. Empty stays empty so the field
-    // is editable.
-    if (request.scheme === "smb" && request.remotePath) {
-      const trimmed = request.remotePath.replace(/^\/+/, "");
-      const firstSlash = trimmed.indexOf("/");
-      setSmbShare(firstSlash >= 0 ? trimmed.slice(0, firstSlash) : trimmed);
-    } else {
-      setSmbShare("");
-    }
-    setSmbDomain("");
-    setSmbShareOptions([]);
-    setSmbShareLoading(false);
-    setRememberPassword(false);
-    setAutoConnect(false);
-    setSelectedDraftId(null);
-    setShowPassword(false);
-    setShowPassphrase(false);
-    setError(null);
-    setBusy(false);
-    // Probe the OS keychain once per dialog open. Cheap (a single
-    // sentinel get_password) and lets the storage-target decision +
-    // helper text run synchronously off `keychainAvailable` from
-    // here on.
     void credsCapable()
       .then((ok) => setKeychainAvailable(!!ok))
       .catch(() => setKeychainAvailable(false));
-    // Edit mode — pre-fill every field from the saved entry. We do
-    // this after the request-default seeding above so the saved
-    // values win for fields the request didn't carry. The id is
-    // tracked via `selectedDraftId` so the connect flow knows to
-    // update-in-place vs. insert.
     if (editingConnectionId) {
       const saved = settings.connections.find((c) => c.id === editingConnectionId);
       if (saved) {
-        setScheme(saved.kind);
-        setHost(saved.host);
-        setPort(saved.port);
-        setUser(saved.user);
-        setRememberPassword(!!saved.rememberPassword);
-        setAutoConnect(!!saved.autoConnect);
-        // Keychain wins when present — pre-0.2.306 plaintext entries
-        // still load via `saved.password` so existing data keeps
-        // working. Either path triggers the password field's
-        // pre-fill.
         void credsLoad(saved.id, "auth")
           .then((kc) => setPassword(kc ?? saved.password ?? ""))
           .catch(() => setPassword(saved.password ?? ""));
-        if (saved.kind === "sftp") {
-          setAuthMode(saved.authMode ?? "password");
-          setPrivateKeyPath(saved.privateKeyPath ?? "");
-        }
-        if (saved.kind === "smb") {
-          setSmbShare(saved.share ?? "");
-          setSmbDomain(saved.domain ?? "");
-        }
-        setSelectedDraftId(saved.id);
       }
     }
-  }, [open, request, editingConnectionId, settings.connections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per seedKey flip; sync seeding happened during render
+  }, [seedKey]);
 
   /** Manually trigger the SMB share-list probe with the form's
    *  current host / user / password / port / domain. Fires
@@ -347,6 +365,7 @@ export default function RemoteConnectDialog({
   useEffect(() => {
     setSmbShareOptions([]);
     setSmbShareLoading(false);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- deps are the change triggers; the reset intentionally reads none of them.
   }, [scheme, host, port, user, password, smbDomain]);
 
   const matches = useMemo(() => {

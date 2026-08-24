@@ -28,6 +28,8 @@ import { readBase64 } from "../../api/client";
 import type { Entry } from "../../api/fs";
 import { mimeForPath } from "../../util/mime";
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
 interface Props {
   entry: Entry;
   mode?: "inline" | "modal";
@@ -42,7 +44,6 @@ function formatTime(t: number): string {
   const s = total % 60;
   const m = Math.floor(total / 60) % 60;
   const h = Math.floor(total / 3600);
-  const pad = (n: number) => String(n).padStart(2, "0");
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
@@ -63,13 +64,21 @@ export default function MediaBody({ entry, mode = "inline" }: Props) {
   const [scrubbing, setScrubbing] = useState<boolean>(false);
   const [scrubTime, setScrubTime] = useState<number>(0);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Reset playback state the moment the target entry changes
+  // (render-adjust — stale media state never paints).
+  const entryPath = entry.path;
+  const [prevMediaPath, setPrevMediaPath] = useState<string | null>(null);
+  if (entryPath !== prevMediaPath) {
+    setPrevMediaPath(entryPath);
     setSrc(null);
     setError(null);
     setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     readBase64(entry.path)
       .then((b64) => {
         if (cancelled) return;
@@ -117,6 +126,7 @@ export default function MediaBody({ entry, mode = "inline" }: Props) {
       el.removeEventListener("pause", onPause);
       el.removeEventListener("error", onError);
     };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- re-attach on src/scrubbing flips so handlers capture fresh guards.
   }, [src, scrubbing]);
 
   // Apply controlled volume + muted to the underlying element.
@@ -125,6 +135,7 @@ export default function MediaBody({ entry, mode = "inline" }: Props) {
     if (!el) return;
     el.volume = volume;
     el.muted = muted;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- src swap re-applies volume/muted to the new element.
   }, [volume, muted, src]);
 
   if (error) {

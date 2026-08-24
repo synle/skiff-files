@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useSettings } from "../state/settings";
 
 interface Props {
@@ -83,14 +83,17 @@ export default function QuickJump({ open, onClose, onJump, home }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Reset query + highlight every time the palette re-opens. A stale
-  // query would leak between sessions.
-  useEffect(() => {
+  // Reset query + highlight every time the palette re-opens (render-
+  // adjust pattern — no cascading effect commit). A stale query would
+  // leak between sessions.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setQuery("");
       setHighlightIdx(0);
     }
-  }, [open]);
+  }
 
   const items = useMemo(
     () => buildItems(settings.bookmarks, settings.recentPaths, home),
@@ -106,10 +109,11 @@ export default function QuickJump({ open, onClose, onJump, home }: Props) {
     );
   }, [items, query]);
 
-  // Keep the highlight in bounds as the filter shrinks the list.
-  useEffect(() => {
-    if (highlightIdx >= filtered.length) setHighlightIdx(0);
-  }, [filtered.length, highlightIdx]);
+  // Keep the highlight in bounds as the filter shrinks the list
+  // (render-adjust — derived clamp).
+  if (highlightIdx >= filtered.length && highlightIdx !== 0) {
+    setHighlightIdx(0);
+  }
 
   return (
     <Dialog

@@ -345,11 +345,16 @@ function KeyRecorderDialog({
   onCommit: (combo: string) => void;
 }) {
   const [captured, setCaptured] = useState<string | null>(null);
+  // Clear the captured combo when the dialog closes (render-adjust —
+  // no stale combo on next open, no cascading effect).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (!open) setCaptured(null);
+  }
+
   useEffect(() => {
-    if (!open) {
-      setCaptured(null);
-      return;
-    }
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
@@ -449,6 +454,13 @@ function CrashReportingBlock() {
   );
 }
 
+function fmtBytes(b: number): string {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 /** Settings → Advanced widget for the SQLite-backed thumbnail
  *  cache (added 0.2.245). Shows the live row count + on-disk byte
  *  size and offers a "Clear cache" button. The fetch is best-
@@ -470,14 +482,12 @@ function ThumbnailCacheBlock() {
         setUnavailable(true);
       });
   };
+  // Mount-only probe by design — refresh() captures dialog-local
+  // state; re-running on every render would churn the check.
   useEffect(() => {
     refresh();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const fmtBytes = (b: number): string => {
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
-  };
   return (
     <Box>
       <Typography variant="body2" sx={{ mb: 0.5 }}>
@@ -618,53 +628,20 @@ function CustomFileKindsEditor() {
   );
 }
 
-/** Settings → Saved data widget. Lists each saved-X type
- *  (workspaces, selection groups, searches) with rename + delete
- *  buttons. Closes the management gap — without this, deleting
- *  workspaces or selections has no UI surface, and renaming any
- *  is impossible after creation. */
-function SavedDataEditor() {
-  const { settings, update } = useSettings();
-
-  const renameItem = <
-    K extends "tabWorkspaces" | "savedSelections" | "savedSearches" | "savedSyncJobs",
-  >(
-    key: K,
-    id: string,
-    current: string,
-  ) => {
-    const next = window.prompt("Rename:", current);
-    if (next === null) return; // user cancelled
-    const trimmed = next.trim();
-    if (!trimmed) return;
-    const list = settings[key] as Array<{ id: string; label: string }>;
-    update(key, list.map((x) => (x.id === id ? { ...x, label: trimmed } : x)) as Settings[K]);
-  };
-  const deleteItem = <
-    K extends "tabWorkspaces" | "savedSelections" | "savedSearches" | "savedSyncJobs",
-  >(
-    key: K,
-    id: string,
-    label: string,
-  ) => {
-    if (!window.confirm(`Delete "${label}"?`)) return;
-    const list = settings[key] as Array<{ id: string }>;
-    update(key, list.filter((x) => x.id !== id) as Settings[K]);
-  };
-
-  const Block = ({
-    title,
-    items,
-    onRename,
-    onDelete,
-    secondary,
-  }: {
-    title: string;
-    items: Array<{ id: string; label: string }>;
-    onRename: (id: string, current: string) => void;
-    onDelete: (id: string, label: string) => void;
-    secondary?: (item: { id: string; label: string }) => string;
-  }) => (
+function SavedDataBlock({
+  title,
+  items,
+  onRename,
+  onDelete,
+  secondary,
+}: {
+  title: string;
+  items: Array<{ id: string; label: string }>;
+  onRename: (id: string, current: string) => void;
+  onDelete: (id: string, label: string) => void;
+  secondary?: (item: { id: string; label: string }) => string;
+}) {
+  return (
     <Box>
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
         {title}
@@ -716,10 +693,45 @@ function SavedDataEditor() {
       )}
     </Box>
   );
+}
+
+/** Settings → Saved data widget. Lists each saved-X type
+ *  (workspaces, selection groups, searches) with rename + delete
+ *  buttons. Closes the management gap — without this, deleting
+ *  workspaces or selections has no UI surface, and renaming any
+ *  is impossible after creation. */
+function SavedDataEditor() {
+  const { settings, update } = useSettings();
+
+  const renameItem = <
+    K extends "tabWorkspaces" | "savedSelections" | "savedSearches" | "savedSyncJobs",
+  >(
+    key: K,
+    id: string,
+    current: string,
+  ) => {
+    const next = window.prompt("Rename:", current);
+    if (next === null) return; // user cancelled
+    const trimmed = next.trim();
+    if (!trimmed) return;
+    const list = settings[key] as Array<{ id: string; label: string }>;
+    update(key, list.map((x) => (x.id === id ? { ...x, label: trimmed } : x)) as Settings[K]);
+  };
+  const deleteItem = <
+    K extends "tabWorkspaces" | "savedSelections" | "savedSearches" | "savedSyncJobs",
+  >(
+    key: K,
+    id: string,
+    label: string,
+  ) => {
+    if (!window.confirm(`Delete "${label}"?`)) return;
+    const list = settings[key] as Array<{ id: string }>;
+    update(key, list.filter((x) => x.id !== id) as Settings[K]);
+  };
 
   return (
     <Stack spacing={2}>
-      <Block
+      <SavedDataBlock
         title={`Tab workspaces (${settings.tabWorkspaces.length})`}
         items={settings.tabWorkspaces}
         onRename={(id, current) => renameItem("tabWorkspaces", id, current)}
@@ -729,7 +741,7 @@ function SavedDataEditor() {
           return ws ? `${ws.tabs.length} tab${ws.tabs.length === 1 ? "" : "s"}` : "";
         }}
       />
-      <Block
+      <SavedDataBlock
         title={`Selection groups (${settings.savedSelections.length})`}
         items={settings.savedSelections}
         onRename={(id, current) => renameItem("savedSelections", id, current)}
@@ -739,7 +751,7 @@ function SavedDataEditor() {
           return sel ? `${sel.paths.length} path${sel.paths.length === 1 ? "" : "s"}` : "";
         }}
       />
-      <Block
+      <SavedDataBlock
         title={`Saved sync-job templates (${settings.savedSyncJobs.length})`}
         items={settings.savedSyncJobs}
         onRename={(id, current) => renameItem("savedSyncJobs", id, current)}
@@ -750,7 +762,7 @@ function SavedDataEditor() {
           return `${j.src} → ${j.dest} · ${j.conflictPolicy}`;
         }}
       />
-      <Block
+      <SavedDataBlock
         title={`Saved searches (${settings.savedSearches.length})`}
         items={settings.savedSearches}
         onRename={(id, current) => renameItem("savedSearches", id, current)}
@@ -814,11 +826,12 @@ function compareVersions(a: string, b: string): number {
  * the Version and Latest rows line up visually. Returns null for null
  * / malformed inputs so the caller can omit the timestamp gracefully.
  */
+const pad = (n: number) => n.toString().padStart(2, "0");
+
 function formatReleaseTimestamp(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  const pad = (n: number) => n.toString().padStart(2, "0");
   return (
     `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
     `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
@@ -957,13 +970,20 @@ export default function SettingsPage() {
       .catch(() => setBuiltAt(""));
   }, []);
 
+  // Flip to "checking" as soon as `version` becomes usable
+  // (render-adjust — the badge never shows a stale status).
+  const [prevVersion, setPrevVersion] = useState(version);
+  if (version !== prevVersion) {
+    setPrevVersion(version);
+    if (version !== "unknown") setLatestStatus("checking");
+  }
+
   useEffect(() => {
     // Fire-and-forget the GH release check. `version` arrives async, so
     // re-run once it lands. Skip while still "unknown" — we'd compare
     // garbage and report bogus status.
     if (version === "unknown") return;
     let cancelled = false;
-    setLatestStatus("checking");
     void fetchLatestRelease().then((rel) => {
       if (cancelled) return;
       if (!rel) {

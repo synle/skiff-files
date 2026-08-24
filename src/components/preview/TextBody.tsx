@@ -112,18 +112,24 @@ export default function TextBody({ entry, mode = "inline" }: Props) {
   // the virtualized branch records per-line element refs lazily.
   const contentRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Reset content + search state when the target file changes
+  // (render-adjust — the loading frame paints with the keystroke of
+  // navigation). Markdown toggle persists across files by design;
+  // font zoom only resets on remount.
+  const filePath = entry.path;
+  const [prevFilePath, setPrevFilePath] = useState<string | null>(null);
+  if (filePath !== prevFilePath) {
+    setPrevFilePath(filePath);
     setText(null);
     setError(null);
     setCopyState("idle");
-    // Reset search state on selection change so a stale query from
-    // the previous file doesn't surface fake "0 matches" copy.
     setQuery("");
     setSearchOpen(false);
     setActiveHit(0);
-    // Markdown toggle persists across files — most users want one
-    // mode across the session. Only reset font zoom on first mount.
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     readText(entry.path)
       .then((t) => !cancelled && setText(t))
       .catch((e) => !cancelled && setError(String(e)));
@@ -145,14 +151,10 @@ export default function TextBody({ entry, mode = "inline" }: Props) {
 
   // Clamp active hit when the matches list shrinks (user typed past
   // the end of a query — `n of 0` is the right read but `activeHit`
-  // would otherwise dangle).
-  useEffect(() => {
-    if (matches.length === 0) {
-      if (activeHit !== 0) setActiveHit(0);
-    } else if (activeHit >= matches.length) {
-      setActiveHit(0);
-    }
-  }, [matches.length, activeHit]);
+  // would otherwise dangle). Render-adjust clamp.
+  if (activeHit > 0 && activeHit >= matches.length) {
+    setActiveHit(0);
+  }
 
   if (error) {
     return (
@@ -609,6 +611,7 @@ function InlineTextView({ text, language, matches, activeHit, fontPx }: InlineTe
     if (el && "scrollIntoView" in el) {
       (el as HTMLElement).scrollIntoView({ block: "nearest" });
     }
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- activeHit is the scroll trigger even though the body only touches the container.
   }, [activeHit, matches.length]);
 
   return (
@@ -799,7 +802,7 @@ export function overlayMatchesInLine(
   let cursor = 0;
   // Hits are appended in match-list order; sort by start to be safe
   // against future caller changes.
-  const sorted = [...hits].sort((a, b) => a[0] - b[0]);
+  const sorted = hits.toSorted((a, b) => a[0] - b[0]);
   for (const [start, end, idx] of sorted) {
     if (start > cursor) parts.push(escapeHtml(line.slice(cursor, start)));
     const cls = idx === activeHit ? "skiff-search-hit skiff-search-hit-active" : "skiff-search-hit";

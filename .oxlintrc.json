@@ -8,12 +8,35 @@
   "plugins": ["unicorn", "typescript", "react"],
   "rules": {
     "react/react-in-jsx-scope": "off",
-    "react/set-state-in-effect": "warn",
-    "react/static-components": "warn",
-    "react/no-unstable-nested-components": "warn",
-    "react/refs": "warn",
-    "react-hooks/exhaustive-deps": "warn",
-    "react/immutability": "warn"
+    "eslint/no-underscore-dangle": [
+      "warn",
+      {
+        "allow": [
+          "_resetFolderSizeCacheForTests",
+          "_resetTrashStackForTests",
+          "__testing__",
+          "__persistProbe"
+        ],
+        "allowFunctionParams": true
+      }
+    ],
+    "react/no-unstable-nested-components": [
+      "error",
+      {
+        "allowAsProps": true
+      }
+    ]
   },
+  "overrides": [
+    {
+      "files": ["*.test.ts", "*.test.tsx"],
+      "rules": {
+        "unicorn/consistent-function-scoping": "off",
+        "eslint/no-shadow": "off",
+        "eslint/no-unmodified-loop-condition": "off",
+        "eslint/no-await-in-loop": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["dist/", "coverage/", "src-tauri/target/"]
 }

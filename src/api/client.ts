@@ -315,9 +315,11 @@ export async function removeOrTrashMany(paths: string[]): Promise<void> {
     }
   }
   if (local.length) await fsTrashMany(local);
+  // oxlint-disable-next-line eslint/no-await-in-loop -- serial remote deletes keep per-server load predictable
   for (const r of remote) await connRemove(r.id, r.remotePath);
 }
 
+// oxlint-disable-next-line eslint/no-await-in-loop -- sequential by design — serial ops keep per-server load predictable
 /** Permanently delete a multi-path selection. Bypasses OS trash. Local
  *  paths use `fs_remove` (recursive); remote paths route through
  *  `conn_remove`. The caller should confirm with destructive wording
@@ -326,9 +328,12 @@ export async function permanentlyDeleteMany(paths: string[]): Promise<void> {
   for (const p of paths) {
     const loc = parseLocation(p);
     if (isConnectionBacked(loc)) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- destructive op: strict per-path ordering keeps failure handling simple
       await connRemove(loc.backend.connectionId, loc.remotePath);
     } else {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- module resolves from cache after first loop pass
       const { fsRemove } = await import("./fs");
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same per-path ordering as the remote arm
       await fsRemove(p);
     }
   }

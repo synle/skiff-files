@@ -808,7 +808,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.bookmarks].sort((a, b) =>
+                        const sorted = settings.bookmarks.toSorted((a, b) =>
                           a.label.localeCompare(b.label, undefined, {
                             sensitivity: "base",
                             numeric: true,
@@ -1037,7 +1037,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.tabWorkspaces].sort((a, b) =>
+                        const sorted = settings.tabWorkspaces.toSorted((a, b) =>
                           a.label.localeCompare(b.label, undefined, {
                             sensitivity: "base",
                             numeric: true,
@@ -1180,7 +1180,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.savedSearches].sort((a, b) =>
+                        const sorted = settings.savedSearches.toSorted((a, b) =>
                           a.label.localeCompare(b.label, undefined, {
                             sensitivity: "base",
                             numeric: true,
@@ -1313,7 +1313,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.savedSyncJobs].sort((a, b) =>
+                        const sorted = settings.savedSyncJobs.toSorted((a, b) =>
                           a.label.localeCompare(b.label, undefined, {
                             sensitivity: "base",
                             numeric: true,
@@ -1458,7 +1458,7 @@ export default function Sidebar({ home, page, onSwitchPage, onNavigate }: Props)
                     <IconButton
                       size="small"
                       onClick={() => {
-                        const sorted = [...settings.savedSelections].sort((a, b) =>
+                        const sorted = settings.savedSelections.toSorted((a, b) =>
                           a.label.localeCompare(b.label, undefined, {
                             sensitivity: "base",
                             numeric: true,

@@ -22,7 +22,6 @@ const COPY_SUFFIX_RE = /-copy-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}(?:-\d+)?$/;
 /** Format `Date` as `YYYY-MM-DD-HH-MM`. Local time — users expect
  *  the timestamp to match what their wall clock says. */
 function formatStamp(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
   return [
     d.getFullYear(),
     pad(d.getMonth() + 1),
@@ -42,6 +41,8 @@ function splitExt(name: string): { stem: string; ext: string } {
 
 /** Build the duplicate name. `isDir = true` skips the extension
  *  split entirely. `now` lets tests inject a fixed clock. */
+const pad = (n: number) => String(n).padStart(2, "0");
+
 export function duplicateName(source: string, options?: { isDir?: boolean; now?: Date }): string {
   const isDir = options?.isDir ?? false;
   const now = options?.now ?? new Date();

@@ -197,7 +197,7 @@ function sortEntries(
     }
   };
   if (!groupFoldersFirst) {
-    return [...entries].sort(cmp);
+    return entries.toSorted(cmp);
   }
   const groups = { dirs: [] as Entry[], files: [] as Entry[] };
   for (const e of entries) {
@@ -299,6 +299,9 @@ function RenameInput({
   // setSelectionRange in a useLayoutEffect fires before paint so the
   // user never sees the full-name selection flash.
   const ref = useRef<HTMLInputElement>(null);
+  // Focus + pre-select the stem when the input mounts. The effect
+  // re-runs only if the target entry changes (which remounts the
+  // editor anyway), so this stays a mount-time behavior.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -315,7 +318,7 @@ function RenameInput({
       }
     }
     el.select();
-  }, []);
+  }, [entry.isDir, entry.name]);
   return (
     <input
       ref={ref}
@@ -1227,11 +1230,14 @@ export default function FileList(props: Props) {
     path,
     onRename,
   } = props;
-  const colWidth = {
-    size: columnWidths.size ?? 96,
-    modified: columnWidths.modified ?? 180,
-    kind: columnWidths.kind ?? 120,
-  };
+  const colWidth = useMemo(
+    () => ({
+      size: columnWidths.size ?? 96,
+      modified: columnWidths.modified ?? 180,
+      kind: columnWidths.kind ?? 120,
+    }),
+    [columnWidths.size, columnWidths.modified, columnWidths.kind],
+  );
 
   /** Build a mousedown handler for the column-resize handle of one
    *  column. Captures the starting width + clientX so mousemove can
@@ -1274,20 +1280,20 @@ export default function FileList(props: Props) {
    *  via `folderSizeCache` so a second hover is instant. */
   const [folderSizes, setFolderSizes] = useState<Record<string, number>>({});
   const folderHoverTimer = useRef<number | null>(null);
-  const armFolderHover = useCallback((path: string, isDir: boolean) => {
+  const armFolderHover = useCallback((entryPath: string, isDir: boolean) => {
     if (!isDir) return;
     if (folderHoverTimer.current != null) {
       clearTimeout(folderHoverTimer.current);
     }
-    const cached = getCachedFolderSize(path);
+    const cached = getCachedFolderSize(entryPath);
     if (cached) {
-      setFolderSizes((m) => ({ ...m, [path]: cached.totalSize }));
+      setFolderSizes((m) => ({ ...m, [entryPath]: cached.totalSize }));
       return;
     }
     folderHoverTimer.current = window.setTimeout(() => {
-      void fetchFolderSize(path)
+      void fetchFolderSize(entryPath)
         .then((s) => {
-          setFolderSizes((m) => ({ ...m, [path]: s.totalSize }));
+          setFolderSizes((m) => ({ ...m, [entryPath]: s.totalSize }));
         })
         .catch(() => {
           /* permissions / disconnected sftp / etc. — silently skip */
@@ -1861,11 +1867,11 @@ export default function FileList(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listDragRect != null, view, rowH, sorted]);
 
-  const toggleSel = (path: string, additive: boolean) => {
+  const toggleSel = (selPath: string, additive: boolean) => {
     setSelected((prev) => {
       const next = new Set(additive ? prev : []);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
+      if (next.has(selPath)) next.delete(selPath);
+      else next.add(selPath);
       return next;
     });
   };

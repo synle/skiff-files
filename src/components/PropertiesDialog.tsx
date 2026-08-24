@@ -52,10 +52,18 @@ export default function PropertiesDialog({ entry, onClose }: Props) {
   const [sha256, setSha256] = useState<string | null>(null);
   const [hashing, setHashing] = useState(false);
 
-  useEffect(() => {
+  // Reset derived stats when the target entry changes (render-adjust
+  // — the "—" placeholders paint with the first commit).
+  const entryPath = entry?.path ?? null;
+  const [prevEntryPath, setPrevEntryPath] = useState<string | null>(null);
+  if (entryPath !== prevEntryPath) {
+    setPrevEntryPath(entryPath);
     setSummary(null);
     setSha256(null);
     setHashing(false);
+  }
+
+  useEffect(() => {
     if (!entry?.isDir) return;
     let cancelled = false;
     void dirSummary(entry.path)

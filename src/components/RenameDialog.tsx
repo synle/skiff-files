@@ -16,7 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface Props {
   open: boolean;
@@ -57,14 +57,19 @@ export default function RenameDialog({
   const [error, setError] = useState<string | null>(null);
 
   // Reset state on every open so a previous error / draft doesn't
-  // bleed into the next rename.
-  useEffect(() => {
+  // bleed into the next rename. Done via the React-documented
+  // "adjust state when a prop changes" render pattern (not an
+  // effect) so the reset lands without an extra commit.
+  const [prevResetKey, setPrevResetKey] = useState<string | null>(null);
+  const resetKey = open ? originalName : null;
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
     if (open) {
       setName(originalName);
       setError(null);
       setBusy(false);
     }
-  }, [open, originalName]);
+  }
 
   const trimmed = name.trim();
   const collides = trimmed.length > 0 && trimmed !== originalName && !!existingNames?.has(trimmed);

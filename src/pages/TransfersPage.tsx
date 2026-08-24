@@ -224,10 +224,10 @@ export default function TransfersPage() {
     const onRun = (e: Event) => {
       const detail = (e as CustomEvent<string | { id: string; dryRun?: boolean }>).detail;
       const id = typeof detail === "string" ? detail : detail?.id;
-      const dryRun = typeof detail === "string" ? false : !!detail?.dryRun;
+      const eventDryRun = typeof detail === "string" ? false : !!detail?.dryRun;
       if (!id) return;
       const job = (settings.savedSyncJobs as SavedJob[]).find((j) => j.id === id);
-      if (job) void handleRunSavedJob(job, dryRun);
+      if (job) void handleRunSavedJob(job, eventDryRun);
     };
     window.addEventListener("skiff:run-sync-job", onRun);
     return () => window.removeEventListener("skiff:run-sync-job", onRun);
@@ -351,7 +351,7 @@ export default function TransfersPage() {
   /** Fills the form with a saved job's values + starts it immediately.
    *  Skips the form-fill if the user just wants to inspect — that path
    *  is the click on the row itself. */
-  const handleRunSavedJob = async (j: SavedJob, dryRun = false) => {
+  const handleRunSavedJob = async (j: SavedJob, eventDryRun = false) => {
     setSrc(j.src);
     setDest(j.dest);
     setPlanner(j.planner);
@@ -366,7 +366,7 @@ export default function TransfersPage() {
         maxSizeGb: j.maxSizeGb,
         lookbackDays: j.lookbackDays,
         conflictPolicy: j.conflictPolicy,
-        dryRun,
+        dryRun: eventDryRun,
         // Saved jobs predate the bandwidth field; fall back to the
         // current Settings default rather than 0 so existing saves
         // honor the user's current cap.
@@ -386,7 +386,7 @@ export default function TransfersPage() {
     }
   };
 
-  const jobList = Object.values(jobs).sort((a, b) => a.info.id.localeCompare(b.info.id));
+  const jobList = Object.values(jobs).toSorted((a, b) => a.info.id.localeCompare(b.info.id));
 
   return (
     <Box sx={{ flex: 1, p: 3, overflow: "auto" }}>

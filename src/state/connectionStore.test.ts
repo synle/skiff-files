@@ -159,7 +159,7 @@ describe("migrateLegacyDrafts — idempotency (Bug 13)", () => {
     // must NOT double up. Dedup is by `{kind, host, port, user}`.
     const second = migrateLegacyDrafts(first);
     expect(second).toHaveLength(2);
-    const ids = second.map((c) => c.id).sort();
+    const ids = second.map((c) => c.id).toSorted();
     expect(ids).toEqual(["legacy-ftp", "legacy-sftp"]);
   });
 

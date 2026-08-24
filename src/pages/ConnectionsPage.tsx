@@ -78,11 +78,11 @@ export default function ConnectionsPage() {
 
   /** TOFU-pinned host fingerprints. Refreshed alongside live state. */
   const [knownHosts, setKnownHosts] = useState<KnownHostEntry[]>([]);
-  const refreshKnownHosts = () => {
+  const refreshKnownHosts = useCallback(() => {
     connKnownHostsList()
       .then(setKnownHosts)
       .catch(() => setKnownHosts([]));
-  };
+  }, []);
 
   /** Pull live sessions from Rust. Does NOT broadcast
    *  `skiff:connections-changed` — that event is dispatched by the
@@ -101,6 +101,9 @@ export default function ConnectionsPage() {
   }, []);
 
   useEffect(() => {
+    // False positive: refreshLive is async — its setState calls all
+    // run after `await`, never during this effect tick.
+    // oxlint-disable-next-line react/set-state-in-effect
     void refreshLive();
     refreshKnownHosts();
     // Re-pull whenever some other surface fires the event (e.g. the
@@ -108,7 +111,7 @@ export default function ConnectionsPage() {
     const onChange = () => void refreshLive();
     window.addEventListener("skiff:connections-changed", onChange);
     return () => window.removeEventListener("skiff:connections-changed", onChange);
-  }, [refreshLive]);
+  }, [refreshLive, refreshKnownHosts]);
 
   /** Index of live sessions by id — O(1) lookup while rendering rows. */
   const liveById = useMemo(() => new Map(live.map((c) => [c.id, c])), [live]);

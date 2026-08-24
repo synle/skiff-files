@@ -2,6 +2,8 @@
 // dialog. Pure functions, no React — kept here so they can be unit-tested
 // without spinning up Testing Library.
 
+const pad = (n: number) => n.toString().padStart(2, "0");
+
 /** Human-readable byte size. Picks the largest unit where the value is < 1024. */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";
@@ -44,7 +46,6 @@ export function formatMtimeAs(
     case "iso":
       return d.toISOString().replace("T", " ").slice(0, 19);
     case "short": {
-      const pad = (n: number) => n.toString().padStart(2, "0");
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
     case "relative":

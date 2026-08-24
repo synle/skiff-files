@@ -14,7 +14,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface Props {
   open: boolean;
@@ -63,15 +63,19 @@ export default function NewEntryDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset state on every open so a previous error / draft doesn't
-  // bleed into the next create.
-  useEffect(() => {
+  // Reset state on every open (render-adjust pattern — see
+  // RenameDialog) so a previous error / draft doesn't bleed into
+  // the next create.
+  const [prevResetKey, setPrevResetKey] = useState<string | null>(null);
+  const resetKey = open ? defaultName : null;
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
     if (open) {
       setName(defaultName);
       setError(null);
       setBusy(false);
     }
-  }, [open, defaultName]);
+  }
 
   const trimmed = name.trim();
   const collides = trimmed.length > 0 && existingNames.has(trimmed);

@@ -60,8 +60,16 @@ export function resolveEffective(mode: ThemeMode): EffectiveMode {
 export function useEffectiveMode(mode: ThemeMode): EffectiveMode {
   const [effective, setEffective] = useState<EffectiveMode>(() => resolveEffective(mode));
 
-  useEffect(() => {
+  // Re-resolve when the user changes the mode (render-adjust pattern —
+  // no cascading effect commit). The OS-theme listener below stays an
+  // effect: matchMedia is a genuine external system.
+  const [prevMode, setPrevMode] = useState(mode);
+  if (mode !== prevMode) {
+    setPrevMode(mode);
     setEffective(resolveEffective(mode));
+  }
+
+  useEffect(() => {
     if (mode !== "system") return;
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

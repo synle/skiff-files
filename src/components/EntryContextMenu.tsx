@@ -91,6 +91,27 @@ interface Props {
   pasteCount?: number;
 }
 
+/** Right-aligned shortcut hint for a menu item. Renders inside
+ *  the MenuItem next to the ListItemText so the user sees
+ *  "Rename… · F2". Tiny + monospace so it reads as a key, not a
+ *  label. Hoisted to module scope (pure — captures nothing). */
+function shortcut(label: string) {
+  return (
+    <Typography
+      variant="caption"
+      sx={{
+        ml: 2,
+        color: "text.disabled",
+        fontFamily: "monospace",
+        fontSize: "0.7rem",
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </Typography>
+  );
+}
+
 export default function EntryContextMenu({
   state,
   onClose,
@@ -119,24 +140,6 @@ export default function EntryContextMenu({
 }: Props) {
   const isRemote = state?.entry.path.startsWith("sftp://") ?? false;
   const open = state != null;
-  /** Right-aligned shortcut hint for a menu item. Renders inside
-   *  the MenuItem next to the ListItemText so the user sees
-   *  "Rename… · F2". Tiny + monospace so it reads as a key, not a
-   *  label. */
-  const shortcut = (label: string) => (
-    <Typography
-      variant="caption"
-      sx={{
-        ml: 2,
-        color: "text.disabled",
-        fontFamily: "monospace",
-        fontSize: "0.7rem",
-        flexShrink: 0,
-      }}
-    >
-      {label}
-    </Typography>
-  );
   return (
     <Menu
       open={open}

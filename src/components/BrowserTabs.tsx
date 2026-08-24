@@ -71,6 +71,21 @@ function labelFor(path: string): string {
   return segs[segs.length - 1] ?? path;
 }
 
+/** Close the OS window via the Tauri window API. No-ops outside
+ *  Tauri — browser-dev / Vitest mock the module silently. Used by
+ *  Cmd/Ctrl+Q and by the "no tabs left" branch of Cmd/Ctrl+W:
+ *  closing the last tab is the browser-convention trigger for
+ *  closing the window. Hoisted to module scope (pure — captures
+ *  nothing). */
+async function closeWindow(): Promise<void> {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().close();
+  } catch {
+    /* outside Tauri — no-op */
+  }
+}
+
 export default function BrowserTabs({ home, pane = "main", isFocusedPane = true }: Props) {
   // Seed tabs from persisted settings. Empty saved list → spawn the
   // default Home tab. Settings is also our write-back target so the
@@ -389,7 +404,7 @@ export default function BrowserTabs({ home, pane = "main", isFocusedPane = true 
         // Browser muscle memory: Cmd/Ctrl+Shift+[ / ] cycles between
         // tabs. Wraps at the ends. Distinct from plain Cmd+[/] which
         // is back/forward inside a tab's history.
-        const idx = tabs.findIndex((t) => t.id === activeId);
+        const idx = tabs.findIndex((tab) => tab.id === activeId);
         if (idx >= 0 && tabs.length > 1) {
           e.preventDefault();
           const isPrev = matchesCombo(
@@ -436,14 +451,6 @@ export default function BrowserTabs({ home, pane = "main", isFocusedPane = true 
    *  no-op. Used by Cmd/Ctrl+Q and by the "no tabs left" branch of
    *  Cmd/Ctrl+W: closing the last tab is the browser-convention
    *  trigger for closing the window. */
-  const closeWindow = async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      await getCurrentWindow().close();
-    } catch {
-      /* outside Tauri — no-op */
-    }
-  };
 
   const closeTab = (id: string) => {
     let shouldCloseWindow = false;

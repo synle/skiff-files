@@ -126,8 +126,10 @@ export async function runPaste(
 
   for (const src of clipboard.paths) {
     try {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- serial dispatch is the documented paste contract (one drawer row at a time)
       const meta = await deps.stat(src);
       const dest = meta.isDir ? `${destFolder}/${meta.name}` : destFolder;
+      // oxlint-disable-next-line eslint/no-await-in-loop -- serial dispatch is the documented paste contract (one drawer row at a time)
       const jobId = await deps.startSync(src, dest);
       jobIds.add(jobId);
       if (isCut) remoteCutPaths.push(src);
@@ -135,12 +137,14 @@ export async function runPaste(
       // Serial dispatch keeps the OperationsDrawer at one row at a
       // time and avoids the "60 stuck rows" pile-up the parallel
       // shape produced.
+      // oxlint-disable-next-line eslint/no-await-in-loop -- serial dispatch is the documented paste contract (one drawer row at a time)
       await waitForJob(jobId);
       // Refresh the destination after each file lands so the user
       // sees the listing grow as files arrive. Skipped when the
       // user has navigated away.
       if (deps.currentPath() === destFolder) {
         try {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- serial dispatch is the documented paste contract (one drawer row at a time)
           await deps.refresh(destFolder);
         } catch {
           /* tolerated */

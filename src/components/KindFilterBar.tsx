@@ -62,10 +62,13 @@ export const RECENCY_LABELS: Record<RecencyGroup, string> = {
   month: "This month",
 };
 
+/** Stable default so the prop keeps one identity across renders. */
+const NO_TAGS: import("../state/settings").TagColor[] = [];
+
 export default function KindFilterBar({
   active,
   onChange,
-  activeTags = [],
+  activeTags = NO_TAGS,
   onTagsChange,
   activeRecency = null,
   onRecencyChange,

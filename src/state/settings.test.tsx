@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import {
@@ -246,18 +247,19 @@ describe("persist effect dedup (regression for the cross-window loop)", () => {
     onReady: (api: { setSettings: (s: typeof DEFAULTS) => void; updateTheme: () => void }) => void;
   }) {
     const { settings, setSettings, update } = useSettings();
-    // Surface both APIs to the test the first time we render.
-    const surfaced = (typeof window !== "undefined" &&
+    // Surface both APIs to the test exactly once. The guard flag
+    // write happens inside an effect so we never mutate outer state
+    // during render.
+    useEffect(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__persistProbe) as boolean | undefined;
-    if (!surfaced) {
+      if ((window as any).__persistProbe) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__persistProbe = true;
       onReady({
         setSettings: (s) => setSettings(s),
         updateTheme: () => update("themeMode", "dark"),
       });
-    }
+    });
     return <div data-testid="theme">{settings.themeMode}</div>;
   }
 

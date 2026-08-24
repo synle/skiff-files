@@ -20,7 +20,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Entry } from "../api/fs";
 import { rename as clientRename } from "../api/client";
 import { applyBulkRename } from "../util/bulkRename";
@@ -50,8 +50,13 @@ export default function BulkRenameDialog({ entries, onClose, onDone }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   // Reset state every time the dialog re-opens with a new selection
-  // — last session's pattern shouldn't leak.
-  useEffect(() => {
+  // — last session's pattern shouldn't leak. Render-adjust pattern:
+  // the reset lands during the render that sees the new selection,
+  // no cascading effect commit.
+  const entriesKey = entries.map((e) => e.name).join("\u0000");
+  const [prevEntriesKey, setPrevEntriesKey] = useState(entriesKey);
+  if (entriesKey !== prevEntriesKey) {
+    setPrevEntriesKey(entriesKey);
     if (entries.length > 0) {
       setFind("");
       setReplace("");
@@ -64,7 +69,7 @@ export default function BulkRenameDialog({ entries, onClose, onDone }: Props) {
       setProgress(null);
       setError(null);
     }
-  }, [entries]);
+  }
 
   const results = useMemo(
     () =>
@@ -122,6 +127,7 @@ export default function BulkRenameDialog({ entries, onClose, onDone }: Props) {
       const parent = sep > 0 ? entry.path.slice(0, sep) : entry.path;
       const dest = `${parent}/${r.newName}`;
       try {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- renames apply one file at a time so progress + errors stay per-row accurate
         await clientRename(entry.path, dest);
       } catch (e) {
         setError(`${r.oldName} → ${r.newName}: ${e}`);

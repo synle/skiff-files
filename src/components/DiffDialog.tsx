@@ -43,11 +43,22 @@ export default function DiffDialog({ left, right, onClose }: Props) {
     error: null,
   });
 
+  // Clear stale content the moment open/paths change (render-adjust
+  // — the loading placeholder paints on the first commit instead of
+  // one effect later).
+  const [prevFetchKey, setPrevFetchKey] = useState<string | null>(null);
+  const fetchKey = open ? `${left}|${right}` : null;
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
+    if (open) {
+      setLeftFile({ text: null, error: null });
+      setRightFile({ text: null, error: null });
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setLeftFile({ text: null, error: null });
-    setRightFile({ text: null, error: null });
     void readText(left!)
       .then((t) => !cancelled && setLeftFile({ text: t, error: null }))
       .catch((e) => !cancelled && setLeftFile({ text: null, error: String(e) }));
@@ -98,6 +109,7 @@ export default function DiffDialog({ left, right, onClose }: Props) {
               const prefix = h.added ? "+" : h.removed ? "-" : " ";
               return (
                 <Box
+                  // oxlint-disable-next-line react/no-array-index-key -- diff hunks are positional by definition; the list never reorders
                   key={i}
                   component="pre"
                   sx={{
@@ -118,6 +130,7 @@ export default function DiffDialog({ left, right, onClose }: Props) {
                     // don't render a phantom blank line.
                     .filter((line, idx, arr) => !(idx === arr.length - 1 && line === ""))
                     .map((line, j) => (
+                      // oxlint-disable-next-line react/no-array-index-key -- line content may repeat inside a hunk; position is the identity
                       <Box key={j}>
                         {prefix} {line}
                       </Box>
