@@ -87,17 +87,17 @@ Shipped sections: Appearance (theme / accent / font size / language), Default vi
 
 ## Status snapshot (as of 0.2.316)
 
-| Phase                                 | Status     | Notes                                                                                                                                              |
-| ------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 — Scaffold & repo hygiene           | ✅ shipped | Branding + CI workflows + public repo                                                                                                              |
-| 1 — Core local file explorer          | ✅ shipped | Browse / mkdir / rename / remove / copy; virtualized list; light/dark/system theme; settings page                                                  |
-| 1.5 — Preview pane                    | ✅ shipped | All kinds via one `Body` dispatch: image (EXIF auto-orient), text (Prism highlight, search, zoom), markdown, PDF, audio/video, folder summary      |
-| 2 — Connection abstraction & SFTP     | ✅ shipped | `russh` backend, registry as Tauri State, Connections page, `sftp://` scheme, ssh-config import, known-hosts TOFU, ssh-agent auth                 |
-| 3 — FTP/FTPS + SMB                    | partial    | Plain FTP (0.2.246) + write ops (0.2.247); in-app SMB via pure-Rust `smb2` (0.2.265). Still pending: FTPS, FTP upload via Skiffsync.               |
-| 4 — Skiffsync (cpsync-inspired)       | ✅ shipped | Skip-if-unchanged, 9 conflict policies, dry-run, cancel/pause/resume, cross-protocol engine, `cpstamp`/`dedup`/`cprepo`, saved-job templates       |
-| 5 — NTFS mount support                | deferred   | Not started — optional, behind cargo feature flag                                                                                                 |
-| 6 — Polish, performance, distribution | partial    | Most polish items shipped under 0.2.x (see CHANGELOG). Still open: bundle-size budget audit, auto-updates.                                        |
-| 7 — Release pipeline                  | ✅ shipped | `build.yml`, `integration.yml`, `release-official.yml`, `release-beta.yml`, automerge; macOS arm64+x64 / Windows / Linux matrix                     |
+| Phase                                 | Status     | Notes                                                                                                                                         |
+| ------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Scaffold & repo hygiene           | ✅ shipped | Branding + CI workflows + public repo                                                                                                         |
+| 1 — Core local file explorer          | ✅ shipped | Browse / mkdir / rename / remove / copy; virtualized list; light/dark/system theme; settings page                                             |
+| 1.5 — Preview pane                    | ✅ shipped | All kinds via one `Body` dispatch: image (EXIF auto-orient), text (Prism highlight, search, zoom), markdown, PDF, audio/video, folder summary |
+| 2 — Connection abstraction & SFTP     | ✅ shipped | `russh` backend, registry as Tauri State, Connections page, `sftp://` scheme, ssh-config import, known-hosts TOFU, ssh-agent auth             |
+| 3 — FTP/FTPS + SMB                    | partial    | Plain FTP (0.2.246) + write ops (0.2.247); in-app SMB via pure-Rust `smb2` (0.2.265). Still pending: FTPS, FTP upload via Skiffsync.          |
+| 4 — Skiffsync (cpsync-inspired)       | ✅ shipped | Skip-if-unchanged, 9 conflict policies, dry-run, cancel/pause/resume, cross-protocol engine, `cpstamp`/`dedup`/`cprepo`, saved-job templates  |
+| 5 — NTFS mount support                | deferred   | Not started — optional, behind cargo feature flag                                                                                             |
+| 6 — Polish, performance, distribution | partial    | Most polish items shipped under 0.2.x (see CHANGELOG). Still open: bundle-size budget audit, auto-updates.                                    |
+| 7 — Release pipeline                  | ✅ shipped | `build.yml`, `integration.yml`, `release-official.yml`, `release-beta.yml`, automerge; macOS arm64+x64 / Windows / Linux matrix               |
 
 The per-patch shipping notes live in [`CHANGELOG.md`](./CHANGELOG.md). When you ship a new patch version, append the entry there.
 
@@ -187,19 +187,19 @@ These are tracked here so they don't get lost, but the user has asked that they 
 
 ## Tech Decisions (committed)
 
-| Decision           | Choice                                                           | Why                                                   |
-| ------------------ | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| Shell              | Tauri v2                                                         | Smallest bundles, native webview                      |
-| Sidecar            | None (raw template)                                              | All FS/SFTP/FTP/SMB clients have pure-Rust crates     |
-| Frontend           | React 19 + TS + MUI v9 + Vite 6                                  | Matches `display-dj` / `sqlui-native`                 |
-| Routing            | `HashRouter`                                                     | Required under `tauri://`                             |
-| State              | Zustand or React Context (no Redux)                              | Project is browser-shaped                             |
-| Virtualization     | `@tanstack/react-virtual`                                        | Smooth at 100k entries                                |
-| SFTP               | `russh` + `russh-sftp`                                           | Pure-Rust, no libssh2 C build pain                    |
-| FTP                | `suppaftp`                                                       | Async, FTPS-capable, maintained                       |
-| SMB                | `smb2`                                                           | Pure-Rust SMB 2/3 — no OS mount, no Samba install                     |
-| Watcher            | `notify`                                                         | Cross-platform standard                                               |
-| Credentials        | `keyring` crate                                                  | Native Keychain / Credential Manager / Secret Service                 |
-| Thumbnail cache    | `rusqlite`                                                       | Tiny, embedded                                                        |
-| Trash              | `trash` crate                                                    | Real OS trash on all 3 OSes                           |
-| Tests              | Vitest (frontend), `cargo test` (Rust), Playwright (e2e — later) | Matches sister repos                                  |
+| Decision        | Choice                                                           | Why                                                   |
+| --------------- | ---------------------------------------------------------------- | ----------------------------------------------------- |
+| Shell           | Tauri v2                                                         | Smallest bundles, native webview                      |
+| Sidecar         | None (raw template)                                              | All FS/SFTP/FTP/SMB clients have pure-Rust crates     |
+| Frontend        | React 19 + TS + MUI v9 + Vite 6                                  | Matches `display-dj` / `sqlui-native`                 |
+| Routing         | `HashRouter`                                                     | Required under `tauri://`                             |
+| State           | Zustand or React Context (no Redux)                              | Project is browser-shaped                             |
+| Virtualization  | `@tanstack/react-virtual`                                        | Smooth at 100k entries                                |
+| SFTP            | `russh` + `russh-sftp`                                           | Pure-Rust, no libssh2 C build pain                    |
+| FTP             | `suppaftp`                                                       | Async, FTPS-capable, maintained                       |
+| SMB             | `smb2`                                                           | Pure-Rust SMB 2/3 — no OS mount, no Samba install     |
+| Watcher         | `notify`                                                         | Cross-platform standard                               |
+| Credentials     | `keyring` crate                                                  | Native Keychain / Credential Manager / Secret Service |
+| Thumbnail cache | `rusqlite`                                                       | Tiny, embedded                                        |
+| Trash           | `trash` crate                                                    | Real OS trash on all 3 OSes                           |
+| Tests           | Vitest (frontend), `cargo test` (Rust), Playwright (e2e — later) | Matches sister repos                                  |
